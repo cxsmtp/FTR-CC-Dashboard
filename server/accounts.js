@@ -14,6 +14,7 @@
  */
 import path from 'node:path';
 
+import { impactSettings } from '../vendor/mz/public/calculator/model.js';
 import { MAX_PROFILES, migrate, newProfile, newReport, patchProfile, reportMeta, summary } from '../vendor/mz/public/calculator/profiles.js';
 import { Collection, fail } from './store.js';
 
@@ -54,6 +55,8 @@ const accountMeta = (a) => ({
   salesforceKind: a.salesforceKind ?? '',
   salesforceId: a.salesforceId ?? '',
   primaryReportId: a.primaryReportId ?? null,
+  impactEnabled: Boolean(a.impactEnabled),
+  impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed),
 });
 
 const reportIndex = (r) => ({
@@ -96,8 +99,19 @@ export class Accounts {
     const next = patchProfile(current, patch, user.name);
     return this.accounts.put(next);
   }
-  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name }, hosts) {
+  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency }, hosts) {
     const account = this.get(id, teamIds);
+    // Impact (beta): the soft savings in the report, off until the SE turns it on and confirms the currency.
+    if (impactCurrency !== undefined) {
+      const cur = String(impactCurrency).toUpperCase();
+      if (!/^[A-Z]{3}$/.test(cur)) throw fail(400, 'Choose a currency.');
+      account.impact = impactSettings({ ...account.impact, currency: cur });
+      account.impactCurrencyConfirmed = true;
+    }
+    if (impactEnabled !== undefined) {
+      if (impactEnabled && !account.impactCurrencyConfirmed) throw fail(409, 'Confirm the currency for this account first.');
+      account.impactEnabled = Boolean(impactEnabled);
+    }
     if (salesforceUrl !== undefined) {
       const sf = checkSalesforceUrl(salesforceUrl, hosts);
       Object.assign(account, { salesforceUrl: sf.url, salesforceKind: sf.kind, salesforceId: sf.recordId });

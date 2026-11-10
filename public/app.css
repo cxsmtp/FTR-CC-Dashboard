@@ -295,3 +295,4 @@ td .flex, .bar .name .flex { flex-wrap: nowrap; }
 .flex .grow { flex: 1; min-width: 200px; width: auto; }
 #forgot-link { justify-self: center; }
 .panel h2 .chip { margin-left: auto; }
+.grid.g3 { align-items: start; }

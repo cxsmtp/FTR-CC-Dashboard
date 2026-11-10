@@ -39,6 +39,25 @@ Teams form a tree (Global → EMEA → …). The Admin sets it up under **Teams*
 6. Check the figures: Triage & remediation, the Fusion tab used (**Use this instead** picks which one counts), the extra % and bundles.
 7. **Generate projection report.** It downloads the HTML report, and **Download PDF summary** gives the pages to present. Make as many reports as you need: each is kept.
 
+### Impact (beta): soft savings for an account
+
+Off by default, for each account. In the calculator, tick **Impact (beta)** in the account bar:
+
+1. **Confirm the currency.** One is suggested from the account's name (GmbH → EUR, Pvt Ltd → INR…), its team or region, or your time zone. Confirm it or pick another. **Currency: … · change** changes it later.
+2. On the **Impact** tab, set the **minutes to triage** a finding by hand, the **minutes to remediate** one, and the **developers' hourly rate**.
+3. The tab shows the savings estimate from the triage and remediation forecast of the existing vulnerabilities. Reports for that account then carry a **What the credits give back** section and slide in the PDF summary: the soft savings.
+
+Untick it and the account's reports carry no savings.
+
+### The status strip
+
+The strip at the top of the calculator stays in view as you work and when you generate a report. It shows:
+- the Checkmarx One connection (tenant);
+- where the account's data comes from (Checkmarx One, the exports, git or cloc-fusion);
+- whether the Salesforce link is there;
+- whether Impact is on;
+- whether the account is ready to generate.
+
 ## 4. Primary and shared reports
 
 Open **Accounts**, then the account:

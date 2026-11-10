@@ -186,3 +186,23 @@ test('the audit log records reports and sign-ins, and nothing in data holds a se
   const sessions = fs.readFileSync(path.join(env.dataDir, 'sessions.json'), 'utf8');
   assert.ok(!sessions.includes(admin.cookie.split('=')[1]));
 });
+
+test('Impact (beta): off by default, on only after the SE confirms a currency, kept per account', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = team(env.teams.emea.id);
+  const { data } = await se1.post('/api/projections', { name: 'Helios Energie GmbH' }, h);
+  const id = data.customer.id;
+  let a = (await se1.get(`/api/cc/accounts/${id}`)).data.account;
+  assert.equal(a.impactEnabled, false);
+  const hint = (await se1.get(`/api/cc/accounts/${id}/currency?tz=America/New_York`)).data;
+  assert.equal(hint.currency, 'EUR');
+  assert.equal((await se1.put(`/api/cc/accounts/${id}`, { impactEnabled: true })).status, 409);
+  assert.equal((await se1.put(`/api/cc/accounts/${id}`, { impactCurrency: 'xx1' })).status, 400);
+  a = (await se1.put(`/api/cc/accounts/${id}`, { impactCurrency: 'EUR', impactEnabled: true })).data.account;
+  assert.equal(a.impactEnabled, true);
+  assert.equal(a.impactCurrency, 'EUR');
+  assert.equal((await se1.get(`/api/projections/${id}`, h)).data.customer.impact.currency, 'EUR');
+  // Another team cannot ask.
+  const apac = await client(env.base, 'apac@t.example');
+  assert.equal((await apac.get(`/api/cc/accounts/${id}/currency`)).status, 404);
+});

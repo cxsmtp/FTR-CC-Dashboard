@@ -13,6 +13,7 @@ import { PERMISSIONS, need, needTeam, peopleInScope, scopeOf, subtree, teamPath 
 import { Teams } from './teams.js';
 import { Accounts, DEFAULT_SALESFORCE_HOSTS } from './accounts.js';
 import { Terms } from './terms.js';
+import { suggestCurrency } from './currency.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
 import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
 import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, MZ_SOURCE, impactSettings, pageFor, summary } from './calculator.js';
@@ -366,13 +367,18 @@ export function createApp(config, { log = console.log, calculatorService = null,
     const members = iam.users().filter((u) => u.active !== false && u.teamId === a.teamId).map((u) => ({ id: u.id, name: u.name }));
     if (a.ownerId && !members.some((m) => m.id === a.ownerId)) members.push({ id: a.ownerId, name: userName(a.ownerId) });
     return {
-      account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
+      account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, impactEnabled: Boolean(a.impactEnabled), impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed), impactCurrency: a.impact?.currency ?? 'USD', reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
       reports: reps,
       members,
       can: { edit: ctx.permissions.has('calculator.use'), share: ctx.permissions.has('reports.share'), deleteAccount: ctx.permissions.has('accounts.delete') },
     };
   };
   r('GET', '/api/cc/accounts/:id', ready2, (req, ctx, body, res, url, params) => accountDetail(ctx, params.id));
+  /** A currency to suggest for the account's impact, for the SE to confirm. */
+  r('GET', '/api/cc/accounts/:id/currency', perm('calculator.use'), (req, ctx, body, res, url, params) => {
+    const a = accounts.get(params.id, ctx.scope);
+    return suggestCurrency({ accountName: a.name, teamNames: teamPath(ctx.teams, a.teamId).reverse().flatMap((t) => [t.name, t.region].filter(Boolean)), timeZone: String(url.searchParams.get('tz') ?? '').slice(0, 64) });
+  });
   r('PUT', '/api/cc/accounts/:id', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const before = accounts.get(params.id, ctx.scope);
     const patch = {};
@@ -387,6 +393,8 @@ export function createApp(config, { log = console.log, calculatorService = null,
       needTeam(ctx.scope, String(body.teamId));
       patch.teamId = String(body.teamId);
     }
+    if (body?.impactCurrency !== undefined) patch.impactCurrency = body.impactCurrency;
+    if (body?.impactEnabled !== undefined) patch.impactEnabled = body.impactEnabled === true;
     const after = accounts.setDetails(params.id, ctx.scope, patch, hosts().salesforce);
     record(ctx, req, 'account.update', after.name, { id: after.id, changed: Object.keys(patch), ...(patch.teamId && patch.teamId !== before.teamId ? { fromTeam: before.teamId, toTeam: patch.teamId } : {}) });
     return accountDetail(ctx, params.id);

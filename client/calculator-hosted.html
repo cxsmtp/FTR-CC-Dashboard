@@ -22,6 +22,7 @@
       <button type="button" class="ghost sm" id="sa-theme" aria-label="Light or dark" title="Light or dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" /></svg></button>
       <button type="button" class="ghost sm" id="hc-signout">Sign out</button>
     </nav>
+    <div class="hc-status" id="hc-status" role="status" aria-live="polite"></div>
     <header class="topbar sa-top">
       <div class="topbar-title">
         <div class="title-row"><h1>Cx Credits Calculator</h1></div>
@@ -33,6 +34,7 @@
           <span class="hc-sf-row"><input id="hc-sf" type="url" inputmode="url" spellcheck="false" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><button type="button" class="primary sm" id="hc-sf-save">Save</button><a id="hc-sf-open" class="ghost sm hc-btn" target="_blank" rel="noopener noreferrer" hidden>Open in Salesforce ↗</a></span>
         </label>
         <label class="field hc-owner"><span>Accountable SE</span><select id="hc-owner"></select></label>
+        <div class="hc-impact"><label class="hc-switch"><input type="checkbox" id="hc-impact" /><span><b>Impact</b> <i class="hc-beta">beta</i><small>Soft savings in the report, from triage and remediation of the existing vulnerabilities</small></span></label><button type="button" class="ghost sm" id="hc-currency" hidden></button></div>
         <div class="hc-reports" id="hc-reports" aria-live="polite"></div>
       </div>
       <form class="sa-connect" id="sa-connect" autocomplete="off">
@@ -55,6 +57,7 @@
     <footer class="sa-foot"><span>FTR Credits Command Center · calculator from CxMissionZero {{MZ}} · PolyForm Internal Use License 1.0.0 · <a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a></span><span>Supporting information only: Checkmarx's own records are authoritative.</span></footer>
   </div>
 </div>
+<dialog id="hc-cur-dialog" class="hc-dialog"><form method="dialog"><h2>Impact currency</h2><p id="hc-cur-why"></p><label class="field"><span>Currency for this account</span><select id="hc-cur-select"></select></label><p class="hint">Then set the minutes to triage and to remediate a finding and the developers' hourly rate on the <b>Impact</b> tab. The soft savings appear in the report and its PDF once Impact is on.</p><div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary" id="hc-cur-ok">Confirm and turn Impact on</button></div></form></dialog>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <!--SCRIPTS-->
 </body>

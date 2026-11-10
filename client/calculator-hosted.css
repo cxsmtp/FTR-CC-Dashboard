@@ -43,3 +43,30 @@
 .hc-pill.warn { color: #b45309; border-color: rgba(180, 83, 9, .35); }
 .hc-pill.bad { color: #b91c1c; border-color: rgba(185, 28, 28, .35); }
 @media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; } }
+
+/* The status strip: always on top while working and generating. */
+.hc-status { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 10px 0 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px -14px rgba(0, 0, 0, .35); font-size: 12.5px; }
+.hc-status .hc-st { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+.hc-status .hc-st i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.hc-status .hc-st.ok { color: #047857; border-color: rgba(4, 120, 87, .35); background: rgba(16, 185, 129, .08); }
+.hc-status .hc-st.warn { color: #b45309; border-color: rgba(180, 83, 9, .35); background: rgba(245, 158, 11, .08); }
+.hc-status .hc-st.bad { color: #b91c1c; border-color: rgba(185, 28, 28, .35); background: rgba(239, 68, 68, .07); }
+.hc-status .hc-st.off { color: var(--muted); }
+.hc-status .hc-label { color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 11px; }
+.hc-status .hc-ready { margin-left: auto; font-weight: 600; }
+.hc-status.flash { animation: hcflash 1.2s ease 2; }
+@keyframes hcflash { 50% { box-shadow: 0 0 0 4px rgba(34, 211, 238, .45); } }
+:root[data-theme="dark"] .hc-status .hc-st.ok { color: #34d399; }
+:root[data-theme="dark"] .hc-status .hc-st.warn { color: #fbbf24; }
+:root[data-theme="dark"] .hc-status .hc-st.bad { color: #f87171; }
+
+.hc-impact { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hc-switch { display: inline-flex; gap: 10px; align-items: center; cursor: pointer; }
+.hc-switch input { width: 18px; height: 18px; }
+.hc-switch small { display: block; color: var(--muted); font-size: 12px; }
+.hc-beta { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; color: #7c3aed; border: 1px solid rgba(124, 58, 237, .4); }
+.hc-dialog { border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; max-width: 460px; background: var(--surface); color: inherit; }
+.hc-dialog::backdrop { background: rgba(6, 10, 25, .5); }
+.hc-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+.hc-dialog .field { display: grid; gap: 6px; margin: 10px 0; }
+.hc-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }

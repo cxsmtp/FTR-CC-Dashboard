@@ -47,7 +47,7 @@ export function startHosted() {
     }
   })();
   if (!teams.some((t) => t.id === team)) team = teams.some((t) => t.id === cfg.ownTeamId) ? cfg.ownTeamId : teams[0]?.id ?? '';
-  $('hc-team').innerHTML = teams.map((t) => `<option value="${esc(t.id)}"${t.id === team ? ' selected' : ''}>${esc(t.path)}</option>`).join('');
+  $('hc-team').innerHTML = teams.map((t) => `<option value="${esc(t.id)}" title="${esc(t.path)}"${t.id === team ? ' selected' : ''}>${esc(t.path.split(' › ').pop())}</option>`).join('');
   $('hc-team').disabled = teams.length < 2;
   if (params.get('account')) {
     try {
@@ -75,6 +75,8 @@ export function startHosted() {
 
   // The calculator's own requests (/api/projections…), with the account opened followed for the account bar.
   let newByClick = false;
+  let openCustomer = null;
+  let calculator = null;
   const RESERVED = new Set(['reports', 'read', 'series', 'git', 'report-runtime', 'standalone', 'fusion']);
   const api = async (path, options = {}) => {
     const { method = 'GET' } = options;
@@ -85,6 +87,8 @@ export function startHosted() {
       newByClick = false;
     }
     const answer = await server(url.pathname + url.search, { method, body: options.body });
+    if (answer?.customer && (method === 'GET' || method === 'POST') && url.pathname.startsWith('/api/projections')) openCustomer = answer.customer;
+    if (method === 'PUT' && answer?.customer) openCustomer = { ...openCustomer, ...answer.customer };
     const m = url.pathname.match(/^\/api\/projections\/([^/]+)$/);
     if (m && !RESERVED.has(m[1])) {
       if (method === 'GET') showAccount(decodeURIComponent(m[1]));
@@ -116,6 +120,10 @@ export function startHosted() {
       $('hc-sf-open').hidden = true;
       $('hc-owner').innerHTML = '';
       $('hc-reports').innerHTML = '<span>Open or add an account below.</span>';
+      $('hc-impact').checked = false;
+      $('hc-impact').disabled = true;
+      $('hc-currency').hidden = true;
+      renderStatus();
       return;
     }
     try {
@@ -136,10 +144,103 @@ export function startHosted() {
       if (p) parts.push(`<span>${p.how === 'marked' ? 'Primary' : 'Primary (latest, none marked)'}: <b>${num(p.totalCredits)}</b> credits · ${esc(fmtDateTime(p.createdAt))} by ${esc(p.createdBy)}</span>`);
       parts.push(`<a href="/#/accounts/${encodeURIComponent(a.id)}">Mark primary and shared →</a>`);
       $('hc-reports').innerHTML = parts.join('');
+      $('hc-impact').disabled = false;
+      $('hc-impact').checked = Boolean(a.impactEnabled);
+      $('hc-currency').hidden = !a.impactCurrencyConfirmed;
+      $('hc-currency').textContent = `Currency: ${a.impactCurrency} · change`;
+      if (impactShown !== Boolean(a.impactEnabled)) {
+        impactShown = Boolean(a.impactEnabled);
+        calculator?.refresh();
+      }
+      renderStatus();
     } catch (error) {
       if (error.status !== 401) $('hc-reports').textContent = error.message;
     }
   }
+  // ---- Impact (beta): per account, off by default, the currency suggested and confirmed by the SE ----------------------
+  let impactShown = false;
+  async function chooseCurrency() {
+    let hint = { currency: account?.impactCurrency || 'USD', why: '' };
+    try {
+      hint = await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/currency?tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || '')}`);
+    } catch {}
+    const pick = account.impactCurrencyConfirmed ? account.impactCurrency : hint.currency;
+    const options = [...document.querySelectorAll('#calc-imp-currency option')].map((o) => o.value);
+    if (!options.includes(pick)) options.unshift(pick);
+    $('hc-cur-select').innerHTML = options.map((c) => `<option value="${esc(c)}"${c === pick ? ' selected' : ''}>${esc(c)}</option>`).join('');
+    $('hc-cur-why').textContent = account.impactCurrencyConfirmed ? `This account's soft savings are in ${account.impactCurrency}. Change it if needed.` : `Suggested: ${hint.currency}, from ${hint.why}. Please confirm or choose another.`;
+    $('hc-cur-ok').textContent = account.impactEnabled || account.impactCurrencyConfirmed ? 'Confirm' : 'Confirm and turn Impact on';
+    const dlg = $('hc-cur-dialog');
+    return new Promise((resolve) => {
+      dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok' ? $('hc-cur-select').value : null), { once: true });
+      dlg.showModal();
+    });
+  }
+  async function setImpact(patch) {
+    await server(`/api/cc/accounts/${encodeURIComponent(account.id)}`, { method: 'PUT', body: patch });
+    await showAccount(account.id);
+    // The calculator reloads the account, so its Impact tab has the currency now kept with it.
+    await calculator.load();
+  }
+  $('hc-impact').addEventListener('change', async (event) => {
+    if (!account) return;
+    const on = event.target.checked;
+    event.target.checked = !on;
+    try {
+      if (on && !account.impactCurrencyConfirmed) {
+        const cur = await chooseCurrency();
+        if (!cur) return;
+        await setImpact({ impactCurrency: cur, impactEnabled: true });
+      } else await setImpact({ impactEnabled: on });
+      toast(on ? 'Impact is on for this account: set the minutes and the hourly rate on the Impact tab. Soft savings go into its reports.' : 'Impact is off for this account: its reports carry no savings.', 'ok', 8000);
+      if (on) document.querySelector('[data-ptabs="calculator"] [data-pt="impact"]')?.click();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  $('hc-currency').addEventListener('click', async () => {
+    if (!account) return;
+    const cur = await chooseCurrency();
+    if (!cur) return;
+    try {
+      await setImpact({ impactCurrency: cur });
+      toast(`Currency set to ${cur}.`, 'ok');
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+
+  // ---- The status strip: the Checkmarx One connection and what this account's report will hold, always on top -----------
+  let cxState = { connected: false, tenant: '' };
+  function renderStatus() {
+    const chip = (kind, text) => `<span class="hc-st ${kind}"><i></i>${esc(text)}</span>`;
+    const cu = openCustomer && account && openCustomer.id === account.id ? openCustomer : null;
+    const trSource = cu?.tr?.totals?.meta?.source;
+    const fusionCx = cu?.fusion?.projects?.length ?? cu?.fusionProjects ?? 0;
+    const fusionNew = cu?.fusionNew?.projects?.length ?? 0;
+    const parts = [
+      '<span class="hc-label">Status</span>',
+      cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
+    ];
+    if (account) {
+      parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : chip('off', 'T&R: no data yet'));
+      parts.push(fusionCx || fusionNew ? chip('ok', `Fusion: ${[fusionCx ? `${fusionCx} Checkmarx One projects` : '', fusionNew ? `${fusionNew} repositories (git / cloc-fusion)` : ''].filter(Boolean).join(' + ')}`) : chip('off', 'Fusion: none yet'));
+      parts.push(account.salesforceUrl ? chip('ok', 'Salesforce: linked') : chip('bad', 'Salesforce: link missing'));
+      parts.push(account.impactEnabled ? chip('ok', `Impact (beta): on · ${account.impactCurrency}`) : chip('off', 'Impact (beta): off'));
+      parts.push(`<span class="hc-ready">${account.salesforceUrl ? (trSource || fusionCx || fusionNew ? 'Ready to generate' : 'Bring in data to generate') : 'Add the Salesforce link to generate'}</span>`);
+    } else parts.push(chip('off', 'No account open'));
+    $('hc-status').innerHTML = parts.join('');
+  }
+  // Generating a report: the status above it, in view, so what the report is built from is plain.
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest?.('#calc-generate, #calc-pdf')) return;
+    renderStatus();
+    const strip = $('hc-status');
+    strip.classList.remove('flash');
+    void strip.offsetWidth;
+    strip.classList.add('flash');
+  }, true);
+
   $('hc-sf-save').addEventListener('click', async () => {
     if (!account) return;
     try {
@@ -185,7 +286,7 @@ export function startHosted() {
     else delete document.documentElement.dataset.theme;
   };
   try {
-    applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+    applyTheme(localStorage.getItem(THEME_KEY) || 'light');
   } catch {
     applyTheme('light');
   }
@@ -230,7 +331,7 @@ export function startHosted() {
 
   // ---- The calculator ---------------------------------------------------------------------------------
   let connected = false;
-  const calculator = initCalculator({
+  calculator = initCalculator({
     api,
     $,
     esc,
@@ -244,6 +345,8 @@ export function startHosted() {
     standalone: true,
     canRead: () => connected,
     canGit: () => true,
+    // Impact (beta): on only for an account whose SE turned it on (and confirmed its currency).
+    impactOn: () => Boolean(account?.impactEnabled),
     sampleFile: (name) => fetch(`/calc-assets/samples/${encodeURIComponent(name)}`, { credentials: 'same-origin' }),
   });
   showAccount(null);
@@ -252,6 +355,8 @@ export function startHosted() {
   const shell = document.querySelector('.shell');
   const showState = (state) => {
     connected = Boolean(state?.connected);
+    cxState = { connected, tenant: state?.tenant ?? '' };
+    renderStatus();
     shell.classList.toggle('can-read', connected);
     $('sa-disconnect').hidden = !connected;
     $('sa-key').placeholder = connected ? 'Connected: paste another key to switch' : 'Paste the API key (not kept: in memory for your session only)';
@@ -285,6 +390,10 @@ export function startHosted() {
   });
   server('/api/cc/cxone/status').then(showState, (error) => setStatus('sa-connect-status', error.message, 'error'));
 
+  const impactTab = document.querySelector('[data-ptabs="calculator"] [data-pt="impact"]');
+  if (impactTab) impactTab.innerHTML = 'Impact <i class="hc-beta">beta</i>';
+  for (const hint of document.querySelectorAll('#page-calculator .hint')) if (hint.textContent.includes('They start from Settings → Impact')) hint.textContent = 'Kept with this account: the minutes to triage and to remediate a finding by hand, and the developers\u2019 hourly rate, in the currency confirmed above.';
+  renderStatus();
   startHelpTips();
   calculator.load();
 }

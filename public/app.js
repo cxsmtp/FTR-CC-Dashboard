@@ -82,12 +82,12 @@ const go = (path) => {
 // ---- Theme ----------------------------------------------------------------------------------------------
 const THEME_KEY = 'cxcalc-theme';
 function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
 }
 try {
-  applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+  applyTheme(localStorage.getItem(THEME_KEY) || 'light');
 } catch {
-  applyTheme('dark');
+  applyTheme('light');
 }
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
@@ -502,7 +502,7 @@ async function viewAccount(id) {
           </div>
           ${d.can.edit ? '<div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="err"></span></div>' : ''}
         </form>
-        ${a.salesforceUrl ? `<dl class="kv mt"><dt>Salesforce</dt><dd>${esc(a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account')} <span class="mono">${esc(a.salesforceId)}</span></dd><dt>Created</dt><dd>${esc(dateTime(a.createdAt))} by ${esc(a.createdBy)}</dd><dt>Updated</dt><dd>${esc(dateTime(a.updatedAt))}</dd></dl>` : ''}
+        ${a.salesforceUrl ? `<dl class="kv mt"><dt>Salesforce</dt><dd>${esc(a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account')} <span class="mono">${esc(a.salesforceId)}</span></dd><dt>Created</dt><dd>${esc(dateTime(a.createdAt))} by ${esc(a.createdBy)}</dd><dt>Updated</dt><dd>${esc(dateTime(a.updatedAt))}</dd><dt>Impact <span class="chip star">beta</span></dt><dd>${a.impactEnabled ? `On · soft savings in ${esc(a.impactCurrency)} go into its reports` : 'Off: turn it on in the calculator for soft savings in the reports'}</dd></dl>` : ''}
         ${d.can.deleteAccount ? '<div class="mt"><button class="danger sm" id="del-acct">Delete account and its reports</button></div>' : ''}
       </div>
     </div>
