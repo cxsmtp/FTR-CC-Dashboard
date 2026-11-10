@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export const fail = (status, message) => Object.assign(new Error(message), { status });
 
@@ -98,15 +98,63 @@ export class Collection {
   }
 }
 
-/** The audit trail: one JSON line per event, appended, never rewritten. */
+/**
+ * The audit trail: one JSON line per event, appended, never rewritten, each chained to the one before by SHA-256
+ * (as CxMissionZero's audit log is), so an edited, removed or reordered line shows when the log is verified.
+ */
 export class AuditLog {
+  #last = '';
   constructor(file) {
     this.file = file;
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    this.#last = this.#tail();
+  }
+  #tail() {
+    try {
+      const text = fs.readFileSync(this.file, 'utf8').trimEnd();
+      const line = text.slice(text.lastIndexOf('\n') + 1);
+      return line ? JSON.parse(line).hash ?? '' : '';
+    } catch {
+      return '';
+    }
+  }
+  static hashOf(prev, event) {
+    return createHash('sha256').update(`${prev}\n${JSON.stringify(event)}`).digest('hex');
   }
   record({ actor = null, action, target = '', details = {}, ip = '' }) {
-    const line = JSON.stringify({ at: new Date().toISOString(), actor, action, target, details, ip });
-    fs.appendFileSync(this.file, `${line}\n`, { mode: 0o600 });
+    const event = { at: new Date().toISOString(), actor, action, target, details, ip };
+    const hash = AuditLog.hashOf(this.#last, event);
+    fs.appendFileSync(this.file, `${JSON.stringify({ ...event, prev: this.#last, hash })}\n`, { mode: 0o600 });
+    this.#last = hash;
+  }
+  /** Walk the whole log: every line chained to the one before. */
+  verify() {
+    let text = '';
+    try {
+      text = fs.readFileSync(this.file, 'utf8');
+    } catch {
+      return { ok: true, events: 0 };
+    }
+    let prev = '';
+    let n = 0;
+    for (const line of text.split('\n')) {
+      if (!line) continue;
+      n++;
+      let e;
+      try {
+        e = JSON.parse(line);
+      } catch {
+        return { ok: false, events: n, brokenAt: n, why: 'a line is not JSON' };
+      }
+      if (e.hash === undefined) {
+        prev = '';
+        continue; // written before the chain existed
+      }
+      const { prev: p, hash, ...event } = e;
+      if (p !== prev || AuditLog.hashOf(prev, event) !== hash) return { ok: false, events: n, brokenAt: n, at: e.at, why: p !== prev ? 'a line before it was removed or changed' : 'this line was changed' };
+      prev = hash;
+    }
+    return { ok: true, events: n };
   }
   /** The newest events first, up to `limit`, those matching `filter`. */
   recent({ limit = 200, filter = () => true } = {}) {
@@ -121,7 +169,9 @@ export class AuditLog {
     for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
       if (!lines[i]) continue;
       try {
-        const event = JSON.parse(lines[i]);
+        const { prev, hash, ...event } = JSON.parse(lines[i]);
+        void prev;
+        void hash;
         if (filter(event)) out.push(event);
       } catch {}
     }

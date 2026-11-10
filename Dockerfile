@@ -5,9 +5,9 @@ WORKDIR /app
 COPY --chown=cc:cc . .
 RUN mkdir -p /data && chown cc:cc /data
 USER cc
-ENV NODE_ENV=production DATA_DIR=/data PORT=8080
-EXPOSE 8080
+ENV NODE_ENV=production DATA_DIR=/data PORT=8443 HTTPS=on
+EXPOSE 8443
 VOLUME ["/data"]
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=5s CMD wget --no-check-certificate -qO- https://127.0.0.1:8443/healthz || exit 1
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "server/index.js"]
+CMD ["node", "server/launch.js"]

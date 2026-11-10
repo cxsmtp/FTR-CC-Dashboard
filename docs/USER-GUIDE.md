@@ -12,6 +12,14 @@ The command center is where every Sales Engineer works out the credits an accoun
 
 **Forgot your password?** On the sign-in page, click **Forgot your password?** and enter your work email. A link to choose a new one arrives by email. It works once, for 30 minutes, and signs you out everywhere else. Nothing arrived? Check spam, or ask an Admin to reset it: they give you a new one-time password. Locked out after 5 wrong tries? Wait 15 minutes.
 
+### Single sign-on
+
+If your Admin turned on single sign-on, click **Sign in with SSO** (or the name your Admin gave it) on the sign-in page and use your company account. You still accept the terms of use the first time.
+
+### Your theme
+
+**Theme** at the bottom of the menu: light, dark or your system's, in six palettes. Your choice follows you to every device. The version (CC-xx.xx.xx) is under it: click it for **About** and what is new.
+
 ## 2. Who sees what
 
 | You are | You see and work on |

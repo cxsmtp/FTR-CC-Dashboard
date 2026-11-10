@@ -45,7 +45,8 @@
 @media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; } }
 
 /* The status strip: always on top while working and generating. */
-.hc-status { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 10px 0 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px -14px rgba(0, 0, 0, .35); font-size: 12.5px; }
+.hc-status-wrap { position: sticky; top: 0; z-index: 20; margin: 10px 0 0; }
+.hc-status { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px -14px rgba(0, 0, 0, .35); font-size: 12.5px; }
 .hc-status .hc-st { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
 .hc-status .hc-st i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .hc-status .hc-st.ok { color: #047857; border-color: rgba(4, 120, 87, .35); background: rgba(16, 185, 129, .08); }
@@ -70,3 +71,35 @@
 .hc-dialog h2 { margin: 0 0 8px; font-size: 18px; }
 .hc-dialog .field { display: grid; gap: 6px; margin: 10px 0; }
 .hc-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* Calculating: the working pill under the status strip, the report overlay, totals that count up. */
+.hc-work { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; color: #fff; background: linear-gradient(120deg, #0891b2, #4f46e5 55%, #7c3aed); background-size: 200% 100%; animation: hcflow 2.4s linear infinite; box-shadow: 0 8px 24px -12px rgba(79, 70, 229, .7); }
+.hc-work[hidden] { display: none; }
+.hc-work b { font-weight: 600; }
+.hc-bar { flex: 1; max-width: 260px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+.hc-bar i { display: block; height: 100%; width: 0; background: #fff; border-radius: 99px; transition: width .4s ease; }
+@keyframes hcflow { to { background-position: -200% 0; } }
+.hc-orbit { position: relative; display: inline-block; width: 18px; height: 18px; flex: none; }
+.hc-orbit i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; border-top-color: currentColor; animation: hcspin .9s linear infinite; }
+.hc-orbit i:nth-child(2) { inset: 4px; animation-duration: 1.4s; animation-direction: reverse; opacity: .7; }
+.hc-orbit i:nth-child(3) { inset: 12px; animation-duration: .7s; }
+.hc-orbit.big { width: 72px; height: 72px; color: #6366f1; }
+.hc-orbit.big i { border-width: 3px; }
+.hc-orbit.big i:nth-child(2) { inset: 10px; border-top-color: #06b6d4; }
+.hc-orbit.big i:nth-child(3) { inset: 22px; border-top-color: #a855f7; }
+@keyframes hcspin { to { transform: rotate(360deg); } }
+.hc-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgba(8, 12, 30, .35); backdrop-filter: blur(4px); animation: hcfade .2s ease; }
+@keyframes hcfade { from { opacity: 0; } }
+.hc-card { display: grid; justify-items: center; gap: 12px; min-width: min(420px, 90vw); padding: 28px 30px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 30px 80px -30px rgba(30, 27, 75, .6); text-align: center; }
+.hc-card h2 { margin: 0; font-size: 18px; }
+.hc-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; color: var(--muted); text-align: left; }
+.hc-steps li { opacity: .45; transition: opacity .3s; }
+.hc-steps li::before { content: "○ "; }
+.hc-steps li.on { opacity: 1; color: inherit; }
+.hc-steps li.on::before { content: "● "; color: #6366f1; }
+.hc-card.done .hc-orbit i { animation: none; border-color: #10b981; }
+.hc-card.failed .hc-orbit i { animation: none; border-color: #ef4444; }
+.hc-note { margin: 0; font-weight: 600; font-size: 15px; }
+.hc-pop { animation: hcpop .5s ease; }
+@keyframes hcpop { 50% { transform: scale(1.06); text-shadow: 0 0 18px rgba(99, 102, 241, .5); } }
+@media (prefers-reduced-motion: reduce) { .hc-work, .hc-orbit i, .hc-pop { animation: none !important; } }

@@ -14,16 +14,29 @@ import { Teams } from './teams.js';
 import { Accounts, DEFAULT_SALESFORCE_HOSTS } from './accounts.js';
 import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
+import { Sso, mergeSso } from './sso.js';
+import { UpdateService, VersionStore } from './updates.js';
+import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
 import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
+import { HSTS_AGES, HttpsManager } from '../vendor/mz/src/https-manager.js';
+import { AcmeService, CHALLENGE_PREFIX, RENEW_DAYS, cleanNames, validName } from '../vendor/mz/src/acme.js';
 import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, MZ_SOURCE, impactSettings, pageFor, summary } from './calculator.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+/** The version as people see it, MZ's way: CC-01.01.00. */
+export const versionLabel = (v = VERSION) => `CC-${String(v).split('.').map((n) => n.padStart(2, '0')).join('.')}`;
 const COOKIE = 'cc_session';
 const BODY_LIMIT = 256 * 1024;
 const CALC_LIMIT = 40 * 1024 * 1024;
 
-export function createApp(config, { log = console.log, calculatorService = null, mailTransport = smtpTransport } = {}) {
+export function createApp(config, { log: baseLog = console.log, calculatorService = null, mailTransport = smtpTransport, updateService = null } = {}) {
+  // Errors kept for the troubleshooting report (the last 50, without request bodies).
+  const recentErrors = [];
+  const log = (line) => {
+    if (/error|\!|failed/i.test(String(line))) recentErrors.push({ at: new Date().toISOString(), line: String(line).slice(0, 300) }), recentErrors.splice(0, Math.max(0, recentErrors.length - 50));
+    baseLog(line);
+  };
   fs.mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
   const iam = new Iam(config.dataDir);
   const teams = new Teams(config.dataDir);
@@ -39,6 +52,30 @@ export function createApp(config, { log = console.log, calculatorService = null,
   const calc = calculatorService ?? new CalculatorService({ cxoneHosts: hosts().cxone, gitHosts: hosts().git, log });
   const syncHosts = () => Object.assign(calc, { cxoneHosts: hosts().cxone, gitHosts: hosts().git });
   const idleMs = config.sessionIdleHours * 3600 * 1000;
+  const startJobs = [];
+  const stopJobs = [];
+
+  // ---- Single sign-on (SAML) --------------------------------------------------------------------------------------
+  const sso = new Sso({ settings: () => settings.value.sso, publicUrl: config.publicUrl });
+  const isAdminUser = (user) => user.role === 'admin' || iam.permissionsOf({ ...user, active: true }).has('users.manage');
+
+  // ---- HTTPS (CxMissionZero's HttpsManager and Let's Encrypt client, as they are) ------------------------------------
+  const httpsManager = new HttpsManager({ dataDir: config.dataDir, env: config.env ?? process.env, log: { log, warn: log } });
+  const ACME_DIRECTORY = String(config.env?.ACME_DIRECTORY_URL ?? '').trim();
+  const acme = new AcmeService({ dataDir: config.dataDir, https: httpsManager, log: { log, warn: log }, ...(ACME_DIRECTORY ? { directories: { production: ACME_DIRECTORY, staging: ACME_DIRECTORY } } : {}) });
+  const LETSENCRYPT_DOMAIN = String(config.env?.LETSENCRYPT_DOMAIN ?? '').trim();
+  acme.onEvent((event) => {
+    const names = event.names.join(', ');
+    if (event.kind === 'issued') {
+      audit.record({ action: 'https.letsencrypt.issued', target: names, details: { staging: event.staging, validTo: event.validTo } });
+      try {
+        if (event.by === 'LETSENCRYPT_DOMAIN' && !event.staging) httpsManager.setMode('https', { system: true, by: "Let's Encrypt" });
+        else if (httpsManager.mode === 'http') httpsManager.setMode('both', { by: "Let's Encrypt" });
+      } catch (error) {
+        log(`! [https] ${error.message}`);
+      }
+    } else audit.record({ action: 'https.letsencrypt.failed', target: names, details: { error: event.error } });
+  });
 
   // ---- Email (Settings → Email server) and forgotten passwords, as CxMissionZero does them ---------------------
   const secrets = new Secrets(config.dataDir);
@@ -116,7 +153,7 @@ export function createApp(config, { log = console.log, calculatorService = null,
   const actorOf = (ctx) => (ctx ? { id: ctx.user.id, email: ctx.user.email, name: ctx.user.name } : null);
   const record = (ctx, req, action, target = '', details = {}) => audit.record({ actor: actorOf(ctx), action, target, details, ip: ipOf(req) });
 
-  const cookie = (value, maxAge) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict${config.secureCookies ? '; Secure' : ''}; Max-Age=${maxAge}`;
+  const cookie = (value, maxAge, req) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict${config.secureCookies || req?.socket?.encrypted || httpsManager.mode === 'https' ? '; Secure' : ''}; Max-Age=${maxAge}`;
 
   // Guards: signed in; then (for everything but the first-sign-in steps) a password of their own and the terms.
   const signedIn = (req, ctx) => {
@@ -154,8 +191,12 @@ export function createApp(config, { log = console.log, calculatorService = null,
       audit.record({ action: 'auth.failed', target: clean(body?.email, 254).toLowerCase(), ip, details: { status: error.status } });
       throw error;
     });
+    if (sso.ready() && sso.config().passwordSignIn === 'admins' && !isAdminUser(user)) {
+      audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.password.refused', ip, details: { why: 'single sign-on only' } });
+      throw fail(403, `Use ${sso.config().label}: passwords are kept for Admins.`);
+    }
     const { token } = iam.openSession(user.id, { idleMs, ip, agent: req.headers['user-agent'] });
-    res.setHeader('Set-Cookie', cookie(token, Math.floor(idleMs / 1000)));
+    res.setHeader('Set-Cookie', cookie(token, Math.floor(idleMs / 1000), req));
     audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.signin', ip });
     return { ok: true };
   });
@@ -165,12 +206,76 @@ export function createApp(config, { log = console.log, calculatorService = null,
       if (!iam.sessions.value || !Object.values(iam.sessions.value.sessions).some((s) => s.userId === ctx.user.id)) calc.forget(ctx.user.id);
       record(ctx, req, 'auth.signout');
     }
-    res.setHeader('Set-Cookie', cookie('', 0));
+    res.setHeader('Set-Cookie', cookie('', 0, req));
     return { ok: true };
   });
 
   // ---- Forgot your password? A one-time link to the account's own email (server/password-reset.js) ------------------
   r('GET', '/api/auth/reset', () => ({ available: resetReady().ready }));
+  r('GET', '/api/auth/sso', () => ({ enabled: sso.ready(), label: sso.config().label, passwordsForAdminsOnly: sso.ready() && sso.config().passwordSignIn === 'admins' }));
+  r('GET', '/saml/login', async (req, ctx, body, res) => send(res, 302, '', { Location: await sso.loginUrl() }));
+  r('GET', '/saml/metadata', (req, ctx, body, res) => send(res, 200, sso.metadata(), { 'Content-Type': 'application/samlmetadata+xml; charset=utf-8' }));
+  r('GET', '/api/settings/sso', perm('security.sso'), () => ({ ...sso.view(), roles: Object.entries(iam.roles()).filter(([id, role]) => id !== 'admin' && !role.permissions.includes('users.manage')).map(([id, role]) => ({ id, name: role.name })), teams: teams.list().map((t) => ({ id: t.id, path: teamPath(teams.list(), t.id).map((x) => x.name).join(' › ') })) }));
+  r('PUT', '/api/settings/sso', perm('security.sso'), (req, ctx, body) => {
+    settings.value.sso = mergeSso(settings.value.sso ?? {}, body ?? {}, { roles: iam.roles(), teams: teams.list() });
+    settings.save();
+    record(ctx, req, 'settings.sso', settings.value.sso.enabled ? 'on' : 'off', { changed: Object.keys(body ?? {}) });
+    return r2sso();
+  });
+  const r2sso = () => sso.view();
+
+  /** The identity provider's answer (a form POST from its site): checked, then the person is signed in. */
+  async function samlAcs(req, res) {
+    const ip = ipOf(req);
+    let text = '';
+    try {
+      let size = 0;
+      for await (const chunk of req) {
+        size += chunk.length;
+        if (size > 1024 * 1024) throw fail(413, 'Too large.');
+        text += chunk;
+      }
+    } catch (error) {
+      return send(res, error.status ?? 400, 'Bad request', { 'Content-Type': 'text/plain; charset=utf-8' });
+    }
+    const page = (title, message, target = '/#/login') =>
+      send(res, 200, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="${message ? 5 : 0};url=${target}"><title>${title}</title><link rel="stylesheet" href="/app.css"></head><body><div class="wizard"><div class="panel"><h1 class="serif">${title}</h1><p class="muted">${message ? message.replace(/[&<>"']/g, '') : 'Signing you in…'}</p><p><a href="${target}">Continue</a></p></div></div></body></html>`, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'" });
+    let who;
+    try {
+      who = await sso.verify(new URLSearchParams(text).get('SAMLResponse'));
+    } catch (error) {
+      audit.record({ action: 'auth.sso.refused', ip, details: { error: error.message } });
+      return page('Single sign-on failed', `${error.message} Ask an Admin, or sign in with your password if you have one.`);
+    }
+    let user = iam.byEmail(who.email);
+    if (!user && sso.config().jit) {
+      const c = sso.config();
+      try {
+        ({ user } = await iam.create({ email: who.email, name: who.name || who.email.split('@')[0], role: c.jitRole, teamId: c.jitTeamId }));
+        Object.assign(user, { mustChangePassword: false, ssoCreated: true });
+        iam.save();
+        audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'user.create.sso', ip, details: { role: c.jitRole, team: teams.get(c.jitTeamId)?.name } });
+      } catch (error) {
+        return page('Single sign-on failed', error.message);
+      }
+    }
+    if (!user || user.active === false) {
+      audit.record({ action: 'auth.sso.refused', target: who.email, ip, details: { why: user ? 'access turned off' : 'no access' } });
+      return page('No access yet', 'You signed in with the identity provider, but you do not have access to the command center. Ask an Admin to invite you.');
+    }
+    // A password chosen through SSO is not needed: someone made by an Admin and signing in with SSO need not set one.
+    if (user.mustChangePassword) {
+      user.mustChangePassword = false;
+      iam.save();
+    }
+    user.lastSignInAt = new Date().toISOString();
+    iam.save();
+    const { token } = iam.openSession(user.id, { idleMs, ip, agent: req.headers['user-agent'] });
+    res.setHeader('Set-Cookie', cookie(token, Math.floor(idleMs / 1000), req));
+    audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.sso.signin', ip });
+    // A page of this site moves on, so the browser sends the new (SameSite=Strict) cookie with the next request.
+    return page('Signed in', '', '/#/');
+  }
   async function sendResetLink(email, ip) {
     const user = iam.byEmail(email);
     const why = !user ? 'no account has that address' : user.active === false ? 'the account is turned off' : !resetAllowed(resetPolicy(), { isAdmin: managesPeople(user) }) ? 'resetting by email is not allowed for this account' : !resetReady().ready ? 'email or PUBLIC_URL is not set up' : !passwordResets.maySend(user.id) ? 'too many links for this account in the last hour' : '';
@@ -247,6 +352,9 @@ export function createApp(config, { log = console.log, calculatorService = null,
       guideSeen: Boolean(ctx.user.guideSeenAt),
       organisationName: settings.value.organisationName,
       version: VERSION,
+      versionLabel: versionLabel(),
+      prefs: ctx.user.prefs ?? {},
+      theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
       mz: MZ_SOURCE.label,
     };
   });
@@ -265,6 +373,24 @@ export function createApp(config, { log = console.log, calculatorService = null,
     terms.accept(ctx.user.id, ipOf(req));
     record(ctx, req, 'terms.accept', '', { version: terms.version, hash: terms.hash });
     return { ok: true };
+  });
+  // Themes: each person's own look (kept with them, on every device), else the organisation's.
+  const THEME_MODES = ['light', 'dark', 'system'];
+  const ACCENTS = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite'];
+  r('PUT', '/api/me/prefs', signedIn, (req, ctx, body) => {
+    const prefs = { ...(ctx.user.prefs ?? {}) };
+    if (body?.mode !== undefined) {
+      if (!THEME_MODES.includes(body.mode)) throw fail(400, 'Choose light, dark or system.');
+      prefs.mode = body.mode;
+    }
+    if (body?.accent !== undefined) {
+      if (!ACCENTS.includes(body.accent)) throw fail(400, 'Choose one of the themes.');
+      prefs.accent = body.accent;
+    }
+    if (body?.seenVersion !== undefined) prefs.seenVersion = String(body.seenVersion).slice(0, 20);
+    ctx.user.prefs = prefs;
+    iam.save();
+    return { prefs };
   });
   r('POST', '/api/me/guide', ready2, (req, ctx) => {
     iam.markGuideSeen(ctx.user.id);
@@ -552,12 +678,226 @@ export function createApp(config, { log = console.log, calculatorService = null,
   const hostList = (v) => (Array.isArray(v) ? v : String(v ?? '').split(/[\s,]+/)).map((h) => String(h).trim().toLowerCase().replace(/^\*\./, '')).filter((h) => /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(h)).slice(0, 50);
   r('PUT', '/api/settings', perm('settings.manage'), (req, ctx, body) => {
     if (body?.organisationName !== undefined) settings.value.organisationName = clean(body.organisationName, 120) || settings.value.organisationName;
+    if (body?.theme !== undefined) {
+      const mode = ['light', 'dark', 'system'].includes(body.theme?.mode) ? body.theme.mode : 'light';
+      const accent = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite'].includes(body.theme?.accent) ? body.theme.accent : 'aurora';
+      settings.value.theme = { mode, accent };
+    }
     for (const k of ['salesforceHosts', 'cxoneHosts', 'gitHosts']) if (body?.[k] !== undefined) settings.value[k] = hostList(body[k]);
     settings.save();
     syncHosts();
     record(ctx, req, 'settings.update', '', { changed: Object.keys(body ?? {}) });
     return { ...settings.value, effective: hosts() };
   });
+  // ---- HTTPS (Settings → HTTPS), as CxMissionZero runs it ----------------------------------------------------------------
+  const hostOf = (req) => String(req.headers.host ?? '').trim().toLowerCase();
+  function httpsHosts(req, extra = []) {
+    const hosts = new Set();
+    const add = (value) => {
+      const host = String(value ?? '').trim().toLowerCase().replace(/^\[(.*)\](:\d+)?$/, '$1').replace(/^([^:]+):\d+$/, '$1');
+      if (host && host.length < 254 && /^[a-z0-9.:*-]+$/.test(host)) hosts.add(host);
+    };
+    add(hostOf(req));
+    try {
+      add(new URL(config.publicUrl).hostname);
+    } catch {}
+    for (const host of Array.isArray(extra) ? extra.slice(0, 10) : []) add(host);
+    return [...hosts];
+  }
+  const acmeView = (req) => ({ ...acme.status(), suggested: httpsHosts(req).filter(validName), fromEnvironment: LETSENCRYPT_DOMAIN });
+  const httpsStatus = async (req) => {
+    const host = hostOf(req) || `localhost:${config.port}`;
+    return { ...(await httpsManager.status(httpsHosts(req))), viewing: { secure: Boolean(req.socket.encrypted), host, httpUrl: `http://${host}`, httpsUrl: `https://${host}` }, hstsAges: HSTS_AGES, acme: acmeView(req), publicUrl: config.publicUrl };
+  };
+  const tlsPerm = perm('security.https');
+  r('GET', '/api/https', tlsPerm, (req) => httpsStatus(req));
+  r('POST', '/api/https/inspect', tlsPerm, (req, ctx, body) => httpsManager.inspect({ files: body?.files, passphrase: String(body?.passphrase ?? ''), hosts: httpsHosts(req, body?.hosts) }));
+  r('POST', '/api/https/certificate', tlsPerm, async (req, ctx, body) => {
+    const report = await httpsManager.install({ files: body?.files, passphrase: String(body?.passphrase ?? ''), hosts: httpsHosts(req, body?.hosts), confirm: Boolean(body?.confirm), by: ctx.user.email });
+    record(ctx, req, 'https.certificate', report.summary.subject, { names: report.summary.names, issuer: report.summary.issuer, validTo: report.summary.validTo, fingerprint: report.summary.fingerprint });
+    return { report, status: await httpsStatus(req) };
+  });
+  r('POST', '/api/https/certificate/previous', tlsPerm, async (req, ctx) => {
+    httpsManager.restorePrevious({ by: ctx.user.email });
+    record(ctx, req, 'https.certificate.previous');
+    return httpsStatus(req);
+  });
+  r('DELETE', '/api/https/certificate', tlsPerm, async (req, ctx, body, res, url) => {
+    const fallback = httpsManager.removeUploaded({ confirm: url.searchParams.get('confirm') === '1', by: ctx.user.email });
+    record(ctx, req, 'https.certificate.remove', '', { fallback });
+    return httpsStatus(req);
+  });
+  r('POST', '/api/https/self-signed', tlsPerm, async (req, ctx, body) => {
+    httpsManager.selfSign({ names: Array.isArray(body?.names) ? body.names : [], by: ctx.user.email });
+    record(ctx, req, 'https.selfSigned', '', { names: body?.names });
+    return httpsStatus(req);
+  });
+  r('POST', '/api/https/request', tlsPerm, async (req, ctx, body) => {
+    const csr = httpsManager.createRequest({ names: Array.isArray(body?.names) ? body.names : httpsHosts(req), organization: body?.organization ?? '', by: ctx.user.email });
+    record(ctx, req, 'https.request', '', { names: body?.names });
+    return { csr, status: await httpsStatus(req) };
+  });
+  r('GET', '/api/https/request.csr', tlsPerm, () => {
+    const csr = httpsManager.requestCsr();
+    if (!csr) throw fail(404, 'No certificate request has been made here.');
+    return { download: csr, name: 'command-center.csr', type: 'application/pkcs10' };
+  });
+  r('POST', '/api/https/mode', tlsPerm, async (req, ctx, body) => {
+    const from = httpsManager.mode;
+    httpsManager.setMode(String(body?.mode ?? ''), { secure: Boolean(req.socket.encrypted), confirm: Boolean(body?.confirm), by: ctx.user.email });
+    record(ctx, req, 'https.mode', `${from} → ${httpsManager.mode}`);
+    return httpsStatus(req);
+  });
+  r('POST', '/api/https/hardening', tlsPerm, async (req, ctx, body) => {
+    httpsManager.setHardening({ ...(body?.hsts ? { hsts: body.hsts } : {}), ...(body?.minVersion ? { minVersion: body.minVersion } : {}) }, { by: ctx.user.email });
+    record(ctx, req, 'https.hardening', '', { hsts: body?.hsts, minVersion: body?.minVersion });
+    return httpsStatus(req);
+  });
+  r('POST', '/api/https/browser-check', tlsPerm, async (req, ctx, body) => {
+    httpsManager.recordBrowserCheck({ ok: body?.ok, url: body?.url, by: ctx.user.email });
+    return { ok: true };
+  });
+  r('GET', '/api/https/acme', tlsPerm, (req) => acmeView(req));
+  r('POST', '/api/https/acme', tlsPerm, (req, ctx, body) => {
+    acme.start({ names: body?.names, email: body?.email, staging: body?.staging === true, agree: body?.agree === true, skipPrecheck: body?.skipPrecheck === true, by: ctx.user.email });
+    record(ctx, req, 'https.letsencrypt.request', acme.status().last?.names?.join(', ') ?? '', { staging: body?.staging === true });
+    return acmeView(req);
+  });
+  r('POST', '/api/https/acme/renew', tlsPerm, (req, ctx) => {
+    acme.renew({ by: ctx.user.email });
+    record(ctx, req, 'https.letsencrypt.renew');
+    return acmeView(req);
+  });
+  r('DELETE', '/api/https/acme', tlsPerm, (req, ctx) => {
+    acme.disable();
+    record(ctx, req, 'https.letsencrypt.off');
+    return acmeView(req);
+  });
+
+  // ---- Backups (CxMissionZero's way): nightly, before every version switch, by hand; download and restore -------------
+  const backupDir = path.join(config.dataDir, 'backups');
+  const backupPassphrase = String(config.env?.BACKUP_PASSPHRASE ?? '');
+  const takeBackup = (reason) => {
+    const b = writeBackupTo(backupDir, { dataDir: config.dataDir, passphrase: backupPassphrase, version: VERSION, reason });
+    audit.record({ action: 'backup.written', target: b.name, details: { reason, bytes: b.bytes, sha256: b.sha256, sealed: Boolean(backupPassphrase) } });
+    return b.name;
+  };
+  const backupPerm = perm('backup.manage');
+  r('GET', '/api/backups', backupPerm, () => ({ backups: listBackups(backupDir), sealed: Boolean(backupPassphrase), dir: backupDir }));
+  r('POST', '/api/backups', backupPerm, (req, ctx) => ({ name: takeBackup(`by ${ctx.user.email}`), backups: listBackups(backupDir) }));
+  r('GET', '/api/backups/:name', backupPerm, (req, ctx, body, res, url, params) => {
+    const item = listBackups(backupDir).find((b) => b.name === params.name);
+    if (!item) throw fail(404, 'That backup no longer exists.');
+    record(ctx, req, 'backup.download', item.name);
+    return { download: fs.readFileSync(path.join(backupDir, item.name)), name: item.name, type: 'application/octet-stream' };
+  });
+  r('POST', '/api/backups/inspect', backupPerm, (req, ctx, body) => describeBackup(readBackup(Buffer.from(String(body?.data ?? ''), 'base64'), { passphrase: String(body?.passphrase ?? '') })));
+  r('POST', '/api/backups/restore', backupPerm, (req, ctx, body) => {
+    const bundle = readBackup(Buffer.from(String(body?.data ?? ''), 'base64'), { passphrase: String(body?.passphrase ?? '') });
+    if (body?.confirm !== true) throw fail(409, 'Confirm: everything here is replaced by the backup (a backup of what is here now is taken first).');
+    const before = takeBackup(`before restoring a backup from ${bundle.at}`);
+    restoreBackup(bundle, { dataDir: config.dataDir });
+    record(ctx, req, 'backup.restore', bundle.at, { ...describeBackup(bundle), before });
+    if (supervised) setTimeout(() => process.exit(75), 300).unref?.();
+    return { restored: describeBackup(bundle), before, restarting: supervised };
+  });
+  startJobs.push(() => {
+    // Nightly: an hour after the last one is a day old.
+    const t = setInterval(() => {
+      const last = listBackups(backupDir)[0];
+      if (!last || Date.now() - Date.parse(last.at) > 24 * 3600 * 1000) {
+        try {
+          takeBackup('nightly');
+        } catch (error) {
+          log(`[backup] ${error.message}`);
+        }
+      }
+    }, 60 * 60 * 1000);
+    t.unref?.();
+    stopJobs.push(() => clearInterval(t));
+  });
+
+  // ---- Updates and rollback (server/updates.js, server/launch.js) ------------------------------------------------------
+  const supervised = process.env.CC_SUPERVISOR === '1';
+  const versionStore = new VersionStore({ dataDir: config.dataDir, builtInDir: process.env.CC_BUILTIN_DIR || config.root, builtInVersion: process.env.CC_BUILTIN_VERSION || VERSION });
+  const updates = updateService ?? new UpdateService({ store: versionStore, runningVersion: VERSION, repo: String(config.env?.UPDATE_REPO || 'cxsmtp/FTR-CC-Dashboard'), token: String(config.env?.UPDATE_GITHUB_TOKEN ?? ''), backup: async (reason) => takeBackup(reason), log, supervised });
+  const updPerm = perm('system.update');
+  r('GET', '/api/updates', updPerm, () => updates.status());
+  r('POST', '/api/updates/check', updPerm, async (req, ctx) => {
+    await updates.check();
+    record(ctx, req, 'updates.check');
+    return updates.status();
+  });
+  r('POST', '/api/updates/install', updPerm, async (req, ctx, body) => {
+    const done = await updates.install(String(body?.version ?? ''), { by: ctx.user.email });
+    record(ctx, req, 'updates.install', done.version, { sha256: done.sha256, files: done.files });
+    if (body?.switch === true) {
+      await updates.switchTo(done.version, { by: ctx.user.email });
+      record(ctx, req, 'updates.switch', done.version);
+    }
+    return updates.status();
+  });
+  r('POST', '/api/updates/switch', updPerm, async (req, ctx, body) => {
+    const out = await updates.switchTo(String(body?.version ?? ''), { by: ctx.user.email, reason: body?.reason === 'rollback' ? 'rollback by hand' : 'by hand' });
+    record(ctx, req, 'updates.switch', out.to, { from: VERSION });
+    return { ...updates.status(), ...out };
+  });
+  r('PUT', '/api/updates/auto', updPerm, (req, ctx, body) => {
+    const auto = updates.setAuto({ enabled: body?.enabled, hour: body?.hour }, { by: ctx.user.email });
+    record(ctx, req, 'updates.auto', auto.enabled ? `on at ${auto.hour}:00` : 'off');
+    return updates.status();
+  });
+  r('POST', '/api/system/restart', updPerm, (req, ctx) => {
+    if (!supervised) throw fail(409, 'This server was not started by the launcher: restart it where it runs.');
+    record(ctx, req, 'system.restart');
+    setTimeout(() => process.exit(75), 300).unref?.();
+    return { restarting: true };
+  });
+  startJobs.push(() => {
+    updates.start();
+    stopJobs.push(() => updates.stop());
+  });
+
+  // ---- Troubleshooting report: versions, health and settings in force, no secrets ----------------------------------
+  const startedAt = Date.now();
+  r('GET', '/api/system/diagnostics', perm('settings.manage'), async (req, ctx) => {
+    let disk = null;
+    try {
+      const st = fs.statfsSync(config.dataDir);
+      disk = { freeMB: Math.round((st.bavail * st.bsize) / 1048576), totalMB: Math.round((st.blocks * st.bsize) / 1048576) };
+    } catch {}
+    record(ctx, req, 'system.diagnostics');
+    const report = {
+      generatedAt: new Date().toISOString(),
+      version: versionLabel(),
+      mz: MZ_SOURCE.label,
+      node: process.version,
+      platform: `${process.platform} ${process.arch}`,
+      uptimeMinutes: Math.round((Date.now() - startedAt) / 60000),
+      memoryMB: Math.round(process.memoryUsage().rss / 1048576),
+      disk,
+      https: httpsManager.describe(),
+      sso: { ready: sso.ready() },
+      email: { ready: mailReady(), resetReady: resetReady().ready },
+      updates: { running: VERSION, supervised, auto: versionStore.state.auto, lastCheck: versionStore.state.lastCheck, failed: versionStore.state.failed, events: (versionStore.state.events ?? []).slice(0, 10) },
+      backups: { count: listBackups(backupDir).length, last: listBackups(backupDir)[0] ?? null, sealed: Boolean(backupPassphrase) },
+      counts: { people: iam.users().length, teams: teams.list().length, accounts: accounts.accounts.size, reports: accounts.reports.size },
+      audit: audit.verify(),
+      recentErrors: recentErrors.slice(-20),
+    };
+    return { download: JSON.stringify(report, null, 2), name: `cc-troubleshooting-${report.generatedAt.slice(0, 10)}.json`, type: 'application/json' };
+  });
+  r('GET', '/api/audit/verify', perm('audit.view'), (req, ctx) => {
+    const result = audit.verify();
+    record(ctx, req, 'audit.verify', result.ok ? 'intact' : 'broken', result);
+    return result;
+  });
+  r('GET', '/api/audit/export.csv', perm('audit.view'), (req, ctx) => {
+    const events = audit.recent({ limit: 100000 });
+    record(ctx, req, 'audit.export', '', { rows: events.length });
+    return { csv: csv(['When', 'Who', 'Email', 'Action', 'On', 'Details', 'Address'], events.map((e) => [e.at, e.actor?.name ?? '', e.actor?.email ?? '', e.action, e.target, JSON.stringify(e.details ?? {}), e.ip])), name: 'audit.csv' };
+  });
+
   // ---- Email server (SMTP) --------------------------------------------------------------------------------------
   const smtpView = () => ({ smtp: publicSmtp(smtpNow()), verified: mailReady(), verifiedAt: settings.value.smtpVerifiedAt ?? null, passwordReset: resetPolicy(), reset: resetReady(), publicUrl: linkBase() });
   r('GET', '/api/settings/smtp', perm('settings.manage'), () => smtpView());
@@ -603,11 +943,6 @@ export function createApp(config, { log = console.log, calculatorService = null,
   r('GET', '/api/audit', perm('audit.view'), (req, ctx, body, res, url) => {
     const q = String(url.searchParams.get('q') ?? '').toLowerCase().slice(0, 100);
     return { events: audit.recent({ limit: 500, filter: (e) => !q || JSON.stringify(e).toLowerCase().includes(q) }) };
-  });
-  r('GET', '/api/backup', perm('settings.manage'), (req, ctx) => {
-    record(ctx, req, 'backup.download');
-    const all = (col) => col.list().map((m) => col.get(m.id)).filter(Boolean);
-    return { kind: 'ftr-cc-dashboard-backup', version: VERSION, at: new Date().toISOString(), iam: { roles: iam.roles(), users: iam.users() }, teams: teams.list(), settings: settings.value, terms: terms.doc.value, accounts: all(accounts.accounts), reports: all(accounts.reports) };
   });
 
   // ---- The calculator's API (/api/projections…), per team -----------------------------------------------------
@@ -672,7 +1007,7 @@ export function createApp(config, { log = console.log, calculatorService = null,
   // ---- The requests ---------------------------------------------------------------------------------------------
   const PUBLIC_DIR = path.join(config.root, 'public');
   const SAMPLES = path.join(config.root, 'vendor', 'mz', 'public', 'calculator', 'samples');
-  const LEGAL = { '/legal/terms': 'TERMS.md', '/legal/license': 'LICENSE', '/legal/guide': 'docs/USER-GUIDE.md' };
+  const LEGAL = { '/legal/terms': 'TERMS.md', '/legal/license': 'LICENSE', '/legal/guide': 'docs/USER-GUIDE.md', '/legal/changelog': 'CHANGELOG.md' };
 
   const PUBLIC_POSTS = new Set(['/api/auth/signin', '/api/auth/forgot', '/api/auth/reset/check', '/api/auth/reset/confirm']);
 
@@ -681,6 +1016,12 @@ export function createApp(config, { log = console.log, calculatorService = null,
     const url = new URL(req.url, 'http://local');
     const pathname = url.pathname;
     const method = req.method === 'HEAD' ? 'GET' : req.method;
+    if (method === 'GET' && pathname.startsWith(CHALLENGE_PREFIX)) return acmeChallenge(req, res);
+    if (method === 'POST' && pathname === '/saml/acs') return samlAcs(req, res);
+    if (req.socket.encrypted) {
+      const hsts = httpsManager.hstsHeader();
+      if (hsts) res.setHeader('Strict-Transport-Security', hsts);
+    }
 
     if (method === 'GET' && LEGAL[pathname]) {
       return send(res, 200, fs.readFileSync(path.join(config.root, LEGAL[pathname]), 'utf8'), { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -725,6 +1066,7 @@ export function createApp(config, { log = console.log, calculatorService = null,
       }
       let result;
       for (const h of match.handlers) result = await h(req, ctx, body, res, url, match.params);
+      if (result?.download !== undefined) return send(res, 200, result.download, { 'Content-Type': `${result.type ?? 'application/octet-stream'}`, 'Content-Disposition': `attachment; filename="${result.name}"` });
       if (result?.csv !== undefined) return send(res, 200, result.csv, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${result.name}"` });
       if (pathname === '/healthz') return send(res, 200, result);
       return send(res, 200, result ?? { ok: true });
@@ -735,5 +1077,56 @@ export function createApp(config, { log = console.log, calculatorService = null,
     }
   }
 
-  return { handle, ready, iam, teams, accounts, audit, terms, settings, calc, SECURITY_HEADERS, APP_CSP };
+  /** Let's Encrypt's HTTP-01 check, answered over plain http in every mode. */
+  function acmeChallenge(req, res) {
+    let token = '';
+    try {
+      token = decodeURIComponent(String(req.url ?? '').slice(CHALLENGE_PREFIX.length).split('?')[0]);
+    } catch {}
+    const value = acme.challenge(token);
+    res.writeHead(value ? 200 : 404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(value ?? 'Not found');
+  }
+  /** The https:// address for a request that came over plain http while the server is HTTPS only. */
+  function httpsOrigin(req) {
+    try {
+      const configured = new URL(config.publicUrl);
+      if (configured.protocol === 'https:') return configured.origin;
+    } catch {}
+    const header = hostOf(req);
+    const hostname = header.replace(/^\[(.*)\](:\d+)?$/, '$1').replace(/^([^:]+):\d+$/, '$1');
+    const served = httpsManager.servedNames();
+    const covered = (name) => served.some((n) => n === name || (n.startsWith('*.') && name.endsWith(n.slice(1)) && !name.slice(0, -n.length + 1).includes('.')));
+    const local = ['localhost', '127.0.0.1', '::1'].includes(hostname);
+    // A request's Host header never chooses another site for the redirect, unless the certificate covers it.
+    const host = header && (local || httpsManager.selfSigned || covered(hostname)) ? header : served.find((n) => !n.startsWith('*.')) || 'localhost';
+    return `https://${host}`;
+  }
+  async function httpsOnly(req, res) {
+    if (req.method === 'GET' && req.url?.startsWith(CHALLENGE_PREFIX)) return acmeChallenge(req, res);
+    const origin = httpsOrigin(req);
+    const target = req.url?.startsWith('/') ? req.url : '/';
+    if (target.startsWith('/api/')) return send(res, 426, { error: `The command center uses HTTPS only: ${origin}`, movedTo: origin });
+    return send(res, 308, '', { Location: `${origin}${target}` });
+  }
+  /** After the server listens: Let's Encrypt from LETSENCRYPT_DOMAIN, renewals, scheduled jobs. */
+  async function started() {
+    await ready;
+    if (LETSENCRYPT_DOMAIN) {
+      try {
+        const names = cleanNames(LETSENCRYPT_DOMAIN);
+        const st = acme.status();
+        const current = st.issued && !st.issued.staging && names.every((n) => st.issued.names.includes(n)) && st.daysLeft > RENEW_DAYS;
+        if (!current) acme.start({ names, email: config.env?.LETSENCRYPT_EMAIL ?? '', staging: /^(1|true|yes|on)$/i.test(config.env?.LETSENCRYPT_STAGING ?? ''), agree: true, by: 'LETSENCRYPT_DOMAIN' });
+      } catch (error) {
+        log(`! [https] LETSENCRYPT_DOMAIN: ${error.message}`);
+      }
+    }
+    acme.startRenewal();
+    for (const job of startJobs) job();
+  }
+  stopJobs.push(() => acme.stop(), () => httpsManager.stop());
+  const stop = () => stopJobs.forEach((j) => j());
+
+  return { handle, httpsOnly, started, stop, https: httpsManager, acme, version: VERSION, versionLabel: versionLabel(), ready, iam, teams, accounts, audit, terms, settings, calc, SECURITY_HEADERS, APP_CSP };
 }

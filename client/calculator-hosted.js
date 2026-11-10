@@ -86,7 +86,19 @@ export function startHosted() {
       if (!newByClick) throw fail(409, 'Click New to add an account.');
       newByClick = false;
     }
-    const answer = await server(url.pathname + url.search, { method, body: options.body });
+    const work = workOf(method, url.pathname);
+    if (work) busy.start(work);
+    let answer;
+    try {
+      answer = await server(url.pathname + url.search, { method, body: options.body });
+    } catch (error) {
+      if (method === 'POST' && url.pathname === '/api/projections/reports') busy.report(false);
+      throw error;
+    } finally {
+      if (work) busy.end(work);
+    }
+    if (url.pathname === '/api/projections/read') busy.read(answer);
+    if (url.pathname === '/api/projections/git/count') busy.git(answer);
     if (answer?.customer && (method === 'GET' || method === 'POST') && url.pathname.startsWith('/api/projections')) openCustomer = answer.customer;
     if (method === 'PUT' && answer?.customer) openCustomer = { ...openCustomer, ...answer.customer };
     const m = url.pathname.match(/^\/api\/projections\/([^/]+)$/);
@@ -96,12 +108,126 @@ export function startHosted() {
       if (method === 'PUT') refreshAccountSoon();
     }
     if (method === 'POST' && url.pathname === '/api/projections' && answer.customer) showAccount(answer.customer.id);
-    if (url.pathname === '/api/projections/reports' && method === 'POST') refreshAccountSoon();
+    if (url.pathname === '/api/projections/reports' && method === 'POST') {
+      refreshAccountSoon();
+      busy.report(true, answer?.report?.totalCredits);
+    }
     return answer;
   };
   document.addEventListener('click', (event) => {
     if (event.target.closest?.('#calc-new')) newByClick = true;
   }, true);
+
+  // ---- Calculating: what is being worked out, always shown, with its progress ------------------------------------------------
+  const WORK = { 'POST /api/projections/read': 'Reading Checkmarx One', 'POST /api/projections/series': 'Calculating the projection', 'POST /api/projections/reports': 'Generating the report', 'POST /api/projections/git/count': 'Counting code from git', 'POST /api/projections/git/repositories': 'Listing repositories', 'POST /api/projections/git/organizations': 'Finding organisations', 'PUT /api/projections': 'Saving' };
+  function workOf(method, pathname) {
+    if (method === 'PUT' && pathname.startsWith('/api/projections/')) return WORK['PUT /api/projections'];
+    return WORK[`${method} ${pathname}`] ?? '';
+  }
+  const busy = (() => {
+    const live = new Map();
+    let reading = null;
+    let counting = null;
+    let shownAt = 0;
+    let overlay = null;
+    const pill = () => document.getElementById('hc-work');
+    const render = () => {
+      const el = pill();
+      if (!el) return;
+      const labels = [...live.keys()];
+      const job = reading ?? counting;
+      if (!labels.length && !job) {
+        el.hidden = true;
+        return;
+      }
+      const label = job ? job.label : labels[labels.length - 1];
+      const pct = job?.total ? Math.min(100, Math.round((job.done / job.total) * 100)) : null;
+      el.hidden = false;
+      el.innerHTML = `<span class="hc-orbit"><i></i><i></i></span><b>${esc(label)}…</b>${job?.detail ? `<span>${esc(job.detail)}</span>` : ''}${pct !== null ? `<span class="hc-bar"><i></i></span><span>${pct}%</span>` : ''}`;
+      if (pct !== null) el.querySelector('.hc-bar i').style.width = `${pct}%`;
+    };
+    const showOverlay = () => {
+      shownAt = Date.now();
+      overlay = document.createElement('div');
+      overlay.className = 'hc-overlay';
+      overlay.innerHTML = `<div class="hc-card"><div class="hc-orbit big"><i></i><i></i><i></i></div><h2>Generating the projection report</h2><ol class="hc-steps"><li class="on">Collecting the figures</li><li>Working out the credits and bundles</li><li>Writing the report</li></ol><p class="hc-note"></p></div>`;
+      document.body.append(overlay);
+      const steps = overlay.querySelectorAll('.hc-steps li');
+      [350, 750].forEach((ms, i) => setTimeout(() => steps[i + 1]?.classList.add('on'), ms));
+    };
+    const hideOverlay = (ok, text) => {
+      if (!overlay) return;
+      const o = overlay;
+      overlay = null;
+      const wait = Math.max(0, 1100 - (Date.now() - shownAt));
+      setTimeout(() => {
+        o.querySelector('.hc-card').classList.add(ok ? 'done' : 'failed');
+        o.querySelector('h2').textContent = ok ? 'Report ready' : 'Not generated';
+        o.querySelector('.hc-note').textContent = text ?? '';
+        o.querySelectorAll('.hc-steps li').forEach((li) => li.classList.add('on'));
+        setTimeout(() => o.remove(), ok ? 1300 : 3500);
+      }, wait);
+    };
+    return {
+      start(label) {
+        live.set(label, (live.get(label) ?? 0) + 1);
+        if (label === WORK['POST /api/projections/reports']) showOverlay();
+        render();
+      },
+      end(label) {
+        const n = (live.get(label) ?? 1) - 1;
+        if (n > 0) live.set(label, n);
+        else live.delete(label);
+        render();
+      },
+      read(job) {
+        reading = job?.state === 'running' ? { label: 'Reading Checkmarx One', done: job.done ?? 0, total: job.total ?? 0, detail: job.step === 'projects' ? `${job.done ?? 0} of ${job.total || '…'} projects` : job.step ? `${job.step}: ${job.done ?? 0} of ${job.total || '…'}` : '' } : null;
+        render();
+      },
+      git(job) {
+        const running = job && !['done', 'failed', 'stopped'].includes(job.state) && (job.rows ?? job.repositories)?.length;
+        const rows = job?.rows ?? [];
+        counting = running ? { label: 'Counting code from git', done: rows.filter((r) => r.state === 'done' || r.done).length, total: rows.length || (job.repositories?.length ?? 0) } : null;
+        render();
+      },
+      report(ok, total) {
+        hideOverlay(ok, ok && Number.isFinite(total) ? `${Math.round(total).toLocaleString()} credits` : '');
+      },
+    };
+  })();
+
+  /** The totals count up to their new value whenever the calculator changes them (its own writes are not changes). */
+  function countUpOnChange(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let last = NaN;
+    let mine = '';
+    let frame = 0;
+    const parse = (t) => Number(String(t).replace(/[^0-9.-]/g, ''));
+    new MutationObserver(() => {
+      const text = el.textContent;
+      if (text === mine) return;
+      const to = parse(text);
+      if (!/[0-9]/.test(text) || !Number.isFinite(to) || to === last) return;
+      const from = Number.isFinite(last) ? last : 0;
+      last = to;
+      cancelAnimationFrame(frame);
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const start = performance.now();
+      const step = (t) => {
+        const k = Math.min(1, (t - start) / 650);
+        mine = k < 1 ? text.replace(/[0-9][0-9,.]*/, Math.round(from + (to - from) * (1 - (1 - k) ** 3)).toLocaleString()) : text;
+        if (el.textContent !== mine) el.textContent = mine;
+        if (k < 1) frame = requestAnimationFrame(step);
+        else {
+          el.classList.add('hc-pop');
+          setTimeout(() => el.classList.remove('hc-pop'), 500);
+        }
+      };
+      frame = requestAnimationFrame(step);
+    }).observe(el, { childList: true, characterData: true, subtree: true });
+  }
+  for (const id of ['calc-sum-total', 'calc-sum-tr', 'calc-sum-fusion', 'calc-sum-bundles']) countUpOnChange(id);
 
   // ---- The account bar ------------------------------------------------------------------------------
   let account = null;

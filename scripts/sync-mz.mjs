@@ -32,7 +32,9 @@ function graph(entry, seen = new Set()) {
 }
 
 const files = new Set();
-for (const entry of ['src/calculator-launcher.js', 'src/standalone-calculator.js', 'src/licence-gate.js', 'public/calculator/standalone.js', 'public/calculator/report-live.js']) {
+// The calculator, and the pieces of MZ the command center runs as they are: HTTPS (certificates, Let's Encrypt) and
+// forgotten passwords.
+for (const entry of ['src/calculator-launcher.js', 'src/standalone-calculator.js', 'src/licence-gate.js', 'public/calculator/standalone.js', 'public/calculator/report-live.js', 'src/https-manager.js', 'src/acme.js', 'src/password-reset.js']) {
   for (const f of graph(path.join(mz, entry))) files.add(path.relative(mz, f));
 }
 const tree = (dir) => fs.readdirSync(path.join(mz, dir), { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? tree(path.join(dir, d.name)) : [path.join(dir, d.name)]));

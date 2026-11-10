@@ -19,6 +19,12 @@ const bool = (v, fallback) => (v === undefined || v === '' ? fallback : /^(1|tru
 
 export function loadConfig(env = process.env) {
   loadDotEnv();
+  // HTTPS by default (MZ's way: your certificate when given, else a self-signed one until an Admin uploads one or
+  // gets one from Let's Encrypt under Settings → HTTPS). HTTPS=off for a laptop or behind a proxy that does HTTPS.
+  if (env.TLS_CERT && !env.TLS_CERT_FILE) env.TLS_CERT_FILE = env.TLS_CERT;
+  if (env.TLS_KEY && !env.TLS_KEY_FILE) env.TLS_KEY_FILE = env.TLS_KEY;
+  if (env.HTTPS === undefined || env.HTTPS === '') env.HTTPS = 'on';
+  if (env.PUBLIC_URL && !env.REPORT_SERVER_URL) env.REPORT_SERVER_URL = env.PUBLIC_URL;
   const port = Number(env.PORT ?? 8080);
   return {
     root: ROOT,
@@ -26,10 +32,9 @@ export function loadConfig(env = process.env) {
     port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 8080,
     dataDir: path.resolve(ROOT, env.DATA_DIR ?? 'data'),
     publicUrl: env.PUBLIC_URL ?? '',
-    tlsCert: env.TLS_CERT ?? '',
-    tlsKey: env.TLS_KEY ?? '',
+    env,
     // Secure cookies whenever the server is reached over https (directly, or behind a proxy that says so).
-    secureCookies: bool(env.SECURE_COOKIES, Boolean(env.TLS_CERT) || String(env.PUBLIC_URL ?? '').startsWith('https://')),
+    secureCookies: bool(env.SECURE_COOKIES, String(env.PUBLIC_URL ?? '').startsWith('https://')),
     trustProxy: bool(env.TRUST_PROXY, false),
     adminEmail: env.ADMIN_EMAIL ?? '',
     adminName: env.ADMIN_NAME ?? 'Administrator',

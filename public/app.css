@@ -296,3 +296,45 @@ td .flex, .bar .name .flex { flex-wrap: nowrap; }
 #forgot-link { justify-self: center; }
 .panel h2 .chip { margin-left: auto; }
 .grid.g3 { align-items: start; }
+
+/* ---- Palettes (data-accent): the gradient, the two accents, the glow -------------------------------------------- */
+:root[data-accent="ocean"] { --grad: linear-gradient(120deg, #0ea5e9 0%, #2563eb 55%, #14b8a6 100%); --cyan: #0ea5e9; --violet: #2563eb; }
+:root[data-accent="emerald"] { --grad: linear-gradient(120deg, #10b981 0%, #14b8a6 55%, #0ea5e9 100%); --cyan: #10b981; --violet: #0d9488; }
+:root[data-accent="sunset"] { --grad: linear-gradient(120deg, #f59e0b 0%, #f97316 45%, #e11d48 100%); --cyan: #f97316; --violet: #e11d48; }
+:root[data-accent="royal"] { --grad: linear-gradient(120deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%); --cyan: #6366f1; --violet: #d946ef; }
+:root[data-accent="graphite"] { --grad: linear-gradient(120deg, #475569 0%, #334155 55%, #2563eb 100%); --cyan: #2563eb; --violet: #475569; }
+:root[data-theme="light"][data-accent="sunset"] { --cyan: #c2410c; --violet: #be123c; }
+:root[data-theme="light"][data-accent="emerald"] { --cyan: #047857; --violet: #0f766e; }
+:root[data-theme="light"][data-accent="ocean"] { --cyan: #0369a1; --violet: #1d4ed8; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.swatch { flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; border-radius: 14px; text-align: left; white-space: normal; }
+.swatch.on { border-color: var(--cyan); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 25%, transparent); }
+.swatch small { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+.sw { display: block; width: 100%; height: 34px; border-radius: 10px; }
+.sw-aurora { background: linear-gradient(120deg, #22d3ee, #6366f1 55%, #a855f7); }
+.sw-ocean { background: linear-gradient(120deg, #0ea5e9, #2563eb 55%, #14b8a6); }
+.sw-emerald { background: linear-gradient(120deg, #10b981, #14b8a6 55%, #0ea5e9); }
+.sw-sunset { background: linear-gradient(120deg, #f59e0b, #f97316 45%, #e11d48); }
+.sw-royal { background: linear-gradient(120deg, #6366f1, #8b5cf6 50%, #d946ef); }
+.sw-graphite { background: linear-gradient(120deg, #475569, #334155 55%, #2563eb); }
+.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-hi); flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; }
+.seg button.primary { background: var(--grad); color: #fff; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: -6px 0 18px; border-bottom: 1px solid var(--line); }
+.tabs a { padding: 10px 14px; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs a:hover { color: var(--text); text-decoration: none; }
+.tabs a.on { color: var(--text); border-bottom-color: var(--cyan); }
+.ver { margin-top: 8px; align-self: flex-start; border: 0; background: transparent; color: var(--faint); font-family: var(--mono); font-size: 11.5px; padding: 2px 8px; }
+.ver:hover { color: var(--cyan); }
+.or { display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 12px; margin: 14px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.btn.sso { width: 100%; justify-content: center; }
+.panel h3 { font-size: 14px; margin: 18px 0 8px; }
+.callout + .callout { margin-top: 10px; }
+
+/* ---- Calculating: an orbit, and numbers that count ----------------------------------------------------------- */
+.orbit { position: relative; width: 64px; height: 64px; }
+.orbit i { position: absolute; inset: 0; border-radius: 50%; border: 3px solid transparent; border-top-color: var(--cyan); animation: spin 1.1s linear infinite; }
+.orbit i:nth-child(2) { inset: 9px; border-top-color: var(--violet); animation-duration: 1.6s; animation-direction: reverse; }
+.orbit i:nth-child(3) { inset: 19px; border-top-color: var(--cyan); animation-duration: .8s; opacity: .7; }
+.kpi .v.counting { opacity: .92; }

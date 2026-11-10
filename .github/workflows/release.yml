@@ -1,0 +1,26 @@
+# A release the command center installs from Settings → Updates: on a v* tag, the app with its production
+# dependencies and MANIFEST.json (every file's SHA-256), and SHA256SUMS, attached to the GitHub release.
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm ci --omit=dev
+      - run: node scripts/make-release.mjs dist
+      - name: Check the tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "CC $GITHUB_REF_NAME" --notes-file <(node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const v=process.argv[1].slice(1);const m=s.split(/\n(?=## )/).find(x=>x.includes(v));console.log(m||'See CHANGELOG.md')" "$GITHUB_REF_NAME")

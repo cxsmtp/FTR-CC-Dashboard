@@ -79,29 +79,75 @@ const go = (path) => {
   else route();
 };
 
-// ---- Theme ----------------------------------------------------------------------------------------------
+// ---- Themes: light, dark or the system's, and six palettes; each person's own, else the organisation's ---------------
 const THEME_KEY = 'cxcalc-theme';
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
-}
-try {
-  applyTheme(localStorage.getItem(THEME_KEY) || 'light');
-} catch {
-  applyTheme('light');
-}
-function toggleTheme() {
-  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-  applyTheme(next);
+const ACCENT_KEY = 'cc-accent';
+const THEMES = [
+  ['aurora', 'Aurora', 'Cyan to violet: the command center\u2019s own'],
+  ['ocean', 'Ocean', 'Deep blue to teal'],
+  ['emerald', 'Emerald', 'Green and teal, calm'],
+  ['sunset', 'Sunset', 'Amber to rose'],
+  ['royal', 'Royal', 'Indigo to magenta'],
+  ['graphite', 'Graphite', 'Quiet greys with one blue'],
+];
+const media = matchMedia('(prefers-color-scheme: dark)');
+let themeMode = 'light';
+function applyTheme(mode = themeMode, accent) {
+  themeMode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light';
+  document.documentElement.dataset.theme = themeMode === 'system' ? (media.matches ? 'dark' : 'light') : themeMode;
+  if (accent) document.documentElement.dataset.accent = accent;
   try {
-    localStorage.setItem(THEME_KEY, next);
+    localStorage.setItem(THEME_KEY, document.documentElement.dataset.theme);
+    if (accent) localStorage.setItem(ACCENT_KEY, accent);
   } catch {}
+}
+media.addEventListener?.('change', () => themeMode === 'system' && applyTheme('system'));
+try {
+  applyTheme(localStorage.getItem(THEME_KEY) || 'light', localStorage.getItem(ACCENT_KEY) || 'aurora');
+} catch {
+  applyTheme('light', 'aurora');
+}
+/** The signed-in person's look: theirs, else the organisation's. */
+function applyMyTheme() {
+  const me = state.me;
+  if (!me) return;
+  applyTheme(me.prefs?.mode ?? me.theme?.mode ?? 'light', me.prefs?.accent ?? me.theme?.accent ?? 'aurora');
+}
+function themePicker() {
+  const me = state.me;
+  const dlg = document.createElement('dialog');
+  const cur = { mode: me.prefs?.mode ?? me.theme?.mode ?? 'light', accent: me.prefs?.accent ?? me.theme?.accent ?? 'aurora' };
+  dlg.innerHTML = `<form method="dialog"><div class="dh"><h2>Theme</h2><p class="muted small">Yours, on every device you sign in on.</p></div><div class="db">
+    <div class="seg" id="modes">${['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${cur.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('')}</div>
+    <div class="swatches mt">${THEMES.map(([id, name, note]) => `<button type="button" class="swatch${cur.accent === id ? ' on' : ''}" data-a="${id}"><span class="sw sw-${id}"></span><b>${name}</b><small>${note}</small></button>`).join('')}</div></div>
+    <div class="df"><button value="ok" class="primary">Done</button></div></form>`;
+  document.body.append(dlg);
+  const save = async () => {
+    applyTheme(cur.mode, cur.accent);
+    try {
+      const r = await api('/api/me/prefs', { method: 'PUT', body: cur });
+      state.me.prefs = r.prefs;
+    } catch {}
+  };
+  for (const b of dlg.querySelectorAll('[data-m]')) b.onclick = () => {
+    cur.mode = b.dataset.m;
+    dlg.querySelectorAll('[data-m]').forEach((x) => x.classList.toggle('primary', x === b));
+    save();
+  };
+  for (const b of dlg.querySelectorAll('[data-a]')) b.onclick = () => {
+    cur.accent = b.dataset.a;
+    dlg.querySelectorAll('[data-a]').forEach((x) => x.classList.toggle('on', x === b));
+    save();
+  };
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.showModal();
 }
 
 // ---- Shell ----------------------------------------------------------------------------------------------
 function shell(active, content) {
   const me = state.me;
   const link = (path, name, label, show = true) => (show ? `<a href="#${path}" class="${active === name ? 'on' : ''}">${icon(name)}<span>${label}</span></a>` : '');
-  const admin = can('users.manage') || can('teams.manage') || can('roles.manage') || can('settings.manage') || can('audit.view');
+  const admin = can('users.manage') || can('teams.manage') || ADMIN_TABS.some(([, , p]) => can(p)) || can('audit.view');
   $('#app').className = 'app';
   $('#app').innerHTML = `
     <aside class="side">
@@ -116,16 +162,18 @@ function shell(active, content) {
         ${link('/guide', 'guide', 'Quick guide')}
         ${admin ? '<div class="label">Administration</div>' : ''}
         ${link('/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
-        ${link('/admin', 'admin', 'Settings & roles', can('settings.manage') || can('roles.manage'))}
+        ${link('/admin', 'admin', 'Settings', ADMIN_TABS.some(([, , p]) => can(p)))}
         ${link('/audit', 'audit', 'Audit log', can('audit.view'))}
       </nav>
       <div class="me">
         <div class="who"><div class="avatar">${esc(initials(me.user.name))}</div><div><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></div></div>
-        <div class="row"><button class="ghost sm" id="theme" title="Light or dark">${icon('theme')}Theme</button><button class="ghost sm" id="signout">${icon('out')}Sign out</button></div>
+        <div class="row"><button class="ghost sm" id="theme" title="Theme">${icon('theme')}Theme</button><button class="ghost sm" id="signout">${icon('out')}Sign out</button></div>
       </div>
+      <button class="ver" id="ver" title="About, version and what is new">${esc(me.versionLabel ?? '')}</button>
     </aside>
     <main class="main fade" id="main">${content}</main>`;
-  $('#theme').onclick = toggleTheme;
+  $('#theme').onclick = themePicker;
+  $('#ver').onclick = () => go('/about');
   $('#signout').onclick = signOut;
 }
 async function signOut() {
@@ -163,9 +211,19 @@ function viewLogin() {
         <button class="primary" type="submit">Sign in</button>
         <a href="#/forgot" class="small" id="forgot-link">Forgot your password?</a>
       </form>
+      <div id="sso-box" hidden><div class="or"><span>or</span></div><a class="btn sso" id="sso-btn" href="/saml/login">${icon('people')}<span id="sso-label">Sign in with SSO</span></a></div>
       <p class="foot">First time? Your Admin sent you a one-time password: sign in with it and you will choose your own, accept the terms of use and see a quick guide.<br/>Internal use only · <a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a> · <a href="/legal/license" target="_blank" rel="noopener">PolyForm Internal Use License</a></p>
     </section>
   </div>`;
+  fetch('/api/auth/sso').then((r) => r.json()).then((x) => {
+    if (!x.enabled) return;
+    $('#sso-label').textContent = x.label;
+    $('#sso-box').hidden = false;
+    if (x.passwordsForAdminsOnly) {
+      $('#login').classList.add('admins-only');
+      $('#login').insertAdjacentHTML('afterbegin', '<p class="small muted">Passwords are kept for Admins: everyone else signs in with single sign-on.</p>');
+    }
+  }).catch(() => {});
   $('#login').onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -175,6 +233,7 @@ function viewLogin() {
     try {
       await api('/api/auth/signin', { method: 'POST', body: { email: f.get('email'), password: f.get('password') } });
       state.me = await api('/api/me');
+      applyMyTheme();
       const next = new URLSearchParams(location.hash.split('?')[1] ?? '').get('next');
       if (next && next.startsWith('/calculator') && firstStepsDone()) location.href = next;
       else go(firstStepsDone() ? home() : '/welcome');
@@ -383,6 +442,13 @@ async function viewOverview(params) {
 
 /** Widths and indents set through the CSSOM (no style attributes: the page's policy allows none). */
 function paint() {
+  // The figures count up from zero as the page appears (not for people who asked for less motion).
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (const el of $$('.kpi .v')) {
+      const to = Number(el.textContent.replace(/[^\d.-]/g, ''));
+      if (Number.isFinite(to) && to > 0) countUp(el, to);
+    }
+  }
   requestAnimationFrame(() => {
     for (const el of $$('[data-w]')) el.style.width = `${Math.max(Number(el.dataset.w) || 0, 0.5)}%`;
     for (const el of $$('[data-indent]')) el.style.width = `${Number(el.dataset.indent) * 18}px`;
@@ -743,71 +809,402 @@ async function viewTeams() {
   for (const b of $$('[data-act="edit"]')) b.onclick = () => edit(d.teams.find((t) => t.id === b.closest('[data-id]').dataset.id));
 }
 
-// ---- Settings and roles ------------------------------------------------------------------------------------------
-async function viewAdmin() {
-  shell('admin', loading());
-  const [s, d, m] = await Promise.all([can('settings.manage') ? api('/api/settings') : null, peopleList(), can('settings.manage') ? api('/api/settings/smtp') : null]);
-  const groups = [...new Set(d.permissions.map((p) => p.group))];
-  $('#main').innerHTML = `<div class="head"><div><h1 class="serif">Settings &amp; roles</h1><p>The organisation's name on reports, the hosts the server may call, roles and their permissions, and backups.</p></div>${s ? `<div class="tools"><a class="btn" href="/api/backup" download="ftr-cc-backup.json">${icon('download')}Download backup</a></div>` : ''}</div>
-    ${s ? `<div class="panel"><h2>Organisation &amp; hosts</h2><form class="form" id="sf">
+// ---- Settings: one tab per area, each only for those whose role allows it (the special ones are Admin-only) -------------
+let adminTab = 'general';
+const ADMIN_TABS = [
+  ['general', 'General', 'settings.manage'],
+  ['email', 'Email (SMTP)', 'settings.manage'],
+  ['sso', 'Single sign-on', 'security.sso'],
+  ['https', 'HTTPS', 'security.https'],
+  ['updates', 'Updates', 'system.update'],
+  ['backups', 'Backups & health', 'backup.manage'],
+  ['roles', 'Roles', 'roles.manage'],
+];
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => reject(new Error(`${file.name} could not be read.`));
+    r.readAsDataURL(file);
+  });
+async function download(path, fallbackName) {
+  const res = await fetch(path, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `The server answered ${res.status}.`);
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? fallbackName;
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+}
+
+async function viewAdmin(tab = adminTab) {
+  const tabs = ADMIN_TABS.filter(([, , p]) => can(p));
+  if (!tabs.length) return go(home());
+  adminTab = tabs.some(([id]) => id === tab) ? tab : tabs[0][0];
+  if (location.hash !== `#/admin/${adminTab}`) history.replaceState(null, '', `#/admin/${adminTab}`);
+  shell('admin', `<div class="head"><div><h1 class="serif">Settings</h1><p>Admin settings for the whole command center. Leaders and Sales Engineers do not see them.</p></div><div class="tools"><a class="btn ghost" href="#/about">${esc(state.me.versionLabel ?? '')} · About</a></div></div>
+    <nav class="tabs" role="tablist">${tabs.map(([id, label]) => `<a role="tab" href="#/admin/${id}" class="${id === adminTab ? 'on' : ''}" aria-selected="${id === adminTab}">${esc(label)}</a>`).join('')}</nav><div id="tab">${loading()}</div>`);
+  try {
+    await ADMIN_VIEWS[adminTab]();
+  } catch (error) {
+    if (error.status !== 401) $('#tab').innerHTML = `<div class="panel"><div class="empty"><b>${esc(error.message)}</b></div></div>`;
+  }
+}
+
+const ADMIN_VIEWS = {
+  async general() {
+    const s = await api('/api/settings');
+    $('#tab').innerHTML = `<div class="panel"><h2>Organisation &amp; hosts</h2><form class="form" id="sf">
       <label class="f">Organisation name on the reports<input name="org" maxlength="120" value="${esc(s.organisationName)}" /></label>
+      <div class="row"><label class="f">Default theme for everyone<select name="accent">${THEMES.map(([id, name]) => `<option value="${id}"${(s.theme?.accent ?? 'aurora') === id ? ' selected' : ''}>${name}</option>`).join('')}</select></label><label class="f">Default mode<select name="mode">${['light', 'dark', 'system'].map((m) => `<option value="${m}"${(s.theme?.mode ?? 'light') === m ? ' selected' : ''}>${m[0].toUpperCase()}${m.slice(1)}</option>`).join('')}</select></label></div>
       <div class="row"><label class="f">Salesforce hosts${s.fromEnvironment.salesforce ? ' (set by SALESFORCE_HOSTS)' : ''}<textarea name="sfh" rows="3" ${s.fromEnvironment.salesforce ? 'disabled' : ''}>${esc(s.effective.salesforce.join('\n'))}</textarea></label>
       <label class="f">Checkmarx One hosts${s.fromEnvironment.cxone ? ' (set by CXONE_ALLOWED_HOSTS)' : ''}<textarea name="cxh" rows="3" ${s.fromEnvironment.cxone ? 'disabled' : ''}>${esc(s.effective.cxone.join('\n'))}</textarea></label>
       <label class="f">Git hosts${s.fromEnvironment.git ? ' (set by GIT_ALLOWED_HOSTS)' : ''}<textarea name="gh" rows="3" ${s.fromEnvironment.git ? 'disabled' : ''}>${esc(s.effective.git.join('\n'))}</textarea></label></div>
       <p class="muted small">A host here also allows every name below it (force.com allows acme.lightning.force.com). Private and link-local addresses are never called, whatever is listed.</p>
-      <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="serr"></span></div></form></div>` : ''}
-    ${m ? smtpPanel(m) : ''}
-    ${can('roles.manage') ? `<div class="panel mt"><h2>Roles <small>nobody can give permissions they do not hold</small><button class="sm" id="newrole">${icon('plus')}New role</button></h2>
-      <div class="tw"><table><thead><tr><th>Role</th><th>Permissions</th><th></th></tr></thead><tbody>${d.roles.map((r) => `<tr data-id="${esc(r.id)}"><td><b>${esc(r.name)}</b><span class="sub">${esc(r.description)}</span></td><td class="small">${r.permissions.map((p) => esc(d.permissions.find((x) => x.id === p)?.label ?? p)).join(' · ')}</td><td class="actions">${r.locked ? '<span class="chip">Locked</span>' : '<button class="sm" data-act="role">Edit</button>'}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
-  if (m) wireSmtp(m);
-  if ($('#sf')) $('#sf').onsubmit = async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target);
-    const body = { organisationName: f.get('org') };
-    if (!s.fromEnvironment.salesforce) body.salesforceHosts = f.get('sfh');
-    if (!s.fromEnvironment.cxone) body.cxoneHosts = f.get('cxh');
-    if (!s.fromEnvironment.git) body.gitHosts = f.get('gh');
-    try {
-      await api('/api/settings', { method: 'PUT', body });
-      toast('Settings saved.', 'ok');
-    } catch (error) {
-      $('#serr').textContent = error.message;
-    }
-  };
-  const editRole = (r) => {
-    const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form class="form" id="rf"><div class="dh"><h2>${r ? `Edit ${esc(r.name)}` : 'New role'}</h2></div><div class="db form">
-      <div class="row"><label class="f">Name<input name="name" required maxlength="60" value="${esc(r?.name ?? '')}" /></label><label class="f">Description<input name="desc" maxlength="300" value="${esc(r?.description ?? '')}" /></label></div>
-      ${groups.map((g) => `<div><div class="muted small">${esc(g)}</div><div class="checks">${d.permissions.filter((p) => p.group === g).map((p) => `<label class="check"><input type="checkbox" name="p" value="${esc(p.id)}" ${r?.permissions.includes(p.id) ? 'checked' : ''} ${can(p.id) ? '' : 'disabled'} /><span>${esc(p.label)}<small>${esc(p.description)}</small></span></label>`).join('')}</div></div>`).join('')}
-      <div class="err" id="rerr"></div></div><div class="df">${r && !r.builtin ? '<button type="button" class="danger" id="rdel">Remove</button><span class="spacer"></span>' : ''}<button type="button" class="ghost" id="rclose">Cancel</button><button class="primary" type="submit">Save</button></div></form>`;
-    document.body.append(dlg);
-    dlg.showModal();
-    const close = () => (dlg.close(), dlg.remove());
-    $('#rclose', dlg).onclick = close;
-    $('#rf', dlg).onsubmit = async (e) => {
+      <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="serr"></span></div></form></div>`;
+    $('#sf').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const body = { organisationName: f.get('org'), theme: { accent: f.get('accent'), mode: f.get('mode') } };
+      if (!s.fromEnvironment.salesforce) body.salesforceHosts = f.get('sfh');
+      if (!s.fromEnvironment.cxone) body.cxoneHosts = f.get('cxh');
+      if (!s.fromEnvironment.git) body.gitHosts = f.get('gh');
+      try {
+        await api('/api/settings', { method: 'PUT', body });
+        toast('Settings saved.', 'ok');
+      } catch (error) {
+        $('#serr').textContent = error.message;
+      }
+    };
+  },
+
+  async email() {
+    const m = await api('/api/settings/smtp');
+    $('#tab').innerHTML = smtpPanel(m).replace('<div class="panel mt">', '<div class="panel">');
+    wireSmtp(m);
+  },
+
+  async sso() {
+    const x = await api('/api/settings/sso');
+    const chip = x.ready ? '<span class="chip ok"><i></i>On</span>' : x.enabled ? '<span class="chip warn"><i></i>On, but PUBLIC_URL is missing</span>' : '<span class="chip"><i></i>Off</span>';
+    $('#tab').innerHTML = `<div class="grid g2">
+      <div class="panel"><h2>Identity provider (SAML 2.0) ${chip}</h2>
+        <form class="form" id="ssof">
+          <label class="f">Sign-in URL of the identity provider (SSO URL)<input name="entryPoint" value="${esc(x.entryPoint)}" placeholder="https://login.microsoftonline.com/<tenant>/saml2" /></label>
+          <label class="f">Identity provider issuer (entity ID) <span class="muted">optional, checked when given</span><input name="idpIssuer" value="${esc(x.idpIssuer)}" placeholder="https://sts.windows.net/<tenant>/" /></label>
+          <label class="f">Signing certificate of the identity provider <span class="muted">PEM or base64; two for a rollover</span><textarea name="idpCert" rows="5" placeholder="${x.certificates.length ? 'Kept: paste to replace' : '-----BEGIN CERTIFICATE-----'}"></textarea></label>
+          ${x.certificates.map((c) => `<div class="small muted">${icon('star')} ${esc(c.subject)} · valid until ${esc(date(c.validTo))} · <span class="mono">${esc(c.fingerprint.slice(0, 23))}…</span></div>`).join('')}
+          <div class="row"><label class="f">Email attribute<input name="emailAttribute" value="${esc(x.emailAttribute)}" /></label><label class="f">Name attribute<input name="nameAttribute" value="${esc(x.nameAttribute)}" /></label></div>
+          <label class="check"><input type="checkbox" name="wantResponseSigned" ${x.wantResponseSigned ? 'checked' : ''} /><span>Require the whole response signed too<small>Assertions must always be signed. Turn this on if your identity provider signs both.</small></span></label>
+          <label class="f">Button on the sign-in page<input name="label" maxlength="60" value="${esc(x.label)}" /></label>
+          <label class="check"><input type="checkbox" name="jit" ${x.jit ? 'checked' : ''} /><span>Add people on their first sign-in<small>Otherwise only people an Admin invited can sign in. Never as an Admin or anyone who manages people.</small></span></label>
+          <div class="row"><label class="f">Their role<select name="jitRole">${x.roles.map((r) => `<option value="${esc(r.id)}"${r.id === x.jitRole ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+          <label class="f">Their team<select name="jitTeamId"><option value="">Choose…</option>${x.teams.map((t) => `<option value="${esc(t.id)}"${t.id === x.jitTeamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label></div>
+          <label class="f">Who may still sign in with a password<select name="passwordSignIn"><option value="everyone"${x.passwordSignIn === 'everyone' ? ' selected' : ''}>Everyone</option><option value="admins"${x.passwordSignIn === 'admins' ? ' selected' : ''}>Admins only (a way in if the identity provider is down)</option></select></label>
+          <label class="check"><input type="checkbox" name="enabled" ${x.enabled ? 'checked' : ''} /><span><b>Single sign-on is on</b></span></label>
+          <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="ssoerr"></span></div>
+        </form></div>
+      <div class="panel"><h2>This service, for the identity provider</h2>
+        ${x.sp ? `<dl class="kv"><dt>Entity ID (audience)</dt><dd class="mono">${esc(x.sp.entityId)}</dd><dt>Reply URL (ACS)</dt><dd class="mono">${esc(x.sp.acs)}</dd><dt>Sign-on URL</dt><dd class="mono">${esc(x.sp.login)}</dd><dt>Metadata</dt><dd><a href="/saml/metadata" target="_blank" rel="noopener">${esc(x.sp.metadata)}</a></dd><dt>Name ID</dt><dd class="mono">emailAddress</dd></dl>
+        <div class="callout mt">In your identity provider, add an enterprise application (SAML) with the Entity ID and Reply URL above, send the work email as the NameID or the email attribute, and assign the Sales Engineers and leaders. Then paste its SSO URL and signing certificate here.</div>` : '<div class="callout warn">Set <b>PUBLIC_URL</b> to the https address people use, and restart: the identity provider needs it.</div>'}
+      </div></div>`;
+    $('#ssof').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const body = { entryPoint: f.get('entryPoint'), idpIssuer: f.get('idpIssuer'), emailAttribute: f.get('emailAttribute'), nameAttribute: f.get('nameAttribute'), wantResponseSigned: f.get('wantResponseSigned') === 'on', label: f.get('label'), jit: f.get('jit') === 'on', jitRole: f.get('jitRole'), jitTeamId: f.get('jitTeamId'), passwordSignIn: f.get('passwordSignIn'), enabled: f.get('enabled') === 'on' };
+      if (String(f.get('idpCert') ?? '').trim()) body.idpCert = f.get('idpCert');
+      try {
+        await api('/api/settings/sso', { method: 'PUT', body });
+        toast('Single sign-on saved.', 'ok');
+        viewAdmin('sso');
+      } catch (error) {
+        $('#ssoerr').textContent = error.message;
+      }
+    };
+  },
+
+  async https() {
+    const h = await api('/api/https');
+    const cert = h.certificate ?? {};
+    const sum = cert.summary ?? {};
+    const issues = (cert.checks ?? []).filter((c) => c.level === 'error' || c.level === 'warn').map((c) => `${c.title}${c.detail ? `: ${c.detail}` : ''}`);
+    const selfSigned = Boolean(sum.selfSigned || /self/i.test(String(cert.source ?? '')));
+    const MODE = { http: 'HTTP only', both: 'HTTP and HTTPS', https: 'HTTPS only' };
+    const age = (s) => ({ 86400: 'a day', 604800: 'a week', 15768000: 'half a year', 31536000: 'a year' })[s] ?? `${s} s`;
+    const acme = h.acme ?? {};
+    $('#tab').innerHTML = `<div class="grid g2">
+      <div class="panel"><h2>How the server is reached <span class="chip ${h.mode === 'https' ? 'ok' : h.mode === 'both' ? 'warn' : 'bad'}"><i></i>${esc(MODE[h.mode])}</span></h2>
+        <p class="muted small">One port answers both: each connection's first byte says whether it is TLS. You are viewing this page over <b>${h.viewing.secure ? 'HTTPS' : 'plain http'}</b>.</p>
+        <div class="seg">${['http', 'both', 'https'].map((m) => `<button class="${h.mode === m ? 'primary' : ''}" data-mode="${m}">${esc(MODE[m])}</button>`).join('')}</div>
+        ${h.mode !== 'https' ? `<p class="small mt">To switch to HTTPS only, open <a href="${esc(h.viewing.httpsUrl)}/#/admin/https">${esc(h.viewing.httpsUrl)}</a> and switch there: that proves HTTPS works from your browser first.</p>` : ''}
+        <h3 class="mt">Hardening</h3>
+        <form class="form" id="hard"><div class="row"><label class="f">Lowest TLS version<select name="minVersion">${['TLSv1.2', 'TLSv1.3'].map((v) => `<option${h.minVersion === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="f">HSTS for<select name="maxAge">${h.hstsAges.map((a) => `<option value="${a}"${h.hsts.maxAge === a ? ' selected' : ''}>${esc(age(a))}</option>`).join('')}</select></label></div>
+        <label class="check"><input type="checkbox" name="hsts" ${h.hsts.enabled ? 'checked' : ''} /><span>HSTS: browsers refuse plain http to this name<small>Only with HTTPS only and a certificate browsers trust.</small></span></label>
+        <label class="check"><input type="checkbox" name="sub" ${h.hsts.includeSubDomains ? 'checked' : ''} /><span>Include subdomains</span></label>
+        <div class="flex"><button type="submit">Save hardening</button></div></form>
+        <div class="err" id="herr"></div></div>
+      <div class="panel"><h2>Certificate in use ${h.mode === 'http' || !sum.subject ? '' : selfSigned ? '<span class="chip warn"><i></i>Self-signed: browsers warn</span>' : cert.usable === false ? '<span class="chip bad"><i></i>Not usable</span>' : '<span class="chip ok"><i></i>Trusted</span>'}</h2>
+        ${sum.subject ? `<dl class="kv"><dt>For</dt><dd>${esc(sum.subject)}</dd><dt>Names</dt><dd class="mono small">${esc((sum.names ?? []).join(', '))}</dd><dt>Issuer</dt><dd>${esc(sum.issuer ?? '')}</dd><dt>Valid until</dt><dd>${esc(date(sum.validTo))}${sum.daysLeft !== undefined ? ` · ${esc(sum.daysLeft)} days` : ''}</dd><dt>Source</dt><dd>${esc(cert.source ?? (h.uploaded ? 'uploaded here' : h.environmentCertificate ? 'from the server options' : 'self-signed'))}</dd></dl>` : '<p class="muted">No certificate in use (HTTP only).</p>'}
+        ${issues.length ? `<div class="callout warn mt">${issues.map((i) => esc(typeof i === 'string' ? i : i.message ?? JSON.stringify(i))).join('<br/>')}</div>` : ''}
+        <h3 class="mt">Upload your certificate</h3>
+        <form class="form" id="up"><label class="f">Certificate files <span class="muted">PEM (certificate, chain and key, in any files) or one .pfx</span><input type="file" name="files" multiple accept=".pem,.crt,.cer,.key,.pfx,.p12" /></label>
+        <label class="f">Key or .pfx passphrase <span class="muted">if any</span><input type="password" name="pass" autocomplete="off" /></label>
+        <div class="flex"><button type="button" id="inspect">Check it</button><button class="primary" type="submit">Check and put to use</button>${h.previous ? '<button type="button" class="ghost" id="prev">Put the previous one back</button>' : ''}</div>
+        <div id="upres" class="small mt"></div></form>
+        <details class="mt"><summary>No certificate yet? Ask IT with a request (CSR), or use a self-signed one</summary>
+          <form class="form mt" id="csr"><label class="f">Names it is for<input name="names" value="${esc([...new Set([...(h.selfSignedNames ?? []), h.viewing.host.replace(/:\d+$/, '')])].join(', '))}" /></label><label class="f">Organisation<input name="org" /></label>
+          <div class="flex"><button type="submit">Create a request</button>${h.request?.available ? `<button type="button" class="ghost" id="csrdl">${icon('download')}Download the request</button>` : ''}<button type="button" class="ghost" id="ss">Make a self-signed one for these names</button></div></form></details>
+      </div>
+      <div class="panel"><h2>Free certificate from Let's Encrypt ${acme.issued ? `<span class="chip ok"><i></i>${esc(acme.issued.names?.join(', '))} · renews by itself</span>` : ''}</h2>
+        <p class="muted small">For a public name the internet reaches on port 80. Renewed 30 days before it expires.${acme.fromEnvironment ? ` Set by LETSENCRYPT_DOMAIN: ${esc(acme.fromEnvironment)}.` : ''}</p>
+        <form class="form" id="le"><div class="row"><label class="f">Names<input name="names" value="${esc((acme.last?.names ?? acme.suggested ?? []).join(', '))}" /></label><label class="f">Email for expiry notices<input name="email" type="email" value="${esc(acme.email ?? '')}" /></label></div>
+        <label class="check"><input type="checkbox" name="agree" /><span>I accept the <a href="https://letsencrypt.org/repository/" target="_blank" rel="noopener noreferrer">Let's Encrypt Subscriber Agreement</a></span></label>
+        <label class="check"><input type="checkbox" name="staging" /><span>Staging (a test certificate browsers do not trust)</span></label>
+        <div class="flex"><button class="primary" type="submit">Get the certificate</button>${acme.issued ? '<button type="button" id="renew">Renew now</button><button type="button" class="ghost" id="leoff">Stop renewing</button>' : ''}</div>
+        ${acme.running || acme.last ? `<p class="small mt">${esc(acme.running ? 'Working on it…' : acme.last?.error ? `Last attempt failed: ${acme.last.error}` : acme.last?.at ? `Last attempt ${dateTime(acme.last.at)}` : '')}</p>` : ''}</form></div>
+    </div>`;
+    const err = (e) => ($('#herr').textContent = e.message);
+    for (const b of $$('[data-mode]')) b.onclick = async () => {
+      const mode = b.dataset.mode;
+      try {
+        await api('/api/https/mode', { method: 'POST', body: { mode } });
+      } catch (error) {
+        if (/Confirm/.test(error.message) && confirm(error.message)) await api('/api/https/mode', { method: 'POST', body: { mode, confirm: true } }).catch(err);
+        else return err(error);
+      }
+      toast(`Now ${MODE[mode]}.`, 'ok');
+      viewAdmin('https');
+    };
+    $('#hard').onsubmit = async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
       try {
-        await api(`/api/roles/${encodeURIComponent(r?.id ?? 'new')}`, { method: 'PUT', body: { name: f.get('name'), description: f.get('desc'), permissions: f.getAll('p') } });
-        close();
-        viewAdmin();
+        await api('/api/https/hardening', { method: 'POST', body: { minVersion: f.get('minVersion'), hsts: { enabled: f.get('hsts') === 'on', includeSubDomains: f.get('sub') === 'on', maxAge: Number(f.get('maxAge')) } } });
+        toast('Saved.', 'ok');
+        viewAdmin('https');
       } catch (error) {
-        $('#rerr', dlg).textContent = error.message;
+        err(error);
       }
     };
-    if ($('#rdel', dlg)) $('#rdel', dlg).onclick = async () => {
+    const files = async () => Promise.all([...$('#up input[type=file]').files].map(async (file) => ({ name: file.name, data: await fileToBase64(file) })));
+    const report = (r) => {
+      const s2 = r.summary ?? {};
+      const probs = (r.checks ?? []).filter((c) => c.level === 'error' || c.level === 'warn').map((c) => `${c.title}${c.detail ? `: ${c.detail}` : ''}`);
+      $('#upres').innerHTML = `${s2.subject ? `<b>${esc(s2.subject)}</b> · valid until ${esc(date(s2.validTo))} · ${esc((s2.names ?? []).join(', '))}` : ''}${probs.length ? `<div class="callout warn mt">${probs.map(esc).join('<br/>')}</div>` : '<div class="ok-t">Checked like a browser would: it works.</div>'}`;
+    };
+    $('#inspect').onclick = async () => {
       try {
-        await api(`/api/roles/${encodeURIComponent(r.id)}`, { method: 'DELETE' });
-        close();
-        viewAdmin();
+        report(await api('/api/https/inspect', { method: 'POST', body: { files: await files(), passphrase: $('#up [name=pass]').value } }));
       } catch (error) {
-        $('#rerr', dlg).textContent = error.message;
+        $('#upres').textContent = error.message;
       }
     };
-  };
-  if ($('#newrole')) $('#newrole').onclick = () => editRole(null);
-  for (const b of $$('[data-act="role"]')) b.onclick = () => editRole(d.roles.find((x) => x.id === b.closest('tr').dataset.id));
-}
+    $('#up').onsubmit = async (e) => {
+      e.preventDefault();
+      const body = { files: await files(), passphrase: $('#up [name=pass]').value };
+      try {
+        await api('/api/https/certificate', { method: 'POST', body });
+      } catch (error) {
+        if (/Confirm|confirm/.test(error.message) && confirm(error.message)) {
+          await api('/api/https/certificate', { method: 'POST', body: { ...body, confirm: true } }).catch((x) => ($('#upres').textContent = x.message));
+        } else return ($('#upres').textContent = error.message);
+      }
+      toast('Certificate in use.', 'ok');
+      viewAdmin('https');
+    };
+    if ($('#prev')) $('#prev').onclick = async () => {
+      await api('/api/https/certificate/previous', { method: 'POST', body: {} }).catch(err);
+      viewAdmin('https');
+    };
+    const names = (form) => String(new FormData(form).get('names') ?? '').split(/[\s,]+/).filter(Boolean);
+    $('#csr').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api('/api/https/request', { method: 'POST', body: { names: names(e.target), organization: new FormData(e.target).get('org') } });
+        await download('/api/https/request.csr', 'command-center.csr');
+        viewAdmin('https');
+      } catch (error) {
+        err(error);
+      }
+    };
+    if ($('#csrdl')) $('#csrdl').onclick = () => download('/api/https/request.csr', 'command-center.csr').catch(err);
+    $('#ss').onclick = async () => {
+      try {
+        await api('/api/https/self-signed', { method: 'POST', body: { names: names($('#csr')) } });
+        toast('Self-signed certificate made.', 'ok');
+        viewAdmin('https');
+      } catch (error) {
+        err(error);
+      }
+    };
+    $('#le').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api('/api/https/acme', { method: 'POST', body: { names: names(e.target), email: f.get('email'), agree: f.get('agree') === 'on', staging: f.get('staging') === 'on' } });
+        toast('Asking Let’s Encrypt: this takes under a minute.', 'ok');
+        setTimeout(() => adminTab === 'https' && viewAdmin('https'), 4000);
+      } catch (error) {
+        err(error);
+      }
+    };
+    if ($('#renew')) $('#renew').onclick = () => api('/api/https/acme/renew', { method: 'POST', body: {} }).then(() => toast('Renewing.', 'ok'), err);
+    if ($('#leoff')) $('#leoff').onclick = () => api('/api/https/acme', { method: 'DELETE' }).then(() => viewAdmin('https'), err);
+  },
+
+  async updates() {
+    const u = await api('/api/updates');
+    const ev = { installed: 'Installed', 'install-failed': 'Install refused', switch: 'Switched', 'rolled-back': 'Rolled back', started: 'Started', refused: 'Not started', auto: 'Auto-update' };
+    $('#tab').innerHTML = `<div class="grid g2">
+      <div class="panel"><h2>This server <span class="chip ok"><i></i>${esc(state.me.versionLabel)}</span></h2>
+        <dl class="kv"><dt>Running</dt><dd>${esc(u.running)} (${esc(u.source)})</dd><dt>Built-in</dt><dd>${esc(u.builtIn)}</dd><dt>Releases from</dt><dd><a href="https://github.com/${esc(u.repo)}/releases" target="_blank" rel="noopener noreferrer">github.com/${esc(u.repo)}</a></dd><dt>Last check</dt><dd>${esc(u.lastCheck ? `${dateTime(u.lastCheck.at)} · newest ${u.lastCheck.newest ?? '—'}` : 'never')}</dd></dl>
+        ${u.supervised ? '' : '<div class="callout warn mt">Not started by the launcher (<code>npm start</code> / the container’s command), so versions can be installed but not switched to from here.</div>'}
+        <div class="flex mt"><button class="primary" id="chk">Check for updates</button>${u.supervised ? '<button id="restart" class="ghost">Restart the server</button>' : ''}</div>
+        <h3 class="mt">Auto-update</h3>
+        <form class="flex" id="auto"><label class="check"><input type="checkbox" name="enabled" ${u.auto?.enabled ? 'checked' : ''} /><span>Install new releases by themselves</span></label><label class="f">at<select name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${u.auto?.hour === h ? ' selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select></label><button>Save</button></form>
+        <p class="muted small">Every release is checked against its SHA-256 and the manifest of its files before it is installed, and again before it starts. A backup is taken before every switch. A version that does not come up, or stops within two minutes, is rolled back by itself and never installed automatically again.</p></div>
+      <div class="panel"><h2>Releases</h2>
+        ${u.releases.length ? `<div class="tw"><table><thead><tr><th>Version</th><th>Published</th><th></th></tr></thead><tbody>${u.releases.map((r) => `<tr data-v="${esc(r.version)}"><td><b>${esc(r.version)}</b> ${r.runningNow ? '<span class="chip ok"><i></i>Running</span>' : r.installed ? '<span class="chip"><i></i>Installed</span>' : ''}${r.failed ? '<span class="chip bad"><i></i>Failed to start</span>' : ''}${r.prerelease ? '<span class="chip warn"><i></i>Pre-release</span>' : ''}<span class="sub">${esc(r.notes.split('\n').find((l) => l.trim().startsWith('-'))?.replace(/^[-*]\s*/, '') ?? '')}</span></td><td>${esc(date(r.publishedAt))}</td><td class="actions">${r.runningNow ? '' : !r.installable ? '<span class="muted small">no checksummed archive</span>' : r.installed ? `<button class="sm" data-act="switch">${icon('send')}Switch to</button>` : `<button class="sm" data-act="install">Install</button><button class="sm primary" data-act="installswitch">Install and switch</button>`}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No releases listed yet</b>Check for updates.</div>'}
+        ${u.installed.length || u.source !== 'built-in' ? `<h3 class="mt">Roll back</h3><div class="flex">${u.source !== 'built-in' ? `<button class="sm" data-roll="built-in">Back to the built-in ${esc(u.builtIn)}</button>` : ''}${u.installed.filter((i) => i.version !== u.running).map((i) => `<button class="sm" data-roll="${esc(i.version)}" ${i.verified ? '' : 'disabled title="Its files changed: it would not start"'}>Switch to ${esc(i.version)}</button>`).join('')}</div>` : ''}</div>
+      <div class="panel"><h2>Recent events</h2>${u.events.length ? `<div class="tw"><table><tbody>${u.events.map((e) => `<tr><td class="small">${esc(dateTime(e.at))}</td><td><span class="chip ${/fail|refused|rolled/.test(e.type) ? 'bad' : 'ok'}"><i></i>${esc(ev[e.type] ?? e.type)}</span></td><td class="small">${esc([e.version, e.from && `from ${e.from}`, e.to && `to ${e.to}`, e.why || e.error || e.reason, e.by && `by ${e.by}`].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Nothing yet.</p>'}</div>
+    </div>`;
+    const busy = (b, text) => {
+      b.disabled = true;
+      b.innerHTML = `<span class="spinner"></span>${esc(text)}`;
+    };
+    $('#chk').onclick = async (e) => {
+      busy(e.target, 'Checking…');
+      try {
+        await api('/api/updates/check', { method: 'POST', body: {} });
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+      viewAdmin('updates');
+    };
+    const waitForRestart = async (to) => {
+      shell('admin', `<div class="loading"><div class="orbit"><i></i><i></i><i></i></div><b>Switching to ${esc(to)}…</b><span class="muted">A backup was taken. The page comes back by itself in a few seconds.</span></div>`);
+      for (let i = 0; i < 90; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const h = await fetch('/healthz', { cache: 'no-store' }).then((r) => r.json());
+          if (h.version === to || i > 5) return location.reload();
+        } catch {}
+      }
+      location.reload();
+    };
+    for (const b of $$('[data-act]')) b.onclick = async () => {
+      const v = b.closest('tr').dataset.v;
+      busy(b, b.dataset.act === 'switch' ? 'Switching…' : 'Installing…');
+      try {
+        if (b.dataset.act === 'switch') await api('/api/updates/switch', { method: 'POST', body: { version: v } });
+        else await api('/api/updates/install', { method: 'POST', body: { version: v, switch: b.dataset.act === 'installswitch' } });
+        if (b.dataset.act !== 'install') return waitForRestart(v);
+        toast(`${v} installed and verified.`, 'ok');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+      viewAdmin('updates');
+    };
+    for (const b of $$('[data-roll]')) b.onclick = async () => {
+      if (!confirm(`Switch to ${b.dataset.roll}? A backup is taken first. Going back to an older version can leave newer data it does not know.`)) return;
+      try {
+        const r = await api('/api/updates/switch', { method: 'POST', body: { version: b.dataset.roll, reason: 'rollback' } });
+        waitForRestart(r.to);
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    };
+    $('#auto').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      await api('/api/updates/auto', { method: 'PUT', body: { enabled: f.get('enabled') === 'on', hour: Number(f.get('hour')) } }).then(() => toast('Saved.', 'ok'), (x) => toast(x.message, 'bad'));
+    };
+    if ($('#restart')) $('#restart').onclick = async () => {
+      if (!confirm('Restart the server? Everyone sees "reconnecting" for a few seconds.')) return;
+      await api('/api/system/restart', { method: 'POST', body: {} });
+      waitForRestart(u.running);
+    };
+  },
+
+  async backups() {
+    const [b, v] = await Promise.all([api('/api/backups'), can('audit.view') ? api('/api/audit/verify') : null]);
+    $('#tab').innerHTML = `<div class="grid g2">
+      <div class="panel"><h2>Backups <small>nightly, before every version switch, and by hand · the newest 14 kept</small></h2>
+        <p class="muted small">Everything: people, teams, accounts, reports, settings, certificates and the audit log. ${b.sealed ? 'Sealed with BACKUP_PASSPHRASE.' : 'Not sealed: set BACKUP_PASSPHRASE to seal them with a passphrase.'} Kept in <span class="mono">${esc(b.dir)}</span>.</p>
+        <div class="flex"><button class="primary" id="now">${icon('plus')}Back up now</button></div>
+        <div class="tw mt"><table><tbody>${b.backups.map((x) => `<tr><td class="small mono">${esc(x.name)}</td><td class="small">${esc(dateTime(x.at))}</td><td class="num small">${esc((x.bytes / 1024).toFixed(0))} KB</td><td class="actions"><button class="sm ghost" data-dl="${esc(x.name)}">${icon('download')}Download</button></td></tr>`).join('') || '<tr><td><div class="empty"><b>No backups yet</b></div></td></tr>'}</tbody></table></div>
+        <h3 class="mt">Restore</h3>
+        <form class="form" id="rs"><label class="f">A backup file<input type="file" name="file" accept=".ccbackup" /></label><label class="f">Its passphrase <span class="muted">if sealed</span><input type="password" name="pass" autocomplete="off" /></label><div class="flex"><button type="submit" class="danger">Check and restore</button></div><div class="small" id="rsres"></div></form></div>
+      <div class="panel"><h2>Health</h2>
+        ${v ? `<p>${v.ok ? `<span class="chip ok"><i></i>Audit log intact</span> ${esc(v.events)} events, each chained to the one before.` : `<span class="chip bad"><i></i>Audit log broken</span> at event ${esc(v.brokenAt)}: ${esc(v.why)}.`}</p>` : ''}
+        <p class="muted small">The troubleshooting report has versions, health, settings in force, update events, backups and recent errors, and no secrets, keys or customer data.</p>
+        <div class="flex"><button id="diag">${icon('download')}Download troubleshooting report</button>${can('audit.view') ? `<a class="btn ghost" href="/api/audit/export.csv" download>${icon('download')}Audit log (CSV)</a>` : ''}</div></div>
+    </div>`;
+    $('#now').onclick = async () => {
+      await api('/api/backups', { method: 'POST', body: {} }).then(() => toast('Backed up.', 'ok'), (x) => toast(x.message, 'bad'));
+      viewAdmin('backups');
+    };
+    for (const btn of $$('[data-dl]')) btn.onclick = () => download(`/api/backups/${encodeURIComponent(btn.dataset.dl)}`, btn.dataset.dl).catch((x) => toast(x.message, 'bad'));
+    $('#diag').onclick = () => download('/api/system/diagnostics', 'cc-troubleshooting.json').catch((x) => toast(x.message, 'bad'));
+    $('#rs').onsubmit = async (e) => {
+      e.preventDefault();
+      const file = e.target.file.files[0];
+      if (!file) return ($('#rsres').textContent = 'Choose a backup file.');
+      const body = { data: await fileToBase64(file), passphrase: e.target.pass.value };
+      try {
+        const info = await api('/api/backups/inspect', { method: 'POST', body });
+        if (!confirm(`Restore the backup of ${dateTime(info.at)} (${info.files} files: ${info.accounts} accounts, ${info.reports} reports)?\n\nEverything here is replaced. A backup of what is here now is taken first.`)) return;
+        const r = await api('/api/backups/restore', { method: 'POST', body: { ...body, confirm: true } });
+        $('#rsres').textContent = r.restarting ? 'Restored. The server restarts to read it…' : 'Restored. Restart the server to read it.';
+        if (r.restarting) setTimeout(() => location.reload(), 6000);
+      } catch (error) {
+        $('#rsres').textContent = error.message;
+      }
+    };
+  },
+
+  async roles() {
+    const d = await peopleList();
+    const groups = [...new Set(d.permissions.map((p) => p.group))];
+    $('#tab').innerHTML = `<div class="panel"><h2>Roles <small>nobody can give permissions they do not hold · the special ones stay with Admins</small><button class="sm" id="newrole">${icon('plus')}New role</button></h2>
+      <div class="tw"><table><thead><tr><th>Role</th><th>Permissions</th><th></th></tr></thead><tbody>${d.roles.map((r) => `<tr data-id="${esc(r.id)}"><td><b>${esc(r.name)}</b><span class="sub">${esc(r.description)}</span></td><td class="small">${r.permissions.map((p) => esc(d.permissions.find((x) => x.id === p)?.label ?? p)).join(' · ')}</td><td class="actions">${r.locked ? '<span class="chip">Locked</span>' : '<button class="sm" data-act="role">Edit</button>'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    const editRole = (r) => {
+      const dlg = document.createElement('dialog');
+      dlg.innerHTML = `<form class="form" id="rf"><div class="dh"><h2>${r ? `Edit ${esc(r.name)}` : 'New role'}</h2></div><div class="db form">
+        <div class="row"><label class="f">Name<input name="name" required maxlength="60" value="${esc(r?.name ?? '')}" /></label><label class="f">Description<input name="desc" maxlength="300" value="${esc(r?.description ?? '')}" /></label></div>
+        ${groups.map((g) => `<div><div class="muted small">${esc(g)}</div><div class="checks">${d.permissions.filter((p) => p.group === g).map((p) => `<label class="check"><input type="checkbox" name="p" value="${esc(p.id)}" ${r?.permissions.includes(p.id) ? 'checked' : ''} ${can(p.id) && !p.special ? '' : 'disabled'} /><span>${esc(p.label)}${p.special ? ' <span class="chip">Admin only</span>' : ''}<small>${esc(p.description)}</small></span></label>`).join('')}</div></div>`).join('')}
+        <div class="err" id="rerr"></div></div><div class="df">${r && !r.builtin ? '<button type="button" class="danger" id="rdel">Remove</button><span class="spacer"></span>' : ''}<button type="button" class="ghost" id="rclose">Cancel</button><button class="primary" type="submit">Save</button></div></form>`;
+      document.body.append(dlg);
+      dlg.showModal();
+      const close = () => (dlg.close(), dlg.remove());
+      $('#rclose', dlg).onclick = close;
+      $('#rf', dlg).onsubmit = async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        try {
+          await api(`/api/roles/${encodeURIComponent(r?.id ?? 'new')}`, { method: 'PUT', body: { name: f.get('name'), description: f.get('desc'), permissions: f.getAll('p') } });
+          close();
+          viewAdmin('roles');
+        } catch (error) {
+          $('#rerr', dlg).textContent = error.message;
+        }
+      };
+      if ($('#rdel', dlg)) $('#rdel', dlg).onclick = async () => {
+        try {
+          await api(`/api/roles/${encodeURIComponent(r.id)}`, { method: 'DELETE' });
+          close();
+          viewAdmin('roles');
+        } catch (error) {
+          $('#rerr', dlg).textContent = error.message;
+        }
+      };
+    };
+    $('#newrole').onclick = () => editRole(null);
+    for (const b of $$('[data-act="role"]')) b.onclick = () => editRole(d.roles.find((x) => x.id === b.closest('tr').dataset.id));
+  },
+};
 
 // ---- Email server (SMTP), as CxMissionZero sets it up ---------------------------------------------------------------
 function smtpPanel(m) {
@@ -843,7 +1240,7 @@ function wireSmtp() {
     try {
       await api('/api/settings/smtp', { method: 'PUT', body: { smtp, passwordReset: f.get('passwordReset') } });
       toast('Saved. Now Test connection: nothing is sent until it succeeds.', 'ok');
-      viewAdmin();
+      viewAdmin('email');
     } catch (error) {
       msg(error.message);
     }
@@ -853,7 +1250,7 @@ function wireSmtp() {
     try {
       const r = await api('/api/settings/smtp/test', { method: 'POST', body: {} });
       toast(r.message, 'ok');
-      viewAdmin();
+      viewAdmin('email');
     } catch (error) {
       msg(error.message);
     }
@@ -882,6 +1279,50 @@ async function viewAudit(params) {
   };
 }
 
+// ---- About: the version, what is new, the licence ------------------------------------------------------------------
+/** Markdown from this repository's own files (CHANGELOG.md), as safe HTML: headings, lists, bold and code only. */
+function md(text) {
+  const inline = (t) => esc(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  const out = [];
+  let list = false;
+  for (const line of String(text).split('\n')) {
+    const h = /^(#{1,3})\s+(.*)$/.exec(line);
+    const li = /^\s*[-*]\s+(.*)$/.exec(line);
+    if (!li && list) (out.push('</ul>'), (list = false));
+    if (h) out.push(`<h${h[1].length + 1}>${inline(h[2])}</h${h[1].length + 1}>`);
+    else if (li) (list || (out.push('<ul>'), (list = true)), out.push(`<li>${inline(li[1])}</li>`));
+    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+  }
+  if (list) out.push('</ul>');
+  return out.join('');
+}
+async function viewAbout() {
+  shell('', loading());
+  const log = await fetch('/legal/changelog').then((r) => r.text()).catch(() => '');
+  $('#main').innerHTML = `<div class="head"><div><h1 class="serif">About</h1><p>FTR Credits Command Center <b>${esc(state.me.versionLabel)}</b>, with the Cx Credits Calculator from CxMissionZero <b>${esc(state.me.mz)}</b>.</p></div>
+    <div class="tools"><a class="btn" href="/legal/guide" target="_blank" rel="noopener">User guide</a><a class="btn ghost" href="/legal/terms" target="_blank" rel="noopener">Terms of use</a><a class="btn ghost" href="/legal/license" target="_blank" rel="noopener">PolyForm Internal Use License 1.0.0</a></div></div>
+    <div class="grid g3"><div class="panel md"><h2>What is new</h2>${md(log.replace(/^# .*\n/, ''))}</div>
+    <div class="panel"><h2>Version</h2><dl class="kv"><dt>Command center</dt><dd>${esc(state.me.versionLabel)} (${esc(state.me.version)})</dd><dt>Calculator</dt><dd>CxMissionZero ${esc(state.me.mz)}</dd><dt>Licence</dt><dd>PolyForm Internal Use 1.0.0: internal business use only</dd></dl>
+    <p class="muted small mt">An independent project, not a Checkmarx product. Figures are supporting information only: Checkmarx's own records are authoritative.</p>${can('system.update') ? '<a class="btn mt" href="#/admin/updates">Updates and rollback</a>' : ''}</div></div>`;
+}
+/** Once per new version: what changed, in a dialog. */
+async function whatsNew() {
+  const me = state.me;
+  if (!me || me.prefs?.seenVersion === me.version) return;
+  const first = !me.prefs?.seenVersion;
+  me.prefs = { ...(me.prefs ?? {}), seenVersion: me.version };
+  api('/api/me/prefs', { method: 'PUT', body: { seenVersion: me.version } }).catch(() => {});
+  if (first) return;
+  const log = await fetch('/legal/changelog').then((r) => r.text()).catch(() => '');
+  const section = log.split(/\n(?=## )/).find((x) => x.startsWith('## ')) ?? '';
+  if (!section) return;
+  const dlg = document.createElement('dialog');
+  dlg.innerHTML = `<form method="dialog"><div class="dh"><span class="chip star">${esc(me.versionLabel)}</span><h2 class="mt">What is new</h2></div><div class="db md">${md(section)}</div><div class="df"><a class="btn ghost" href="#/about">Every version</a><button value="ok" class="primary">Got it</button></div></form>`;
+  document.body.append(dlg);
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.showModal();
+}
+
 // ---- Router ---------------------------------------------------------------------------------------------------
 async function route() {
   const [pathPart, query = ''] = location.hash.replace(/^#/, '').split('?');
@@ -897,8 +1338,10 @@ async function route() {
     }
   }
   if (!state.me) return viewLogin();
+  applyMyTheme();
   if (path === '/login') return go(firstStepsDone() ? home() : '/welcome');
   if (!firstStepsDone()) return viewWelcome();
+  whatsNew();
   try {
     if (path === '/' || path === '/welcome') return go(home());
     if (path === '/overview') return await viewOverview(params);
@@ -907,8 +1350,10 @@ async function route() {
     if (path === '/people') return await viewPeople();
     if (path === '/teams') return await viewTeams();
     if (path === '/admin') return await viewAdmin();
+    if (path.startsWith('/admin/')) return await viewAdmin(path.slice('/admin/'.length));
     if (path === '/audit') return await viewAudit(params);
     if (path === '/guide') return viewGuide();
+    if (path === '/about') return await viewAbout();
     go(home());
   } catch (error) {
     if (error.status === 401) return;

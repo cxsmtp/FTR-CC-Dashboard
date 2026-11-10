@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-/** Start the command center: `npm start` (http), or https with TLS_CERT and TLS_KEY. */
-import fs from 'node:fs';
-import http from 'node:http';
-import https from 'node:https';
-
+/**
+ * Start the command center. HTTP and HTTPS are answered on the same port (MZ's HttpsManager: each connection's first
+ * byte tells a TLS handshake from plain http), so moving from http to HTTPS only is done in Settings → HTTPS without
+ * changing the port. Under the launcher (server/launch.js) it tells the launcher when it is up, for rollbacks.
+ */
 import { loadConfig } from './config.js';
 import { createApp } from './app.js';
+import { describeCertificate } from '../vendor/mz/src/tls.js';
 
 const [major] = process.versions.node.split('.').map(Number);
 if (major < 22) {
@@ -20,12 +21,28 @@ const handler = (req, res) =>
     console.error(error);
     if (!res.headersSent) res.writeHead(500).end();
   });
-const server = config.tlsCert && config.tlsKey ? https.createServer({ cert: fs.readFileSync(config.tlsCert), key: fs.readFileSync(config.tlsKey), minVersion: 'TLSv1.2' }, handler) : http.createServer(handler);
-server.headersTimeout = 30_000;
-server.requestTimeout = 120_000;
-server.listen(config.port, config.host, () => {
-  console.log(`FTR Credits Command Center on ${config.tlsCert ? 'https' : 'http'}://${config.host}:${config.port} · data in ${config.dataDir}`);
+const httpsOnly = (req, res) =>
+  app.httpsOnly(req, res).catch(() => {
+    if (!res.headersSent) res.writeHead(500).end();
+  });
+
+const server = app.https.listen({ app: handler, httpsOnly, port: config.port, host: config.host }, async () => {
+  const mode = app.https.mode;
+  const where = `${config.host}:${config.port}`;
+  console.log(`FTR Credits Command Center ${app.versionLabel} on ${mode === 'http' ? `http://${where}` : mode === 'https' ? `https://${where} (plain http on the same port is redirected)` : `http://${where} and https://${where}`} · data in ${config.dataDir}`);
+  const options = mode === 'http' ? null : app.https.contextOptions();
+  if (options) {
+    const { selfSigned, source } = app.https.describe();
+    console.log(`[https] ${selfSigned ? 'Self-signed certificate (browsers warn until it is trusted: upload yours under Settings → HTTPS, or get one from Let’s Encrypt there)' : `Certificate (${source})`}: ${describeCertificate(options)}`);
+  }
+  app.https.watch();
+  await app.started();
+  if (process.env.CC_SUPERVISOR === '1') process.send?.({ type: 'ready', version: app.version });
 });
-const stop = () => server.close(() => process.exit(0));
+const stop = () => {
+  server.close();
+  app.stop();
+  setTimeout(() => process.exit(0), 500).unref();
+};
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);

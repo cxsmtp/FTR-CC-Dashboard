@@ -28,7 +28,11 @@ export const PERMISSIONS = [
   { id: 'users.manage', group: 'Administration', label: 'Manage people', description: 'Invite people, give them a role and a team, reset their password, deactivate them; never beyond their own permissions.' },
   { id: 'roles.manage', group: 'Administration', label: 'Manage roles', description: 'Create and change roles; never with permissions they do not hold.' },
   { id: 'audit.view', group: 'Administration', label: 'See the audit log', description: 'Who signed in, who changed what, every report generated and shared.' },
-  { id: 'settings.manage', group: 'Administration', label: 'Settings', description: 'Organisation name, Salesforce hosts allowed, sign-in rules and backups.' },
+  { id: 'security.https', group: 'Administration', label: 'HTTPS and certificates', description: 'Upload and replace the server certificate, get one from Let\u2019s Encrypt, and move the server from http to HTTPS only. Admin only.', special: true },
+  { id: 'security.sso', group: 'Administration', label: 'Single sign-on (SAML)', description: 'Connect the company identity provider for sign-in. Admin only.', special: true },
+  { id: 'system.update', group: 'Administration', label: 'Updates and rollback', description: 'Install new versions (checked against their checksums), turn on auto-update and roll back. Admin only.', special: true },
+  { id: 'backup.manage', group: 'Administration', label: 'Backups and restore', description: 'Take, download and restore backups (they hold every account, person and key). Admin only.', special: true },
+  { id: 'settings.manage', group: 'Administration', label: 'Settings', description: 'Organisation name, the hosts the server may call, the email server and the troubleshooting report. Admin only.', special: true },
 ];
 export const PERMISSION_IDS = PERMISSIONS.map((p) => p.id);
 
@@ -41,6 +45,8 @@ export const DEFAULT_ROLES = {
 };
 
 export const cleanPermissions = (list) => [...new Set((Array.isArray(list) ? list : []).filter((p) => PERMISSION_IDS.includes(p)))];
+/** Held by the Admin role alone (HTTPS, single sign-on, updates, backups, settings): never by another role, not even a leader's. */
+export const ADMIN_ONLY = PERMISSIONS.filter((p) => p.special).map((p) => p.id);
 
 /** The teams as a tree: children by parent. */
 export function teamTree(teams) {

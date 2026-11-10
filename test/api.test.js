@@ -206,3 +206,12 @@ test('Impact (beta): off by default, on only after the SE confirms a currency, k
   const apac = await client(env.base, 'apac@t.example');
   assert.equal((await apac.get(`/api/cc/accounts/${id}/currency`)).status, 404);
 });
+
+test('Admin-only settings: no other role can hold them, not even a leader’s', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  for (const p of ['security.https', 'security.sso', 'system.update', 'backup.manage', 'settings.manage']) {
+    assert.equal((await admin.put('/api/roles/new', { name: `x-${p}`, permissions: [p, 'dashboard.view'] })).status, 403, p);
+  }
+  const lead = await client(env.base, 'vp@t.example');
+  for (const path of ['/api/https', '/api/settings/sso', '/api/updates', '/api/backups', '/api/settings', '/api/settings/smtp']) assert.equal((await lead.get(path)).status, 403, path);
+});

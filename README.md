@@ -11,7 +11,13 @@ The **Cx Credits Calculator**, hosted for every Sales Engineer, with team-based 
 - **Dashboards.** Projected credits from primary reports (T&R and Fusion), rolled up the team tree; per SE, per account, the largest projections, activity by month, accounts missing a Salesforce link; CSV export.
 - **Impact (beta), per account.** Off by default. The SE confirms a suggested currency (from the account's name, region or time zone) and sets the minutes to triage and to remediate a finding and the developers' hourly rate. The report and its PDF then show the soft savings of the triage and remediation forecast (MZ's own Impact section).
 - **Status strip.** The Checkmarx One connection, the account's data sources, its Salesforce link, Impact and readiness, always on top in the calculator, including while a report is generated.
-- **Light by default.** Light and dark themes, light first.
+- **HTTPS by default, from CxMissionZero.** Upload the company certificate (PEM or .pfx) or get one from Let's Encrypt; switch between HTTP, HTTP + HTTPS and HTTPS only on one port; HSTS and the lowest TLS version.
+- **Single sign-on (SAML 2.0)** with Entra ID, Okta, Ping or ADFS. Signed assertions only; people can optionally be added on their first sign-in; passwords can be kept for Admins only.
+- **Updates with checksum checks and automatic rollback.** Releases come from GitHub Releases, checked against SHA256SUMS and a manifest of every file. A backup is taken before every switch. A version that does not come up is rolled back by itself. Roll back by hand to any version, and auto-update at a chosen hour.
+- **Backups, health and audit integrity.** Nightly backups, sealed with a passphrase if set, that can be restored. A chained audit log you can verify. A troubleshooting report with no secrets.
+- **Admin-only settings.** HTTPS, single sign-on, updates, backups and settings can never be given to another role, not even a leader's.
+- **Themes and versions.** Six palettes in light, dark or the system's mode, kept per person; light by default. The version is shown as CC-xx.xx.xx, with an About page and "What is new" after each update.
+- **Animated calculations.** Progress while reading Checkmarx One or counting code, a report-generating overlay, and totals that count up.
 - **Prospects not on Checkmarx One.** A Fusion forecast from **git** (read-only token) or from the **cloc-fusion** report the prospect runs themselves.
 - **Forgot your password? and email (from CxMissionZero).** An Admin sets up the SMTP server under Settings → Email server, tests it, and can send a test email. People can then reset a forgotten password with a one-time emailed link, and invites can send a welcome email. The one-time password itself is never emailed.
 - **First sign-in.** A one-time password, then the person chooses their own, accepts the **terms of use**, and reads a **quick guide** for their role.
@@ -25,7 +31,7 @@ Node.js 22 or later, and git (for Fusion · from Git). **No npm dependencies.**
 
 ```bash
 cp .env.example .env    # set ADMIN_EMAIL and PUBLIC_URL at least
-npm start
+npm start      # the launcher: HTTPS on PORT (8443 in the container), updates and rollback
 ```
 
 On the first start the server creates the Admin and writes their one-time password to `DATA_DIR/initial-admin-password.txt`. The file is deleted once they choose their own password. Sign in, then add the teams (**Teams**) and people (**People → Invite someone**).
@@ -43,12 +49,16 @@ To try it with a fictional organisation (3 regions, 27 people, about 40 accounts
 DATA_DIR=./demo-data node scripts/demo-seed.mjs && DATA_DIR=./demo-data npm start
 ```
 
+Admins: see the **[admin and hosting guide](docs/ADMIN-GUIDE.md)** for HTTPS, single sign-on, email, updates and backups.
+
 ## Hosting it internally
 
 | Setting | What it does |
 | --- | --- |
 | `PUBLIC_URL` | The address people use. Requests from any other origin are refused; with `https://`, cookies are `Secure`. |
-| `TLS_CERT` / `TLS_KEY` | Serve https directly. Or put it behind your reverse proxy (TLS there) and set `TRUST_PROXY=true`. |
+| `HTTPS`, `TLS_CERT_FILE` / `TLS_KEY_FILE` (or `TLS_PFX_FILE`), `LETSENCRYPT_DOMAIN` | HTTPS is on by default (self-signed until you upload a certificate or get one from Let's Encrypt under Settings → HTTPS). `HTTPS=off` behind a reverse proxy that does TLS (then set `TRUST_PROXY=true`). |
+| `UPDATE_REPO`, `UPDATE_GITHUB_TOKEN`, `HTTPS_PROXY` | Where releases come from, and the company proxy for outbound calls. |
+| `BACKUP_PASSPHRASE` | Seals backups (AES-256-GCM). |
 | `DATA_DIR` | Everything is kept here as JSON files. **Back it up** (or use Settings → Download backup). |
 | `SESSION_IDLE_HOURS` | Sign-out after this long idle (8 hours by default). A session never lasts more than 7 days. |
 | `SALESFORCE_HOSTS`, `CXONE_ALLOWED_HOSTS`, `GIT_ALLOWED_HOSTS` | The only hosts accepted for Salesforce links, Checkmarx One and git. Or set them in Settings. Addresses inside a network (private, loopback, link-local, metadata) are never called, so an API key or token cannot make the server call inside the company network. |
@@ -88,6 +98,9 @@ npm run dev
 | `server/app.js` | Routes: sign-in, dashboards, accounts, reports, people, teams, roles, settings, audit, the calculator's API |
 | `server/rbac.js` | Permissions, roles, the team tree and scope |
 | `server/iam.js` | People, passwords, sessions |
+| `server/sso.js` | Single sign-on (SAML 2.0) |
+| `server/updates.js`, `server/launch.js`, `scripts/make-release.mjs` | Checksum-verified updates, the launcher with rollback, release builds |
+| `server/backup.js` | Backups and restore |
 | `server/password-reset.js`, `server/mailer.js` | Forgotten passwords and the email server (from CxMissionZero) |
 | `server/accounts.js` | Accounts (calculator customers + Salesforce, owner, team, primary) and reports (+ shared) |
 | `server/calculator.js` | The hosted calculator page and each person's Checkmarx One and git reads |

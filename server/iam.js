@@ -9,7 +9,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 import { Doc, fail } from './store.js';
-import { DEFAULT_ROLES, PERMISSION_IDS, cleanPermissions } from './rbac.js';
+import { ADMIN_ONLY, DEFAULT_ROLES, PERMISSION_IDS, cleanPermissions } from './rbac.js';
 
 const scrypt = promisify(scryptCb);
 
@@ -67,11 +67,11 @@ export class Iam {
     const roles = {};
     for (const [id, role] of Object.entries(DEFAULT_ROLES)) {
       const stored = raw.roles?.[id];
-      roles[id] = { ...role, permissions: role.locked ? [...PERMISSION_IDS] : cleanPermissions(stored?.permissions ?? role.permissions), name: role.locked ? role.name : clean(stored?.name ?? role.name, 60) || role.name, description: stored?.description ?? role.description };
+      roles[id] = { ...role, permissions: role.locked ? [...PERMISSION_IDS] : cleanPermissions(stored?.permissions ?? role.permissions).filter((p) => !ADMIN_ONLY.includes(p)), name: role.locked ? role.name : clean(stored?.name ?? role.name, 60) || role.name, description: stored?.description ?? role.description };
     }
     for (const [id, role] of Object.entries(raw.roles ?? {})) {
       if (DEFAULT_ROLES[id] || ['__proto__', 'constructor', 'prototype'].includes(id)) continue;
-      roles[id] = { name: clean(role.name, 60) || id, description: clean(role.description, 300), permissions: cleanPermissions(role.permissions), builtin: false };
+      roles[id] = { name: clean(role.name, 60) || id, description: clean(role.description, 300), permissions: cleanPermissions(role.permissions).filter((p) => !ADMIN_ONLY.includes(p)), builtin: false };
     }
     raw.roles = roles;
     raw.users = Array.isArray(raw.users) ? raw.users.filter((u) => u?.id && u?.email) : [];
@@ -96,6 +96,7 @@ export class Iam {
     if (roles[key]?.locked) throw fail(400, 'The Admin role always holds every permission.');
     const wanted = cleanPermissions(permissions);
     if (wanted.some((p) => !granterPermissions.has(p))) throw fail(403, 'A role cannot be given permissions you do not hold.');
+    if (wanted.some((p) => ADMIN_ONLY.includes(p))) throw fail(403, 'HTTPS, single sign-on, updates, backups and settings stay with the Admin role: no other role can hold them.');
     roles[key] = { ...(roles[key] ?? { builtin: false }), name: clean(name, 60) || roles[key]?.name || 'New role', description: clean(description, 300), permissions: wanted };
     this.save();
     return { id: key, ...roles[key] };
