@@ -6,12 +6,17 @@
   "description": "FTR Credits Command Center: the Cx Credits Calculator hosted for every Sales Engineer, with team-based RBAC and leadership dashboards of every projection made and shared.",
   "type": "module",
   "main": "server/index.js",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test test/*.test.js",
     "sync-mz": "node scripts/sync-mz.mjs",
     "reset-admin": "node scripts/reset-admin.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "^10.2.1"
   }
 }

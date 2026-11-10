@@ -10,6 +10,7 @@ The **Cx Credits Calculator**, hosted for every Sales Engineer, with team-based 
 - **Team structure and RBAC.** Teams form a tree (Global → regions → teams). Everyone in a team works on all of its accounts together. Leaders see every team below them; Executives and Admins see every team. Other teams' accounts are invisible. There are five roles (Admin, Executive, Leader, Sales Engineer, Viewer) plus custom roles, and nobody can grant what they do not hold.
 - **Dashboards.** Projected credits from primary reports (T&R and Fusion), rolled up the team tree; per SE, per account, the largest projections, activity by month, accounts missing a Salesforce link; CSV export.
 - **Prospects not on Checkmarx One.** A Fusion forecast from **git** (read-only token) or from the **cloc-fusion** report the prospect runs themselves.
+- **Forgot your password? and email (from CxMissionZero).** An Admin sets up the SMTP server under Settings → Email server, tests it, and can send a test email. People can then reset a forgotten password with a one-time emailed link, and invites can send a welcome email. The one-time password itself is never emailed.
 - **First sign-in.** A one-time password, then the person chooses their own, accepts the **terms of use**, and reads a **quick guide** for their role.
 - **Licensing.** [PolyForm Internal Use License 1.0.0](LICENSE) with the [terms of use](TERMS.md), shown and accepted in the product.
 
@@ -48,10 +49,13 @@ DATA_DIR=./demo-data node scripts/demo-seed.mjs && DATA_DIR=./demo-data npm star
 | `DATA_DIR` | Everything is kept here as JSON files. **Back it up** (or use Settings → Download backup). |
 | `SESSION_IDLE_HOURS` | Sign-out after this long idle (8 hours by default). A session never lasts more than 7 days. |
 | `SALESFORCE_HOSTS`, `CXONE_ALLOWED_HOSTS`, `GIT_ALLOWED_HOSTS` | The only hosts accepted for Salesforce links, Checkmarx One and git. Or set them in Settings. Addresses inside a network (private, loopback, link-local, metadata) are never called, so an API key or token cannot make the server call inside the company network. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional: the email server on the first start. Or set it in Settings → Email server. Either way an Admin tests it there before anything is sent. Reset links point only at `PUBLIC_URL`, which must be https. |
 | `MZ_PRODUCT_CODE` | The calculator, like CxMissionZero, works until **31 December 2026** unless a product activation code is given. Given here, nobody has to type it. |
 
 ## Security
 
+- Forgotten passwords (as CxMissionZero): a 256-bit one-time link to the account's own email. Only its hash is kept, in memory. It works once, for 30 minutes, and only while the password is unchanged; using it signs the account out everywhere. The answer never says whether an address has an account, and requests are rate-limited per address and per account. Admins can exclude people who manage people, or turn it off.
+- The SMTP password is encrypted at rest (AES-256-GCM, key in `DATA_DIR/secret.key`) and never shown again; mail is sent only after a successful test of exactly the settings in force, and a password login always uses TLS.
 - Passwords hashed with scrypt; 12 characters minimum; account locked 15 minutes after 5 wrong tries; sign-in rate limits per address and per account.
 - Sessions: random tokens in an `HttpOnly`, `SameSite=Strict` cookie; only their SHA-256 is stored. CSRF token and Origin check on every change.
 - Content Security Policy on every page: the dashboard runs only its own files; the calculator only its own scripts, pinned by hash.
@@ -81,6 +85,7 @@ npm run dev
 | `server/app.js` | Routes: sign-in, dashboards, accounts, reports, people, teams, roles, settings, audit, the calculator's API |
 | `server/rbac.js` | Permissions, roles, the team tree and scope |
 | `server/iam.js` | People, passwords, sessions |
+| `server/password-reset.js`, `server/mailer.js` | Forgotten passwords and the email server (from CxMissionZero) |
 | `server/accounts.js` | Accounts (calculator customers + Salesforce, owner, team, primary) and reports (+ shared) |
 | `server/calculator.js` | The hosted calculator page and each person's Checkmarx One and git reads |
 | `client/` | The calculator's hosted entry and frame (replaces MZ's standalone.js) |

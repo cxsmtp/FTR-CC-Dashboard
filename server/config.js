@@ -37,6 +37,8 @@ export function loadConfig(env = process.env) {
     sessionIdleHours: Math.min(Math.max(Number(env.SESSION_IDLE_HOURS ?? 8) || 8, 1), 72),
     productCode: env.MZ_PRODUCT_CODE ?? '',
     salesforceHosts: list(env.SALESFORCE_HOSTS, null),
+    // The email server on the first start (an Admin still tests it in Settings → Email server before anything is sent).
+    smtp: env.SMTP_HOST ? { host: env.SMTP_HOST, port: Number(env.SMTP_PORT ?? 587), secure: bool(env.SMTP_SECURE, false), requireAuth: Boolean(env.SMTP_USER), user: env.SMTP_USER ?? '', password: env.SMTP_PASSWORD ?? '', fromAddress: env.SMTP_FROM ?? '', fromName: env.SMTP_FROM_NAME ?? 'FTR Credits Command Center' } : null,
     cxoneHosts: list(env.CXONE_ALLOWED_HOSTS, null),
     gitHosts: list(env.GIT_ALLOWED_HOSTS, null),
   };

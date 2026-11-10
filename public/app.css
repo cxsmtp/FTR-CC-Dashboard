@@ -291,3 +291,7 @@ dialog .df { padding: 0 22px 18px; display: flex; justify-content: flex-end; gap
 .more { display: block; text-align: center; margin-top: 12px; font-size: 13px; }
 td .flex, .bar .name .flex { flex-wrap: nowrap; }
 .bar .name .flex > div { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ok-t { color: var(--green); }
+.flex .grow { flex: 1; min-width: 200px; width: auto; }
+#forgot-link { justify-self: center; }
+.panel h2 .chip { margin-left: auto; }

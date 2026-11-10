@@ -183,6 +183,17 @@ export class Iam {
     this.save();
   }
 
+  /** A new password chosen through an emailed reset link: checked as any other, and not the current one. */
+  async setPasswordFromLink(id, next) {
+    const user = this.byId(id);
+    if (!user) throw fail(404, 'That person no longer has access.');
+    const problem = passwordProblem(next, user.email);
+    if (problem) throw fail(400, problem);
+    if (await checkPassword(next, user.passwordHash)) throw fail(400, 'Choose a password different from the current one.');
+    Object.assign(user, { passwordHash: await hashPassword(next), mustChangePassword: false, failed: 0, lockedUntil: 0, passwordChangedAt: new Date().toISOString() });
+    this.save();
+  }
+
   markGuideSeen(id) {
     const user = this.byId(id);
     if (user) {

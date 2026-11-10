@@ -10,7 +10,7 @@ The command center is where every Sales Engineer works out the credits an accoun
 4. **Accept the terms of use.** Read them first: projections are supporting information only, keys and tokens are for the projection only, and the command center is for internal use under the PolyForm Internal Use License 1.0.0. You are asked again whenever the terms change.
 5. **Read the quick guide.** It shows the steps for your role. It is always under **Quick guide** in the menu.
 
-Forgot your password, or locked out after 5 wrong tries? Wait 15 minutes, or ask an Admin to reset it. You get a new one-time password.
+**Forgot your password?** On the sign-in page, click **Forgot your password?** and enter your work email. A link to choose a new one arrives by email. It works once, for 30 minutes, and signs you out everywhere else. Nothing arrived? Check spam, or ask an Admin to reset it: they give you a new one-time password. Locked out after 5 wrong tries? Wait 15 minutes.
 
 ## 2. Who sees what
 
@@ -57,6 +57,7 @@ Open **Accounts**, then the account:
 
 - **People:** **Invite someone** with their role and team. A one-time password is shown **once**: give it to them over a channel only they read. **Edit** to change a role or team, reset a password, turn access off, or remove someone (their accounts stay with the team). Nobody can give a role with permissions they do not hold, and there is always one active Admin.
 - **Teams:** make the tree, choose each team's region and leaders.
+- **Settings & roles → Email server (SMTP):** the mail server, port, TLS, sign-in and from address. **Save**, then **Test connection**: nothing is sent until the test succeeds for exactly those settings. **Send test email** proves delivery. Choose who may reset a forgotten password by email (everyone; everyone but those who manage people; nobody). Links in emails point at the server's `PUBLIC_URL`. When email works, **Invite someone** can also send a welcome email (never the one-time password).
 - **Settings & roles:** the organisation name on reports; the Salesforce, Checkmarx One and git hosts the server may call; custom roles; **Download backup**.
 - **Audit log:** sign-ins, accounts and reports made, primary and shared marks, and every change to people, teams, roles and settings.
 - Locked out of every Admin account? On the server: `node scripts/reset-admin.mjs you@yourcompany.com`.

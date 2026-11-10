@@ -12,10 +12,10 @@ export const PASSWORD = 'Test-Password-For-Tests-1';
 export const SF = 'https://acme.lightning.force.com/lightning/r/Opportunity/006AB000001xYzQAAQ/view';
 
 /** A server on a free port with: Global → EMEA, APAC; an Admin, a VP leading Global, an EMEA leader, two EMEA SEs, one APAC SE. */
-export async function start() {
+export async function start({ mailTransport, publicUrl = '' } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-test-'));
-  const config = { root: ROOT, dataDir, adminEmail: 'admin@t.example', adminName: 'Admin', sessionIdleHours: 8, signInPerMinute: 10000, secureCookies: false, trustProxy: false, publicUrl: '', productCode: '', salesforceHosts: null, cxoneHosts: null, gitHosts: null };
-  const app = createApp(config, { log: () => {} });
+  const config = { root: ROOT, dataDir, adminEmail: 'admin@t.example', adminName: 'Admin', sessionIdleHours: 8, signInPerMinute: 10000, secureCookies: false, trustProxy: false, publicUrl, productCode: '', salesforceHosts: null, cxoneHosts: null, gitHosts: null };
+  const app = createApp(config, { log: () => {}, ...(mailTransport ? { mailTransport } : {}) });
   await app.ready;
   const server = http.createServer((req, res) => app.handle(req, res));
   await new Promise((r) => server.listen(0, '127.0.0.1', r));

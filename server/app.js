@@ -13,6 +13,8 @@ import { PERMISSIONS, need, needTeam, peopleInScope, scopeOf, subtree, teamPath 
 import { Teams } from './teams.js';
 import { Accounts, DEFAULT_SALESFORCE_HOSTS } from './accounts.js';
 import { Terms } from './terms.js';
+import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
+import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
 import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, MZ_SOURCE, impactSettings, pageFor, summary } from './calculator.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -20,7 +22,7 @@ const COOKIE = 'cc_session';
 const BODY_LIMIT = 256 * 1024;
 const CALC_LIMIT = 40 * 1024 * 1024;
 
-export function createApp(config, { log = console.log, calculatorService = null } = {}) {
+export function createApp(config, { log = console.log, calculatorService = null, mailTransport = smtpTransport } = {}) {
   fs.mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
   const iam = new Iam(config.dataDir);
   const teams = new Teams(config.dataDir);
@@ -36,6 +38,48 @@ export function createApp(config, { log = console.log, calculatorService = null 
   const calc = calculatorService ?? new CalculatorService({ cxoneHosts: hosts().cxone, gitHosts: hosts().git, log });
   const syncHosts = () => Object.assign(calc, { cxoneHosts: hosts().cxone, gitHosts: hosts().git });
   const idleMs = config.sessionIdleHours * 3600 * 1000;
+
+  // ---- Email (Settings → Email server) and forgotten passwords, as CxMissionZero does them ---------------------
+  const secrets = new Secrets(config.dataDir);
+  if (!settings.value.smtp && config.smtp?.host) {
+    // First start with SMTP_* in the environment: those settings, still to be tested by an Admin.
+    settings.value.smtp = { ...mergeSmtp({}, config.smtp), password: secrets.seal(config.smtp.password ?? '') };
+    settings.save();
+  }
+  const smtpNow = () => {
+    const kept = settings.value.smtp ?? {};
+    return { ...mergeSmtp({}, { ...kept, password: undefined }), password: secrets.open(kept.password) };
+  };
+  const mailReady = () => {
+    const smtp = smtpNow();
+    return Boolean(smtp.host) && settings.value.smtpVerified === smtpFingerprint(smtp);
+  };
+  const resetPolicy = () => (RESET_POLICIES.includes(settings.value.passwordReset) ? settings.value.passwordReset : 'everyone');
+  /** Reset links point only at the address set for this server, never at the one a request came in on. */
+  const linkBase = () => {
+    try {
+      const u = new URL(config.publicUrl);
+      if (u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname))) return u.origin;
+    } catch {}
+    return '';
+  };
+  const resetReady = () => {
+    const missing = [];
+    if (resetPolicy() === 'off') missing.push('Turned off in Settings → Email server.');
+    if (!mailReady()) missing.push('The email server is not set up and tested (Settings → Email server).');
+    if (!linkBase()) missing.push('PUBLIC_URL is not set to the https address people use.');
+    return { ready: !missing.length, policy: resetPolicy(), missing };
+  };
+  const sendMail = async (to, message) => {
+    if (!mailReady()) throw new MailError('The email server is not set up and tested yet (Settings → Email server).', 409);
+    return mailTransport.send(smtpNow(), { to, subject: message.subject, text: message.text, html: message.html });
+  };
+  const passwordResets = new PasswordResets();
+  const resetsInFlight = new Set();
+  const RESET_ASKED = 'If that address has an account that may reset its password here, a link to choose a new one is on its way. It works once, for 30 minutes. Nothing arrived? Check spam, or ask an Admin.';
+  const RESET_DEAD = 'This link no longer works: it was used, a newer one was sent, it is more than 30 minutes old, or the password has changed since. Ask for a new one.';
+  const utc = (ms) => `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  const managesPeople = (user) => iam.permissionsOf({ ...user, active: true }).has('users.manage');
   // Sign-in attempts: per address and email (a guess at one account), and per address overall (many accounts);
   // the per-account lock in iam.js stops slow guessing. Behind a proxy, set TRUST_PROXY so each person has their address.
   const signInPerAccount = new RateLimit({ max: 10, windowMs: 60_000 });
@@ -124,6 +168,69 @@ export function createApp(config, { log = console.log, calculatorService = null 
     return { ok: true };
   });
 
+  // ---- Forgot your password? A one-time link to the account's own email (server/password-reset.js) ------------------
+  r('GET', '/api/auth/reset', () => ({ available: resetReady().ready }));
+  async function sendResetLink(email, ip) {
+    const user = iam.byEmail(email);
+    const why = !user ? 'no account has that address' : user.active === false ? 'the account is turned off' : !resetAllowed(resetPolicy(), { isAdmin: managesPeople(user) }) ? 'resetting by email is not allowed for this account' : !resetReady().ready ? 'email or PUBLIC_URL is not set up' : !passwordResets.maySend(user.id) ? 'too many links for this account in the last hour' : '';
+    if (why) return audit.record({ action: 'auth.reset.refused', target: user ? user.email : '', details: { why }, ip });
+    const { token, exp } = passwordResets.issue(user);
+    // The secret travels after #: browsers never send that part to a server, nor in a Referer.
+    const link = `${linkBase()}/#/reset?token=${token}`;
+    try {
+      await sendMail(user.email, systemEmail({ subject: 'Reset your FTR Credits Command Center password', lines: [`Someone, hopefully you, asked to reset the password of ${user.email} on the FTR Credits Command Center.`, 'To choose a new password, open the link below. It works once, for 30 minutes.'], facts: [['Asked from', ip || 'unknown'], ['Asked at', utc(Date.now())], ['Link works until', utc(exp)]], button: { label: 'Choose a new password', url: link }, footer: 'Did not ask for this? Ignore this email: your password stays as it is and the link stops working by itself. If it keeps happening, tell an Admin.' }));
+      audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.reset.sent', ip, details: { until: utc(exp) } });
+    } catch (error) {
+      passwordResets.revokeUser(user.id);
+      audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.reset.failed', ip, details: { error: error.message } });
+    }
+  }
+  r('POST', '/api/auth/forgot', (req, ctx, body) => {
+    const ip = ipOf(req);
+    if (passwordResets.ipBlocked(ip)) throw fail(429, 'Too many requests from this address. Wait a quarter of an hour.');
+    passwordResets.noteIp(ip);
+    const email = clean(body?.email, 254).toLowerCase();
+    if (!email) throw fail(400, 'Enter the email address you sign in with.');
+    // Always the same answer, and the work after it, so neither the words nor the timing say whether the address has an account.
+    setImmediate(() => sendResetLink(email, ip).catch((error) => log(`[password reset] ${error.message}`)));
+    return { message: RESET_ASKED };
+  });
+  const liveLink = (req, token) => {
+    const ip = ipOf(req);
+    if (passwordResets.ipBlocked(ip)) throw fail(429, 'Too many requests from this address. Wait a quarter of an hour.');
+    const user = passwordResets.check(token, (id) => {
+      const u = iam.byId(id);
+      return u && { ...u, disabled: u.active === false };
+    });
+    if (!user || !resetAllowed(resetPolicy(), { isAdmin: managesPeople(user) })) {
+      passwordResets.noteIp(ip);
+      throw fail(400, RESET_DEAD);
+    }
+    return user;
+  };
+  r('POST', '/api/auth/reset/check', (req, ctx, body) => {
+    const user = liveLink(req, body?.token);
+    return { email: maskEmail(user.email), minutes: Math.round(RESET_TTL_MS / 60_000) };
+  });
+  r('POST', '/api/auth/reset/confirm', async (req, ctx, body) => {
+    const token = String(body?.token ?? '');
+    const user = liveLink(req, token);
+    if (resetsInFlight.has(user.id)) throw fail(409, 'This link is already being used. Wait a moment.');
+    resetsInFlight.add(user.id);
+    try {
+      await iam.setPasswordFromLink(user.id, body?.password);
+      passwordResets.consume(token);
+      passwordResets.revokeUser(user.id);
+      iam.endSessionsOf(user.id);
+      calc.forget(user.id);
+      audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.reset.done', ip: ipOf(req) });
+      sendMail(user.email, systemEmail({ subject: 'Your FTR Credits Command Center password was changed', lines: [`The password of ${user.email} was just changed with a reset link sent to this address, and every place it was signed in was signed out.`], facts: [['Changed from', ipOf(req) || 'unknown'], ['Changed at', utc(Date.now())]], footer: 'Was this not you? Tell an Admin at once: they can turn the account off and set a new password.' })).catch((error) => log(`[password reset] confirmation not sent: ${error.message}`));
+      return { email: user.email };
+    } finally {
+      resetsInFlight.delete(user.id);
+    }
+  });
+
   r('GET', '/api/me', signedIn, (req, ctx) => {
     const team = teams.get(ctx.user.teamId);
     const scopeTeams = ctx.teams.filter((t) => ctx.scope.has(t.id)).map((t) => ({ id: t.id, name: t.name, region: t.region, parentId: t.parentId, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaderIds: t.leaderIds }));
@@ -144,6 +251,7 @@ export function createApp(config, { log = console.log, calculatorService = null 
   });
   r('POST', '/api/me/password', signedIn, async (req, ctx, body) => {
     await iam.setPassword(ctx.user.id, body?.current, body?.next);
+    passwordResets.revokeUser(ctx.user.id);
     iam.endSessionsOf(ctx.user.id, { except: ctx.session.id });
     record(ctx, req, 'auth.password');
     const file = path.join(config.dataDir, 'initial-admin-password.txt');
@@ -339,6 +447,7 @@ export function createApp(config, { log = console.log, calculatorService = null 
     roles: Object.entries(iam.roles()).map(([id, role]) => ({ id, ...role, grantable: iam.canGrant(id, ctx.permissions) })),
     teams: ctx.teams.filter((t) => ctx.scope.has(t.id) || ctx.permissions.has('teams.manage')).map((t) => ({ ...t, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaders: (t.leaderIds ?? []).map((id) => ({ id, name: userName(id) })), members: iam.users().filter((u) => u.teamId === t.id).length })),
     permissions: PERMISSIONS,
+    mail: resetReady().ready,
   }));
   /** May this person change `target`: in their scope, and holding the role they hold. */
   const canManage = (ctx, target) => ctx.permissions.has('users.manage') && (ctx.permissions.has('scope.all') || ctx.scope.has(target.teamId)) && iam.canGrant(target.role, ctx.permissions);
@@ -350,7 +459,19 @@ export function createApp(config, { log = console.log, calculatorService = null 
     if (!ctx.permissions.has('scope.all')) needTeam(ctx.scope, teamId);
     const { user, temporary } = await iam.create({ email: body?.email, name: body?.name, title: body?.title, role, teamId });
     record(ctx, req, 'user.create', user.email, { role, team: teams.get(teamId)?.name });
-    return { user: publicUser(user), temporary };
+    // A welcome email when the server can send one: where to sign in, and how to set a password with
+    // "Forgot your password?". The one-time password itself is never emailed.
+    let welcomed = false;
+    if (body?.sendWelcome && resetReady().ready) {
+      try {
+        await sendMail(user.email, systemEmail({ subject: 'You have access to the FTR Credits Command Center', lines: [`${ctx.user.name} gave you access to the FTR Credits Command Center as ${iam.roles()[role]?.name ?? role} in ${teams.get(teamId)?.name ?? 'your team'}.`, 'To set your password, open the link below, choose "Forgot your password?" and enter this address: a link to choose your password follows. Or sign in with the one-time password your Admin gives you.'], button: { label: 'Open the command center', url: `${linkBase()}/#/forgot?email=${encodeURIComponent(user.email)}` }, footer: 'The command center is for internal use only. You will be asked to accept its terms of use when you first sign in.' }));
+        welcomed = true;
+        record(ctx, req, 'user.welcome', user.email);
+      } catch (error) {
+        log(`[welcome] not sent to a new person: ${error.message}`);
+      }
+    }
+    return { user: publicUser(user), temporary, welcomed };
   });
   r('PUT', '/api/people/:id', perm('users.manage'), (req, ctx, body, res, url, params) => {
     const target = iam.byId(params.id);
@@ -362,7 +483,10 @@ export function createApp(config, { log = console.log, calculatorService = null 
       if (!ctx.permissions.has('scope.all')) needTeam(ctx.scope, String(body.teamId));
     }
     const user = iam.update(target.id, { name: body?.name, title: body?.title, role: body?.role, teamId: body?.teamId, active: body?.active });
-    if (user.active === false) calc.forget(user.id);
+    if (user.active === false) {
+      calc.forget(user.id);
+      passwordResets.revokeUser(user.id);
+    }
     record(ctx, req, 'user.update', user.email, { changed: Object.keys(body ?? {}) });
     return { user: publicUser(user) };
   });
@@ -370,6 +494,7 @@ export function createApp(config, { log = console.log, calculatorService = null 
     const target = iam.byId(params.id);
     if (!target || !canManage(ctx, target)) throw fail(404, 'That person is not one you can change.');
     const temporary = await iam.resetPassword(target.id);
+    passwordResets.revokeUser(target.id);
     calc.forget(target.id);
     record(ctx, req, 'user.reset', target.email);
     return { temporary };
@@ -379,6 +504,7 @@ export function createApp(config, { log = console.log, calculatorService = null 
     if (!target || !canManage(ctx, target)) throw fail(404, 'That person is not one you can change.');
     if (target.id === ctx.user.id) throw fail(400, 'You cannot remove yourself.');
     iam.remove(target.id);
+    passwordResets.revokeUser(target.id);
     teams.forget(target.id);
     calc.forget(target.id);
     record(ctx, req, 'user.remove', target.email);
@@ -424,6 +550,48 @@ export function createApp(config, { log = console.log, calculatorService = null 
     record(ctx, req, 'settings.update', '', { changed: Object.keys(body ?? {}) });
     return { ...settings.value, effective: hosts() };
   });
+  // ---- Email server (SMTP) --------------------------------------------------------------------------------------
+  const smtpView = () => ({ smtp: publicSmtp(smtpNow()), verified: mailReady(), verifiedAt: settings.value.smtpVerifiedAt ?? null, passwordReset: resetPolicy(), reset: resetReady(), publicUrl: linkBase() });
+  r('GET', '/api/settings/smtp', perm('settings.manage'), () => smtpView());
+  r('PUT', '/api/settings/smtp', perm('settings.manage'), (req, ctx, body) => {
+    if (body?.smtp) {
+      const next = mergeSmtp(smtpNow(), body.smtp);
+      settings.value.smtp = { ...next, password: secrets.seal(next.password) };
+    }
+    if (body?.passwordReset !== undefined) {
+      if (!RESET_POLICIES.includes(body.passwordReset)) throw fail(400, 'Choose who may reset a forgotten password by email.');
+      settings.value.passwordReset = body.passwordReset;
+    }
+    settings.save();
+    record(ctx, req, 'settings.smtp', smtpNow().host, { changed: [...Object.keys(body?.smtp ?? {}).filter((k) => k !== 'password'), ...(body?.smtp?.password ? ['password'] : []), ...(body?.passwordReset ? ['passwordReset'] : [])] });
+    return smtpView();
+  });
+  r('POST', '/api/settings/smtp/test', perm('settings.manage'), async (req, ctx) => {
+    const smtp = smtpNow();
+    try {
+      await mailTransport.verify(smtp);
+    } catch (error) {
+      record(ctx, req, 'settings.smtp.test', smtp.host, { ok: false, error: error.message });
+      throw fail(400, error.message);
+    }
+    settings.value.smtpVerified = smtpFingerprint(smtp);
+    settings.value.smtpVerifiedAt = new Date().toISOString();
+    settings.save();
+    record(ctx, req, 'settings.smtp.test', smtp.host, { ok: true });
+    return { ...smtpView(), message: `Connected to ${smtp.host}:${smtp.port}${smtp.requireAuth ? ' and signed in' : ''}. Email can be sent.` };
+  });
+  r('POST', '/api/settings/smtp/send-test', perm('settings.manage'), async (req, ctx, body) => {
+    const to = clean(body?.to, 254).toLowerCase() || ctx.user.email;
+    if (!/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(to)) throw fail(400, 'That is not an email address.');
+    try {
+      await sendMail(to, systemEmail({ subject: 'FTR Credits Command Center: test message', lines: ['This is a test message from the FTR Credits Command Center.', 'The email server is working: forgotten-password links and welcome emails can be sent.'] }));
+    } catch (error) {
+      throw fail(error.status ?? 400, error.message);
+    }
+    record(ctx, req, 'settings.smtp.sendTest', to);
+    return { message: `A test message went to ${to}.` };
+  });
+
   r('GET', '/api/audit', perm('audit.view'), (req, ctx, body, res, url) => {
     const q = String(url.searchParams.get('q') ?? '').toLowerCase().slice(0, 100);
     return { events: audit.recent({ limit: 500, filter: (e) => !q || JSON.stringify(e).toLowerCase().includes(q) }) };
@@ -498,6 +666,8 @@ export function createApp(config, { log = console.log, calculatorService = null 
   const SAMPLES = path.join(config.root, 'vendor', 'mz', 'public', 'calculator', 'samples');
   const LEGAL = { '/legal/terms': 'TERMS.md', '/legal/license': 'LICENSE', '/legal/guide': 'docs/USER-GUIDE.md' };
 
+  const PUBLIC_POSTS = new Set(['/api/auth/signin', '/api/auth/forgot', '/api/auth/reset/check', '/api/auth/reset/confirm']);
+
   async function handle(req, res) {
     await ready;
     const url = new URL(req.url, 'http://local');
@@ -537,7 +707,7 @@ export function createApp(config, { log = console.log, calculatorService = null 
       let body = null;
       if (method !== 'GET') {
         // Changes come only from this site's own pages: the session's CSRF token, and the browser's Origin when it says one.
-        if (pathname !== '/api/auth/signin') {
+        if (!PUBLIC_POSTS.has(pathname)) {
           if (!ctx || req.headers['x-csrf-token'] !== ctx.session.csrf) throw fail(ctx ? 403 : 401, ctx ? 'Reload the page: the request did not come from it.' : 'Sign in first.');
         }
         const origin = req.headers.origin;

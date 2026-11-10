@@ -161,6 +161,7 @@ function viewLogin() {
         <label class="f">Password<input type="password" name="password" autocomplete="current-password" required /></label>
         <div class="err" id="err"></div>
         <button class="primary" type="submit">Sign in</button>
+        <a href="#/forgot" class="small" id="forgot-link">Forgot your password?</a>
       </form>
       <p class="foot">First time? Your Admin sent you a one-time password: sign in with it and you will choose your own, accept the terms of use and see a quick guide.<br/>Internal use only · <a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a> · <a href="/legal/license" target="_blank" rel="noopener">PolyForm Internal Use License</a></p>
     </section>
@@ -184,6 +185,59 @@ function viewLogin() {
     }
   };
 }
+// ---- Forgot your password? ------------------------------------------------------------------------------
+function authCard(inner) {
+  $('#app').className = 'app bare';
+  $('#app').innerHTML = `<div class="auth fade"><section class="pitch"><div class="brand"><div class="logo">${LOGO}</div><div><b>FTR Credits</b><span>Command Center</span></div></div><h1 class="serif">Back in, <em>safely.</em></h1><p>A link to choose a new password goes to your own work email. It works once, for 30 minutes, and every place you were signed in is signed out when you use it.</p></section><section class="card">${inner}</section></div>`;
+}
+async function viewForgot(params) {
+  const { available } = await api('/api/auth/reset').catch(() => ({ available: false }));
+  if (!available) {
+    authCard(`<h2>Forgot your password?</h2><p class="lead">Resetting by email is not set up on this server yet.</p><div class="callout">Ask an Admin: they can give you a new one-time password from <b>People → Edit → Reset password</b>.</div><p class="foot"><a href="#/login">Back to sign in</a></p>`);
+    return;
+  }
+  authCard(`<h2>Forgot your password?</h2><p class="lead">Enter the email you sign in with. If it has an account here, a link to choose a new password is sent to it.</p>
+    <form class="form" id="fp"><label class="f">Work email<input type="email" name="email" autocomplete="username" required autofocus value="${esc(params.get('email') ?? '')}" /></label><div class="err" id="err"></div><button class="primary" type="submit">Send me a link</button><a href="#/login" class="small">Back to sign in</a></form>`);
+  $('#fp').onsubmit = async (e) => {
+    e.preventDefault();
+    const button = e.target.querySelector('button');
+    button.disabled = true;
+    try {
+      const r = await api('/api/auth/forgot', { method: 'POST', body: { email: new FormData(e.target).get('email') } });
+      authCard(`<h2>Check your email</h2><div class="callout mt">${esc(r.message)}</div><p class="foot"><a href="#/login">Back to sign in</a></p>`);
+    } catch (error) {
+      $('#err').textContent = error.message;
+      button.disabled = false;
+    }
+  };
+}
+async function viewReset(params) {
+  const token = params.get('token') ?? '';
+  // The link's secret is not left in the address bar or the history.
+  history.replaceState(null, '', `${location.pathname}#/reset`);
+  if (!token) return go('/forgot');
+  let who;
+  try {
+    who = await api('/api/auth/reset/check', { method: 'POST', body: { token } });
+  } catch (error) {
+    authCard(`<h2>Choose a new password</h2><div class="callout warn mt">${esc(error.message)}</div><p class="foot"><a href="#/forgot">Ask for a new link</a> · <a href="#/login">Sign in</a></p>`);
+    return;
+  }
+  authCard(`<h2>Choose a new password</h2><p class="lead">For <b>${esc(who.email)}</b>. At least 12 characters.</p>
+    <form class="form" id="rp"><label class="f">New password<input type="password" name="next" autocomplete="new-password" minlength="12" required autofocus /></label><label class="f">New password again<input type="password" name="again" autocomplete="new-password" minlength="12" required /></label><div class="err" id="err"></div><button class="primary" type="submit">Save my new password</button></form>`);
+  $('#rp').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (f.get('next') !== f.get('again')) return ($('#err').textContent = 'The two passwords are not the same.');
+    try {
+      await api('/api/auth/reset/confirm', { method: 'POST', body: { token, password: f.get('next') } });
+      authCard(`<h2>Password changed</h2><div class="callout mt">Your new password is saved and every place you were signed in was signed out. Sign in with it now.</div><p class="foot"><a class="btn primary" href="#/login">Sign in</a></p>`);
+    } catch (error) {
+      $('#err').textContent = error.message;
+    }
+  };
+}
+
 const firstStepsDone = () => state.me && !state.me.user.mustChangePassword && state.me.terms.accepted && state.me.guideSeen;
 const home = () => (can('dashboard.view') ? '/overview' : '/guide');
 
@@ -569,6 +623,7 @@ function editPerson(d, u) {
     <div class="row"><label class="f">Role<select name="role">${roles.map((r) => `<option value="${esc(r.id)}"${r.id === (u?.role ?? 'se') ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
     <label class="f">Team<select name="team" required>${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u?.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label></div>
     <p class="muted small">${esc(roles.find((r) => r.id === (u?.role ?? 'se'))?.description ?? '')}</p>
+    ${u ? '' : `<label class="check"><input type="checkbox" name="welcome" ${d.mail ? 'checked' : 'disabled'} /><span>Email them a welcome<small>${d.mail ? 'Where to sign in, and how to set their password with "Forgot your password?". The one-time password is never emailed.' : 'Set up the email server in Settings to send one.'}</small></span></label>`}
     ${u ? `<div class="flex"><button type="button" class="sm" id="reset">Reset password</button><button type="button" class="sm ${u.active ? 'danger' : ''}" id="active">${u.active ? 'Turn access off' : 'Turn access on'}</button><button type="button" class="sm danger" id="remove">Remove</button></div>` : ''}
     <div class="err" id="perr"></div><div id="secret"></div></div>
     <div class="df"><button type="button" class="ghost" id="close">Close</button><button class="primary" type="submit">${u ? 'Save' : 'Invite'}</button></div></form>`;
@@ -594,8 +649,9 @@ function editPerson(d, u) {
         done();
         toast('Saved.', 'ok');
       } else {
-        const r = await api('/api/people', { method: 'POST', body: { email: f.get('email'), name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team') } });
+        const r = await api('/api/people', { method: 'POST', body: { email: f.get('email'), name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team'), sendWelcome: f.get('welcome') === 'on' } });
         showSecret(r.temporary, r.user.email);
+        if (r.welcomed) $('#secret', dlg).insertAdjacentHTML('beforeend', '<p class="small muted mt">A welcome email is on its way to them.</p>');
       }
     } catch (error) {
       $('#perr', dlg).textContent = error.message;
@@ -690,7 +746,7 @@ async function viewTeams() {
 // ---- Settings and roles ------------------------------------------------------------------------------------------
 async function viewAdmin() {
   shell('admin', loading());
-  const [s, d] = await Promise.all([can('settings.manage') ? api('/api/settings') : null, peopleList()]);
+  const [s, d, m] = await Promise.all([can('settings.manage') ? api('/api/settings') : null, peopleList(), can('settings.manage') ? api('/api/settings/smtp') : null]);
   const groups = [...new Set(d.permissions.map((p) => p.group))];
   $('#main').innerHTML = `<div class="head"><div><h1 class="serif">Settings &amp; roles</h1><p>The organisation's name on reports, the hosts the server may call, roles and their permissions, and backups.</p></div>${s ? `<div class="tools"><a class="btn" href="/api/backup" download="ftr-cc-backup.json">${icon('download')}Download backup</a></div>` : ''}</div>
     ${s ? `<div class="panel"><h2>Organisation &amp; hosts</h2><form class="form" id="sf">
@@ -700,8 +756,10 @@ async function viewAdmin() {
       <label class="f">Git hosts${s.fromEnvironment.git ? ' (set by GIT_ALLOWED_HOSTS)' : ''}<textarea name="gh" rows="3" ${s.fromEnvironment.git ? 'disabled' : ''}>${esc(s.effective.git.join('\n'))}</textarea></label></div>
       <p class="muted small">A host here also allows every name below it (force.com allows acme.lightning.force.com). Private and link-local addresses are never called, whatever is listed.</p>
       <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="serr"></span></div></form></div>` : ''}
+    ${m ? smtpPanel(m) : ''}
     ${can('roles.manage') ? `<div class="panel mt"><h2>Roles <small>nobody can give permissions they do not hold</small><button class="sm" id="newrole">${icon('plus')}New role</button></h2>
       <div class="tw"><table><thead><tr><th>Role</th><th>Permissions</th><th></th></tr></thead><tbody>${d.roles.map((r) => `<tr data-id="${esc(r.id)}"><td><b>${esc(r.name)}</b><span class="sub">${esc(r.description)}</span></td><td class="small">${r.permissions.map((p) => esc(d.permissions.find((x) => x.id === p)?.label ?? p)).join(' · ')}</td><td class="actions">${r.locked ? '<span class="chip">Locked</span>' : '<button class="sm" data-act="role">Edit</button>'}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+  if (m) wireSmtp(m);
   if ($('#sf')) $('#sf').onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -751,6 +809,65 @@ async function viewAdmin() {
   for (const b of $$('[data-act="role"]')) b.onclick = () => editRole(d.roles.find((x) => x.id === b.closest('tr').dataset.id));
 }
 
+// ---- Email server (SMTP), as CxMissionZero sets it up ---------------------------------------------------------------
+function smtpPanel(m) {
+  const x = m.smtp;
+  const status = m.verified ? `<span class="chip ok"><i></i>Tested ${esc(dateTime(m.verifiedAt))}</span>` : x.host ? '<span class="chip warn"><i></i>Not tested: nothing is sent until it is</span>' : '<span class="chip"><i></i>Not set up</span>';
+  return `<div class="panel mt"><h2>Email server (SMTP) ${status}</h2>
+    <p class="muted small">Used for "Forgot your password?" links and welcome emails. Nothing is sent until <b>Test connection</b> succeeds for exactly the settings saved. The password is kept encrypted and never shown again.</p>
+    <form class="form" id="smtp">
+      <div class="row"><label class="f">Mail server<input name="host" value="${esc(x.host)}" placeholder="smtp.office365.com" autocomplete="off" /></label><label class="f">Port<input name="port" type="number" min="1" max="65535" value="${esc(x.port)}" /></label></div>
+      <div class="row"><label class="check"><input type="checkbox" name="secure" ${x.secure ? 'checked' : ''} /><span>Implicit TLS<small>On for port 465. Off for 587 and 25, where STARTTLS is required whenever a password is sent.</small></span></label>
+      <label class="check"><input type="checkbox" name="rejectUnauthorized" ${x.rejectUnauthorized !== false ? 'checked' : ''} /><span>Check the mail server's certificate<small>Leave on. For a private CA, set NODE_EXTRA_CA_CERTS on the server instead.</small></span></label></div>
+      <label class="check"><input type="checkbox" name="requireAuth" ${x.requireAuth ? 'checked' : ''} /><span>The server needs a sign-in</span></label>
+      <div class="row"><label class="f">User name<input name="user" value="${esc(x.user)}" autocomplete="off" /></label><label class="f">Password<input name="password" type="password" autocomplete="new-password" placeholder="${x.passwordSet ? 'Kept: type to replace' : ''}" /></label></div>
+      <div class="row"><label class="f">From name<input name="fromName" value="${esc(x.fromName)}" /></label><label class="f">From address<input name="fromAddress" type="email" value="${esc(x.fromAddress)}" placeholder="Same as the user name" /></label></div>
+      <div class="row"><label class="f">Who may reset a forgotten password by email<select name="passwordReset"><option value="everyone"${m.passwordReset === 'everyone' ? ' selected' : ''}>Everyone</option><option value="not-admins"${m.passwordReset === 'not-admins' ? ' selected' : ''}>Everyone but those who manage people</option><option value="off"${m.passwordReset === 'off' ? ' selected' : ''}>Nobody: Admins reset passwords</option></select></label>
+      <label class="f">Links in emails point at<input value="${esc(m.publicUrl || 'PUBLIC_URL is not set')}" disabled /></label></div>
+      ${m.reset.ready ? '<div class="callout">"Forgot your password?" is working.</div>' : `<div class="callout warn">"Forgot your password?" is not available yet: ${m.reset.missing.map(esc).join(' ')}</div>`}
+      <div class="flex"><button class="primary" type="submit">Save</button><button type="button" id="smtp-test">Test connection</button><input id="smtp-to" type="email" placeholder="Send a test to (you by default)" class="grow" /><button type="button" id="smtp-send">Send test email</button></div>
+      <div class="small" id="smtp-msg" aria-live="polite"></div>
+    </form></div>`;
+}
+function wireSmtp() {
+  const form = $('#smtp');
+  const msg = (text, ok) => {
+    $('#smtp-msg').textContent = text;
+    $('#smtp-msg').className = `small ${ok ? 'ok-t' : 'err'}`;
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(form);
+    const smtp = { host: f.get('host'), port: Number(f.get('port')), secure: f.get('secure') === 'on', requireAuth: f.get('requireAuth') === 'on', rejectUnauthorized: f.get('rejectUnauthorized') === 'on', user: f.get('user'), fromName: f.get('fromName'), fromAddress: f.get('fromAddress') };
+    if (f.get('password')) smtp.password = f.get('password');
+    try {
+      await api('/api/settings/smtp', { method: 'PUT', body: { smtp, passwordReset: f.get('passwordReset') } });
+      toast('Saved. Now Test connection: nothing is sent until it succeeds.', 'ok');
+      viewAdmin();
+    } catch (error) {
+      msg(error.message);
+    }
+  };
+  $('#smtp-test').onclick = async () => {
+    msg('Testing…', true);
+    try {
+      const r = await api('/api/settings/smtp/test', { method: 'POST', body: {} });
+      toast(r.message, 'ok');
+      viewAdmin();
+    } catch (error) {
+      msg(error.message);
+    }
+  };
+  $('#smtp-send').onclick = async () => {
+    msg('Sending…', true);
+    try {
+      msg((await api('/api/settings/smtp/send-test', { method: 'POST', body: { to: $('#smtp-to').value } })).message, true);
+    } catch (error) {
+      msg(error.message);
+    }
+  };
+}
+
 // ---- Audit ------------------------------------------------------------------------------------------------------
 async function viewAudit(params) {
   shell('audit', loading());
@@ -770,6 +887,8 @@ async function route() {
   const [pathPart, query = ''] = location.hash.replace(/^#/, '').split('?');
   const path = pathPart || '/';
   const params = new URLSearchParams(query);
+  if (path === '/forgot') return viewForgot(params);
+  if (path === '/reset') return viewReset(params);
   if (!state.me) {
     try {
       state.me = await api('/api/me');
