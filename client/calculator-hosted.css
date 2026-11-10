@@ -1,0 +1,45 @@
+/* The hosted calculator's frame: MZ's standalone head (src/standalone-calculator.js), the command center's nav and
+   the account bar. The calculator itself is styled by MZ's styles.css and nextgen.css, unchanged. */
+.shell.standalone { display: block; min-height: 100vh; }
+.shell.standalone .content { margin: 0 auto; max-width: 1480px; padding: 0 clamp(12px, 3vw, 32px) 24px; }
+.shell.standalone .sa-top { position: static; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; padding: 14px 0; }
+.shell.standalone .sa-top .topbar-title { flex: 1 1 320px; min-width: 0; }
+.shell.standalone .sa-top h1 { white-space: normal; overflow: visible; }
+.shell.standalone .sa-sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 900px; }
+.shell.standalone #sa-theme { min-width: 36px; display: inline-flex; align-items: center; justify-content: center; }
+.shell.standalone #sa-theme svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+.shell.standalone:not(.can-read) #calc-read, .shell.standalone:not(.can-read) .calc-branches, .shell.standalone:not(.can-read) .calc-read-limit, .shell.standalone:not(.can-read) .calc-source-state, .shell.standalone:not(.can-read) .calc-origins, .shell.standalone:not(.can-read) .calc-apply-read, .shell.standalone #calc-email-open, .shell.standalone #calc-email-form, .shell.standalone .calc-toolbar { display: none !important; }
+.shell.standalone .sa-connect { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.shell.standalone .sa-connect .sa-key { margin: 0; flex: 1 1 320px; max-width: 560px; }
+.shell.standalone .sa-connect .status { align-self: center; }
+.shell.standalone .sa-advanced { flex: 1 1 100%; font-size: 13px; }
+.shell.standalone .sa-advanced-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+.shell.standalone .sa-advanced .field { margin: 0; }
+.shell.standalone .sa-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 24px; color: var(--muted); font-size: 12px; }
+.shell.standalone .sa-foot a { color: inherit; }
+
+.hc-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.hc-nav a { color: var(--muted); text-decoration: none; padding: 4px 2px; border-bottom: 2px solid transparent; }
+.hc-nav a:hover { color: var(--text, inherit); }
+.hc-nav a[aria-current="page"] { color: var(--text, inherit); border-bottom-color: #22d3ee; }
+.hc-nav .hc-brand { color: var(--text, inherit); display: inline-flex; align-items: center; gap: 8px; border: 0; }
+.hc-nav .hc-brand span:not(.hc-logo) { color: var(--muted); }
+.hc-logo { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, #22d3ee, #8b5cf6); box-shadow: 0 0 14px rgba(139, 92, 246, .45); }
+.hc-spacer { flex: 1; }
+.hc-me { color: var(--muted); font-size: 13px; }
+
+.hc-account { flex: 1 1 100%; display: grid; grid-template-columns: minmax(160px, 220px) minmax(280px, 1fr) minmax(160px, 220px); gap: 10px 14px; align-items: end; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.hc-account .field { margin: 0; }
+.hc-sf-row { display: flex; gap: 8px; align-items: center; }
+.hc-sf-row input { flex: 1; min-width: 0; }
+.hc-req { color: #b91c1c; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-left: 4px; }
+.hc-account.missing-sf .hc-sf input { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, .15); }
+.hc-btn { display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; }
+.hc-reports { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); align-items: center; }
+.hc-reports b { color: var(--text, inherit); }
+.hc-reports a { color: #0891b2; }
+.hc-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); }
+.hc-pill.ok { color: #047857; border-color: rgba(4, 120, 87, .35); }
+.hc-pill.warn { color: #b45309; border-color: rgba(180, 83, 9, .35); }
+.hc-pill.bad { color: #b91c1c; border-color: rgba(185, 28, 28, .35); }
+@media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; } }

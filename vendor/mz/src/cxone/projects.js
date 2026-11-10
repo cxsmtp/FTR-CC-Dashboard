@@ -1,0 +1,132 @@
+import { mapWithConcurrency } from './client.js';
+import { withinWindow } from '../window.js';
+
+/** FAE Flush's temporary copies ("<name>_FAE", tagged so): never part of the backlog anywhere else. */
+export const FAE_FLUSH_TAG = 'mz-fae-flush';
+
+/**
+ * Projects API: GET /api/projects (offset/limit paginated), without FAE Flush's copies.
+ * `stats.stopped` says the read stopped at `maxItems` with more projects possibly left.
+ */
+export async function listProjects(client, { maxItems = 5000, stats = null } = {}) {
+  const projects = [];
+  let fetched = 0;
+  for await (const project of client.paginate('/api/projects', {
+    itemsKey: 'projects',
+    limit: 100,
+    maxItems,
+  })) {
+    fetched += 1;
+    if (project?.tags && Object.hasOwn(project.tags, FAE_FLUSH_TAG)) continue;
+    projects.push({
+      id: project.id,
+      name: project.name ?? project.id,
+      createdAt: project.createdAt ?? null,
+      updatedAt: project.updatedAt ?? null,
+      tags: project.tags ?? {},
+      groups: project.groups ?? [],
+      repoUrl: project.repoUrl ?? '',
+      mainBranch: project.mainBranch ?? '',
+      criticality: project.criticality ?? null,
+    });
+  }
+  if (stats) stats.stopped = fetched >= maxItems;
+  return projects;
+}
+
+/** How many projects the tenant has, as GET /api/projects says (FAE Flush's copies included); null when it does not say. */
+export async function countProjects(client) {
+  const page = await client.request('/api/projects', { query: { limit: 1, offset: 0 }, retries: 1 });
+  const total = Number(page?.filteredTotalCount ?? page?.totalCount);
+  return Number.isFinite(total) ? total : null;
+}
+
+/**
+ * The tenant's applications (groups of projects in Checkmarx One): id, name and their projects.
+ * A tenant without the applications service gives none.
+ */
+export async function listApplications(client, { maxItems = 2000 } = {}) {
+  const applications = [];
+  for await (const app of client.paginate('/api/applications', { itemsKey: 'applications', limit: 100, maxItems })) {
+    if (!app?.id) continue;
+    applications.push({
+      id: String(app.id),
+      name: String(app.name ?? app.id),
+      projectIds: (Array.isArray(app.projectIds) ? app.projectIds : []).map(String),
+    });
+  }
+  return applications;
+}
+
+// A long list of project ids in the query string will trip request-line limits,
+// so last-scan lookups go out in chunks.
+const LAST_SCAN_CHUNK = 50;
+
+const chunk = (items, size) => {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+};
+
+/**
+ * Latest completed scan per project, keyed by project id.  Used both by the
+ * scan-results risk fallback and by the project activity window.
+ */
+export async function getLastScans(client, projectIds) {
+  if (projectIds.length === 0) return {};
+
+  // The chunks are independent: a few at once.
+  const answers = await mapWithConcurrency(chunk(projectIds, LAST_SCAN_CHUNK), 4, (ids) =>
+    client.request('/api/projects/last-scan', {
+      query: { 'project-ids': ids, 'scan-status': 'Completed' },
+    }),
+  );
+  // Keyed by project id from Checkmarx One's answer: never a key that reaches Object.prototype.
+  const merged = Object.create(null);
+  for (const response of answers) {
+    if (!response || typeof response !== 'object') continue;
+    for (const [id, scan] of Object.entries(response)) if (id !== '__proto__' && id !== 'constructor' && id !== 'prototype') merged[id] = scan;
+  }
+  return merged;
+}
+
+/** The date a project was last scanned, from whichever field the tenant uses. */
+export function lastScanDate(scan) {
+  for (const key of ['updatedAt', 'createdAt', 'scanDate', 'completedAt', 'finishedAt']) {
+    if (scan?.[key]) return scan[key];
+  }
+  return null;
+}
+
+/**
+ * Narrow the project list to those scanned inside `window`, so the (expensive)
+ * per-project risk fetch only runs for projects that have recent activity.
+ *
+ * Returns the kept projects plus the counts needed to explain the filtering,
+ * and degrades to "keep everything" if the last-scan lookup is unavailable.
+ */
+export async function filterProjectsByActivity(client, projects, window, { lastScans: known = null } = {}) {
+  if (!window) return { projects, lastScans: known ?? {}, skipped: 0, warning: null };
+
+  // `lastScans` given: the scans that count (each project's primary branch's, src/cxone/branches.js).
+  let lastScans = known;
+  try {
+    lastScans ??= await getLastScans(
+      client,
+      projects.map((project) => project.id),
+    );
+  } catch (error) {
+    return {
+      projects,
+      lastScans: {},
+      skipped: 0,
+      warning: `Could not read last-scan dates, so the project activity window was not applied: ${error.message}`,
+    };
+  }
+
+  const kept = projects.filter((project) =>
+    withinWindow(window, lastScanDate(lastScans[project.id])),
+  );
+
+  return { projects: kept, lastScans, skipped: projects.length - kept.length, warning: null };
+}

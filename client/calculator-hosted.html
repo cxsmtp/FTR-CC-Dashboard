@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-ui="nextgen" data-look="future" class="sa-future" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="generator" content="FTR Credits Command Center · calculator from CxMissionZero {{MZ}}" />
+<title>Calculator · FTR Credits Command Center</title>
+<!--CSS-->
+</head>
+<body>
+<div class="shell standalone hosted">
+  <div class="content">
+    <nav class="hc-nav" aria-label="Command center">
+      <a class="hc-brand" href="/#/overview"><span class="hc-logo" aria-hidden="true"></span><b>FTR Credits</b> <span>Command Center</span></a>
+      <a href="/#/overview">Dashboard</a>
+      <a href="/#/accounts">Accounts</a>
+      <a href="/calculator" aria-current="page">Calculator</a>
+      <a href="/#/guide">Guide</a>
+      <span class="hc-spacer"></span>
+      <span class="hc-me" id="hc-me"></span>
+      <button type="button" class="ghost sm" id="sa-theme" aria-label="Light or dark" title="Light or dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" /></svg></button>
+      <button type="button" class="ghost sm" id="hc-signout">Sign out</button>
+    </nav>
+    <header class="topbar sa-top">
+      <div class="topbar-title">
+        <div class="title-row"><h1>Cx Credits Calculator</h1></div>
+        <p class="sa-sub">Work out the credits an account needs: read their Checkmarx One tenant with an API key, or, for a prospect not on Checkmarx One, count their code from git or import their cloc-fusion report. Every account and report is kept here for your team.</p>
+      </div>
+      <div class="hc-account" id="hc-account">
+        <label class="field hc-team"><span>Team (region)</span><select id="hc-team"></select></label>
+        <label class="field hc-sf"><span>Salesforce opportunity or account link <b class="hc-req">required</b></span>
+          <span class="hc-sf-row"><input id="hc-sf" type="url" inputmode="url" spellcheck="false" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><button type="button" class="primary sm" id="hc-sf-save">Save</button><a id="hc-sf-open" class="ghost sm hc-btn" target="_blank" rel="noopener noreferrer" hidden>Open in Salesforce ↗</a></span>
+        </label>
+        <label class="field hc-owner"><span>Accountable SE</span><select id="hc-owner"></select></label>
+        <div class="hc-reports" id="hc-reports" aria-live="polite"></div>
+      </div>
+      <form class="sa-connect" id="sa-connect" autocomplete="off">
+        <label class="field sa-key"><span>Customer's Checkmarx One API key</span><input type="password" id="sa-key" spellcheck="false" placeholder="Paste the API key (not kept: in memory for your session only)" autocomplete="off" /></label>
+        <button type="submit" class="primary sm" id="sa-connect-go">Connect</button>
+        <button type="button" class="ghost sm" id="sa-disconnect" hidden>Disconnect</button>
+        <span class="status" id="sa-connect-status" aria-live="polite"></span>
+        <details class="sa-advanced"><summary>Advanced</summary>
+          <div class="sa-advanced-grid">
+            <label class="field"><span>API URL</span><input id="sa-base" spellcheck="false" placeholder="From the key" /></label>
+            <label class="field"><span>IAM URL</span><input id="sa-iam" spellcheck="false" placeholder="From the key" /></label>
+            <label class="field"><span>Tenant</span><input id="sa-tenant" spellcheck="false" placeholder="From the key" /></label>
+          </div>
+        </details>
+      </form>
+    </header>
+    <main>
+<!--CALCULATOR-->
+    </main>
+    <footer class="sa-foot"><span>FTR Credits Command Center · calculator from CxMissionZero {{MZ}} · PolyForm Internal Use License 1.0.0 · <a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a></span><span>Supporting information only: Checkmarx's own records are authoritative.</span></footer>
+  </div>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<!--SCRIPTS-->
+</body>
+</html>

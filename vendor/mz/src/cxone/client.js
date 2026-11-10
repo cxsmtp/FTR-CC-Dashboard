@@ -1,0 +1,481 @@
+import { Semaphore } from '../ttl-cache.js';
+import { TokenProvider } from './auth.js';
+import { scrubText } from './endpoints.js';
+
+export { scrubText };
+
+/** Calls to Checkmarx One in flight at once, per connection; the rest queue. */
+const MAX_CONCURRENT = Math.max(1, Number(process.env.CX_MAX_CONCURRENCY) || 24);
+
+export class CxApiError extends Error {
+  /** Message, path and the answer's body pass through scrubText(): no token, key or signature ever reaches a log or the browser. */
+  constructor(message, { status = 0, path = '', body = '' } = {}) {
+    super(scrubText(message));
+    this.name = 'CxApiError';
+    this.status = Number(status) || 0;
+    this.path = scrubText(path);
+    this.body = scrubText(body);
+  }
+}
+
+// What a trace keeps of a body: all of a page of results, to see every field that came back (debugging only).
+const TRACE_BODY = 256 * 1024;
+const RETRYABLE = new Set([429, 502, 503, 504]);
+// Pages of one collection read at once once its size is known (CX_PAGES_AT_ONCE).
+const PAGES_AT_ONCE = Math.max(1, Number(process.env.CX_PAGES_AT_ONCE) || 4);
+// One request may not hang the caller for minutes (Node's fetch has no overall timeout).
+const REQUEST_TIMEOUT_MS = Math.max(5_000, Number(process.env.CX_REQUEST_TIMEOUT_MS) || 60_000);
+
+/** "fetch failed" says nothing: name the host and the network reason (timeout, DNS, TLS, refused…). */
+export function networkReason(error) {
+  if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return `no answer within ${Math.round(REQUEST_TIMEOUT_MS / 1000)} s`;
+  const cause = error?.cause;
+  const code = cause?.code || error?.code || '';
+  const known = {
+    ENOTFOUND: 'host name not found (DNS)',
+    EAI_AGAIN: 'DNS lookup failed temporarily',
+    ECONNREFUSED: 'connection refused',
+    ECONNRESET: 'connection reset',
+    ETIMEDOUT: 'connection timed out',
+    UND_ERR_CONNECT_TIMEOUT: 'connection timed out',
+    UND_ERR_SOCKET: 'connection closed unexpectedly',
+    CERT_HAS_EXPIRED: 'TLS certificate expired',
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'its certificate is not trusted here (usually a company proxy that inspects HTTPS)',
+    UNABLE_TO_GET_ISSUER_CERT_LOCALLY: 'its certificate is not trusted here (usually a company proxy that inspects HTTPS)',
+    UNABLE_TO_GET_ISSUER_CERT: 'its certificate is not trusted here (usually a company proxy that inspects HTTPS)',
+    SELF_SIGNED_CERT_IN_CHAIN: 'its certificate is not trusted here (usually a company proxy that inspects HTTPS)',
+    DEPTH_ZERO_SELF_SIGNED_CERT: 'self-signed TLS certificate',
+  };
+  return known[code] || [code, cause?.message || error?.message].filter(Boolean).join(': ') || 'network error';
+}
+
+/**
+ * Checkmarx One negotiates API versions through the Accept header and answers
+ * 400 Bad Request when it is missing. Only v1.0 exists today.
+ */
+export const ACCEPT = 'application/json; version=1.0';
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Thin authenticated wrapper around the Checkmarx One REST API. */
+export class CxClient {
+  #connection;
+  #tokens;
+
+  /**
+   * @param {{baseUrl: string, tokenUrl: string, apiKey: string}} connection
+   *   Per-session connection descriptor, built from the API key the operator
+   *   pasted into the portal.
+   */
+  #limit = new Semaphore(MAX_CONCURRENT);
+
+  constructor(connection, tokenProvider = new TokenProvider(connection)) {
+    this.#connection = connection;
+    this.#tokens = tokenProvider;
+  }
+
+  /**
+   * Who this connection acts as, from the access token's claims (username,
+   * email, name), for the audit log. Never throws.
+   */
+  async identity() {
+    try {
+      const token = await this.#tokens.getToken();
+      const claims = JSON.parse(Buffer.from(String(token).split('.')[1] ?? '', 'base64url').toString('utf8'));
+      // An email Checkmarx One says it has not verified is anyone's to type: it never identifies a person here.
+      const email = claims.email_verified === false ? '' : claims.email || '';
+      return {
+        user: claims.preferred_username || email || claims.name || claims.sub || '',
+        email,
+        name: claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(' '),
+        clientId: claims.azp || '',
+      };
+    } catch {
+      return { user: '', email: '', name: '', clientId: '' };
+    }
+  }
+
+  /** Requests running and queued against Checkmarx One right now. */
+  get load() {
+    return { active: this.#limit.active, waiting: this.#limit.waiting, waitingBackground: this.#limit.waitingLow, limit: this.#limit.limit };
+  }
+
+  get baseUrl() {
+    return this.#connection.baseUrl;
+  }
+
+  #originsKey = null;
+  #origins = new Set();
+
+  /** Whether `url` is on this connection's own Checkmarx One hosts (API, IAM, token URL): the only places the access token goes. */
+  #isOwn(url) {
+    const { baseUrl, iamUrl, tokenUrl } = this.#connection;
+    const key = `${baseUrl}|${iamUrl ?? ''}|${tokenUrl ?? ''}`;
+    if (key !== this.#originsKey) {
+      this.#origins = new Set();
+      for (const address of [baseUrl, iamUrl, tokenUrl]) {
+        try {
+          if (address) this.#origins.add(new URL(address).origin);
+        } catch {}
+      }
+      this.#originsKey = key;
+    }
+    return this.#origins.has(url.origin) && !url.username && !url.password;
+  }
+
+  /**
+   * The address of an API path, which carries the access token: only ever on this connection's own Checkmarx One
+   * hosts (its API, or its IAM for the user directory). An absolute address elsewhere, or a path that would move
+   * the host (`@evil.example/…`), is refused before anything is sent.
+   */
+  #target(path) {
+    const raw = String(path ?? '');
+    let url;
+    try {
+      url = new URL(/^https?:\/\//i.test(raw) ? raw : `${this.baseUrl}${raw}`);
+    } catch {
+      throw new CxApiError('That is not a Checkmarx One API address.', { status: 400 });
+    }
+    if (!this.#isOwn(url)) {
+      throw new CxApiError(`Refused to send the access token to ${url.host}, which is not this connection's Checkmarx One host.`, { status: 400, path: url.pathname });
+    }
+    return url;
+  }
+
+  /**
+   * @param {string} path  API path, optionally with a query string.
+   * @param {object} [options]
+   * @param {string} [options.method]
+   * @param {object} [options.query]
+   * @param {any}    [options.body]      JSON-serialised when present.
+   * @param {string} [options.accept]
+   * @param {number} [options.retries]
+   * @param {function} [options.trace]   Debugging (Labs → Fusion results): called with each attempt's
+   *   request and answer in full, the access token never included.
+   */
+  async request(path, { method = 'GET', query, body, accept = ACCEPT, retries = 3, background = false, trace = null } = {}) {
+    if (!this.baseUrl) throw new CxApiError('Checkmarx One API URL is not configured.', { path });
+
+    const url = this.#target(path);
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value === undefined || value === null || value === '') continue;
+      if (Array.isArray(value)) value.forEach((entry) => url.searchParams.append(key, String(entry)));
+      else url.searchParams.set(key, String(value));
+    }
+
+    let lastError;
+    const sent = { Authorization: 'Bearer [hidden]', Accept: accept, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) };
+    const traced = (attempt, started, response, text, error) => {
+      if (!trace) return;
+      try {
+        trace({
+          at: new Date(started).toISOString(), attempt: attempt + 1, method, url: scrubText(url.href), request: { headers: sent, body: body === undefined ? undefined : scrubText(JSON.stringify(body).slice(0, TRACE_BODY)) },
+          ...(response ? { status: response.status, statusText: response.statusText, headers: Object.fromEntries([...response.headers].filter(([k]) => k !== 'set-cookie')), body: scrubText(text.slice(0, TRACE_BODY)), truncated: text.length > TRACE_BODY } : { error: scrubText(error?.message ?? String(error)) }),
+          ms: Date.now() - started,
+        });
+      } catch {}
+    };
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      const token = await this.#tokens.getToken();
+      let response;
+      let text = '';
+      const started = Date.now();
+      try {
+        // Only the network round trip holds a slot; back-off waits do not.
+        [response, text] = await this.#limit.run(async () => {
+          const r = await fetch(url, {
+            method,
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: accept,
+              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          });
+          return [r, await r.text().catch(() => '')];
+        }, { low: background });
+      } catch (error) {
+        traced(attempt, started, null, '', error);
+        // A dropped connection or DNS hiccup: as retryable as a 503.
+        lastError = Object.assign(new CxApiError(`Could not reach Checkmarx One at ${url.host}: ${networkReason(error)}.`, { status: 502, path: url.pathname }), { cause: error });
+        if (attempt === retries) throw lastError;
+        await sleep(2 ** attempt * 500);
+        continue;
+      }
+
+      traced(attempt, started, response, text);
+      if (response.ok) {
+        if (response.status === 204 || !text) return null;
+        try {
+          return JSON.parse(text);
+        } catch {
+          return text;
+        }
+      }
+
+      const detail = text.slice(0, 1000);
+
+      // A 401 usually means the cached token aged out mid-flight; retry once
+      // with a fresh one before giving up.
+      if (response.status === 401 && attempt < retries) {
+        this.#tokens.reset();
+        continue;
+      }
+
+      lastError = new CxApiError(
+        `${method} ${url.pathname} failed: ${response.status} ${response.statusText}`,
+        { status: response.status, path: url.pathname, body: detail },
+      );
+
+      if (!RETRYABLE.has(response.status) || attempt === retries) throw lastError;
+
+      const retryAfter = Number(response.headers.get('retry-after'));
+      await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 500);
+    }
+
+    throw lastError ?? new CxApiError(`${method} ${url.pathname} failed.`, { path: url.pathname });
+  }
+
+  /**
+   * Download a file (a scan's source code, as a zip) to `file`, streamed: never held whole in memory.
+   * Returns the bytes written.
+   */
+  async download(path, file, { timeoutMs = 30 * 60_000 } = {}) {
+    const { createWriteStream } = await import('node:fs');
+    const { pipeline } = await import('node:stream/promises');
+    const { Readable } = await import('node:stream');
+    const url = this.#target(path);
+    const token = await this.#tokens.getToken();
+    return this.#limit.run(async () => {
+      let r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/zip, application/octet-stream, */*' }, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+      // A redirect to a signed storage address (the source code): followed as a browser does, keeping the access token
+      // on Checkmarx One's own host (its gateway wants it) and dropping it elsewhere; the other way once if refused.
+      if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
+        await r.body?.cancel().catch(() => {});
+        const stored = await this.#storage(new URL(r.headers.get('location'), url), token, { Accept: '*/*' }, timeoutMs);
+        r = stored.response;
+        if (!r.ok) throw new CxApiError(`GET the storage address of ${url.pathname} failed: ${stored.tried}`, { status: r.status, path: url.pathname, body: (await r.text().catch(() => '')).slice(0, 500) });
+      }
+      if (!r.ok) throw new CxApiError(`GET ${url.pathname} failed: ${r.status} ${r.statusText}`, { status: r.status, path: url.pathname, body: (await r.text().catch(() => '')).slice(0, 500) });
+      let bytes = 0;
+      const counted = Readable.fromWeb(r.body).on('data', (chunk) => (bytes += chunk.length));
+      await pipeline(counted, createWriteStream(file, { flags: 'wx', mode: 0o600 }));
+      return bytes;
+    });
+  }
+
+  /**
+   * Where `path` redirects to, without following it (Checkmarx One's "download source code" answers 302 with a signed
+   * storage address): { status, location, ms }. The location is made absolute against the API's address.
+   */
+  async redirectOf(path, { timeoutMs = 60_000 } = {}) {
+    const url = this.#target(path);
+    const token = await this.#tokens.getToken();
+    const started = Date.now();
+    return this.#limit.run(async () => {
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: '*/*' }, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+      const location = r.headers.get('location') ?? '';
+      if (r.status >= 400) throw new CxApiError(`GET ${url.pathname} failed: ${r.status} ${r.statusText}`, { status: r.status, path: url.pathname, body: (await r.text().catch(() => '')).slice(0, 500) });
+      await r.body?.cancel().catch(() => {});
+      return { status: r.status, location: location ? new URL(location, url).href : '', ms: Date.now() - started };
+    });
+  }
+
+  /**
+   * Whether a signed address answers, reading its first byte only, the way download() reads it (with the access token
+   * on Checkmarx One's own host): { status, type, size, auth: 'token' | 'none', tried, ms }.
+   */
+  async probeUrl(address, { timeoutMs = 30_000 } = {}) {
+    const started = Date.now();
+    const token = await this.#tokens.getToken();
+    return this.#limit.run(async () => {
+      const { response: r, auth, tried } = await this.#storage(new URL(address), token, { Range: 'bytes=0-0' }, timeoutMs);
+      const range = r.headers.get('content-range') ?? '';
+      const size = Number(range.split('/')[1] ?? r.headers.get('content-length'));
+      await r.body?.cancel().catch(() => {});
+      return { status: r.status, type: r.headers.get('content-type') ?? '', size: Number.isFinite(size) ? size : null, auth, tried, ms: Date.now() - started };
+    });
+  }
+
+  /**
+   * GET a storage address as a browser follows a redirect to it: with the access token on Checkmarx One's own host
+   * (some tenants' gateway refuses it without), without it elsewhere (plain signed storage refuses a second
+   * credential). Refused (401, 403 or 400) on Checkmarx One's own host, it is tried once without the token; the token
+   * is never sent to any other host.
+   * { response, auth: 'token' | 'none', tried: '401 with the access token, 403 without it' }.
+   */
+  async #storage(target, token, headers, timeoutMs) {
+    const own = this.#isOwn(target);
+    const get = (withToken) => fetch(target, { headers: { ...headers, ...(withToken && own ? { Authorization: `Bearer ${token}` } : {}) }, signal: AbortSignal.timeout(timeoutMs) });
+    const how = (withToken) => (withToken ? 'with the access token' : 'without it');
+    const first = await get(own);
+    if (!own || ![400, 401, 403].includes(first.status)) return { response: first, auth: own ? 'token' : 'none', tried: `${first.status} ${how(own)}` };
+    await first.body?.cancel().catch(() => {});
+    const second = await get(false);
+    return { response: second, auth: 'none', tried: `${first.status} ${how(true)}, ${second.status} ${how(false)}` };
+  }
+
+  /**
+   * Put a file to an upload address Checkmarx One gave (POST /api/uploads): a signed address, so sent without
+   * the access token, streamed from disk.
+   */
+  async uploadFile(url, file, { timeoutMs = 30 * 60_000 } = {}) {
+    const { createReadStream, statSync } = await import('node:fs');
+    const target = new URL(url);
+    const size = statSync(file).size;
+    const token = await this.#tokens.getToken();
+    // As the stored copy is read: with the access token on Checkmarx One's own host (its gateway refuses the upload
+    // without it), without it elsewhere (plain signed storage); refused on the own host, once without it. The token
+    // is never sent to any other host.
+    const own = this.#isOwn(target);
+    const how = (withToken) => (withToken ? 'with the access token' : 'without it');
+    // Each try reads the file afresh; a stream the answer did not read (an early refusal) is closed, never left open.
+    const put = async (withToken) => {
+      const body = createReadStream(file);
+      body.on('error', () => {});
+      try {
+        return await fetch(target, { method: 'PUT', headers: { 'Content-Type': 'application/zip', 'Content-Length': String(size), ...(withToken && own ? { Authorization: `Bearer ${token}` } : {}) }, body, duplex: 'half', signal: AbortSignal.timeout(timeoutMs) });
+      } finally {
+        body.destroy();
+      }
+    };
+    return this.#limit.run(async () => {
+      let r = await put(own);
+      let tried = `${r.status} ${how(own)}`;
+      if (own && [400, 401, 403].includes(r.status)) {
+        await r.body?.cancel().catch(() => {});
+        r = await put(false);
+        tried += `, ${r.status} ${how(false)}`;
+      }
+      if (!r.ok) throw new CxApiError(`PUT upload failed: ${tried}`, { status: r.status, path: target.pathname, body: (await r.text().catch(() => '')).slice(0, 500) });
+      return size;
+    });
+  }
+
+  /**
+   * Walk an offset/limit paginated collection.  Checkmarx One is not entirely
+   * consistent about the envelope key, so the caller says where the rows live.
+   *
+   * When the first page says how many rows there are, the remaining pages are
+   * read a few at a time instead of one after another (still within the
+   * shared limit on calls to Checkmarx One), and handed out in order. The end
+   * is where it always was: the total, or the first short page.
+   */
+  async *paginate(path, { query = {}, itemsKey, limit = 100, maxItems = 10_000, offsetIsPage = false, parallel = PAGES_AT_ONCE, gate = null } = {}) {
+    let offset = 0;
+    let fetched = 0;
+    // `gate`: a Semaphore the caller shares between many reads (a fetch's pages), on top of the connection's own limit.
+    const read = (at) => (gate ? gate.run(() => this.request(path, { query: { ...query, offset: at, limit } })) : this.request(path, { query: { ...query, offset: at, limit } }));
+
+    while (fetched < maxItems) {
+      const page = await read(offset);
+      const items = extractItems(page, itemsKey);
+      if (items.length === 0) return;
+
+      for (const item of items) {
+        yield item;
+        fetched += 1;
+        if (fetched >= maxItems) return;
+      }
+
+      const total = Number(
+        page?.filteredTotalCount ??
+          page?.totalCount ??
+          page?.metaData?.filteredResults ??
+          page?.metaData?.totalResults,
+      );
+      if (items.length < limit) return;
+      // GET /api/results numbers pages rather than rows, and its totalCount
+      // has been seen reporting only the first page, so a short page is the
+      // only reliable end marker there.
+      if (offsetIsPage) {
+        offset += 1;
+        // A few pages ahead at once (their count is not known): read in order, stop at the first short
+        // page, and drop what was asked for beyond it. One long walk takes a quarter of the round trips.
+        if (parallel > 1) {
+          for (;;) {
+            const batch = Array.from({ length: parallel }, (_, i) => {
+              const pending = read(offset + i);
+              pending.catch(() => {});
+              return pending;
+            });
+            for (const pending of batch) {
+              const rows = extractItems(await pending, itemsKey);
+              for (const item of rows) {
+                yield item;
+                fetched += 1;
+                if (fetched >= maxItems) return;
+              }
+              if (rows.length < limit) return;
+              offset += 1;
+            }
+          }
+        }
+        continue;
+      }
+      if (Number.isFinite(total) && fetched >= total) return;
+      offset += limit;
+
+      // The rest at once (a few ahead), now that the size is known.
+      if (parallel > 1 && Number.isFinite(total) && total > fetched) {
+        const offsets = [];
+        for (let at = offset; at < Math.min(total, offset + (maxItems - fetched)); at += limit) offsets.push(at);
+        // Marked handled when asked for: a page that fails while an earlier one
+        // is still awaited must not count as an unhandled rejection. Awaiting it
+        // still throws.
+        const ask = (at) => {
+          const pending = read(at);
+          pending.catch(() => {});
+          return pending;
+        };
+        const ahead = offsets.slice(0, parallel).map(ask);
+        let next = ahead.length;
+        let lastFull = true;
+        for (let i = 0; i < offsets.length && lastFull; i++) {
+          const rows = extractItems(await ahead[i], itemsKey);
+          if (next < offsets.length) ahead.push(ask(offsets[next++]));
+          for (const item of rows) {
+            yield item;
+            fetched += 1;
+            if (fetched >= maxItems) return;
+          }
+          // Ran out early: the total was generous.
+          lastFull = rows.length >= limit;
+        }
+        if (!lastFull || fetched >= total) return;
+        offset = offsets.length ? offsets[offsets.length - 1] + limit : offset;
+      }
+    }
+  }
+}
+
+/** Pull the row array out of a response envelope of unknown shape. */
+export function extractItems(page, itemsKey) {
+  if (Array.isArray(page)) return page;
+  if (!page || typeof page !== 'object') return [];
+  if (itemsKey && Array.isArray(page[itemsKey])) return page[itemsKey];
+
+  for (const key of ['items', 'results', 'data', 'content', 'risks', 'projects', 'entries']) {
+    if (Array.isArray(page[key])) return page[key];
+  }
+  // Last resort: a single array-valued property.
+  const arrays = Object.values(page).filter(Array.isArray);
+  return arrays.length === 1 ? arrays[0] : [];
+}
+
+/** Run `worker` over `items` with a bounded number of parallel calls. */
+export async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await worker(items[index], index);
+    }
+  });
+
+  await Promise.all(runners);
+  return results;
+}

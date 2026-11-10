@@ -1,0 +1,576 @@
+// The Cx Credits Calculator on its own: one HTML file (built by src/standalone-calculator.js) that runs in
+// any browser with no server. It answers the calculator's requests (public/calculator/page.js) itself, with
+// the same rules as the server (profiles.js), and keeps customers and reports in this browser (IndexedDB).
+// Opened from disk it cannot read Checkmarx One (its API answers no other site): the two exports from
+// Checkmarx One → Analytics stand in. Served by the launcher (cx-credits-calculator.mjs, src/calculator-launcher.js)
+// it can: the API key typed at the top goes to the launcher, which reads Checkmarx One as CxMissionZero does.
+
+import { initCalculator } from './page.js';
+import { impactSettings } from './model.js';
+import { MAX_PROFILES, MAX_REPORTS, fail, iso, migrate, newId, newProfile, newReport, patchProfile, reportMeta, restoreProfile, summary, text } from './profiles.js';
+import { startHelpTips } from '../help-tips.js';
+
+const DB_NAME = 'cx-credits-calculator';
+const NAMES_KEY = 'cxcalc-names';
+// The futuristic look's theme: light to start with, then what each person chooses (the theme button).
+const THEME_KEY = 'cxcalc-theme-future';
+const GIT_ONLY_LAUNCHER = 'This file on its own cannot reach git: download cloc-fusion (the button on this tab) and import its report, upload cloc results, or count from git with the launcher (cx-credits-calculator.mjs).';
+
+/** The browser's database: customers and reports, each by id. Falls back to memory when it cannot be opened. */
+function openStore() {
+  const memory = { customers: new Map(), reports: new Map() };
+  const opened = new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        for (const name of ['customers', 'reports']) if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name, { keyPath: 'id' });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+      request.onblocked = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+  const tx = async (name, mode, fn) => {
+    const db = await opened;
+    if (!db) return fn(null, memory[name]);
+    return new Promise((resolve, reject) => {
+      const t = db.transaction(name, mode);
+      const store = t.objectStore(name);
+      let out;
+      Promise.resolve(fn(store, null)).then((value) => (out = value), reject);
+      t.oncomplete = () => resolve(out);
+      t.onerror = () => reject(t.error ?? new Error('The browser could not save this.'));
+      t.onabort = () => reject(t.error ?? new Error('The browser could not save this: it may be out of space.'));
+    });
+  };
+  const ask = (request) => new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return {
+    persistent: opened.then(Boolean),
+    all: (name) => tx(name, 'readonly', (store, mem) => (store ? ask(store.getAll()) : [...mem.values()])),
+    get: (name, id) => tx(name, 'readonly', (store, mem) => (store ? ask(store.get(id)) : mem.get(id))),
+    put: (name, value) => tx(name, 'readwrite', (store, mem) => (store ? ask(store.put(value)) : mem.set(value.id, value))),
+    remove: (name, id) => tx(name, 'readwrite', (store, mem) => (store ? ask(store.delete(id)) : mem.delete(id))),
+  };
+}
+
+const readNames = () => {
+  try {
+    const v = JSON.parse(localStorage.getItem(NAMES_KEY) || '{}');
+    return { organisation: String(v.organisation ?? ''), preparedBy: String(v.preparedBy ?? '') };
+  } catch {
+    return { organisation: '', preparedBy: '' };
+  }
+};
+
+/** A request to the launcher that served this page: its secret goes with it, its errors come back as errors. */
+async function toLauncher(launcher, path, { method = 'GET', body } = {}) {
+  let response;
+  try {
+    response = await fetch(path, { method, headers: { 'Content-Type': 'application/json', 'X-Calculator-Token': launcher.token }, ...(body ? { body } : {}) });
+  } catch {
+    throw fail(503, 'The launcher has stopped: run node cx-credits-calculator.mjs again, then reload this page.');
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw fail(response.status, data.error || `The launcher answered ${response.status}.`);
+  return data;
+}
+
+/** The calculator's requests, answered here as the server answers them (src/server.js, /api/projections…). */
+function localApi(store, names, launcher = null) {
+  const byNewest = (a, b) => String(b.createdAt).localeCompare(String(a.createdAt));
+  const customer = async (id) => {
+    const found = await store.get('customers', id);
+    if (!found) throw fail(404, 'That customer no longer exists.');
+    return migrate(found);
+  };
+  const routes = [
+    ['GET', /^\/api\/projections$/, async () => {
+      const all = (await store.all('customers')).map(migrate);
+      return { customers: all.sort((a, b) => String(a.name).localeCompare(String(b.name))).map(summary), organisationName: names().organisation, impactDefaults: impactSettings({}) };
+    }],
+    ['POST', /^\/api\/projections$/, async (body) => {
+      if ((await store.all('customers')).length >= MAX_PROFILES) throw fail(409, `There are already ${MAX_PROFILES} customers. Delete one first.`);
+      const profile = newProfile({ name: body?.name, by: names().preparedBy });
+      await store.put('customers', profile);
+      return { customer: profile };
+    }],
+    ['GET', /^\/api\/projections\/reports$/, async (_body, _m, query) => {
+      const id = query.get('customer') || '';
+      const list = (await store.all('reports')).filter((r) => !id || r.customerId === id).sort(byNewest);
+      return { reports: list.map(reportMeta) };
+    }],
+    ['POST', /^\/api\/projections\/reports$/, async (body) => {
+      const c = await customer(String(body?.customerId ?? ''));
+      const report = newReport({ customerId: c.id, customer: c.name, by: names().preparedBy, data: body?.data });
+      await store.put('reports', report);
+      for (const old of (await store.all('reports')).sort(byNewest).slice(MAX_REPORTS)) await store.remove('reports', old.id);
+      return { report: reportMeta(report) };
+    }],
+    ['POST', /^\/api\/projections\/reports\/[^/]+\/email$/, async () => {
+      throw fail(409, 'This calculator runs on its own and sends no email: download the report and attach it.');
+    }],
+    ['GET', /^\/api\/projections\/reports\/([^/]+)$/, async (_body, m) => {
+      const report = await store.get('reports', decodeURIComponent(m[1]));
+      if (!report) throw fail(404, 'That report no longer exists.');
+      return { report };
+    }],
+    ['DELETE', /^\/api\/projections\/reports\/([^/]+)$/, async (_body, m) => {
+      if (!(await store.get('reports', decodeURIComponent(m[1])))) throw fail(404, 'That report no longer exists.');
+      await store.remove('reports', decodeURIComponent(m[1]));
+      return { ok: true };
+    }],
+    // Reading Checkmarx One: through the launcher when there is one, else the two exports stand in.
+    ['GET', /^\/api\/projections\/read$/, async (_body, _m, query) => (launcher ? toLauncher(launcher, `/api/projections/read${query.has('since') ? `?since=${encodeURIComponent(query.get('since'))}` : ''}`) : { state: 'none' })],
+    ['POST', /^\/api\/projections\/(read|series)$/, async (body, m) => {
+      if (launcher) return toLauncher(launcher, `/api/projections/${m[1]}`, { method: 'POST', body: JSON.stringify(body ?? {}) });
+      throw fail(409, 'This calculator works from the two Checkmarx One exports: drop them below, or load the sample data.');
+    }],
+    // Counting code lines from git (Fusion — new customer): the launcher does it, with this computer's git.
+    ['GET', /^\/api\/projections\/git\/connections$/, async () => (launcher ? toLauncher(launcher, '/api/projections/git/connections') : { connections: [] })],
+    ['GET', /^\/api\/projections\/git\/count$/, async (_body, _m, query) => {
+      if (!launcher) throw fail(409, GIT_ONLY_LAUNCHER);
+      return toLauncher(launcher, `/api/projections/git/count?id=${encodeURIComponent(query.get('id') ?? '')}&after=${encodeURIComponent(query.get('after') ?? '')}`);
+    }],
+    // cloc-fusion's one-file page: in this file (src/standalone-calculator.js put it in), or from the launcher.
+    ['GET', /^\/api\/projections\/git\/cloc-fusion$/, async () => {
+      if (launcher) return toLauncher(launcher, '/api/projections/git/cloc-fusion');
+      const data = document.getElementById('cx-cloc-fusion');
+      if (!data) throw fail(404, 'cloc-fusion is not in this file.');
+      const { base64, ...about } = JSON.parse(data.textContent);
+      return { ...about, html: new TextDecoder().decode(Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0))) };
+    }],
+    ['POST', /^\/api\/projections\/git\/(organizations|repositories|count)$/, async (body, m) => {
+      if (!launcher) throw fail(409, GIT_ONLY_LAUNCHER);
+      return toLauncher(launcher, `/api/projections/git/${m[1]}`, { method: 'POST', body: JSON.stringify(body ?? {}) });
+    }],
+    ['GET', /^\/api\/projections\/([^/]+)$/, async (_body, m) => ({ customer: await customer(decodeURIComponent(m[1])) })],
+    ['PUT', /^\/api\/projections\/([^/]+)$/, async (body, m) => {
+      const patch = {};
+      for (const key of ['name', 'tr', 'fusion', 'fusionNew', 'totals', 'scope', 'impact']) if (body?.[key] !== undefined) patch[key] = body[key];
+      const next = patchProfile(await customer(decodeURIComponent(m[1])), patch, names().preparedBy);
+      await store.put('customers', next);
+      return { customer: summary(next) };
+    }],
+    ['DELETE', /^\/api\/projections\/([^/]+)$/, async (_body, m) => {
+      await customer(decodeURIComponent(m[1]));
+      await store.remove('customers', decodeURIComponent(m[1]));
+      return { ok: true };
+    }],
+  ];
+  return async (path, { method = 'GET', body } = {}) => {
+    const url = new URL(path, 'https://calculator.invalid');
+    for (const [verb, pattern, handle] of routes) {
+      const m = verb === method && pattern.exec(url.pathname);
+      if (m) return structuredClone(await handle(body ? JSON.parse(body) : null, m, url.searchParams));
+    }
+    throw fail(404, 'Not available in the standalone calculator.');
+  };
+}
+
+export function startStandalone({ samples = {} } = {}) {
+  const $ = (id) => document.getElementById(id);
+  const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+  let toastTimer = null;
+  const toast = (message, kind = '', ms = 6000) => {
+    const el = $('toast');
+    el.textContent = message;
+    el.className = `toast ${kind}`;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (el.hidden = true), ms);
+  };
+  const setStatus = (id, message, kind = '') => {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = message;
+    el.className = `status ${kind}`;
+  };
+  const showError = (id, error) => setStatus(id, error.message, 'error');
+  const fmtDateTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
+
+  // On its own, the Customer ▾ menu sits in the head, beside the title (in the app it stays at the top of the page).
+  const head = document.querySelector('.sa-top .topbar-title');
+  const customer = document.querySelector('#page-calculator .calc-customer');
+  if (head && customer) head.after(customer);
+  // With the launcher, the projection settings sit right under the keys, squeezed to two lines: the read and its
+  // settings, then the reading line; the project filters stay folded.
+  const keys = document.getElementById('sa-connect');
+  const heart = document.getElementById('calc-heart');
+  if (keys && heart) {
+    keys.after(heart);
+    heart.classList.add('calc-heart-compact');
+  }
+  // The keys and the settings fold into one line once a read starts (the settings are set), so the credits come first;
+  // the line keeps the read's progress and says what is set. Settings opens them again.
+  let setup = null;
+  if (keys && heart) {
+    setup = document.createElement('section');
+    setup.className = 'sa-setup';
+    setup.id = 'sa-setup';
+    setup.innerHTML = '<div class="sa-setup-bar"><span class="sa-setup-dot" aria-hidden="true"></span><span class="sa-setup-text" id="sa-setup-text" aria-live="polite"></span><progress id="sa-setup-progress" max="100" value="0" hidden></progress><button type="button" class="link sa-setup-toggle" id="sa-setup-toggle" aria-expanded="true" aria-controls="sa-setup-body">Hide settings</button></div><div class="sa-setup-body" id="sa-setup-body"></div>';
+    keys.before(setup);
+    setup.querySelector('.sa-setup-body').append(keys, heart);
+  }
+
+  // The theme: light to start with, or light or dark as chosen here.
+  const applyTheme = (theme) => {
+    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+  };
+  try {
+    applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+  } catch {
+    applyTheme('light');
+  }
+  $('sa-theme').addEventListener('click', () => {
+    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    const next = dark ? 'light' : 'dark';
+    applyTheme(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {}
+  });
+
+  // The calculator's tabs (in CxMissionZero, app.js switches them): one panel shown at a time, the arrow keys move along.
+  const showTab = (tab) => {
+    const group = tab.closest('[data-ptabs]').dataset.ptabs;
+    for (const t of document.querySelectorAll(`[data-ptabs="${group}"] [data-pt]`)) {
+      const on = t === tab;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+    }
+    for (const panel of document.querySelectorAll(`[data-ptpanel^="${group}:"]`)) panel.hidden = panel.dataset.ptpanel !== `${group}:${tab.dataset.pt}`;
+  };
+  for (const bar of document.querySelectorAll('[data-ptabs]')) {
+    const first = bar.querySelector('[data-pt]');
+    if (first) showTab(first);
+  }
+  document.addEventListener('click', (event) => {
+    const tab = event.target.closest?.('[data-ptabs] [data-pt]');
+    if (tab) showTab(tab);
+  });
+  document.addEventListener('keydown', (event) => {
+    const tab = event.target.closest?.('[data-ptabs] [data-pt]');
+    if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = [...tab.closest('[data-ptabs]').querySelectorAll('[data-pt]')].filter((t) => !t.hidden);
+    const i = tabs.indexOf(tab);
+    const next = tabs[event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (i + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+    event.preventDefault();
+    showTab(next);
+    next.focus();
+  });
+
+  // The names on the reports: the organisation making them, and who prepared them.
+  let names = readNames();
+  $('sa-org').value = names.organisation;
+  $('sa-by').value = names.preparedBy;
+  // Served by the launcher: it reads Checkmarx One once the API key is given (window.CX_LAUNCHER = {token}).
+  const launcher = window.CX_LAUNCHER && typeof window.CX_LAUNCHER === 'object' ? window.CX_LAUNCHER : null;
+  // With the launcher, every change is also written to its data file (see startDataFile): the browser's store, and a
+  // save soon after each change to it.
+  const base = openStore();
+  let changed = () => {};
+  const store = {
+    ...base,
+    put: async (name, value) => {
+      const out = await base.put(name, value);
+      changed();
+      return out;
+    },
+    remove: async (name, id) => {
+      const out = await base.remove(name, id);
+      changed();
+      return out;
+    },
+  };
+  let connected = false;
+  const calculator = initCalculator({
+    api: localApi(store, () => names, launcher),
+    $,
+    esc,
+    toast,
+    setStatus,
+    showError,
+    handleAuthLoss: () => false,
+    fmtDateTime,
+    me: () => ({ organisationName: names.organisation, user: { name: names.preparedBy } }),
+    can: () => true,
+    standalone: true,
+    canRead: () => connected,
+    // Counting from git needs the launcher (its computer's git), not a Checkmarx One connection.
+    canGit: () => Boolean(launcher),
+    sampleFile: async (name) => {
+      const b64 = samples[name];
+      if (!b64) throw new Error(`${name}: not in this file`);
+      return new Response(Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0)));
+    },
+  });
+  for (const id of ['sa-org', 'sa-by']) {
+    $(id).addEventListener('input', () => {
+      names = { organisation: $('sa-org').value.trim().slice(0, 120), preparedBy: $('sa-by').value.trim().slice(0, 120) };
+      try {
+        localStorage.setItem(NAMES_KEY, JSON.stringify(names));
+      } catch {}
+      calculator.renderOrg();
+      changed();
+    });
+  }
+
+  /**
+   * The launcher's data file (cx-credits-calculator-data.json, in the folder it was started from): loaded when the page
+   * opens, the file winning over what this browser had (each customer and report cleaned as Restore cleans them), then
+   * written after each change. An empty file takes what this browser already had, so nothing kept before is lost.
+   */
+  async function startDataFile() {
+    const note = $('sa-file-note');
+    const say = (text, kind = '') => {
+      if (!note) return;
+      note.querySelector('.sa-file-state').textContent = text;
+      note.classList.toggle('bad', kind === 'bad');
+    };
+    let got;
+    try {
+      got = await toLauncher(launcher, '/launcher/data');
+    } catch (error) {
+      say(error.message, 'bad');
+      return;
+    }
+    if (!got?.file) return;
+    if (note) {
+      note.hidden = false;
+      // The file's name on the line; where it is, in full, on hover.
+      note.title = `Saved to ${got.file}`;
+    }
+    const file = got.data ?? {};
+    const customers = Array.isArray(file.customers) ? file.customers.slice(0, MAX_PROFILES) : [];
+    const reports = Array.isArray(file.reports) ? file.reports.slice(0, MAX_REPORTS) : [];
+    if (customers.length || reports.length) {
+      for (const c of await base.all('customers')) await base.remove('customers', c.id);
+      for (const r of await base.all('reports')) await base.remove('reports', r.id);
+      for (const c of customers) if (c && typeof c.id === 'string') await base.put('customers', restoreProfile(c));
+      for (const r of reports) if (r && typeof r.id === 'string') await base.put('reports', { ...newReport({ customerId: r.customerId, customer: r.customer, by: r.createdBy, data: r.data }), id: text(r.id, 100) || newId(), createdAt: iso(r.createdAt) ?? new Date().toISOString() });
+      if (file.names && (file.names.organisation || file.names.preparedBy)) {
+        names = { organisation: String(file.names.organisation ?? '').slice(0, 120), preparedBy: String(file.names.preparedBy ?? '').slice(0, 120) };
+        $('sa-org').value = names.organisation;
+        $('sa-by').value = names.preparedBy;
+        try {
+          localStorage.setItem(NAMES_KEY, JSON.stringify(names));
+        } catch {}
+      }
+    }
+    let timer = null;
+    let saving = Promise.resolve();
+    const save = async () => {
+      timer = null;
+      const body = { kind: 'cx-credits-calculator', version: 1, names, customers: await base.all('customers'), reports: await base.all('reports') };
+      try {
+        const done = await toLauncher(launcher, '/launcher/data', { method: 'POST', body: JSON.stringify(body) });
+        say(`Saved ${fmtDateTime(done.savedAt)}`);
+      } catch (error) {
+        say(`Not saved to the file: ${error.message}`, 'bad');
+      }
+    };
+    changed = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => (saving = saving.then(save)), 600);
+    };
+    // Nothing in the file yet: what this browser has goes in it now.
+    if (!customers.length && !reports.length) changed();
+    else say(`Loaded ${customers.length === 1 ? '1 customer' : `${customers.length} customers`} and ${reports.length === 1 ? '1 report' : `${reports.length} reports`} from it`);
+  }
+
+  // Everything kept here, as one file to keep or move to another browser; and back.
+  $('sa-backup').addEventListener('click', async () => {
+    const data = { kind: 'cx-credits-calculator', version: 1, savedAt: new Date().toISOString(), names, customers: await store.all('customers'), reports: await store.all('reports') };
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })), download: `cx-credits-calculator-backup-${data.savedAt.slice(0, 10)}.json` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    toast(`Backed up ${data.customers.length} customer(s) and ${data.reports.length} report(s).`, 'ok');
+  });
+  $('sa-restore').addEventListener('click', () => $('sa-restore-file').click());
+  $('sa-restore-file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (data?.kind !== 'cx-credits-calculator' || !Array.isArray(data.customers) || !Array.isArray(data.reports)) throw new Error('That is not a backup of this calculator.');
+      if (!confirm(`Restore ${data.customers.length} customer(s) and ${data.reports.length} report(s)?\n\nThose with the same id are replaced; the others here stay.`)) return;
+      // Every section through the same cleaners as a save: a backup file can say anything.
+      for (const c of data.customers.slice(0, MAX_PROFILES)) if (c && typeof c.id === 'string') await store.put('customers', restoreProfile(c));
+      for (const r of data.reports.slice(0, MAX_REPORTS)) if (r && typeof r.id === 'string') await store.put('reports', { ...newReport({ customerId: r.customerId, customer: r.customer, by: r.createdBy, data: r.data }), id: text(r.id, 100) || newId(), createdAt: iso(r.createdAt) ?? new Date().toISOString() });
+      await calculator.load();
+      toast('Restored.', 'ok');
+    } catch (error) {
+      toast(error.message, 'bad', 9000);
+    }
+  });
+
+  if (launcher) startConnect();
+
+  /** The API key bar: connect, see the tenant, disconnect. The key goes to the launcher and is not kept in the page. */
+  function startConnect() {
+    const shell = document.querySelector('.shell');
+    const showState = (state) => {
+      connected = Boolean(state?.connected);
+      shell.classList.toggle('can-read', connected);
+      $('sa-disconnect').hidden = !connected;
+      $('sa-key').placeholder = connected ? 'Connected: paste another key to switch' : 'Paste the API key';
+      setStatus('sa-connect-status', connected ? `Connected · ${state.tenant}` : 'Not connected · the two exports work meanwhile', connected ? 'ok' : 'muted');
+      calculator.refresh();
+    };
+    $('sa-connect').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const apiKey = $('sa-key').value.trim();
+      if (!apiKey) return setStatus('sa-connect-status', 'Paste a Checkmarx One API key first.', 'error');
+      setStatus('sa-connect-status', 'Connecting…', 'muted');
+      $('sa-connect-go').disabled = true;
+      try {
+        const state = await toLauncher(launcher, '/launcher/connect', { method: 'POST', body: JSON.stringify({ apiKey, baseUrl: $('sa-base').value, iamUrl: $('sa-iam').value, tenant: $('sa-tenant').value }) });
+        $('sa-key').value = '';
+        showState(state);
+        toast(`Connected to ${state.tenant}: Read from Checkmarx One fills the customer open.`, 'ok');
+        calculator.read();
+      } catch (error) {
+        setStatus('sa-connect-status', error.message, 'error');
+      } finally {
+        $('sa-connect-go').disabled = false;
+      }
+    });
+    $('sa-disconnect').addEventListener('click', async () => {
+      try {
+        showState(await toLauncher(launcher, '/launcher/disconnect', { method: 'POST', body: '{}' }));
+      } catch (error) {
+        setStatus('sa-connect-status', error.message, 'error');
+      }
+    });
+    // A reload while the launcher is still connected stays connected.
+    toLauncher(launcher, '/launcher/status').then(showState, (error) => setStatus('sa-connect-status', error.message, 'error'));
+    startGitTokens();
+    startSetupFold();
+  }
+
+  /**
+   * The keys and settings, folded to one line while a read runs and after it (connected, every setting applied), and
+   * open while there is no connection or a change waits for Apply. Opened or closed by hand, it stays so until the next read.
+   */
+  function startSetupFold() {
+    if (!setup) return;
+    const progress = $('calc-read-progress');
+    const mini = $('sa-setup-progress');
+    let byHand = null;
+    let wasReading = false;
+    const reading = () => !progress.hidden;
+    const pending = () => !$('calc-pending').hidden && !$('calc-pending').classList.contains('idle');
+    const show = (folded) => {
+      setup.classList.toggle('folded', folded);
+      $('sa-setup-toggle').textContent = folded ? 'Settings' : 'Hide settings';
+      $('sa-setup-toggle').setAttribute('aria-expanded', String(!folded));
+    };
+    const update = () => {
+      const now = reading();
+      if (now && !wasReading) byHand = null;
+      wasReading = now;
+      const tokens = calculator.git.list().length;
+      const note = $('calc-read-note').textContent.trim();
+      const parts = [
+        connected ? $('sa-connect-status').textContent.trim() : 'Not connected',
+        now ? `Reading Checkmarx One · ${progress.value}%` : note.replace(/\s+/g, ' '),
+        pending() ? $('calc-pending-count').textContent.trim() : '',
+        tokens ? (tokens === 1 ? '1 git token' : `${tokens} git tokens`) : '',
+      ].filter(Boolean);
+      $('sa-setup-text').textContent = parts.join(' · ');
+      setup.classList.toggle('reading', now);
+      setup.classList.toggle('offline', !connected);
+      mini.hidden = !now;
+      mini.value = progress.value;
+      const auto = connected && !pending() && (now || /\d/.test(note));
+      show(byHand ?? auto);
+    };
+    $('sa-setup-toggle').addEventListener('click', () => {
+      byHand = !setup.classList.contains('folded');
+      show(byHand);
+    });
+    let queued = false;
+    const soon = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        update();
+      });
+    };
+    const watch = new MutationObserver(soon);
+    for (const el of [progress, $('calc-read-note'), $('calc-pending'), $('sa-connect-status'), $('sa-git-list')]) watch.observe(el, { attributes: true, childList: true, subtree: true, characterData: true });
+    // The progress bar's value is a property: followed while a read runs.
+    setInterval(() => reading() && soon(), 700);
+    update();
+  }
+
+  /**
+   * Git tokens beside the API key: each one added to Fusion · from Git's list (held in the page's memory for this
+   * run, never saved or printed), shown here as its platform and its last characters.
+   */
+  function startGitTokens() {
+    const git = calculator.git;
+    const NOTE = '<span class="sa-key-note">Optional: each token’s organisations and repositories are counted on Fusion · from Git. Kept for this run only.</span>';
+    const render = () => {
+      const list = git.list();
+      $('sa-git-list').innerHTML = list.length
+        ? list.map((x, i) => `<span class="sa-git-chip"><b>${esc(x.platform)}</b><code translate="no">${esc(x.masked)}</code><button type="button" data-sa-git-remove="${i}" aria-label="Remove this token" title="Remove">×</button></span>`).join('') + '<button type="button" class="link" id="sa-git-count">Count on Fusion · from Git →</button>'
+        : NOTE;
+      setStatus('sa-git-status', list.length ? `${list.length === 1 ? '1 token' : `${list.length} tokens`} · this run only` : '', list.length ? 'ok' : 'muted');
+    };
+    git.onChange(render);
+    // How the count goes, from Fusion · from Git's own line, beside the tokens.
+    new MutationObserver(() => {
+      const line = $('calc-git-status');
+      const text = line.textContent.trim();
+      if (!text || !git.list().length) return;
+      const kind = ['ok', 'warn', 'error'].find((k) => line.classList.contains(k)) ?? 'muted';
+      setStatus('sa-git-status', text.split(':')[0], kind);
+    }).observe($('calc-git-status'), { childList: true, characterData: true, subtree: true, attributes: true });
+    $('sa-git-token').addEventListener('input', () => {
+      const found = git.detect($('sa-git-token').value.trim());
+      if (found) $('sa-git-provider').value = found;
+    });
+    const add = () => {
+      const token = $('sa-git-token').value.trim();
+      if (!token) return setStatus('sa-git-status', 'Paste a git token first.', 'error');
+      const kind = git.add({ provider: $('sa-git-provider').value, address: $('sa-git-address').value, token });
+      if (!kind) return setStatus('sa-git-status', 'Pick the git host for this token.', 'error');
+      $('sa-git-token').value = '';
+      render();
+      // Counted at once: everything the token can see, on Fusion · from Git.
+      git.count();
+      setStatus('sa-git-status', 'Counting its repositories on Fusion · from Git…', 'muted');
+    };
+    $('sa-git-add').addEventListener('click', add);
+    $('sa-git-token').addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      add();
+    });
+    $('sa-git-list').addEventListener('click', (event) => {
+      const i = event.target.closest('[data-sa-git-remove]')?.dataset.saGitRemove;
+      if (i !== undefined) return git.remove(i);
+      if (event.target.closest('#sa-git-count')) git.open();
+    });
+    render();
+  }
+
+  startHelpTips();
+  store.persistent.then((ok) => {
+    if (!ok) toast('This browser does not let this page keep data: customers and reports last until the page is closed. Use Back up to keep them.', 'warn', 12000);
+  });
+  // With the launcher, its data file first, so the customers shown are the ones it keeps.
+  (launcher ? startDataFile() : Promise.resolve()).finally(() => calculator.load());
+}
