@@ -27,6 +27,7 @@ const avatar = (name, picture, cls = 'sm') => (picture ? `<span class="avatar ${
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
 const ICONS = {
+  help: '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 9h6"/><path d="M9 12h4"/>',
   overview: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
   accounts: '<path d="M3 7h18M3 12h18M3 17h12"/>',
   engine: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
@@ -142,9 +143,12 @@ function applyMyTheme() {
 }
 // ---- Branding (Settings → Branding): the name, the logo, the browser icon, the accent and where the menu sits --------
 state.branding = null;
+const TEJAS_LINE = 'Tejas - Built for speed, engineered for dominance—Tejas turns every airspace into its own.';
 const brandHtml = () => {
   const b = state.branding ?? {};
-  return `<div class="brand"><div class="logo${b.logo ? ' img' : ''}">${b.logo ? `<img src="${esc(b.logo)}" alt="" />` : LOGO}</div><div><b>${esc(b.appName ?? 'FTR Credits')}</b><span>${esc(b.tagline ?? 'Command Center')}</span></div></div>`;
+  // The default logo is Tejas: pointed at, it shows itself, larger, with its line.
+  const tejas = String(b.logo ?? '').includes('v=default');
+  return `<div class="brand"><div class="logo${b.logo ? ' img' : ''}${tejas ? ' tejas' : ''}"${tejas ? ` title="${esc(TEJAS_LINE)}" aria-label="${esc(TEJAS_LINE)}"` : ''}>${b.logo ? `<img src="${esc(b.logo)}" alt="" />` : LOGO}${tejas ? `<span class="tejas-card" role="tooltip"><img src="${esc(b.logo)}" alt="" /><span>${esc(TEJAS_LINE)}</span></span>` : ''}</div><div><b>${esc(b.appName ?? 'FTR Credits')}</b><span>${esc(b.tagline ?? 'Command Center')}</span></div></div>`;
 };
 function applyBranding(b = state.branding) {
   if (!b) return;
@@ -232,7 +236,7 @@ function shell(active, content) {
         ${link('/audit', 'audit', 'Audit log', can('audit.view'))}
       </nav>
       <a class="bgwork" id="bgwork" hidden></a>
-      <nav class="nav guide-nav"><a href="#" id="side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/guide', 'guide', 'Quick guide')}</nav>
+      <nav class="nav guide-nav"><a href="#" id="side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/guide', 'guide', 'Quick guide')}${link('/help', 'help', 'Get help')}</nav>
       <button class="ver" id="ver" title="${can('system.update') ? 'Versions and updates' : 'About, version and what is new'}">${esc(me.versionLabel ?? '')}</button>
       <div class="side-links"><a href="#/about">About</a><span>·</span><a href="#/legal" data-doc="terms">Terms &amp; license</a></div>
       <div class="side-lic">PolyForm Internal Use 1.0.0 · internal use only</div>
@@ -327,7 +331,7 @@ async function jumpTo() {
     ['Overview', '/overview', 'overview', can('dashboard.view')], ['Accounts', '/accounts', 'accounts', can('dashboard.view')], ['CxOne API audit', '/activity', 'pulse', true], ['Fusion engines & rates', '/rates', 'engine', can('users.manage') || can('settings.manage')],
     ['People & roles', '/people', 'people', true], ['Calculator', '/calculator', 'calc', can('calculator.use')], ['Teams', '/teams', 'teams', can('teams.manage') || can('dashboard.view')],
     ['Settings', '/admin', 'admin', ADMIN_TABS.some(([, , p]) => p && can(p))], ['Updates', '/admin/updates', 'admin', can('system.update')], ['Audit log', '/audit', 'audit', can('audit.view')],
-    ['Quick guide', '/guide', 'guide', true], ['About', '/about', 'guide', true],
+    ['Quick guide', '/guide', 'guide', true], ['Get help', '/help', 'help', true], ['Submit a support case', '/help/case', 'help', true], ['Request an enhancement', '/help/enhancement', 'help', true], ['About', '/about', 'guide', true],
   ].filter((x) => x[3]).map(([t, href, ic]) => ({ t, sub: 'Page', href, ic }));
   let items = pages;
   const extra = [];
@@ -2035,6 +2039,7 @@ const ADMIN_TABS = [
   ['https', 'HTTPS', 'security.https'],
   ['updates', 'Updates', 'system.update'],
   ['backups', 'Backups & health', 'backup.manage'],
+  ['help', 'Get help', 'settings.manage'],
   // About: for whoever sees Settings (everyone else finds it at the foot of the menu).
   ['about', 'About', null],
 ];
@@ -2071,6 +2076,23 @@ async function viewAdmin(tab = adminTab) {
 }
 
 const ADMIN_VIEWS = {
+  // Get help: where support cases and enhancement requests go (saved as they change; a refused one goes back).
+  async help() {
+    const me = await api('/api/me');
+    const sup = me.support ?? { mode: 'portal', email: 'bhawani.singh@checkmarx.com' };
+    $('#tab').innerHTML = `<div class="saved-banner">✓ Changes save as you type.</div>
+      <div class="panel"><h2>Get help <small>where support cases and enhancement requests go when people use Get help in the menu</small></h2>
+      <form class="form" id="supf" autocomplete="off">
+        <label class="check"><input type="radio" name="mode" value="portal" ${sup.mode !== 'email' ? 'checked' : ''} /><span><b>Support portal in the command center</b><small>A form, a numbered queue (SUP-0001, ENH-0001) and email updates. Every new request and answer is emailed to the address below; people with “Answer support cases &amp; enhancements” answer them here.</small></span></label>
+        <label class="check"><input type="radio" name="mode" value="email" ${sup.mode === 'email' ? 'checked' : ''} /><span><b>Email</b><small>Get help opens each person’s own email app, addressed to the address below, with the details filled in. For a server that cannot send email.</small></span></label>
+        <label class="f">Send requests to<input type="email" name="email" value="${esc(sup.email)}" placeholder="support@company.com" /></label>
+        <p class="muted small">In the portal, the emails go out through the email server (Settings → Email (SMTP)); until it is set up and tested, requests are kept here and the page says the email could not be sent.</p>
+      </form><div class="saved-foot" id="supsaved">All changes are saved.</div></div>`;
+    autosave($('#supf'), async (form) => {
+      const r = await api('/api/settings/support', { method: 'PUT', body: { mode: form.querySelector('input[name=mode]:checked')?.value ?? 'portal', email: form.elements.email.value } });
+      state.me.support = r;
+    }, { status: $('#supsaved') });
+  },
   async about() {
     $('#tab').innerHTML = await aboutHtml();
   },
@@ -3096,6 +3118,142 @@ async function viewRates(params) {
   }
 }
 
+// ---- Get help: support cases and enhancement requests ---------------------------------------------------------------
+// Everyone raises their own and follows them; the support team ("Answer support cases & enhancements") sees them all,
+// answers, and moves each one on. Every new request and answer is emailed to the support address (Settings → Get help).
+const HELP_STATUS = { new: ['New', ''], 'in-progress': ['In progress', 'ok'], waiting: ['Waiting for reply', 'warn'], completed: ['Completed', 'ok'], declined: ['Declined', ''] };
+const HELP_KIND = { case: 'Support case', enhancement: 'Enhancement' };
+const HELP_PRIORITY = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
+const helpChip = (st) => `<span class="chip ${HELP_STATUS[st]?.[1] ?? ''}"><i></i>${esc(HELP_STATUS[st]?.[0] ?? st)}</span>`;
+const helpState = { filter: { kind: '', status: 'open', whose: 'mine' }, justRaised: '', emailed: null };
+function supportMailto(kind) {
+  const isCase = kind === 'case';
+  const me = state.me.user;
+  const body = [isCase ? 'What happened:' : 'What I would like:', '', '', isCase ? 'What I expected:' : 'Who it helps, and how I would use it:', '', '', ...(isCase ? ['Steps to see it:', '', '', 'Priority (low, normal, high, urgent): normal', ''] : []), '---', `From: ${me.name} <${me.email}>`, `Version: ${state.me.versionLabel}`, `Server: ${location.origin}`].join('\n');
+  return `mailto:${state.me.support.email}?subject=${encodeURIComponent(isCase ? 'Support case: ' : 'Enhancement request: ')}&body=${encodeURIComponent(body)}`;
+}
+async function viewHelp(view) {
+  shell('help', loading());
+  const byEmail = state.me.support?.mode === 'email';
+  let d;
+  try {
+    d = await api('/api/support');
+  } catch (error) {
+    $('#main').innerHTML = `<div class="panel"><div class="empty"><b>${esc(error.message)}</b></div></div>`;
+    return;
+  }
+  if (d.team && !helpState.teamSeen) {
+    helpState.filter.whose = 'all';
+    helpState.teamSeen = true;
+  }
+  const caseHref = byEmail ? supportMailto('case') : '#/help/case';
+  const enhHref = byEmail ? supportMailto('enhancement') : '#/help/enhancement';
+  $('#main').innerHTML = `
+    <div class="head compact"><div class="ht"><h1 class="serif">Get help</h1><span class="crumbs">support cases and enhancement requests${byEmail ? ` · by email to ${esc(state.me.support.email)}` : ' · each gets a number, and you follow it here'}</span></div>
+      <div class="tools"><a class="btn primary" href="${esc(caseHref)}">${icon('help')}Submit a support case</a><a class="btn" href="${esc(enhHref)}">Request an enhancement</a></div></div>
+    <div class="help-grid">
+      <section class="panel help-queue"><div class="flex help-filters">
+        <select id="hf-kind"><option value="">Cases and enhancements</option><option value="case">Support cases</option><option value="enhancement">Enhancements</option></select>
+        <select id="hf-status"><option value="open">Open</option><option value="">Any status</option>${Object.entries(HELP_STATUS).map(([k, [l]]) => `<option value="${k}">${l}</option>`).join('')}</select>
+        ${d.team ? '<select id="hf-whose"><option value="all">Everyone’s</option><option value="mine">Mine</option></select>' : ''}
+      </div><h2 id="hq-title" class="mt"></h2><div id="hq-list"></div></section>
+      <section class="panel help-detail" id="help-detail"></section>
+    </div>`;
+  const f = helpState.filter;
+  $('#hf-kind').value = f.kind;
+  $('#hf-status').value = f.status;
+  if ($('#hf-whose')) $('#hf-whose').value = f.whose;
+  const renderList = () => {
+    const everyone = d.team && f.whose === 'all';
+    const rows = d.requests.filter((r) => (!f.kind || r.kind === f.kind) && (!f.status || (f.status === 'open' ? !['completed', 'declined'].includes(r.status) : r.status === f.status)) && (everyone || r.mine));
+    $('#hq-title').innerHTML = `${everyone ? 'Support queue' : 'My requests'} <small>${num(rows.length)} shown</small>`;
+    $('#hq-list').innerHTML = rows.length
+      ? `<ul class="help-rows">${rows.map((r) => `<li><a class="help-row${r.id === view.toUpperCase() ? ' on' : ''}" href="#/help/${esc(r.id)}"><span class="help-row-top"><b class="mono">${esc(r.id)}</b>${helpChip(r.status)}${r.priority === 'urgent' || r.priority === 'high' ? `<span class="chip bad"><i></i>${HELP_PRIORITY[r.priority]}</span>` : ''}</span><span class="help-row-title">${esc(r.subject)}</span><span class="sub">${r.mine ? '' : `${esc(r.requester.name || r.requester.email)} · `}${esc(dateTime(r.updatedAt))}</span></a></li>`).join('')}</ul>`
+      : `<p class="muted small">${d.requests.length ? 'Nothing matches these filters.' : byEmail ? 'Requests go by email here, so none are listed.' : 'No requests yet. Raise one with the buttons above.'}</p>`;
+  };
+  for (const [id, key] of [['#hf-kind', 'kind'], ['#hf-status', 'status'], ['#hf-whose', 'whose']]) if ($(id)) $(id).onchange = (e) => ((f[key] = e.target.value), renderList());
+  renderList();
+  const box = $('#help-detail');
+  const v = String(view ?? '');
+  if (byEmail && !/^(SUP|ENH)-\d+$/i.test(v)) {
+    box.innerHTML = `<div class="empty"><b>Get help by email</b>Support here is by email. Your email app opens, addressed to <b>${esc(state.me.support.email)}</b>, with a short template to fill in; the answers come back by email.<div class="flex mt"><a class="btn primary" href="${esc(caseHref)}">Email a support case</a><a class="btn" href="${esc(enhHref)}">Email an enhancement request</a></div></div>`;
+    return;
+  }
+  if (v === 'case' || v === 'enhancement') {
+    const isCase = v === 'case';
+    box.innerHTML = `<form class="form" id="help-form" autocomplete="off"><h2>${isCase ? 'Submit a support case' : 'Request an enhancement'}</h2>
+      <p class="muted small">${isCase ? 'Tell the support team what is not working, or where you are stuck. You get an email with the case number, and every answer.' : 'Describe the feature or improvement you would like, and why it helps. You get an email with its number, and can follow it until it is done.'}</p>
+      <label class="f">Title<input name="subject" maxlength="200" required placeholder="In a few words" /></label>
+      <label class="f">Description<textarea name="text" rows="8" maxlength="10000" required placeholder="${isCase ? 'What happened, what you expected, and the steps to see it' : 'What you would like, who it helps, and how you would use it'}"></textarea></label>
+      ${isCase ? '<label class="f">Priority<select name="priority"><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option><option value="urgent">Urgent: work is blocked</option></select></label>' : ''}
+      <div class="flex"><button class="primary" type="submit">Submit</button><a class="btn ghost" href="#/help">Cancel</a><span class="err" id="help-err"></span></div></form>`;
+    $('#help-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      e.target.querySelector('button[type=submit]').disabled = true;
+      try {
+        const r = await api('/api/support', { method: 'POST', body: { kind: v, subject: fd.get('subject'), text: fd.get('text'), priority: fd.get('priority') || 'normal', page: document.referrer ? '' : location.hash } });
+        helpState.justRaised = r.request.id;
+        helpState.emailed = r.emailed;
+        go(`/help/${r.request.id}`);
+      } catch (error) {
+        $('#help-err').textContent = error.message;
+        e.target.querySelector('button[type=submit]').disabled = false;
+      }
+    };
+    return;
+  }
+  if (/^(SUP|ENH)-\d+$/i.test(v)) return helpRequest(v.toUpperCase());
+  box.innerHTML = '<div class="empty"><b>Get help</b>Raise a support case when something does not work, or request an enhancement for something new. Each gets a number, sent to you by email, and you can follow it here until it is done.</div>';
+}
+const helpNote = (emailed) => (emailed?.error ? `Saved, but an email could not be sent: ${esc(emailed.error)}` : emailed?.sent ? 'Saved, and emailed.' : 'Saved.');
+async function helpRequest(id) {
+  const box = $('#help-detail');
+  box.innerHTML = loading();
+  let res;
+  try {
+    res = await api(`/api/support/${encodeURIComponent(id)}`);
+  } catch (error) {
+    box.innerHTML = `<div class="empty"><b>${esc(error.message)}</b></div>`;
+    return;
+  }
+  const { request: r, team } = res;
+  const raised = helpState.justRaised === r.id;
+  const emailed = helpState.emailed;
+  helpState.justRaised = '';
+  box.innerHTML = `${raised ? `<div class="callout ok"><b>Thank you. Your number is ${esc(r.id)}.</b> ${r.kind === 'case' ? 'The support team has been told. You get an email with every answer.' : 'It is now in the list of enhancements. You get an email whenever its status changes.'}${emailed?.error ? `<br /><span class="bad-t">The email with your number could not be sent: ${esc(emailed.error)}</span>` : ''}</div>` : ''}
+    <div class="flex help-head"><b class="mono">${esc(r.id)}</b><span class="chip">${HELP_KIND[r.kind]}</span>${helpChip(r.status)}${r.priority ? `<span class="muted small">Priority: ${HELP_PRIORITY[r.priority] ?? esc(r.priority)}</span>` : ''}</div>
+    <h2 class="help-subject">${esc(r.subject)}</h2>
+    <p class="muted small">Raised by ${esc(r.requester.name || r.requester.email)} · ${esc(dateTime(r.createdAt))}${r.version ? ` · ${esc(r.version)}` : ''}</p>
+    <ol class="help-thread">${r.conversation.map((m) => `<li class="help-msg${m.team ? ' team' : ''}${m.mine ? ' mine' : ''}"><div class="help-msg-head"><b>${esc(m.name)}</b>${m.team ? '<span class="chip ok">Support team</span>' : ''}<span class="muted small">${esc(dateTime(m.at))}</span></div><div class="help-msg-text">${esc(m.text)}</div></li>`).join('')}</ol>
+    <form class="form help-reply" id="help-reply"><label class="f">${r.mine ? 'Add to your request' : 'Answer'}<textarea name="text" rows="4" maxlength="10000" required placeholder="${r.mine ? 'More detail, or an answer to the support team' : 'Your answer: it is emailed to the person who raised it'}"></textarea></label><div class="flex"><button class="primary" type="submit">Send</button></div></form>
+    ${team ? `<div class="flex help-set"><label class="f">Status<select id="help-status-set">${Object.entries(HELP_STATUS).map(([k, [l]]) => `<option value="${k}"${k === r.status ? ' selected' : ''}>${l}</option>`).join('')}</select></label><button type="button" id="help-status-go">Update status</button><span class="muted small">The person who raised it gets an email with the new status.</span></div>` : ''}
+    <p class="small" id="help-view-status"></p>
+    <details class="help-history"><summary>Status history</summary><ul>${r.history.map((h) => `<li>${helpChip(h.status)} ${esc(h.name)} · ${esc(dateTime(h.at))}</li>`).join('')}</ul></details>`;
+  $('#help-reply').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    try {
+      const out = await api(`/api/support/${encodeURIComponent(r.id)}/messages`, { method: 'POST', body: { text: new FormData(e.target).get('text') } });
+      await helpRequest(r.id);
+      $('#help-view-status').innerHTML = helpNote(out.emailed);
+    } catch (error) {
+      $('#help-view-status').textContent = error.message;
+      btn.disabled = false;
+    }
+  };
+  if ($('#help-status-go')) $('#help-status-go').onclick = async () => {
+    try {
+      const out = await api(`/api/support/${encodeURIComponent(r.id)}/status`, { method: 'POST', body: { status: $('#help-status-set').value } });
+      await viewHelp(r.id);
+      $('#help-view-status').innerHTML = helpNote(out.emailed);
+    } catch (error) {
+      $('#help-view-status').textContent = error.message;
+    }
+  };
+}
+
 // ---- Your profile, as CxMissionZero has it: who you are here, and how the command center appears to you ---------------
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'AED', 'SAR', 'QAR', 'KWD', 'BHD', 'OMR', 'ILS', 'TRY', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'ZAR', 'NGN', 'KES', 'EGP', 'JPY', 'CNY', 'HKD', 'SGD', 'AUD', 'NZD', 'KRW', 'TWD', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'CAD', 'MXN', 'BRL', 'ARS', 'CLP', 'COP'];
 async function viewProfile() {
@@ -3477,6 +3635,8 @@ async function route() {
     if (path === '/audit') return await viewAudit(params);
     if (path === '/activity') return await viewActivity(params);
     if (path === '/guide') return viewGuide(params);
+    if (path === '/help') return await viewHelp('');
+    if (path.startsWith('/help/')) return await viewHelp(decodeURIComponent(path.slice('/help/'.length)));
     if (path === '/profile') return viewProfile();
     if (path === '/about') return await viewAbout(params);
     if (path === '/legal') return await viewAbout(new URLSearchParams(`doc=${params.get('doc') ?? 'terms'}`));

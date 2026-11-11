@@ -19,6 +19,7 @@ import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
 import { CallMemory, explainCall } from './resilience.js';
+import { DEFAULT_SUPPORT_EMAIL, KINDS as SUPPORT_KINDS, STATUSES as SUPPORT_STATUSES, SupportDesk, supportEmail } from './support.js';
 import { FusionRates, engineKey, rateModels, withRates } from './fusion-rates.js';
 import { DEFAULT_TR } from '../vendor/mz/public/calculator/model.js';
 import { leverData } from '../vendor/mz/public/calculator/levers.js';
@@ -150,6 +151,13 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const sendMail = async (to, message) => {
     if (!mailReady()) throw new MailError('The email server is not set up and tested yet (Settings → Email server).', 409);
     return mailTransport.send(smtpNow(), { to, subject: message.subject, text: message.text, html: message.html });
+  };
+  // ---- Get help: support cases and enhancement requests (server/support.js) ----
+  const supportDesk = new SupportDesk({ dataDir: config.dataDir });
+  /** Where requests go: the portal here (with emails to the support address), or each person's email app. */
+  const supportChannel = () => {
+    const v = settings.value.support ?? {};
+    return { mode: v.mode === 'email' ? 'email' : 'portal', email: String(v.email || DEFAULT_SUPPORT_EMAIL) };
   };
   const passwordResets = new PasswordResets();
   const resetsInFlight = new Set();
@@ -515,6 +523,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       prefs: ctx.user.prefs ?? {},
       theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
       branding: brandingView(),
+      support: supportChannel(),
       picture: ctx.user.picture ? `/api/people/${ctx.user.id}/picture?v=${encodeURIComponent(ctx.user.picture.at)}` : null,
       sessions: iam.sessionsOf(ctx.user.id),
       mz: MZ_SOURCE.label,
@@ -1066,6 +1075,87 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     calc.forget(target.id);
     record(ctx, req, 'user.remove', target.email);
     return { ok: true };
+  });
+
+  // ---- Get help: everyone raises and follows their own; the support team sees them all, answers, moves them on ----
+  const supportTeam = () => iam.users().filter((u) => u.active !== false && u.email && iam.permissionsOf(u).has('support.manage'));
+  const seesRequest = (ctx, t) => t.requester.id === ctx.user.id || ctx.permissions.has('support.manage');
+  const requestView = (ctx, t, { full = false } = {}) => {
+    const view = { id: t.id, kind: t.kind, subject: t.subject, status: t.status, priority: t.priority, requester: { name: t.requester.name, email: t.requester.email }, mine: t.requester.id === ctx.user.id, createdAt: t.createdAt, updatedAt: t.updatedAt, messages: t.messages.length };
+    if (!full) return view;
+    return { ...view, page: t.page, version: t.version, conversation: t.messages.map((m) => ({ at: m.at, name: m.by.name || m.by.email, team: m.team, mine: m.by.id === ctx.user.id, text: m.text })), history: t.history.map((h) => ({ at: h.at, name: h.by.name || h.by.email, status: h.status })) };
+  };
+  /**
+   * Email about a request. The person who raised it hears of every answer and status change; the support address
+   * (and the support team) of every new request and every answer from that person. Never fails the request: the
+   * answer says what could not be sent.
+   */
+  const mailSupport = async (ctx, t, event, { fromTeam = false, message = null } = {}) => {
+    const appName = settings.value.branding?.appName ? `${settings.value.branding.appName} ${settings.value.branding.tagline ?? ''}`.trim() : 'FTR Credits Command Center';
+    const url = linkBase();
+    const self = String(ctx.user.email ?? '').toLowerCase();
+    const jobs = [];
+    if ((event !== 'message' || fromTeam) && t.requester.email && (event === 'created' || t.requester.email.toLowerCase() !== self)) jobs.push(['requester', [t.requester.email]]);
+    if (!fromTeam && event !== 'status') {
+      const team = [...new Set([supportChannel().email, ...supportTeam().map((u) => u.email)].map((e) => String(e).toLowerCase()).filter((e) => e && e !== self))];
+      if (team.length) jobs.push(['team', team]);
+    }
+    const result = { sent: 0, error: '' };
+    for (const [to, addresses] of jobs) {
+      try {
+        await sendMail(addresses.join(', '), supportEmail(t, { event, to, appName, url, message }));
+        result.sent += addresses.length;
+      } catch (error) {
+        result.error = error.message;
+      }
+    }
+    return result;
+  };
+  r('GET', '/api/support', signedIn, (req, ctx) => ({ team: ctx.permissions.has('support.manage'), statuses: SUPPORT_STATUSES, channel: supportChannel(), requests: supportDesk.list().filter((t) => seesRequest(ctx, t)).map((t) => requestView(ctx, t)) }));
+  r('GET', '/api/support/:id', signedIn, (req, ctx, body, res, url, params) => {
+    const t = supportDesk.get(params.id);
+    if (!t || !seesRequest(ctx, t)) throw fail(404, 'No such request, or it is not yours to see.');
+    return { team: ctx.permissions.has('support.manage'), request: requestView(ctx, t, { full: true }) };
+  });
+  r('POST', '/api/support', signedIn, async (req, ctx, body) => {
+    if (!SUPPORT_KINDS[body?.kind]) throw fail(400, 'Choose a support case or an enhancement.');
+    const channel = supportChannel();
+    if (channel.mode === 'email') throw fail(409, `Requests go by email here: write to ${channel.email}.`);
+    if (supportDesk.raisedSince(ctx.user.id, new Date(Date.now() - 3_600_000).toISOString()) >= 20) throw fail(429, 'You raised 20 requests in the last hour. Add to one of them instead, or try again later.');
+    const t = supportDesk.create({ kind: body.kind, subject: body?.subject, text: body?.text, priority: body?.priority, page: body?.page, version: versionLabel(), requester: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email } });
+    record(ctx, req, t.kind === 'case' ? 'support.case' : 'support.enhancement', `${t.id} ${t.subject}`, { id: t.id, priority: t.priority });
+    const emailed = await mailSupport(ctx, t, 'created');
+    return { request: requestView(ctx, t, { full: true }), emailed };
+  });
+  r('POST', '/api/support/:id/messages', signedIn, async (req, ctx, body, res, url, params) => {
+    const t = supportDesk.get(params.id);
+    if (!t || !seesRequest(ctx, t)) throw fail(404, 'No such request, or it is not yours to see.');
+    // Someone who both raised it and is on the team answers as the person who raised it.
+    const fromTeam = t.requester.id !== ctx.user.id;
+    supportDesk.reply(t.id, { by: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email }, team: fromTeam, text: body?.text });
+    record(ctx, req, 'support.message', t.id, { fromTeam });
+    const emailed = await mailSupport(ctx, t, 'message', { fromTeam, message: t.messages.at(-1).text });
+    return { request: requestView(ctx, t, { full: true }), emailed };
+  });
+  r('POST', '/api/support/:id/status', perm('support.manage'), async (req, ctx, body, res, url, params) => {
+    const t = supportDesk.get(params.id);
+    if (!t) throw fail(404, 'No such request.');
+    const before = t.status;
+    supportDesk.setStatus(t.id, String(body?.status ?? ''), { by: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email } });
+    record(ctx, req, 'support.status', `${t.id} ${before} → ${t.status}`, { id: t.id });
+    const emailed = t.status === before ? { sent: 0, error: '' } : await mailSupport(ctx, t, 'status', { fromTeam: true });
+    return { request: requestView(ctx, t, { full: true }), emailed };
+  });
+  // Settings → Get help: the portal or email, and the address requests go to.
+  r('PUT', '/api/settings/support', perm('settings.manage'), (req, ctx, body) => {
+    const before = supportChannel();
+    const mode = body?.mode === undefined ? before.mode : body.mode === 'email' ? 'email' : 'portal';
+    const email = body?.email === undefined ? before.email : String(body.email).trim().toLowerCase();
+    if (!/^[^\s@<>()",;]+@[^\s@<>()",;]+\.[a-z]{2,}$/i.test(email)) throw fail(400, 'Give the email address requests go to.');
+    settings.value.support = { mode, email };
+    settings.save();
+    record(ctx, req, 'settings.support', `${mode} · ${email}`, { mode, email, before });
+    return supportChannel();
   });
 
   r('POST', '/api/teams', perm('teams.manage'), (req, ctx, body) => {

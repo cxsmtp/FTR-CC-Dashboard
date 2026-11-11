@@ -2,6 +2,14 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.50.00 — 2026-11-11
+
+- **Get help: support cases and enhancement requests.** **Get help** in the menu (and in Jump to): **Submit a support case** (with its priority) or **Request an enhancement**. Each gets a number (SUP-0001, ENH-0001), a status (New, In progress, Waiting for reply, Completed, Declined) and a conversation.
+  - Everyone follows their own requests; the support team (the Admin, and anyone given the new permission **Answer support cases & enhancements**) sees the queue, answers and moves each one on.
+  - **Emails**: every new request and every answer from the person who raised it goes to **bhawani.singh@checkmarx.com** (and the support team); the person who raised it gets their number, every answer and every status change. Through the email server under Settings → Email (SMTP); if it cannot send, the request is kept and the page says so.
+  - **Settings → Get help**: the support portal here, or plain email (each person’s email app opens, addressed to the support address, with a template); and the address requests go to. Saved as it changes. Everything is in the audit log.
+- **Tejas.** Point at the jet logo: it shows itself, larger, with its line — “Tejas - Built for speed, engineered for dominance—Tejas turns every airspace into its own.” (Only while the jet is the logo.)
+
 ## CC-01.49.00 — 2026-11-11
 
 - **No sideways scrolling anywhere.** Every panel, list and table fits its width at any screen size: text wraps or ends in …, and the tables were made to fit rather than scroll (checked on every page at 1280, 1366 and 1920 wide).

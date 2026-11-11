@@ -692,3 +692,12 @@ html[data-no-account] .content > main::before { content: "A new calculation: typ
 .hc-prev-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 8px 0 14px; }
 .hc-prev-facts dt { color: var(--muted); }
 .hc-prev-facts dd { margin: 0; }
+
+/* Tejas: the default logo, pointed at, shows itself larger with its line */
+.logo.tejas, .cc-logo.tejas { position: relative; overflow: visible !important; cursor: default; }
+.tejas-card { position: absolute; left: 0; top: calc(100% + 10px); z-index: 300; width: 300px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--line-hi, var(--border)); background: var(--panel-solid, var(--surface, #fff)); box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .45); color: var(--text); font-size: 13px; font-weight: 500; line-height: 1.45; letter-spacing: 0; text-transform: none; text-align: center; white-space: normal; opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity .18s, transform .18s, visibility .18s; pointer-events: none; }
+.tejas-card img { width: 120px !important; height: 120px !important; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .25)); }
+.logo.tejas:hover .tejas-card, .cc-logo.tejas:hover .tejas-card, .logo.tejas:focus-within .tejas-card { opacity: 1; visibility: visible; transform: none; }
+.tejas-card { width: 210px !important; left: -6px !important; padding: 14px !important; font-family: "Plex", system-ui, -apple-system, "Segoe UI", sans-serif !important; letter-spacing: 0 !important; text-transform: none !important; }
+.tejas-card * { text-transform: none !important; letter-spacing: 0 !important; font-family: inherit !important; }
+.tejas-card img { width: 104px !important; height: 104px !important; }

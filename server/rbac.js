@@ -29,6 +29,7 @@ export const PERMISSIONS = [
   { id: 'teams.manage', group: 'Administration', label: 'Manage teams', description: 'Create, rename, move and remove teams and choose their leaders.' },
   { id: 'users.manage', group: 'Administration', label: 'Manage people', description: 'Invite people into the teams in their scope, give them a role and a team, reset their password, unlock them, sign them out, turn them off; never beyond their own permissions.' },
   { id: 'roles.manage', group: 'Administration', label: 'Manage roles', description: 'Create and change roles; never with permissions they do not hold.' },
+  { id: 'support.manage', group: 'Administration', label: 'Answer support cases & enhancements', description: 'See every support case and enhancement request, answer them and move them on (New, In progress, Waiting for reply, Completed, Declined). Everyone can raise their own and follow them.' },
   { id: 'audit.view', group: 'Administration', label: 'See the audit log', description: 'Who signed in, who changed what, every report generated and shared.' },
   { id: 'security.https', group: 'Administration', label: 'HTTPS and certificates', description: 'Upload and replace the server certificate, get one from Let\u2019s Encrypt, and move the server from http to HTTPS only. Admin only.', special: true },
   { id: 'security.sso', group: 'Administration', label: 'Single sign-on (SAML)', description: 'Connect the company identity provider for sign-in. Admin only.', special: true },

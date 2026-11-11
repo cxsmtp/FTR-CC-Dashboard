@@ -173,6 +173,22 @@ export async function startHosted() {
       img.alt = '';
       $('cc-logo').replaceChildren(img);
       $('cc-logo').classList.add('img');
+      // The default logo is Tejas: pointed at, it shows itself, larger, with its line.
+      if (String(brand.logo).includes('v=default')) {
+        const line = 'Tejas - Built for speed, engineered for dominance—Tejas turns every airspace into its own.';
+        const card = document.createElement('span');
+        card.className = 'tejas-card';
+        card.setAttribute('role', 'tooltip');
+        const big = document.createElement('img');
+        big.src = brand.logo;
+        big.alt = '';
+        const words = document.createElement('span');
+        words.textContent = line;
+        card.append(big, words);
+        $('cc-logo').append(card);
+        $('cc-logo').classList.add('tejas');
+        $('cc-logo').setAttribute('aria-label', line);
+      }
     }
     if (brand.icon) document.getElementById('favicon')?.setAttribute('href', brand.icon);
     document.title = `Calculator · ${brand.appName ?? 'FTR Credits'}`;
@@ -182,6 +198,7 @@ export async function startHosted() {
   // ---- The command center's menu, as on every dashboard page --------------------------------------
   function renderMenu() {
     const ICONS = {
+      help: '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 9h6"/><path d="M9 12h4"/>',
       engine: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
       overview: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
       accounts: '<path d="M3 7h18M3 12h18M3 17h12"/>',
@@ -209,7 +226,7 @@ export async function startHosted() {
       ${link('/#/rates', 'engine', 'Fusion engines &amp; rates', can('users.manage') || settings)}
       ${link('/#/admin', 'admin', 'Settings', settings)}
       ${link('/#/audit', 'audit', 'Audit log', can('audit.view'))}`;
-    $('cc-guide-nav').innerHTML = `<a href="/calculator" id="cc-side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/#/guide', 'guide', 'Quick guide')}`;
+    $('cc-guide-nav').innerHTML = `<a href="/calculator" id="cc-side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/#/guide', 'guide', 'Quick guide')}${link('/#/help', 'help', 'Get help')}`;
     const name = cfg.user?.name ?? '';
     $('cc-avatar').textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
     $('cc-name').textContent = name;
@@ -1087,7 +1104,7 @@ export async function startHosted() {
   const jump = () => {
     const dlg = $('cc-jump-dialog');
     const can = (p) => perms.has(p);
-    const pages = [['Overview', '/#/overview', can('dashboard.view')], ['Accounts', '/#/accounts', can('dashboard.view')], ['CxOne API audit', '/#/activity', true], ['Fusion engines & rates', '/#/rates', can('users.manage') || ADMIN_PERMS.some(can)], ['People & roles', '/#/people', true], ['Teams', '/#/teams', true], ['Settings', '/#/admin', ADMIN_PERMS.some(can)], ['Updates', '/#/admin/updates', can('system.update')], ['Audit log', '/#/audit', can('audit.view')], ['Quick guide', '/#/guide', true], ['About', '/#/about', true]].filter((x) => x[2]).map(([t, href]) => ({ t, sub: 'Page', href }));
+    const pages = [['Overview', '/#/overview', can('dashboard.view')], ['Accounts', '/#/accounts', can('dashboard.view')], ['CxOne API audit', '/#/activity', true], ['Fusion engines & rates', '/#/rates', can('users.manage') || ADMIN_PERMS.some(can)], ['People & roles', '/#/people', true], ['Teams', '/#/teams', true], ['Settings', '/#/admin', ADMIN_PERMS.some(can)], ['Updates', '/#/admin/updates', can('system.update')], ['Audit log', '/#/audit', can('audit.view')], ['Quick guide', '/#/guide', true], ['Get help', '/#/help', true], ['Submit a support case', '/#/help/case', true], ['Request an enhancement', '/#/help/enhancement', true], ['About', '/#/about', true]].filter((x) => x[2]).map(([t, href]) => ({ t, sub: 'Page', href }));
     const accts = names().map((x) => ({ t: x.name, sub: 'Account · open in the calculator', id: x.id }));
     let sel = 0;
     let items = [];
