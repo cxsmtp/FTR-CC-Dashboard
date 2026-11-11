@@ -1139,8 +1139,10 @@ export async function startHosted() {
     const owner = $('hc-owner').selectedOptions[0]?.textContent ?? '';
     const team = $('hc-team').selectedOptions[0]?.textContent ?? '';
     const sfLabel = account?.salesforceUrl ? `${account.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account'} ${account.salesforceId ?? ''}` : 'No Salesforce link';
-    el.innerHTML = `<b>${esc(account?.name ?? 'No account open')}</b>${account ? `<span class="hc-pill ${account.salesforceUrl ? 'ok' : 'bad'}">${esc(sfLabel)}</span><span>${esc(team)}</span><span>${esc(owner)}</span>` : ''}<span class="hc-pill ${cxState.connected ? 'ok' : ''}">${cxState.connected ? `Checkmarx One · ${esc(cxState.tenant)}` : 'Not connected'}</span><button type="button" class="ghost sm" id="hc-unfold">Edit ▾</button>`;
+    el.innerHTML = `<b>${esc(account?.name ?? 'No account open')}</b>${account ? `<span class="hc-pill ${account.salesforceUrl ? 'ok' : 'bad'}">${esc(sfLabel)}</span><span>${esc(team)}</span><span>${esc(owner)}</span>` : ''}<span class="hc-pill ${cxState.connected ? 'ok' : ''}">${cxState.connected ? `Checkmarx One · ${esc(cxState.tenant)}` : 'Not connected'}</span>${account && !$('hc-upload-l').hidden ? '<button type="button" class="hc-3d" id="hc-fold-cv" title="Bring in the report the customer changed and sent back">⇪ The customer’s version</button>' : ''}<button type="button" class="ghost sm" id="hc-unfold">Edit ▾</button>`;
     document.getElementById('hc-unfold').onclick = () => fold(false);
+    const cv = document.getElementById('hc-fold-cv');
+    if (cv) cv.onclick = () => $('hc-upload').click();
   }
   function fold(on) {
     $('hc-account').classList.toggle('folded', on);

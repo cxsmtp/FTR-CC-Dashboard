@@ -530,3 +530,22 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 .hc-share-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .hc-share-hint { margin: 0; font-size: 12px; color: var(--muted); }
 .hc-shared-cell { white-space: nowrap; }
+
+/* The customer's version: a raised, 3D button, in the panel and on the folded bar */
+.hc-3d { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px !important; border-radius: 10px !important; font-weight: 700; font-size: 13px; letter-spacing: .01em; cursor: pointer; white-space: nowrap;
+  color: #fff !important; border: 0 !important; background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 82%, #fff) 0%, var(--cyan) 45%, color-mix(in srgb, var(--cyan) 70%, #000) 100%) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .45) inset, 0 -2px 0 rgba(0, 0, 0, .18) inset, 0 4px 0 color-mix(in srgb, var(--cyan) 55%, #000), 0 8px 16px -6px color-mix(in srgb, var(--cyan) 70%, transparent) !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .25); transform: translateY(0); transition: transform .08s ease, box-shadow .08s ease, filter .15s; }
+.hc-3d:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.hc-3d:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(255, 255, 255, .35) inset, 0 1px 0 color-mix(in srgb, var(--cyan) 55%, #000), 0 3px 8px -4px color-mix(in srgb, var(--cyan) 70%, transparent) !important; }
+.hc-3d:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.hc-fold-sum .hc-3d { margin-left: auto; }
+.hc-fold-sum .hc-3d + button { margin-left: 0; }
+.hc-3d[hidden] { display: none !important; }
+/* As a <button> (the folded bar) MZ draws its sheen and shadow through these variables: the same 3D look through them. */
+html[data-cc][data-ui] button.hc-3d {
+  --btn-sheen: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 82%, #fff) 0%, var(--cyan) 45%, color-mix(in srgb, var(--cyan) 70%, #000) 100%);
+  --btn-hi: rgba(255, 255, 255, .45); --btn-lo: rgba(0, 0, 0, .18);
+  --btn-drop: 0 4px 0 color-mix(in srgb, var(--cyan) 55%, #000); --btn-glow: 0 8px 16px -6px color-mix(in srgb, var(--cyan) 70%, transparent);
+  background-color: var(--cyan) !important; color: #fff !important; height: auto; min-height: 0;
+}

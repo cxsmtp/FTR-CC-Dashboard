@@ -772,26 +772,32 @@ const OV_CARDS = [
   ['shared', 'Shared', (t) => ({ v: num(t.sharedReports), s: `${num(t.accountsShared)} of ${num(t.accounts)} accounts`, g: ring(pct(t.accountsShared, t.accounts)) })],
   ['missing', 'No Salesforce link', (t) => ({ v: num(t.missingSalesforce), s: t.missingSalesforce ? 'no report possible yet' : 'all tied to Salesforce', g: glyph('ext', t.missingSalesforce ? 'bad' : 'ok'), warn: t.missingSalesforce > 0 })],
 ];
-const myCards = () => (Array.isArray(state.me.prefs?.cards) && state.me.prefs.cards.length ? state.me.prefs.cards : OV_CARDS.map(([id]) => id)).filter((id) => OV_CARDS.some(([c]) => c === id));
+/** Shown until a person chooses: credits sold and still needed are a click away in Cards ▾. */
+const DEFAULT_CARDS = ['projected', 'accounts', 'reports', 'shared', 'missing'];
+/** The cards this person shows, in their order. */
+const myCards = () => (Array.isArray(state.me.prefs?.cards) && state.me.prefs.cards.length ? state.me.prefs.cards : DEFAULT_CARDS).filter((id) => OV_CARDS.some(([c]) => c === id));
+const cardOf = (id) => OV_CARDS.find(([c]) => c === id);
 function overviewTiles(t) {
-  const chosen = new Set(myCards());
-  return `<div class="tiles">${OV_CARDS.filter(([id]) => chosen.has(id)).map(([id, label, f]) => {
+  return `<div class="tiles">${myCards().map(cardOf).map(([id, label, f]) => {
     const c = f(t);
     return `<div class="tile${c.hero ? ' hero' : ''}${c.warn ? ' warn' : ''}" data-card="${id}"><div class="tile-g">${c.g}</div><div class="tile-t"><span class="k">${esc(label)}</span><b class="v">${c.v}</b><span class="s">${c.s}</span></div></div>`;
   }).join('')}</div>`;
 }
 function cardsPicker(onDone) {
   document.querySelector('.cards-pop')?.remove();
-  const chosen = new Set(myCards());
+  const shown = myCards();
+  const chosen = new Set(shown);
+  // The chosen cards first, in their order; then the others.
+  const order = [...shown, ...OV_CARDS.map(([id]) => id).filter((id) => !chosen.has(id))];
   const pop = document.createElement('div');
   pop.className = 'cards-pop mp-menu';
-  pop.innerHTML = `<b>Cards on your Overview</b><div class="mp-list">${OV_CARDS.map(([id, label]) => `<label><input type="checkbox" value="${id}" ${chosen.has(id) ? 'checked' : ''} /><span>${esc(label)}</span></label>`).join('')}</div><div class="mp-acts"><button type="button" class="link" data-all>All</button><span class="muted small">Saved for you, on every device</span></div>`;
+  pop.innerHTML = `<b>Cards on your Overview</b><span class="muted small">Tick to show; drag ⠿ or use ▲ ▼ to order them.</span><div class="mp-list cards-order">${order.map((id) => `<div class="co-row" draggable="true" data-id="${id}"><span class="co-grip" aria-hidden="true">⠿</span><label><input type="checkbox" value="${id}" ${chosen.has(id) ? 'checked' : ''} /><span>${esc(cardOf(id)[1])}</span></label><button type="button" class="link" data-up title="Move up" aria-label="Move up">▲</button><button type="button" class="link" data-down title="Move down" aria-label="Move down">▼</button></div>`).join('')}</div><div class="mp-acts"><button type="button" class="link" data-all>All</button><button type="button" class="link" data-default>Default</button><span class="muted small">Saved for you, on every device</span></div>`;
   document.body.append(pop);
   const r = $('#cards-btn').getBoundingClientRect();
   pop.style.top = `${window.scrollY + r.bottom + 6}px`;
   pop.style.left = `${Math.max(8, window.scrollX + r.right - pop.offsetWidth)}px`;
   const save = async () => {
-    const cards = [...pop.querySelectorAll('input:checked')].map((i) => i.value);
+    const cards = [...pop.querySelectorAll('.co-row input:checked')].map((i) => i.value);
     state.me.prefs = { ...(state.me.prefs ?? {}), cards };
     onDone();
     try {
@@ -803,6 +809,38 @@ function cardsPicker(onDone) {
     for (const i of pop.querySelectorAll('input')) i.checked = true;
     save();
   };
+  const list = pop.querySelector('.cards-order');
+  pop.querySelector('[data-default]').onclick = () => {
+    const rows = new Map([...list.children].map((r) => [r.dataset.id, r]));
+    for (const id of [...DEFAULT_CARDS, ...OV_CARDS.map(([c]) => c).filter((c) => !DEFAULT_CARDS.includes(c))]) list.append(rows.get(id));
+    for (const i of list.querySelectorAll('input')) i.checked = DEFAULT_CARDS.includes(i.value);
+    save();
+  };
+  list.addEventListener('click', (e) => {
+    const row = e.target.closest('.co-row');
+    if (!row) return;
+    if (e.target.closest('[data-up]') && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+    else if (e.target.closest('[data-down]') && row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
+    else return;
+    save();
+  });
+  let dragged = null;
+  list.addEventListener('dragstart', (e) => {
+    dragged = e.target.closest('.co-row');
+    dragged?.classList.add('dragging');
+  });
+  list.addEventListener('dragover', (e) => {
+    const over = e.target.closest('.co-row');
+    if (!dragged || !over || over === dragged) return;
+    e.preventDefault();
+    const r = over.getBoundingClientRect();
+    list.insertBefore(dragged, e.clientY > r.top + r.height / 2 ? over.nextElementSibling : over);
+  });
+  list.addEventListener('dragend', () => {
+    dragged?.classList.remove('dragging');
+    dragged = null;
+    save();
+  });
   setTimeout(() => {
     const close = (e) => {
       if (pop.contains(e.target) || e.target.closest('#cards-btn')) return;

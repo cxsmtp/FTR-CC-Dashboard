@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.30.00 — 2026-11-11
+
+- **Overview cards in your order.** **Cards ▾** now lists the cards in the order shown: tick to show, drag ⠿ or use ▲ ▼ to move them. **Default** goes back to the standard set.
+- **Credits sold and Still needed are off by default** (Projected credits, Accounts, Reports, Shared and No Salesforce link show); turn them on in **Cards ▾**. Anyone who already chose their cards keeps their choice.
+- **The customer’s version is a raised, 3D button**, and stays on the bar when the account panel is folded, so the customer’s changed report can be brought in at any time.
+
 ## CC-01.29.00 — 2026-11-11
 
 - **Mark a report shared right as it is made.** When a report is ready, the calculator asks **Shared with the customer?** with an optional note (how and to whom) and **Make it the account’s primary report** (ticked). Choose **✓ Shared with the customer** or **Not yet**.
