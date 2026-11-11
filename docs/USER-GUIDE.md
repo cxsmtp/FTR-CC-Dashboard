@@ -37,8 +37,8 @@ Teams form a tree (Global → EMEA → …). The Admin sets it up under **Teams*
 ## 3. Making a projection (Sales Engineers)
 
 1. Open **Calculator** in the menu. At the top, **Team (region)** is the team you are working in.
-2. **Customer ▾ → + New customer** and type the account's name.
-3. Paste the account's **Salesforce opportunity or account link** and **Save**. Copy it from the address bar of the opportunity (`…/Opportunity/006…`) or account (`…/Account/001…`) in Salesforce. **It is required: no report can be generated without it.** **Open in Salesforce ↗** opens it in a new tab.
+2. Type the **Customer name, as in Salesforce**, and press Enter. As you type, your team's accounts are suggested: pick one to open it. To start another account, click **+ New**, type its name and press Enter. Changing the name of the account that is open renames it.
+3. Next to it, paste the account's **Salesforce opportunity or account link** and **Save**. Copy it from the address bar of the opportunity (`…/Opportunity/006…`) or account (`…/Account/001…`) in Salesforce. **It is required: no report can be generated without it.** **Open in Salesforce ↗** opens it in a new tab.
 4. Choose the **Accountable SE**: you by default.
 5. Bring in the data:
    - **A Checkmarx One customer:** paste the API key they gave you and **Connect**, then **Read from Checkmarx One**. The key is held in the server's memory for your session only: it is never saved, logged or shown again. **Disconnect** forgets it at once, and so does signing out.

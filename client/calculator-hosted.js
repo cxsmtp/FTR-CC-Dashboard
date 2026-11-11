@@ -656,6 +656,80 @@ export async function startHosted() {
   });
   showAccount(null);
 
+  // ---- The customer's name, as in Salesforce: names, opens and starts accounts (MZ's Customer ▾ menu is hidden) -------
+  const picker = $('calc-customer');
+  const names = () => [...picker.options].map((o) => ({ id: o.value, name: o.textContent.trim() }));
+  const openName = () => picker.selectedOptions[0]?.textContent.trim() ?? '';
+  const syncName = () => {
+    $('hc-names').innerHTML = names().map((x) => `<option value="${esc(x.name)}"></option>`).join('');
+    if (document.activeElement !== $('hc-name')) $('hc-name').value = picker.value ? openName() : '';
+    $('hc-account').classList.toggle('missing-name', !picker.value);
+  };
+  new MutationObserver(syncName).observe(picker, { childList: true, subtree: true, characterData: true, attributes: true });
+  picker.addEventListener('change', syncName);
+  let starting = false;
+  let naming = false; // + New: the next name typed starts an account
+  /** A new account, named: MZ's own New customer, then its name field. */
+  async function startAccount(name) {
+    starting = true;
+    const before = picker.value;
+    $('calc-new').click();
+    for (let i = 0; i < 200 && (!picker.value || picker.value === before); i++) await new Promise((r) => setTimeout(r, 50));
+    const field = $('calc-name');
+    field.value = name;
+    field.dispatchEvent(new Event('input'));
+    field.dispatchEvent(new Event('change'));
+    starting = false;
+    syncName();
+  }
+  $('hc-name').addEventListener('change', async () => {
+    const typed = $('hc-name').value.trim();
+    if (!typed || starting) return syncName();
+    const match = names().find((x) => x.name.toLowerCase() === typed.toLowerCase());
+    if (match && match.id !== picker.value) {
+      // One of the team's accounts: open it.
+      picker.value = match.id;
+      picker.dispatchEvent(new Event('change'));
+      return;
+    }
+    if (match) return;
+    if (!picker.value || naming) {
+      naming = false;
+      $('hc-name').placeholder = 'Type the account\u2019s name, or pick one';
+      return startAccount(typed).catch((error) => toast(error.message, 'bad'));
+    }
+    // The open account's name, as Salesforce has it.
+    const field = $('calc-name');
+    field.value = typed;
+    field.dispatchEvent(new Event('input'));
+    field.dispatchEvent(new Event('change'));
+    toast(`Renamed to ${typed}.`, 'ok', 3000);
+  });
+  $('hc-name').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      $('hc-name').dispatchEvent(new Event('change'));
+    }
+  });
+  $('hc-new').addEventListener('click', () => {
+    naming = true;
+    const field = $('hc-name');
+    field.value = '';
+    field.placeholder = 'The new account\u2019s name, as in Salesforce, then Enter';
+    field.focus();
+  });
+  $('hc-name').addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && naming) {
+      naming = false;
+      $('hc-name').placeholder = 'Type the account\u2019s name, or pick one';
+      syncName();
+      $('hc-name').blur();
+    }
+  });
+  $('hc-name').addEventListener('blur', () => setTimeout(() => !naming && syncName(), 200));
+  const empty = document.getElementById('calc-empty');
+  if (empty) empty.innerHTML = 'No accounts yet in this team. Type the customer’s name, as in Salesforce, at the top: each account keeps its own Checkmarx One data, plan and Fusion projects, saved as you go.';
+
   // ---- The customer's Checkmarx One: the key goes to the server, which holds it in memory for this session -------
   const shell = document.querySelector('.shell');
   const showState = (state) => {

@@ -31,6 +31,9 @@
       </div>
       <div class="hc-account" id="hc-account">
         <label class="field hc-team"><span>Team (region)</span><select id="hc-team"></select></label>
+        <div class="field hc-name"><span><label for="hc-name">Customer name</label> <small>as in Salesforce</small></span>
+          <span class="hc-sf-row"><input id="hc-name" list="hc-names" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Type the account's name, or pick one" /><button type="button" class="ghost sm" id="hc-new" title="Start another account">+ New</button></span>
+          <datalist id="hc-names"></datalist></div>
         <label class="field hc-sf"><span>Salesforce opportunity or account link <b class="hc-req">required</b></span>
           <span class="hc-sf-row"><input id="hc-sf" type="url" inputmode="url" spellcheck="false" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><button type="button" class="primary sm" id="hc-sf-save">Save</button><a id="hc-sf-open" class="ghost sm hc-btn" target="_blank" rel="noopener noreferrer" hidden>Open in Salesforce ↗</a></span>
         </label>

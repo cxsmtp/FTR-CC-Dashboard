@@ -17,7 +17,7 @@
 .shell.standalone .sa-foot a { color: inherit; }
 
 
-.hc-account { flex: 1 1 100%; display: grid; grid-template-columns: minmax(160px, 220px) minmax(280px, 1fr) minmax(160px, 220px); gap: 10px 14px; align-items: end; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.hc-account { flex: 1 1 100%; display: grid; grid-template-columns: minmax(150px, 200px) minmax(220px, 300px) minmax(260px, 1fr) minmax(150px, 210px); gap: 10px 14px; align-items: end; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .hc-account .field { margin: 0; }
 .hc-sf-row { display: flex; gap: 8px; align-items: center; }
 .hc-sf-row input { flex: 1; min-width: 0; }
@@ -295,4 +295,21 @@ html[data-cc][data-ui] button.primary, html[data-cc][data-ui] a.button.primary {
 html[data-cc][data-ui] .cc-seg button:not(.primary) { --btn-sheen: none; --btn-drop: 0 0 transparent; --btn-hi: transparent; --btn-lo: transparent; }
 html[data-cc][data-ui] .cc-swatches button.cc-swatch { display: flex; width: 100%; height: auto; min-height: 0; padding: 10px; flex-direction: column; align-items: flex-start; justify-content: flex-start; white-space: normal; text-align: left; border-radius: 14px; }
 html[data-cc][data-ui] .cc-swatches button.cc-swatch b { font-size: 13.5px; }
-html[data-cc] .shell.standalone .sa-top h1 { white-space: nowrap; }
+
+/* The account is named in the account bar (as in Salesforce): MZ's Customer ▾ picker is not shown. */
+html[data-cc] .calc-cust-pick, html[data-cc] #calc-rename-field { display: none !important; }
+.hc-name > span:first-child small { color: var(--muted); font-weight: 400; }
+.hc-name input { flex: 1; min-width: 0; }
+.hc-account.missing-name .hc-name input { border-color: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 15%, transparent); }
+@media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; } }
+/* The account bar: the customer's name and its Salesforce link first, then the team and the accountable SE. */
+.hc-account { grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "name sf sf sf" "team owner . ."; }
+.hc-account .hc-name { grid-area: name; }
+.hc-account .hc-sf { grid-area: sf; }
+.hc-account .hc-team { grid-area: team; }
+.hc-account .hc-owner { grid-area: owner; }
+.hc-name > span:first-child, .hc-name label { font: inherit; }
+html[data-cc] .shell.standalone .sa-top .title-row h1 { white-space: nowrap; }
+html[data-cc] .shell.standalone .sa-top .topbar-title { flex: 1 1 100%; }
+@media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; grid-template-areas: "name" "sf" "team" "owner"; } }
+html[data-cc] .shell.standalone .sa-top .title-row { flex: none; } html[data-cc] .shell.standalone .sa-top .topbar-title { flex-wrap: wrap; gap: 4px 20px; align-items: baseline; } html[data-cc] .shell.standalone .sa-sub { flex: 1 1 380px; }
