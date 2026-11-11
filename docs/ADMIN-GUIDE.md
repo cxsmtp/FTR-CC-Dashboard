@@ -136,7 +136,7 @@ Releases come from this repository's GitHub Releases (`UPDATE_REPO`; `UPDATE_GIT
 - **Reload the server** loads it again beside the running one and hands over, without a restart.
 - **No restart, ever.** The launcher holds the port and passes every connection on. Every switch (an update, a rollback, a restored backup, a reload) loads the new version beside the running one; the running one finishes what it is answering and hands over each person's Checkmarx One connection and their reads; then the new one takes over. Nobody is signed out and the port never closes. If the new version does not come up, the running one carries on.
 
-Making a release: bump `version` in package.json, add the CHANGELOG entry, and tag `v<version>`. The release workflow runs the tests, builds the archive (`scripts/make-release.mjs`) and publishes it. Behind a company proxy, set `HTTPS_PROXY`; the launcher sends the server's own calls through it.
+Making a release: bump `version` in package.json, add the CHANGELOG entry, and merge to `main`. The release workflow sees a version with no release yet, runs the tests, builds the archive (`scripts/make-release.mjs`) with its checksums and publishes it; every server finds it within 15 minutes. (A `v<version>` tag works too.) Behind a company proxy, set `HTTPS_PROXY`; the launcher sends the server's own calls through it.
 
 ## Settings → Backups & health
 
