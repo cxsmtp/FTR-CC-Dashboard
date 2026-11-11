@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.46.00 — 2026-11-11
+
+- **Open in calculator, right from the Accounts list.** Every row has its own **Open in calculator** button: one click and that account is open in the calculator, without going through its page first.
+
 ## CC-01.45.00 — 2026-11-11
 
 - **Overview · Teams: the top team and its three biggest.** The team everything rolls up into (Global Solution Engineering) is one fixed line with its totals; below it, the three teams with the most projected credits, side by side, each with its share, people, accounts, shared, sold and to go. Other teams are a click away on Teams. No more scrolling inside the panel.

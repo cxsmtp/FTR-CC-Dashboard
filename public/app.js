@@ -1030,7 +1030,7 @@ async function viewAccounts(params) {
         <span class="spacer"></span><span class="muted small" id="count"></span>
       </div>
       <div class="tw mt"><table><thead><tr>
-        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th>Salesforce</th><th class="sort num" data-k="tr">T&amp;R</th><th class="sort num" data-k="fusion">Fusion</th><th class="sort num" data-k="credits">Total credits</th><th class="sort num" data-k="sold">Sold</th><th class="sort num" data-k="remaining">Still needed</th><th class="sort num" data-k="reports">Reports</th><th>Customer</th><th class="sort" data-k="last">Last report</th>
+        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th>Salesforce</th><th class="sort num" data-k="tr">T&amp;R</th><th class="sort num" data-k="fusion">Fusion</th><th class="sort num" data-k="credits">Total credits</th><th class="sort num" data-k="sold">Sold</th><th class="sort num" data-k="remaining">Still needed</th><th class="sort num" data-k="reports">Reports</th><th>Customer</th><th class="sort" data-k="last">Last report</th>${can('calculator.use') ? '<th></th>' : ''}
       </tr></thead><tbody id="rows"></tbody></table></div>
     </div>`;
   const val = (a, k) => ({ name: a.name.toLowerCase(), owner: String(a.owner).toLowerCase(), tr: a.primary?.trCredits ?? -1, fusion: a.primary?.fusionCredits ?? -1, credits: a.primary?.totalCredits ?? -1, reports: a.reportCount, sold: a.sold ?? 0, remaining: a.remaining ?? -1, last: a.lastReportAt ?? '' })[k];
@@ -1057,8 +1057,9 @@ async function viewAccounts(params) {
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td class="num">${num(a.reportCount)}</td>
         <td data-edit="shared" title="Double-click: the primary report shared with the customer (to whom), or not">${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>${a.primary?.sharedWith?.length ? `<span class="sub">${esc(a.primary.sharedWith.join(', '))}</span>` : ''}` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
-        <td>${esc(ago(a.lastReportAt))}</td></tr>`).join('')
-      : '<tr><td colspan="11"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>';
+        <td>${esc(ago(a.lastReportAt))}</td>
+        ${can('calculator.use') ? `<td class="actions"><a class="btn sm primary calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator">${icon('calc')}Open in calculator</a></td>` : ''}</tr>`).join('')
+      : `<tr><td colspan="${can('calculator.use') ? 12 : 11}"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>`;
     // One click opens the account; a double-click edits the cell (the click waits a moment to tell them apart).
     for (const el of $$('[data-account]')) {
       let timer = null;
