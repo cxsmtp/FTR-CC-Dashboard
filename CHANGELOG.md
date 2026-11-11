@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.43.00 — 2026-11-11
+
+- **Connect reads Checkmarx One at once.** The moment the API key is given and connected, the calculator reads that customer’s tenant for the account open (as **Read from Checkmarx One** does), also when the account already had data. Before, it read only for an empty account, and could reuse a read made in the last minutes, even one made for another customer.
+
 ## CC-01.42.00 — 2026-11-11
 
 - **Leaders change the accountable SE**, whoever made the projection: in the calculator, on the account page or in the Accounts list (double-click). Leaders and above may do it even where their role does not use the calculator; it is in the audit log.

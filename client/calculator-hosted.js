@@ -1274,8 +1274,9 @@ export async function startHosted() {
       $('sa-key').value = '';
       showState(state);
       fold(true);
-      toast(`Connected to ${state.tenant}: Read from Checkmarx One fills the account open.`, 'ok');
-      calculator.autoRead();
+      toast(`Connected to ${state.tenant}: reading Checkmarx One for ${account?.name ?? 'the account'} now.`, 'ok');
+      // The key given: read this customer's tenant at once (Read from Checkmarx One, pressed for you), never an earlier read.
+      calculator.read();
     } catch (error) {
       setStatus('sa-connect-status', error.message, 'error');
     } finally {
