@@ -23,7 +23,8 @@ export const DEFAULT_TR = Object.freeze({
   lookbackMonths: 12,
   // Findings still to come are left out until the SE ticks them (a projection saved before keeps its own choice).
   includeFuture: false,
-  fusionUpliftPercent: 5,
+  // More findings Fusion is expected to report: none unless the SE sets it (a projection saved before keeps its own %).
+  fusionUpliftPercent: 0,
   // New findings fall as teams adopt AI (assist, triage, remediation): this much fewer over a year.
   aiDeclinePercent: 2,
   // How many new findings to count, against the pace of the trend (100%: as many a month as over the trend's months).

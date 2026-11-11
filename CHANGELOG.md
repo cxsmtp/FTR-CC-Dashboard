@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.56.00 — 2026-11-11
+
+- **More found by Fusion starts at 0%.** A new projection (and **Defaults**) no longer adds 5% more findings for Fusion; set it when the customer's own numbers support it. A projection saved before keeps its own %.
+
 ## CC-01.55.00 — 2026-11-11
 
 Security, second pass (after the Checkmarx One rescan):

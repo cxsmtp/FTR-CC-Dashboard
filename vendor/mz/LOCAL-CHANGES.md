@@ -27,3 +27,5 @@
   severity. The line under the answer (`falsePositiveLine`) and the key slide's note no longer repeat it.
 - **Smooth levers** (`report.js` `leversOnly`; `report-live.js` `figures`): while a slider is dragged only the panel's
   figures follow; the body is written again once it rests (220 ms) or on change, and the scroll position is kept.
+- **More found by Fusion starts at 0%** (`model.js` `DEFAULT_TR.fusionUpliftPercent`, was 5): new projections and the
+  Defaults button; a projection saved before keeps its own %.
