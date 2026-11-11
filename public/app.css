@@ -885,3 +885,5 @@ td[data-edit]:hover { box-shadow: inset 0 -2px 0 var(--line-hi); }
 input.cell-edit, select.cell-edit { width: 100%; min-width: 140px; padding: 5px 8px; font-size: 13px; }
 .sale-inline { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
 .sale-inline input { width: 130px; padding: 5px 8px; }
+.share-inline { display: flex; gap: 6px; align-items: center; }
+.share-inline input { width: 150px; min-width: 0; padding: 5px 8px; }

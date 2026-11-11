@@ -1078,14 +1078,18 @@ async function viewAccounts(params) {
     if (kind === 'shared') {
       if (!can('reports.share')) return toast('Marking reports shared needs the permission to share them.', 'bad');
       if (!a.primary) return toast('No report yet to share.', 'bad');
+      // In the cell itself, as the name is: how and to whom, then ✓; or, when shared, undo it.
       const shared = Boolean(a.primary.sharedAt);
-      if (shared) {
-        if (!confirm(`Mark the primary report of ${a.name} as not shared with the customer?`)) return;
-        return done(() => api(`/api/cc/reports/${encodeURIComponent(a.primary.id)}/shared`, { method: 'POST', body: { shared: false } }), 'No longer marked shared.');
-      }
-      const note = await ask(`${a.name}: shared with the customer`, 'How and to whom was the primary report shared? (optional)');
-      if (note === null) return;
-      return done(() => api(`/api/cc/reports/${encodeURIComponent(a.primary.id)}/shared`, { method: 'POST', body: { shared: true, note } }), 'Marked shared with the customer.');
+      const url = `/api/cc/reports/${encodeURIComponent(a.primary.id)}/shared`;
+      cell.innerHTML = shared
+        ? `<div class="cell-edit share-inline"><span class="muted small">Shared ${esc(date(a.primary.sharedAt))}</span><button type="button" class="sm" data-ok>Not shared</button><button type="button" class="sm ghost" data-x>✕</button></div>`
+        : `<div class="cell-edit share-inline"><input maxlength="300" placeholder="How and to whom (optional)" aria-label="How and to whom was the primary report shared" /><button type="button" class="sm primary" data-ok>✓ Shared</button><button type="button" class="sm ghost" data-x>✕</button></div>`;
+      const note = cell.querySelector('input');
+      (note ?? cell.querySelector('[data-ok]')).focus();
+      const save = () => done(() => api(url, { method: 'POST', body: shared ? { shared: false } : { shared: true, note: note.value } }), shared ? 'No longer marked shared.' : 'Marked shared with the customer.');
+      cell.querySelector('[data-ok]').onclick = save;
+      cell.querySelector('[data-x]').onclick = restore;
+      cell.onkeydown = (e) => (e.key === 'Enter' ? save() : e.key === 'Escape' && restore());
     }
   }
   for (const th of $$('th.sort')) th.onclick = () => {
