@@ -3248,7 +3248,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   const impact = () => impactSettings(c.open?.impact ?? {}, impactSettings(c.impactDefaults ?? {}));
   const IMPACT_FIELDS = {
     'calc-imp-triage': 'triageMinutes', 'calc-imp-fix': 'fixMinutes', 'calc-imp-review': 'reviewMinutes', 'calc-imp-rate': 'hourlyRate', 'calc-imp-price': 'creditPrice', 'calc-imp-currency': 'currency',
-    'calc-imp-lph': 'linesPerHour', 'calc-imp-reviewers': 'reviewers', 'calc-imp-later': 'laterFixMultiplier', 'calc-imp-chance': 'breachChancePercent', 'calc-imp-breach': 'breachCost',
+    'calc-imp-lph': 'linesPerHour', 'calc-imp-reviewers': 'reviewers', 'calc-imp-later': 'laterFixMultiplier', 'calc-imp-arr': 'arr', 'calc-imp-arrpct': 'breachArrPercent', 'calc-imp-breaches': 'breachesAvoided',
   };
 
   function fillImpact() {
@@ -3259,6 +3259,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       $(id).value = key === 'currency' ? v : key === 'hourlyRate' || key === 'creditPrice' ? (v || '') : v;
     }
     $('calc-imp-count').checked = s.countBreach;
+    $('calc-imp-fusion-on').checked = s.countFusion;
   }
 
   const money = (n, currency) => {
@@ -3278,6 +3279,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
 
   /** Fusion's impact: the projects counted on the Fusion tab, and what Fusion adds to triage & remediation. */
   function currentFusionImpact() {
+    if (!impact().countFusion) return null;
     const est = estimate();
     const fn = fnewEstimate();
     const parts = [fusionCounts(est) && est, fnewCounts(fn) && fn].filter(Boolean);
@@ -3324,7 +3326,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const f = currentFusionImpact();
     const { w } = L;
     $('calc-impact-fusion-empty').hidden = Boolean(f);
-    $('calc-impact-fusion-empty').textContent = fusionOff() ? 'Fusion for the existing customer is left out of this projection: tick Add Fusion: Existing customer at the top to count it.' : 'No Fusion projects yet: add them, with their lines of code, on the Fusion tabs.';
+    $('calc-impact-fusion-empty').textContent = !impact().countFusion ? 'Fusion’s impact is not calculated: tick Calculate Fusion’s impact above to see its figures (and count them in the return).' : fusionOff() ? 'Fusion for the existing customer is left out of this projection: tick Add Fusion: Existing customer at the top to count it.' : 'No Fusion projects yet: add them, with their lines of code, on the Fusion tabs.';
     if (!f) return ($('calc-impact-fusion').innerHTML = '');
     const cash = (n) => esc(money(n, f.settings.currency));
     $('calc-impact-fusion').innerHTML = [
@@ -3334,7 +3336,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       kpiTile(w('Reviewers to keep pace'), num(f.reviewersNeeded, 1), w('Full-time, reading what Fusion reads')),
       kpiTile(w('A team reading it once'), w('{0} weeks', num(f.teamWeeks, 1)), w('{0} reviewers, 40 hours a week', num(f.settings.reviewers))),
       f.extraTrue !== null ? kpiTile(w('Found earlier, fixed cheaper'), f.earlyValue === null ? `${num(f.earlyHours)} ${w('hours')}` : cash(f.earlyValue), w('{0} more true positives fixed while coding, not after release', num(f.extraTrue))) : '',
-      f.breachAvoided !== null ? kpiTile(w('Breach cost avoided'), cash(f.breachAvoided), f.settings.countBreach ? w('{0} critical and high found earlier; counted in the return', num(f.extraCriticalHigh)) : w('{0} critical and high found earlier; an expected cost, not counted', num(f.extraCriticalHigh))) : '',
+      f.breachAvoided !== null ? kpiTile(`${w('Breach cost avoided')} <i class="hc-beta">beta</i>`, cash(f.breachAvoided), w('{0} breach(es) × {1}% of ARR; for projection only', num(f.settings.breachesAvoided), num(f.settings.breachArrPercent, 1))) : '',
     ].join('');
   }
 
@@ -3350,6 +3352,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     ].join('');
   }
 
+  $('calc-imp-fusion-on').addEventListener('change', (event) => {
+    if (!c.open) return;
+    c.open.impact = impactSettings({ ...impact(), countFusion: event.target.checked }, impact());
+    if (event.target.checked) $('calc-imp-fusion-box').open = true;
+    renderImpact();
+    save({ impact: c.open.impact });
+  });
   $('calc-imp-count').addEventListener('change', (event) => {
     if (!c.open) return;
     c.open.impact = impactSettings({ ...impact(), countBreach: event.target.checked }, impact());
@@ -3486,6 +3495,52 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
    * One click: read Checkmarx One first when nothing is read yet (or follow the read running), then
    * make the report with every default in place. Returns the report and its file, or null.
    */
+  /**
+   * With Impact on, before each report: add the breach cost (beta)? Off unless chosen; asks the customer's ARR, the
+   * share of it a breach costs (10%) and the breaches avoided. Resolves false only when the person cancels.
+   */
+  function askBreach() {
+    return new Promise((resolve) => {
+      const s = impact();
+      const d = document.createElement('dialog');
+      d.className = 'notice-dialog calc-breach-dialog';
+      d.innerHTML = `<form method="dialog">
+        <h2>Add the breach cost to the report? <i class="hc-beta">beta</i></h2>
+        <p class="hint">For projection only, and being refined on feedback: the breaches Fusion helps avoid, each costing a share of the customer’s annual revenue. It is marked <b>beta</b> in the report and its PDF, and left out unless you add it.</p>
+        <div class="calc-terms">
+          <label class="field"><span>Customer’s annual revenue (ARR, ${esc(s.currency)})</span><input type="number" name="arr" min="0" step="1000000" value="${s.arr || ''}" placeholder="e.g. 250000000" /></label>
+          <label class="field"><span>A breach costs (% of ARR)</span><input type="number" name="pct" min="0" max="100" step="0.5" value="${s.breachArrPercent}" /></label>
+          <label class="field"><span>Breaches avoided</span><input type="number" name="n" min="0" step="1" value="${s.breachesAvoided}" /></label>
+        </div>
+        <p class="status" data-breach-status aria-live="polite"></p>
+        <div class="hc-dialog-actions"><button value="cancel" class="ghost" formnovalidate>Cancel</button><button value="no" class="secondary" formnovalidate>Leave it out</button><button value="yes" class="primary">Add it, marked beta</button></div>
+      </form>`;
+      document.body.append(d);
+      const form = d.querySelector('form');
+      form.addEventListener('submit', (event) => {
+        if (event.submitter?.value !== 'yes') return;
+        if (!(Number(form.arr.value) > 0)) {
+          event.preventDefault();
+          d.querySelector('[data-breach-status]').textContent = 'Give the customer’s annual revenue, or leave the breach cost out.';
+          form.arr.focus();
+        }
+      });
+      d.addEventListener('close', () => {
+        const answer = d.returnValue;
+        d.remove();
+        if (answer !== 'yes' && answer !== 'no') return resolve(false);
+        const on = answer === 'yes';
+        const next = on ? { countBreach: true, countFusion: true, arr: form.arr.value, breachArrPercent: form.pct.value, breachesAvoided: form.n.value } : { countBreach: false };
+        c.open.impact = impactSettings({ ...impact(), ...next }, impact());
+        fillImpact();
+        renderImpact();
+        save({ impact: c.open.impact });
+        resolve(true);
+      });
+      d.showModal();
+    });
+  }
+
   async function generate({ download: save = true } = {}) {
     if (!c.open) return null;
     await flush();
@@ -3496,6 +3551,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       await done;
       await flush();
     }
+    if (impactOn() && !(await askBreach())) return null;
     const data = reportData();
     if (!data.tr && !data.fusion) {
       toast(offline() ? 'Nothing to report yet: drop the two Checkmarx One exports below (or load the sample data), or add Fusion projects first.' : 'Nothing to report yet: read Checkmarx One (or use the two exports), or add Fusion projects first.', 'warn');

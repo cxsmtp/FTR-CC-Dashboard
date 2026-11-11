@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.26.00 — 2026-11-11
+
+- **Git: paste the token, the platform is found.** The calculator's Git choice now has the token field itself: GitHub, GitLab, Bitbucket and Azure DevOps are told from the token (ghp_/github_pat_, glpat-, ATATT/BBDC-, AZDO or the 52-letter Azure form), and the button says **Connect to GitHub →** and so on. Only a token that says nothing asks for the host. Connect adds it, finds its organisations and counts the repositories; added tokens show as chips you can remove. Self-hosted servers and the Azure DevOps organisation go under Advanced.
+- **Impact · Fusion is off by default.** Tick **Calculate Fusion’s impact** to see its figures and count them in the return and the report; its assumptions stay folded away.
+- **Breach cost: simpler, beta, and only when asked.** No more IBM average × a chance per finding: a breach costs a share of the customer’s annual revenue (10% of ARR unless changed) × the breaches avoided. While Impact is on, each report first asks whether to add it (off unless you add it). In the report, its PDF and the slides it is marked **Beta · for projection only, based on feedback**.
+- **Updates: “Latest published” shows the version again** straight after a handover; the release list is kept with the update state instead of waiting for the next check.
+
 ## CC-01.25.00 — 2026-11-11
 
 - **Updates download again.** Release files now come from github.com's download links instead of GitHub's API, whose hourly limit for servers that do not sign in refused 1.24.0 with 403. If that limit is ever hit, the page says when it lifts (and that `UPDATE_GITHUB_TOKEN` raises it).

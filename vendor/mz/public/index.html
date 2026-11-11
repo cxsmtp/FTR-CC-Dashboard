@@ -3801,15 +3801,22 @@ BITBUCKET_TOKEN_2=…  BITBUCKET_URL_2=https://bitbucket.acme.com</pre>
                 </div>
                 <p class="hint">They start from Settings → Impact and are kept with this customer.</p>
                 <h3 class="calc-impact-h3">Fusion</h3>
+                <label class="check calc-imp-fusion-on"><input type="checkbox" id="calc-imp-fusion-on" /> Calculate Fusion’s impact <span class="hint">off by default: no Fusion figures in Impact, the return or the report until ticked</span></label>
+                <details class="calc-imp-fusion-box" id="calc-imp-fusion-box"><summary>Fusion assumptions</summary>
                 <div class="calc-terms" id="calc-impact-fterms">
                   <label class="field"><span>Lines an expert reviews in an hour</span><input type="number" id="calc-imp-lph" min="1" step="10" /></label>
                   <label class="field"><span>Reviewers in a team</span><input type="number" id="calc-imp-reviewers" min="1" step="1" /></label>
                   <label class="field"><span>A fix after release costs (× a fix while coding)</span><input type="number" id="calc-imp-later" min="1" step="0.5" /></label>
-                  <label class="field"><span>Chance a critical or high finding leads to a breach (%)</span><input type="number" id="calc-imp-chance" min="0" max="100" step="0.1" /></label>
-                  <label class="field"><span>A breach costs</span><input type="number" id="calc-imp-breach" min="0" step="100000" /></label>
-                  <label class="check calc-imp-count"><input type="checkbox" id="calc-imp-count" /> Count the breach cost avoided in the return</label>
                 </div>
-                <p class="hint">A breach's cost starts at IBM's Cost of a Data Breach 2024 average; the breach cost avoided is an expected cost, not money saved, so it counts in the return only when ticked.</p>
+                <h4 class="calc-impact-h4">Breach cost <i class="hc-beta">beta</i></h4>
+                <div class="calc-terms">
+                  <label class="check calc-imp-count"><input type="checkbox" id="calc-imp-count" /> Add the breach cost avoided</label>
+                  <label class="field"><span>Customer’s annual revenue (ARR)</span><input type="number" id="calc-imp-arr" min="0" step="1000000" /></label>
+                  <label class="field"><span>A breach costs (% of ARR)</span><input type="number" id="calc-imp-arrpct" min="0" max="100" step="0.5" /></label>
+                  <label class="field"><span>Breaches avoided</span><input type="number" id="calc-imp-breaches" min="0" step="1" /></label>
+                </div>
+                <p class="hint">Off by default, for projection only and marked beta in the report and PDF. You are asked before each report while Impact is on.</p>
+                </details>
               </section>
               <div class="calc-kpis" id="calc-impact-overall"></div>
               <h2 class="calc-impact-part">Triage &amp; remediation</h2>

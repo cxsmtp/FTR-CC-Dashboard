@@ -69,7 +69,19 @@
               <span class="status" id="sa-connect-status" aria-live="polite"></span>
             </form>
           </div>
-          <div class="hc-pane" data-pane="git" hidden><span>A prospect’s repositories on GitHub, GitLab, Bitbucket or Azure DevOps, counted with a read-only token.</span><button type="button" class="primary sm" data-open-tab="fusion-git">Connect to git →</button></div>
+          <div class="hc-pane" data-pane="git" hidden>
+            <form class="sa-connect hc-git" id="hc-git" autocomplete="off">
+              <input type="password" id="hc-git-token" spellcheck="false" placeholder="The customer's read-only git token: GitHub, GitLab, Bitbucket or Azure DevOps (in memory only)" autocomplete="off" aria-label="The customer's git token" />
+              <span class="hc-git-kind" id="hc-git-kind" aria-live="polite"></span>
+              <select id="hc-git-provider" aria-label="Git host" hidden><option value="">Which git host?</option><option value="github">GitHub</option><option value="gitlab">GitLab</option><option value="bitbucket">Bitbucket</option><option value="azure">Azure DevOps</option></select>
+              <button type="submit" class="primary sm" id="hc-git-go">Connect to Git →</button>
+              <details class="sa-advanced"><summary>Advanced</summary>
+                <div class="sa-advanced-grid"><label class="field"><span>Server address (self-hosted, or the Azure DevOps organisation)</span><input id="hc-git-address" type="url" spellcheck="false" placeholder="https://github.com" /></label></div>
+              </details>
+              <span class="status" id="hc-git-status" aria-live="polite"></span>
+              <div class="hc-git-list" id="hc-git-list" hidden></div>
+            </form>
+          </div>
           <div class="hc-pane" data-pane="cloc" hidden><span>The customer runs cloc-fusion where their code is and sends you its report; their code never leaves them.</span><button type="button" class="primary sm" data-open-tab="fusion-cloc">Import a cloc-fusion report →</button></div>
         </div>
         <div class="hc-meta">

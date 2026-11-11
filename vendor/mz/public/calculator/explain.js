@@ -222,7 +222,7 @@ export function fusionImpactSections(f, L) {
       { text: w('Fixed while coding, not after release, where a fix costs {0} times as much: {1} × ({0} − 1) × {2} minutes ÷ 60 = {3} hours.', num(s.laterFixMultiplier, 1), num(f.extraTrue), num(s.fixMinutes), num(f.earlyHours)), total: true },
     ];
     if (f.earlyValue !== null) early.push({ text: w('Worth: {0} hours × {1} = {2}.', num(f.earlyHours), cash(s.hourlyRate), cash(f.earlyValue)) });
-    early.push({ text: w('Breach cost avoided: {0} critical and high × {1}% × {2} = {3}{4}', num(f.extraCriticalHigh), num(s.breachChancePercent, 2), cash(s.breachCost), cash(f.breachAvoided), s.countBreach ? w('; counted in the return.') : w('; an expected cost, not counted in the return.')) });
+    if (f.breachAvoided !== null) early.push({ text: w('Breach cost avoided (beta, for projection only): {0} breach(es) × {1}% of ARR {2} = {3}; counted in the return.', num(s.breachesAvoided), num(s.breachArrPercent, 1), cash(s.arr), cash(f.breachAvoided)) });
     sections.push({ key: 'fusion-early', title: w('Found earlier, fixed cheaper'), lines: early });
   }
   return sections;

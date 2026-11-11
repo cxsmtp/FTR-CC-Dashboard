@@ -469,3 +469,21 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 .hc-sf-hint.bad { color: var(--red); }
 .hc-sf-gate { flex: 1 1 100%; margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13px; color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); background: color-mix(in srgb, var(--amber) 8%, transparent); }
 .hc-account.no-sf .hc-sf input { border-color: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 15%, transparent); }
+
+/* Git: the token alone; the platform read from it */
+.hc-git #hc-git-token { flex: 1 1 320px; min-width: 0; }
+.hc-git-kind { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.hc-git-kind.ok { color: var(--green); }
+.hc-git-kind.ask { color: var(--amber); }
+.hc-git select { max-width: 170px; }
+.hc-git-list { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+.hc-git-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
+.hc-git-chip button { padding: 0 2px; }
+
+/* Impact · Fusion: opt-in, its assumptions folded away */
+.calc-imp-fusion-on { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; font-weight: 600; }
+.calc-imp-fusion-on .hint { font-weight: 400; }
+.calc-imp-fusion-box > summary { cursor: pointer; font-size: 13px; color: var(--muted, inherit); margin-bottom: 6px; }
+.calc-impact-h4 { margin: 14px 0 6px; font-size: 13px; }
+.calc-breach-dialog { max-width: 620px; }
+.calc-breach-dialog .calc-terms { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }

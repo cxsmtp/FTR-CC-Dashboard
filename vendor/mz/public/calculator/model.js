@@ -1089,6 +1089,13 @@ export const IMPACT_DEFAULTS = {
   breachChancePercent: 0.5,
   breachCost: 4880000,
   countBreach: false,
+  // Fusion's impact is worked out only when asked for: off, no Fusion figure is in Impact, the return or the report.
+  countFusion: false,
+  // The breach cost (beta, for projection only): the breaches avoided × a share of the customer's annual revenue (ARR).
+  // Left out unless asked for, and marked beta wherever it is shown.
+  arr: 0,
+  breachArrPercent: 10,
+  breachesAvoided: 1,
 };
 /** Working hours in a developer's year, to say the hours as people. */
 export const HOURS_A_YEAR = 1800;
@@ -1100,6 +1107,7 @@ export function impactSettings(value = {}, base = IMPACT_DEFAULTS) {
   };
   const currency = String(value?.currency || base?.currency || IMPACT_DEFAULTS.currency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'USD';
   const count = value?.countBreach ?? base?.countBreach ?? IMPACT_DEFAULTS.countBreach;
+  const fusionOn = value?.countFusion ?? base?.countFusion ?? IMPACT_DEFAULTS.countFusion;
   return {
     triageMinutes: pick('triageMinutes', 600),
     fixMinutes: pick('fixMinutes', 6000),
@@ -1113,6 +1121,10 @@ export function impactSettings(value = {}, base = IMPACT_DEFAULTS) {
     breachChancePercent: pick('breachChancePercent', 100),
     breachCost: pick('breachCost', 1e11),
     countBreach: count === true || count === 'true',
+    countFusion: fusionOn === true || fusionOn === 'true',
+    arr: pick('arr', 1e13),
+    breachArrPercent: pick('breachArrPercent', 100),
+    breachesAvoided: pick('breachesAvoided', 1000),
   };
 }
 
@@ -1173,8 +1185,8 @@ export function trImpact(rows = {}, months = 12, settings = {}) {
  *   - Found earlier, fixed cheaper: the true positives Fusion adds (the triage & remediation
  *     projection's "more found by Fusion" less their false positives) fixed while the code is being
  *     written, where a fix after release costs `laterFixMultiplier` times as much.
- *   - Breach risk reduced: the critical and high ones of those × the chance one leads to a breach ×
- *     what a breach costs; an expected cost, in the return only when `countBreach`.
+ *   - Breach cost avoided (beta, for projection only): when asked for (`countBreach`), the breaches avoided ×
+ *     the share of the customer's ARR a breach costs (10% unless changed); nothing without the ARR.
  * `rows` are the Fusion estimate's rows (included, units, lines, scans); `trRows` the projection's rows.
  */
 export function fusionImpact(rows = [], credits = 0, months = 12, settings = {}, trRows = null) {
@@ -1195,13 +1207,16 @@ export function fusionImpact(rows = [], credits = 0, months = 12, settings = {},
   const extraCriticalHigh = trRows ? extra(['Critical', 'High']) : null;
   const earlyHours = extraTrue === null ? null : (extraTrue * (s.laterFixMultiplier - 1) * s.fixMinutes) / 60;
   const earlyValue = earlyHours === null || rate === null ? null : earlyHours * rate;
-  const breachAvoided = extraCriticalHigh === null ? null : extraCriticalHigh * (s.breachChancePercent / 100) * s.breachCost;
+  // Beta: only when asked for, and only with the customer's ARR: breaches avoided × the share of ARR a breach costs.
+  const breachCost = s.arr > 0 ? (s.arr * s.breachArrPercent) / 100 : null;
+  const breachAvoided = !s.countBreach || breachCost === null ? null : s.breachesAvoided * breachCost;
   const parts = [expertValue, earlyValue, s.countBreach ? breachAvoided : null].filter((v) => v !== null);
   const value = parts.length ? parts.reduce((a, b) => a + b, 0) : null;
   const net = value === null ? null : value - (cost ?? 0);
   return {
     settings: s,
     months: period,
+    breachCost,
     projects: counted.length,
     linesOnce,
     linesRead,

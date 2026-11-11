@@ -237,7 +237,7 @@ function impactSection(data, L) {
   const cash = (n) => esc(moneyText(n, cur, L.locale));
   const tile = (label, value, sub, cls = '') => `<div class="card impact-tile ${cls}"><h3>${label}</h3><p class="figure">${value}</p><p class="sub">${sub}</p></div>`;
   const overall = o && o.value !== null ? `<div class="cards">${[
-    tile(w('All the credits give back'), cash(o.value), w('Triage & remediation and Fusion, over {0} months', num(o.months)), 'gold'),
+    tile(w('All the credits give back'), cash(o.value), `${w('Triage & remediation and Fusion, over {0} months', num(o.months))}${o.sources?.some((x) => x.key === 'breach') ? ` · ${w('includes the breach cost (beta)')}` : ''}`, 'gold'),
     tile(w('What the credits cost'), cash(o.cost), o.cost === null ? w('Enter what a credit costs') : w('Every credit in this projection')),
     tile(w('Return'), o.roi === null ? '—' : `${num(o.roi * 100)}%`, o.net === null ? w('Once the hour and the credit have a price') : `${w('{0} net', cash(o.net))}${o.paybackMonths !== null ? ` · ${w('paid back in {0} months', num(o.paybackMonths, 1))}` : ''}`),
   ].join('')}</div>` : '';
@@ -267,12 +267,13 @@ function impactSection(data, L) {
       tile(w('Reviewers to keep pace'), num(f.reviewersNeeded, 1), w('Full-time, reading what Fusion reads')),
       tile(w('A team reading it once'), w('{0} weeks', num(f.teamWeeks, 1)), w('{0} reviewers, 40 hours a week', num(f.settings.reviewers))),
       f.extraTrue !== null ? tile(w('Found earlier, fixed cheaper'), f.earlyValue === null ? `${num(f.earlyHours)} ${w('hours')}` : cash(f.earlyValue), w('{0} more true positives fixed while coding, not after release', num(f.extraTrue))) : '',
-      f.breachAvoided !== null ? tile(w('Breach cost avoided'), cash(f.breachAvoided), f.settings.countBreach ? w('{0} critical and high found earlier; counted in the return', num(f.extraCriticalHigh)) : w('{0} critical and high found earlier; an expected cost, not counted', num(f.extraCriticalHigh))) : '',
+      f.breachAvoided !== null ? tile(`${w('Breach cost avoided')} <span class="beta-tag">${w('Beta')}</span>`, cash(f.breachAvoided), w('{0} breach(es) × {1}% of ARR {2}; {3}', num(f.settings.breachesAvoided), num(f.settings.breachArrPercent, 1), cash(f.settings.arr), w('Beta · for projection only, based on feedback')), 'beta') : '',
     ];
     fuHtml = `<h3 class="impact-part">${w('Checkmarx Fusion')}</h3>
   <p class="sub">${w('Fusion has frontier AI models read every line of each project on every Fusion scan: the review an expert would otherwise do by hand, and the findings it adds are fixed while the code is being written.')}</p>
   <div class="cards">${tiles.join('')}</div>
-  <p class="sub">${w('Assumed: an expert reviews {0} lines an hour; a team of {1}; a fix after release costs {2} times as much; {3}% of critical and high findings lead to a breach, which costs {4}.', num(f.settings.linesPerHour), num(f.settings.reviewers), num(f.settings.laterFixMultiplier, 1), num(f.settings.breachChancePercent, 2), cash(f.settings.breachCost))}</p>`;
+  <p class="sub">${w('Assumed: an expert reviews {0} lines an hour; a team of {1}; a fix after release costs {2} times as much.', num(f.settings.linesPerHour), num(f.settings.reviewers), num(f.settings.laterFixMultiplier, 1))}</p>
+  ${f.breachAvoided !== null ? `<p class="sub beta-note"><span class="beta-tag">${w('Beta')}</span> ${w('The breach cost avoided is for projection only and is being refined on feedback: {0} breach(es) avoided, each costing {1}% of the customer’s annual revenue ({2}). It is included in the return above.', num(f.settings.breachesAvoided), num(f.settings.breachArrPercent, 1), cash(f.settings.arr))}</p>` : ''}`;
   }
   return `<section class="impact"><h2>${w('What the credits give back')}</h2>
   ${overall}
@@ -510,7 +511,7 @@ h2{margin:0 0 12px;font-size:18px;font-weight:600} h3{margin:18px 0 6px;font-siz
 .card{border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
 .card h3{margin:0 0 8px}
 .figure{margin:0 0 6px;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums} .figure span{font-size:13px;color:var(--muted);font-weight:400}
-.impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
+.impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .beta-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;background:#ffe2a8;border:1px solid #f0b443;vertical-align:middle} .impact-tile.beta{border-style:dashed} .beta-note{border-left:3px solid #f0b443;padding-left:10px} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
 .sevs{list-style:none;margin:0 0 8px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:13px}
 .sevs li{display:flex;align-items:center;gap:6px} .sevs i{width:8px;height:8px;border-radius:2px;display:inline-block} .sevs b{margin-inline-start:auto;font-variant-numeric:tabular-nums;font-weight:500}
 table.calc{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}

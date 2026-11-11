@@ -940,11 +940,74 @@ export async function startHosted() {
       document.querySelector(`[data-ptpanel="calculator:${b.dataset.openTab}"] input:not([type=hidden]), [data-ptpanel="calculator:${b.dataset.openTab}"] button`)?.focus({ preventScroll: true });
     }, 60);
   });
+  // ---- Git: one field for the token; the platform is told from the token itself ----
+  const GIT_NAMES = { github: 'GitHub', gitlab: 'GitLab', bitbucket: 'Bitbucket', azure: 'Azure DevOps' };
+  const GIT_HOME = { github: 'https://github.com', gitlab: 'https://gitlab.com', bitbucket: 'https://bitbucket.org', azure: 'https://dev.azure.com/your-organisation' };
+  const gitKind = (raw) => {
+    const t = raw.trim();
+    if (!t) return null;
+    const known = calculator?.git?.detect?.(t);
+    if (known) return known;
+    if (/^(ghp_|github_pat_|gho_|ghu_|ghs_|ghr_)/.test(t)) return 'github';
+    if (/^gl[a-z]{1,4}-/.test(t)) return 'gitlab';
+    if (/^(ATBB|ATCTT|ATATT|BBDC-)/.test(t)) return 'bitbucket';
+    // Azure DevOps: the new 84-character tokens carry AZDO; the older ones are 52 letters a–z and 2–7.
+    if (/AZDO/.test(t) || /^[a-z2-7]{52}$/.test(t)) return 'azure';
+    return null;
+  };
+  const gitKindNow = () => gitKind($('hc-git-token').value) ?? ($('hc-git-provider').value || null);
+  function gitShow() {
+    const typed = $('hc-git-token').value.trim();
+    const found = gitKind(typed);
+    $('hc-git-provider').hidden = !typed || Boolean(found);
+    $('hc-git-kind').className = `hc-git-kind ${found ? 'ok' : typed ? 'ask' : ''}`;
+    $('hc-git-kind').textContent = found ? `✓ ${GIT_NAMES[found]}` : typed ? 'Not told by the token: pick the host' : '';
+    const kind = gitKindNow();
+    $('hc-git-address').placeholder = kind ? GIT_HOME[kind] : 'https://github.com';
+    $('hc-git-go').textContent = kind ? `Connect to ${GIT_NAMES[kind]} →` : 'Connect to Git →';
+  }
+  $('hc-git-token').addEventListener('input', gitShow);
+  $('hc-git-provider').addEventListener('change', gitShow);
+  function gitList() {
+    const list = calculator?.git?.list?.() ?? [];
+    $('hc-git-list').hidden = !list.length;
+    $('hc-git-list').innerHTML = list.map((x, i) => `<span class="hc-git-chip"><b>${esc(x.platform)}</b> <code>${esc(x.masked)}</code> ${esc(x.host)} <button type="button" class="link" data-git-drop="${i}" aria-label="Remove this token">✕</button></span>`).join('');
+  }
+  $('hc-git-list').addEventListener('click', (event) => {
+    const b = event.target.closest('[data-git-drop]');
+    if (!b) return;
+    calculator?.git?.remove?.(Number(b.dataset.gitDrop));
+    gitList();
+  });
+  calculator?.git?.onChange?.(gitList);
+  $('hc-git').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const token = $('hc-git-token').value.trim();
+    const status = $('hc-git-status');
+    if (!token) return void (status.textContent = 'Paste the customer’s read-only token first.');
+    const provider = gitKindNow();
+    if (!provider) {
+      $('hc-git-provider').hidden = false;
+      $('hc-git-provider').focus();
+      return void (status.textContent = 'This token does not say which platform it is for: pick the git host.');
+    }
+    const added = calculator?.git?.add?.({ provider, address: $('hc-git-address').value.trim(), token });
+    if (!added) return void (status.textContent = 'The calculator could not take this token: open Fusion · from Git.');
+    $('hc-git-token').value = '';
+    gitShow();
+    gitList();
+    status.textContent = `${GIT_NAMES[added]} token added: finding its organisations and counting the repositories…`;
+    calculator.git.open?.();
+    fold(true);
+    calculator.git.count?.();
+  });
+  gitShow();
+
   /** Without the account's Salesforce link nothing is read or generated: the ways in are locked, and say why. */
   function gate() {
     const ok = Boolean(account?.salesforceUrl);
     $('hc-account').classList.toggle('no-sf', Boolean(account) && !ok);
-    for (const el of [$('sa-connect-go'), $('sa-key'), ...document.querySelectorAll('[data-open-tab]'), document.getElementById('calc-generate'), document.getElementById('hc-refresh')]) {
+    for (const el of [$('sa-connect-go'), $('sa-key'), $('hc-git-go'), $('hc-git-token'), ...document.querySelectorAll('[data-open-tab]'), document.getElementById('calc-generate'), document.getElementById('hc-refresh')]) {
       if (!el) continue;
       el.disabled = !ok;
       el.title = ok ? '' : 'Save the account’s Salesforce link first';

@@ -175,15 +175,15 @@ export function slideContent(raw, { t, lang = 'en', calculations = false } = {})
     const fu = im.fusion;
     const cur = (tri ?? fu).settings.currency;
     const cash = (n) => plain(moneyText(n, cur, L.locale));
-    const SOURCE = { triage: w('AI Triage'), fixes: w('AI Remediation'), expert: w('Expert review replaced'), early: w('Found earlier, fixed cheaper'), breach: w('Breach cost avoided') };
+    const SOURCE = { triage: w('AI Triage'), fixes: w('AI Remediation'), expert: w('Expert review replaced'), early: w('Found earlier, fixed cheaper'), breach: `${w('Breach cost avoided')} (${w('beta')})` };
     const byMoney = o.value !== null && o.value !== undefined;
     const bars = (o.sources ?? [])
-      .map((x) => ({ label: SOURCE[x.key], value: byMoney ? x.value ?? 0 : x.hours, text: byMoney ? cash(x.value ?? 0) : num(x.hours), note: x.hours ? w('{0} hours', num(x.hours)) : w('An expected cost'), colour: x.key === 'breach' ? C.muted : x.key === 'expert' || x.key === 'early' ? C.fusion : C.accent }))
+      .map((x) => ({ label: SOURCE[x.key], value: byMoney ? x.value ?? 0 : x.hours, text: byMoney ? cash(x.value ?? 0) : num(x.hours), note: x.hours ? w('{0} hours', num(x.hours)) : w('Beta · for projection only'), colour: x.key === 'breach' ? C.muted : x.key === 'expert' || x.key === 'early' ? C.fusion : C.accent }))
       .filter((b) => b.value > 0);
     const lines = [];
     if (tri) lines.push(w('{0} false positives cleared: none of them reaches a developer.', num(tri.cleared)));
     if (fu) lines.push(w('Fusion reads every line {0} times; a team of {1} would take {2} weeks to read it once.', num(fu.timesRead, 1), num(fu.settings.reviewers), num(fu.teamWeeks, 1)));
-    if (fu?.breachAvoided && !fu.settings.countBreach) lines.push(w('Breach cost avoided, an expected cost not counted in the return: {0}.', cash(fu.breachAvoided)));
+    if (fu?.breachAvoided) lines.push(w('Breach cost avoided (beta, for projection only, based on feedback): {0}.', cash(fu.breachAvoided)));
     if (o.paybackMonths !== null && o.paybackMonths !== undefined) lines.push(w('The credits are paid back in {0} months.', num(o.paybackMonths, 1)));
     pages.push({
       kind: 'impact',

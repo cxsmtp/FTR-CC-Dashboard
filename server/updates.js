@@ -148,7 +148,8 @@ export class UpdateService {
     this.log = log;
     this.supervised = supervised;
     this.exit = exit;
-    this.cache = null;
+    // The releases last seen, kept with the update state: a version taking over shows them at once, not after the next check.
+    this.cache = Array.isArray(store.state?.releases) ? store.state.releases : null;
     this.busy = null;
   }
 
@@ -208,6 +209,7 @@ export class UpdateService {
       r.tampered = Boolean(t?.tampered);
     }
     this.cache = list;
+    this.store.state.releases = list.slice(0, 20).map((r) => ({ ...r, notes: r.notes.slice(0, 1500) }));
     this.store.state.lastCheck = { at: new Date().toISOString(), newest: list.find((r) => !r.prerelease)?.version ?? null };
     this.store.save();
     return list;

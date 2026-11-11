@@ -152,7 +152,7 @@ export function leverData(sent, inputs) {
     const settings = impactSettings(inputs.impact);
     const trI = tr ? trImpact(tr.rows, tr.months, settings) : null;
     const rows = [...(est?.rows.filter((r) => r.included && r.units).map((r) => ({ included: true, lines: r.lines ?? 0, units: r.units, scans: r.scans })) ?? []), ...(inputs.fusionNewRows ?? [])];
-    const fuI = rows.length ? fusionImpact(rows, fusionCredits ?? 0, est?.settings.periodMonths ?? inputs.months, settings, tr?.rows ?? null) : null;
+    const fuI = rows.length && settings.countFusion ? fusionImpact(rows, fusionCredits ?? 0, est?.settings.periodMonths ?? inputs.months, settings, tr?.rows ?? null) : null;
     return trI || fuI ? { tr: trI, fusion: fuI, overall: overallImpact(trI, fuI) } : null;
   })();
   return {
