@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.34.00 — 2026-11-11
+
+- **Accounts: change it right in the list, with a double-click.** **Account** (rename, as in Salesforce), **Accountable SE** (from the team’s SEs), **Sold** (record a sale of credits now, against the primary report and the account’s opportunity, or the opportunity link you give) and **Customer** (the primary report shared with the customer, with how and to whom, or not any more). Enter or leaving the cell saves, Esc puts it back; a single click still opens the account. Every change is in the audit log.
+- Nothing about an existing instance changes with this version: data and settings stay as they are.
+
 ## CC-01.33.00 — 2026-11-11
 
 - **People: many at once, and no Manage menu needed for the everyday changes.**

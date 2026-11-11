@@ -878,3 +878,10 @@ table.people th.sel, table.people td.sel { width: 32px; text-align: center; }
 table.people tr.picked td { background: color-mix(in srgb, var(--cyan) 7%, transparent); }
 .inline-sel { padding: 4px 8px; font-size: 12.5px; min-width: 150px; max-width: 260px; border-radius: 8px; background: transparent; border: 1px solid transparent; cursor: pointer; }
 .inline-sel:hover, .inline-sel:focus { border-color: var(--line-hi); background: var(--panel); }
+
+/* Accounts: a cell edited in place */
+td[data-edit] { cursor: text; }
+td[data-edit]:hover { box-shadow: inset 0 -2px 0 var(--line-hi); }
+input.cell-edit, select.cell-edit { width: 100%; min-width: 140px; padding: 5px 8px; font-size: 13px; }
+.sale-inline { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.sale-inline input { width: 130px; padding: 5px 8px; }

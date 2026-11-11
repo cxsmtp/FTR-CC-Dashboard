@@ -6,6 +6,9 @@ Rules from the owner, for every change:
   running version drains and hands over its in-memory state; the new one takes the connections). Anything new that
   lives only in memory must be handed over (`handoff()` / `adopt()` in server/app.js and server/calculator.js), and
   nothing may require stopping the container or the launcher to take effect.
+- **It is in production: an update never changes the instance.** People, roles given, teams, accounts, reports, sales,
+  settings, themes and anything an Admin or a person set stay exactly as they are. Something new only fills a gap where
+  nothing is set yet (a new default, a new built-in role); data changes only when someone changes it on a page.
 - Updates are checked every 15 minutes and verified against checksums kept on first sight (server/updates.js).
 - Every action is recorded in the audit log.
 - No "What is new" pop-up: release notes live on the About page only.

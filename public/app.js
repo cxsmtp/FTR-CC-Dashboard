@@ -953,12 +953,13 @@ const soldCell = (a) => {
 async function viewAccounts(params) {
   const focus = params.get('team') ?? '';
   shell('accounts', loading());
-  const [{ accounts }, people] = await Promise.all([api(`/api/accounts${focus ? `?team=${encodeURIComponent(focus)}` : ''}`), peopleList()]);
+  const listUrl = `/api/accounts${focus ? `?team=${encodeURIComponent(focus)}` : ''}`;
+  let [{ accounts }, people] = await Promise.all([api(listUrl), peopleList()]);
   const owners = [...new Map(accounts.map((a) => [a.ownerId, a.owner])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
   void people;
   let sort = { key: 'credits', dir: -1 };
   $('#main').innerHTML = `
-    <div class="head"><div><h1 class="serif">Accounts</h1><p>Every account in your teams with its primary report. Click an account to see all its reports, mark the primary one and record what was shared with the customer.</p></div>
+    <div class="head"><div><h1 class="serif">Accounts</h1><p>Every account in your teams with its primary report. Click an account to open it; <b>double-click</b> its name, accountable SE, sold or customer cell to change it right here.</p></div>
       <div class="tools">${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('plus')}New in calculator</a>` : ''}</div></div>
     <div class="panel">
       <div class="flex">
@@ -986,20 +987,107 @@ async function viewAccounts(params) {
     $('#count').textContent = `${num(list.length)} of ${num(accounts.length)} accounts`;
     $('#rows').innerHTML = list.length
       ? list.map((a) => `<tr class="click" data-account="${esc(a.id)}">
-        <td><b>${esc(a.name)}</b><span class="sub">${esc(a.teamPath)}</span></td>
-        <td><div class="flex"><span class="avatar sm">${esc(initials(a.owner))}</span>${esc(a.owner)}</div></td>
+        <td data-edit="name" title="Double-click to rename"><b>${esc(a.name)}</b><span class="sub">${esc(a.teamPath)}</span></td>
+        <td data-edit="owner" title="Double-click to change the accountable SE"><div class="flex"><span class="avatar sm">${esc(initials(a.owner))}</span>${esc(a.owner)}</div></td>
         <td>${sfChip(a)}</td>
         <td class="num">${a.primary ? num(Math.round(a.primary.trCredits ?? 0)) : '—'}</td>
         <td class="num">${a.primary ? num(Math.round(a.primary.fusionCredits ?? 0)) : '—'}</td>
         <td class="num">${a.primary ? `<span class="credits big">${num(Math.round(a.primary.totalCredits))}</span>${a.primary.how === 'latest' ? '<span class="sub">latest · none marked</span>' : '<span class="sub">primary</span>'}` : '<span class="muted">No report</span>'}</td>
-        <td class="num">${soldCell(a)}</td>
+        <td class="num" data-edit="sold" title="Double-click to record a sale">${soldCell(a)}</td>
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td class="num">${num(a.reportCount)}</td>
-        <td>${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
+        <td data-edit="shared" title="Double-click: the primary report shared with the customer, or not">${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
         <td>${esc(ago(a.lastReportAt))}</td></tr>`).join('')
       : '<tr><td colspan="11"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>';
-    for (const el of $$('[data-account]')) el.onclick = (e) => !e.target.closest('a') && go(`/accounts/${encodeURIComponent(el.dataset.account)}`);
+    // One click opens the account; a double-click edits the cell (the click waits a moment to tell them apart).
+    for (const el of $$('[data-account]')) {
+      let timer = null;
+      el.onclick = (e) => {
+        if (e.target.closest('a, input, select, button, .cell-edit')) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => go(`/accounts/${encodeURIComponent(el.dataset.account)}`), 260);
+      };
+      el.ondblclick = (e) => {
+        clearTimeout(timer);
+        const cell = e.target.closest('[data-edit]');
+        if (cell && !cell.querySelector('.cell-edit')) editCell(accounts.find((a) => a.id === el.dataset.account), cell);
+      };
+    }
   };
+  const reload = async () => {
+    ({ accounts } = await api(listUrl));
+    render();
+  };
+  /** A cell edited in place: Enter or leaving it saves, Esc puts it back. */
+  async function editCell(a, cell) {
+    const kind = cell.dataset.edit;
+    const before = cell.innerHTML;
+    const restore = () => (cell.innerHTML = before);
+    const done = async (fn, msg) => {
+      try {
+        await fn();
+        toast(msg, 'ok');
+        await reload();
+      } catch (error) {
+        toast(error.message, 'bad');
+        restore();
+      }
+    };
+    if (kind === 'name') {
+      cell.innerHTML = `<input class="cell-edit" maxlength="120" value="${esc(a.name)}" aria-label="Account name, as in Salesforce" />`;
+      const input = cell.querySelector('input');
+      input.focus();
+      input.select();
+      let gone = false;
+      const save = () => {
+        if (gone) return;
+        gone = true;
+        const v = input.value.trim();
+        if (!v || v === a.name) return restore();
+        done(() => api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'PUT', body: { name: v } }), `Renamed to ${v}.`);
+      };
+      input.onkeydown = (e) => (e.key === 'Enter' ? save() : e.key === 'Escape' && ((gone = true), restore()));
+      input.onblur = save;
+    }
+    if (kind === 'owner') {
+      let members = [];
+      try {
+        members = (await api(`/api/cc/accounts/${encodeURIComponent(a.id)}`)).members;
+      } catch (error) {
+        return toast(error.message, 'bad');
+      }
+      cell.innerHTML = `<select class="cell-edit" aria-label="Accountable SE">${members.map((m) => `<option value="${esc(m.id)}"${m.id === a.ownerId ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
+      const sel = cell.querySelector('select');
+      sel.focus();
+      sel.onchange = () => done(() => api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'PUT', body: { ownerId: sel.value } }), `Accountable SE: ${sel.selectedOptions[0].textContent}.`);
+      sel.onblur = () => setTimeout(() => cell.querySelector('select') === sel && restore(), 150);
+      sel.onkeydown = (e) => e.key === 'Escape' && restore();
+    }
+    if (kind === 'sold') {
+      if (!can('sales.record')) return toast('Recording sales needs the permission to record them.', 'bad');
+      if (!a.primary) return toast('No projection yet: generate a report first, then record what was sold against it.', 'bad');
+      const opp = a.salesforceKind === 'opportunity';
+      cell.innerHTML = `<div class="cell-edit sale-inline"><input type="number" min="1" step="1" placeholder="Credits sold now" aria-label="Credits sold" />${opp ? '' : '<input type="url" placeholder="Opportunity link (006…)" aria-label="Salesforce opportunity link" />'}<button type="button" class="sm primary">Record</button><button type="button" class="sm ghost" data-x>✕</button></div>`;
+      const [credits, link] = cell.querySelectorAll('input');
+      credits.focus();
+      const save = () => done(() => api(`/api/cc/accounts/${encodeURIComponent(a.id)}/sales`, { method: 'POST', body: { credits: Number(credits.value), date: new Date().toISOString().slice(0, 10), opportunityUrl: opp ? a.salesforceUrl : link.value, reportId: a.primary.id } }), `${num(Number(credits.value))} credits recorded as sold for ${a.name}.`);
+      cell.querySelector('.primary').onclick = save;
+      cell.querySelector('[data-x]').onclick = restore;
+      cell.onkeydown = (e) => (e.key === 'Enter' ? save() : e.key === 'Escape' && restore());
+    }
+    if (kind === 'shared') {
+      if (!can('reports.share')) return toast('Marking reports shared needs the permission to share them.', 'bad');
+      if (!a.primary) return toast('No report yet to share.', 'bad');
+      const shared = Boolean(a.primary.sharedAt);
+      if (shared) {
+        if (!confirm(`Mark the primary report of ${a.name} as not shared with the customer?`)) return;
+        return done(() => api(`/api/cc/reports/${encodeURIComponent(a.primary.id)}/shared`, { method: 'POST', body: { shared: false } }), 'No longer marked shared.');
+      }
+      const note = await ask(`${a.name}: shared with the customer`, 'How and to whom was the primary report shared? (optional)');
+      if (note === null) return;
+      return done(() => api(`/api/cc/reports/${encodeURIComponent(a.primary.id)}/shared`, { method: 'POST', body: { shared: true, note } }), 'Marked shared with the customer.');
+    }
+  }
   for (const th of $$('th.sort')) th.onclick = () => {
     sort = { key: th.dataset.k, dir: sort.key === th.dataset.k ? -sort.dir : th.dataset.k === 'name' || th.dataset.k === 'owner' ? 1 : -1 };
     render();
