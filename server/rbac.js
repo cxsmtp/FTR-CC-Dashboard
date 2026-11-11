@@ -42,6 +42,9 @@ export const DEFAULT_ROLES = {
   executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true },
   leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports, and their people (invite, change, reset, turn off).', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'users.manage'], builtin: true },
   se: { name: 'Sales Engineer', description: 'Their team’s accounts: generate projections, mark the primary report and record what was shared with the customer.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'dashboard.view'], builtin: true },
+  // For when the sales team joins: what was projected and sold for their teams' accounts, and recording sales.
+  sales: { name: 'Sales', description: 'Account executives: the dashboards and accounts of their team, every projection and report, and recording the credits sold. Not the calculator.', permissions: ['dashboard.view', 'dashboard.export', 'sales.record'], builtin: true },
+  salesLeader: { name: 'Sales Leader', description: 'Sales leaders: what Sales sees for every team below the ones they lead, recording sales, and managing their sales people.', permissions: ['dashboard.view', 'dashboard.export', 'sales.record', 'users.manage'], builtin: true },
   viewer: { name: 'Viewer', description: 'Read only: the dashboards of their team (and teams they lead).', permissions: ['dashboard.view'], builtin: true },
 };
 

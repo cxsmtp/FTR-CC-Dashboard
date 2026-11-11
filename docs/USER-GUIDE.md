@@ -27,6 +27,8 @@ If your Admin turned on single sign-on, click **Sign in with SSO** (or the name 
 | **Sales Engineer** | Every account of your team (region). Everyone in a team can open any of its accounts and generate projections for it. You cannot see other teams. |
 | **Leader** | Your team and **every team below the teams you lead**, on the dashboards and in the calculator. For example, a regional director sees their 8 SEs; the VP sees every region and its leaders. |
 | **Executive** | Every team. |
+| **Sales** | The dashboards and accounts of their team: every projection and report, and recording credits sold. Not the calculator. |
+| **Sales Leader** | As Sales, for every team below the ones they lead, and managing their sales people. |
 | **Viewer** | The dashboards of your team, read-only. |
 | **Admin** | Everything, plus people, teams, roles, settings, audit log and backups. |
 
@@ -65,6 +67,17 @@ The strip at the top of the calculator stays in view as you work and when you ge
 - whether the Salesforce link is there;
 - whether Impact is on;
 - whether the account is ready to generate.
+
+### Refresh a projection later
+
+When you paste a customer's Checkmarx One key, tick **Remember this key for the account**. It is kept sealed on the server and never shown again. Next time anyone in your team opens the account, **↻ Refresh from Checkmarx One** reads the tenant again in one click, and you can leave the page while it reads. The account page has the same, as **Refresh in the calculator**. **Forget the key** removes it.
+
+### The customer's own numbers
+
+Customers can **Try other numbers** in the report you sent and **Download my version**. When they send that file back, use **Upload the customer's version** in the calculator or on the account page:
+1. The calculator works their numbers out again and shows what they changed and the difference from what you sent.
+2. Choose whether their version becomes the **primary report**, and whether their choices become the account's settings from now on.
+3. It is kept as a report marked **Customer's version**, so you can see both.
 
 ## 4. Primary and shared reports
 

@@ -220,7 +220,11 @@ export class CalculatorService {
   /** The account's projection was saved after its read finished: it is in. */
   markApplied(userId, accountId) {
     const job = this.#links.get(userId)?.job;
-    if (job?.state === 'done' && (!job.account || job.account.id === accountId)) job.applied = true;
+    if (job?.state === 'done' && !job.applied && (!job.account || job.account.id === accountId)) {
+      job.applied = true;
+      return true;
+    }
+    return false;
   }
 
   /** What runs for this person in the background, for the dashboard: the read, and the git count. */

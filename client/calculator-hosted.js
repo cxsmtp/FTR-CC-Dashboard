@@ -249,6 +249,8 @@ export function startHosted() {
       $('hc-reports').innerHTML = '<span>Open or add an account below.</span>';
       $('hc-impact').checked = false;
       $('hc-impact').disabled = true;
+      $('hc-kept').textContent = '';
+      $('hc-refresh').hidden = $('hc-forget').hidden = $('hc-upload-l').hidden = true;
       $('hc-currency').hidden = true;
       renderStatus();
       return;
@@ -272,6 +274,14 @@ export function startHosted() {
       if (p) parts.push(`<span class="hc-sold">Sold <b>${num(a.sold)}</b> · still needed <b>${num(a.remaining)}</b></span>`);
       parts.push(`<a href="/#/accounts/${encodeURIComponent(a.id)}">Mark primary and shared, record sales →</a>`);
       $('hc-reports').innerHTML = parts.join('');
+      $('hc-kept').innerHTML = a.cxone ? `<span class="hc-pill ok">Checkmarx One key kept · ${esc(a.cxone.tenant)}</span> ${a.cxone.lastReadAt ? `last read ${esc(fmtDateTime(a.cxone.lastReadAt))}` : `kept by ${esc(a.cxone.savedBy)} ${esc(fmtDateTime(a.cxone.savedAt))}`}` : '<span>No Checkmarx One key kept for this account</span>';
+      $('hc-refresh').hidden = !a.cxone;
+      $('hc-forget').hidden = !a.cxone;
+      $('hc-upload-l').hidden = false;
+      if (autoRefresh && a.cxone) {
+        autoRefresh = false;
+        refreshFromKept();
+      }
       $('hc-impact').disabled = false;
       $('hc-impact').checked = Boolean(a.impactEnabled);
       $('hc-currency').hidden = !a.impactCurrencyConfirmed;
@@ -343,7 +353,7 @@ export function startHosted() {
   function renderStatus() {
     const chip = (kind, text) => `<span class="hc-st ${kind}"><i></i>${esc(text)}</span>`;
     const cu = openCustomer && account && openCustomer.id === account.id ? openCustomer : null;
-    const trSource = cu?.tr?.totals?.meta?.source;
+    const trSource = cu?.tr?.totals?.meta?.source ?? (cu?.hasTr ? 'data' : undefined);
     const fusionCx = cu?.fusion?.projects?.length ?? cu?.fusionProjects ?? 0;
     const fusionNew = cu?.fusionNew?.projects?.length ?? 0;
     const parts = [
@@ -351,7 +361,7 @@ export function startHosted() {
       cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
     ];
     if (account) {
-      parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : chip('off', 'T&R: no data yet'));
+      parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : trSource ? chip('ok', 'T&R: worked out') : chip('off', 'T&R: no data yet'));
       parts.push(fusionCx || fusionNew ? chip('ok', `Fusion: ${[fusionCx ? `${fusionCx} Checkmarx One projects` : '', fusionNew ? `${fusionNew} repositories (git / cloc-fusion)` : ''].filter(Boolean).join(' + ')}`) : chip('off', 'Fusion: none yet'));
       parts.push(account.salesforceUrl ? chip('ok', 'Salesforce: linked') : chip('bad', 'Salesforce: link missing'));
       parts.push(account.impactEnabled ? chip('ok', `Impact (beta): on · ${account.impactCurrency}`) : chip('off', 'Impact (beta): off'));
@@ -368,6 +378,63 @@ export function startHosted() {
     void strip.offsetWidth;
     strip.classList.add('flash');
   }, true);
+
+  // ---- Refresh from the kept key, and the customer's own version of a report ------------------------------------------
+  let autoRefresh = params.get('refresh') === '1';
+  async function refreshFromKept() {
+    if (!account?.cxone) return;
+    setStatus('sa-connect-status', `Connecting with the key kept for ${account.name}…`, 'muted');
+    try {
+      const state = await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/cxone/connect`, { method: 'POST', body: {} });
+      showState(state);
+      toast(`Connected to ${state.tenant}: reading it again for ${account.name}. You can leave this page; it carries on.`, 'ok', 8000);
+      // The calculator's own Read: the projection worked out again from what the tenant holds today.
+      setTimeout(() => document.getElementById('calc-read')?.click(), 300);
+    } catch (error) {
+      setStatus('sa-connect-status', error.message, 'error');
+      toast(error.message, 'bad', 9000);
+    }
+  }
+  $('hc-refresh').addEventListener('click', refreshFromKept);
+  $('hc-forget').addEventListener('click', async () => {
+    if (!account || !confirm(`Forget the Checkmarx One key kept for ${account.name}? Refreshing then needs it pasted again.`)) return;
+    try {
+      await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/cxone`, { method: 'DELETE' });
+      showAccount(account.id);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  $('hc-upload').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !account) return;
+    const html = await file.text();
+    let preview;
+    try {
+      preview = await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/customer-version`, { method: 'POST', body: { html, dryRun: true } });
+    } catch (error) {
+      return toast(error.message, 'bad', 9000);
+    }
+    const delta = preview.sentTotal ? preview.total - preview.sentTotal : null;
+    $('hc-cv-body').innerHTML = `<p>${preview.sameName ? '' : `<b class="hc-req">Made for "${esc(preview.customer)}", not ${esc(account.name)}.</b> `}Their numbers, worked out again by the calculator:</p>
+      <div class="hc-delta"><div><small>As sent</small><b>${num(preview.sentTotal)}</b></div><div><small>Their version</small><b>${num(preview.total)}</b></div>${delta !== null ? `<div><small>Difference</small><b>${delta > 0 ? '+' : ''}${num(delta)}</b></div>` : ''}</div>
+      ${preview.changes.length ? `<div class="hc-changes"><b>What they changed</b><ul>${preview.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>` : '<p class="hint">They changed nothing: the figures are as sent.</p>'}`;
+    const dlg = $('hc-cv-dialog');
+    dlg.returnValue = '';
+    dlg.showModal();
+    dlg.addEventListener('close', async () => {
+      if (dlg.returnValue !== 'ok') return;
+      try {
+        await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/customer-version`, { method: 'POST', body: { html, dryRun: false, confirm: true, makePrimary: $('hc-cv-primary').checked, applyPreferences: $('hc-cv-prefs').checked, note: $('hc-cv-note').value } });
+        toast(`The customer's version is recorded${$('hc-cv-primary').checked ? ' as the primary report' : ''}${$('hc-cv-prefs').checked ? ', and their numbers are now this account\u2019s' : ''}.`, 'ok', 9000);
+        await calculator.load();
+        showAccount(account.id);
+      } catch (error) {
+        toast(error.message, 'bad', 9000);
+      }
+    }, { once: true });
+  });
 
   $('hc-sf-save').addEventListener('click', async () => {
     if (!account) return;
@@ -498,7 +565,12 @@ export function startHosted() {
     setStatus('sa-connect-status', 'Connecting…', 'muted');
     $('sa-connect-go').disabled = true;
     try {
-      const state = await server('/api/cc/cxone/connect', { method: 'POST', body: { apiKey, baseUrl: $('sa-base').value, iamUrl: $('sa-iam').value, tenant: $('sa-tenant').value } });
+      const remember = $('sa-remember').checked && Boolean(account);
+      const state = await server('/api/cc/cxone/connect', { method: 'POST', body: { apiKey, baseUrl: $('sa-base').value, iamUrl: $('sa-iam').value, tenant: $('sa-tenant').value, remember, accountId: account?.id } });
+      if (state.saved) {
+        toast(`Key kept for ${account.name}: next time, Refresh from Checkmarx One is one click.`, 'ok', 8000);
+        showAccount(account.id);
+      }
       $('sa-key').value = '';
       showState(state);
       toast(`Connected to ${state.tenant}: Read from Checkmarx One fills the account open.`, 'ok');

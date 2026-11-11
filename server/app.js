@@ -14,6 +14,7 @@ import { Teams } from './teams.js';
 import { Accounts, DEFAULT_SALESFORCE_HOSTS } from './accounts.js';
 import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
+import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } from './customer-version.js';
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore } from './updates.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
@@ -503,7 +504,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const members = iam.users().filter((u) => u.active !== false && u.teamId === a.teamId).map((u) => ({ id: u.id, name: u.name }));
     if (a.ownerId && !members.some((m) => m.id === a.ownerId)) members.push({ id: a.ownerId, name: userName(a.ownerId) });
     return {
-      account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, sold: (a.sales ?? []).reduce((n, x) => n + x.credits, 0), remaining: p ? Math.max(0, Math.round(p.totalCredits - (a.sales ?? []).reduce((n, x) => n + x.credits, 0))) : null, impactEnabled: Boolean(a.impactEnabled), impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed), impactCurrency: a.impact?.currency ?? 'USD', reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
+      account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, cxone: a.cxone ? { tenant: a.cxone.tenant, savedBy: a.cxone.savedBy, savedAt: a.cxone.savedAt, lastReadAt: a.cxone.lastReadAt ?? null } : null, sold: (a.sales ?? []).reduce((n, x) => n + x.credits, 0), remaining: p ? Math.max(0, Math.round(p.totalCredits - (a.sales ?? []).reduce((n, x) => n + x.credits, 0))) : null, impactEnabled: Boolean(a.impactEnabled), impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed), impactCurrency: a.impact?.currency ?? 'USD', reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
       reports: reps,
       sales: [...(a.sales ?? [])].sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.at).localeCompare(String(x.at))),
       members,
@@ -1165,12 +1166,14 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
   r('GET', '/api/projections/git/count', calcTeam, (req, ctx, body, res, url) => calc.gitCountView(ctx.user.id, url.searchParams.get('id'), url.searchParams.get('after')));
   r('GET', '/api/projections/git/cloc-fusion', calcTeam, () => calc.clocFusion());
-  r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: accounts.get(params.id, ctx.teamSet) }));
+  /** An account for the calculator: never with its kept Checkmarx One key, sealed or not. */
+  const forBrowser = ({ cxone, ...a }) => ({ ...a, cxone: cxone ? { tenant: cxone.tenant, savedBy: cxone.savedBy, savedAt: cxone.savedAt, lastReadAt: cxone.lastReadAt ?? null } : null });
+  r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: forBrowser(accounts.get(params.id, ctx.teamSet)) }));
   r('PUT', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
     const patch = {};
     for (const key of ['name', 'tr', 'fusion', 'fusionNew', 'totals', 'scope', 'impact']) if (body?.[key] !== undefined) patch[key] = body[key];
     const saved = summary(accounts.update(params.id, ctx.teamSet, patch, ctx.user));
-    if (patch.tr !== undefined || patch.fusion !== undefined) calc.markApplied(ctx.user.id, params.id);
+    if ((patch.tr !== undefined || patch.fusion !== undefined) && calc.markApplied(ctx.user.id, params.id)) accounts.markRead(params.id);
     return { customer: saved };
   });
   r('DELETE', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
@@ -1184,7 +1187,54 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/cc/cxone/connect', perm('calculator.use'), async (req, ctx, body) => {
     const state = await calc.connectKey(ctx.user.id, body);
     record(ctx, req, 'cxone.connect', state.tenant, { baseUrl: state.baseUrl });
+    // "Remember this key for the account": sealed on this server, used again by the team for one-click refreshes.
+    if (body?.remember === true && body?.accountId) {
+      const a = accounts.saveCxone(String(body.accountId), ctx.scope, { sealedKey: secrets.seal(JSON.stringify({ apiKey: String(body.apiKey ?? ''), baseUrl: String(body.baseUrl ?? ''), iamUrl: String(body.iamUrl ?? ''), tenant: String(body.tenant ?? '') })), connection: { tenant: state.tenant, baseUrl: state.baseUrl, iamUrl: '' }, user: ctx.user });
+      record(ctx, req, 'cxone.key.saved', a.name, { tenant: state.tenant });
+      return { ...state, saved: true };
+    }
     return state;
+  });
+  /** Connect with the key kept for the account: the browser never sees it. */
+  r('POST', '/api/cc/accounts/:id/cxone/connect', perm('calculator.use'), async (req, ctx, body, res, url, params) => {
+    const kept = accounts.cxoneOf(params.id, ctx.scope);
+    if (!kept?.sealedKey) throw fail(404, 'No Checkmarx One key is kept for this account.');
+    const key = JSON.parse(secrets.open(kept.sealedKey) || 'null');
+    if (!key?.apiKey) throw fail(409, 'The key kept for this account could not be opened (was the data folder moved without secret.key?). Paste it again.');
+    let state;
+    try {
+      state = await calc.connectKey(ctx.user.id, key);
+    } catch (error) {
+      record(ctx, req, 'cxone.key.failed', accounts.accounts.meta(params.id)?.name ?? '', { error: error.message });
+      throw fail(error.status ?? 400, `${error.message} The kept key may have expired: paste a new one and tick "Remember".`);
+    }
+    record(ctx, req, 'cxone.key.used', accounts.accounts.meta(params.id)?.name ?? '', { tenant: state.tenant });
+    return state;
+  });
+  r('DELETE', '/api/cc/accounts/:id/cxone', perm('calculator.use'), (req, ctx, body, res, url, params) => {
+    const a = accounts.forgetCxone(params.id, ctx.scope);
+    record(ctx, req, 'cxone.key.forgotten', a.name);
+    return { ok: true };
+  });
+
+  /**
+   * The customer's own version of a report ("Download my version"): only its figures are read, worked out again here,
+   * and recorded as a report of theirs; their choices can become the account's settings and the report its primary.
+   */
+  r('POST', '/api/cc/accounts/:id/customer-version', perm('calculator.use'), (req, ctx, body, res, url, params) => {
+    const account = accounts.get(params.id, ctx.scope);
+    const live = readCustomerVersion(body?.html);
+    const figures = customerFigures(live);
+    const changes = changesOf(live.sentInputs ?? {}, live.inputs);
+    const sameName = figures.customer.trim().toLowerCase() === account.name.trim().toLowerCase();
+    const preview = { customer: figures.customer, sameName, sentTotal: figures.sentTotal, total: figures.total, changes };
+    if (body?.dryRun !== false) return { dryRun: true, ...preview };
+    if (!sameName && body?.confirm !== true) throw fail(409, `This report was made for "${figures.customer}", not ${account.name}. Confirm to record it here anyway.`);
+    const rep = accounts.addCustomerReport({ customerId: account.id, data: figures.data, user: ctx.user, note: body?.note, sentTotal: figures.sentTotal, changes }, ctx.scope);
+    if (body?.makePrimary !== false) accounts.setPrimary(account.id, rep.id, ctx.scope);
+    if (body?.applyPreferences !== false) accounts.update(account.id, ctx.scope, preferencesPatch(account, live.inputs), ctx.user);
+    record(ctx, req, 'report.customerVersion', account.name, { id: rep.id, total: rep.totalCredits, sentTotal: figures.sentTotal, changes: changes.length, primary: body?.makePrimary !== false, preferences: body?.applyPreferences !== false });
+    return { ...preview, report: { id: rep.id, totalCredits: rep.totalCredits }, ...accountDetail(ctx, account.id) };
   });
   r('POST', '/api/cc/cxone/disconnect', perm('calculator.use'), (req, ctx) => calc.disconnect(ctx.user.id));
   r('GET', '/api/cc/cxone/status', perm('calculator.use'), (req, ctx) => calc.status(ctx.user.id));
@@ -1249,7 +1299,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         const origin = req.headers.origin;
         if (origin && config.publicUrl && origin !== new URL(config.publicUrl).origin) throw fail(403, 'That request came from another site.');
         if (origin && !config.publicUrl && new URL(origin).host !== req.headers.host) throw fail(403, 'That request came from another site.');
-        body = await readBody(req, pathname.startsWith('/api/projections') ? CALC_LIMIT : BODY_LIMIT);
+        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') ? CALC_LIMIT : BODY_LIMIT);
       }
       let result;
       for (const h of match.handlers) result = await h(req, ctx, body, res, url, match.params);

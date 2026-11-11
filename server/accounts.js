@@ -57,6 +57,7 @@ const accountMeta = (a) => ({
   salesforceId: a.salesforceId ?? '',
   primaryReportId: a.primaryReportId ?? null,
   impactEnabled: Boolean(a.impactEnabled),
+  cxone: a.cxone ? { tenant: a.cxone.tenant, baseUrl: a.cxone.baseUrl, savedBy: a.cxone.savedBy, savedAt: a.cxone.savedAt, lastReadAt: a.cxone.lastReadAt ?? null } : null,
   soldCredits: (a.sales ?? []).reduce((n, x) => n + (Number(x.credits) || 0), 0),
   salesCount: (a.sales ?? []).length,
   lastSaleAt: (a.sales ?? []).map((x) => x.date).sort().at(-1) ?? null,
@@ -73,6 +74,10 @@ const reportIndex = (r) => ({
   sharedAt: r.sharedAt ?? null,
   sharedById: r.sharedById ?? null,
   sharedNote: r.sharedNote ?? '',
+  source: r.source ?? 'calculator',
+  sentTotal: r.sentTotal ?? null,
+  changes: r.changes ?? [],
+  customerNote: r.customerNote ?? '',
 });
 
 export class Accounts {
@@ -136,6 +141,33 @@ export class Accounts {
     this.get(id, teamIds);
     for (const r of this.reports.list().filter((x) => x.customerId === id)) this.reports.remove(r.id);
     this.accounts.remove(id);
+  }
+
+  // ---- The account's Checkmarx One key, kept sealed so its projection can be refreshed in one click -------------------
+  saveCxone(id, teamIds, { sealedKey, connection, user }) {
+    const account = this.get(id, teamIds);
+    account.cxone = { sealedKey, tenant: connection.tenant, baseUrl: connection.baseUrl, iamUrl: connection.iamUrl, savedBy: user.name, savedById: user.id, savedAt: new Date().toISOString(), lastReadAt: account.cxone?.lastReadAt ?? null };
+    return this.accounts.put(account);
+  }
+  /** The sealed key and where it connects: for the server only, never a browser. */
+  cxoneOf(id, teamIds) {
+    return this.get(id, teamIds).cxone ?? null;
+  }
+  forgetCxone(id, teamIds) {
+    const account = this.get(id, teamIds);
+    delete account.cxone;
+    return this.accounts.put(account);
+  }
+  markRead(id) {
+    const account = this.accounts.get(id);
+    if (account?.cxone) this.accounts.put({ ...account, cxone: { ...account.cxone, lastReadAt: new Date().toISOString() } });
+  }
+
+  /** A report with the customer's own numbers, recorded as theirs. */
+  addCustomerReport({ customerId, data, user, note, sentTotal, changes }, teamIds) {
+    const report = this.addReport({ customerId, data, user }, teamIds);
+    const full = this.reports.get(report.id);
+    return this.reports.put({ ...full, source: 'customer', customerNote: String(note ?? '').slice(0, 300), sentTotal: Number.isFinite(sentTotal) ? sentTotal : null, changes: (changes ?? []).slice(0, 60).map((c) => String(c).slice(0, 200)) });
   }
 
   // ---- Credits sold: one or many sales per account, against its projection --------------------------------------

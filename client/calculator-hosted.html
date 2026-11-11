@@ -35,10 +35,12 @@
         </label>
         <label class="field hc-owner"><span>Accountable SE</span><select id="hc-owner"></select></label>
         <div class="hc-impact"><label class="hc-switch"><input type="checkbox" id="hc-impact" /><span><b>Impact</b> <i class="hc-beta">beta</i><small>Soft savings in the report, from triage and remediation of the existing vulnerabilities</small></span></label><button type="button" class="ghost sm" id="hc-currency" hidden></button></div>
+        <div class="hc-tools" id="hc-tools"><span id="hc-kept"></span><button type="button" class="primary sm" id="hc-refresh" hidden>↻ Refresh from Checkmarx One</button><button type="button" class="ghost sm" id="hc-forget" hidden>Forget the key</button><label class="ghost sm hc-btn hc-file" id="hc-upload-l">⇪ Upload the customer's version<input type="file" id="hc-upload" accept=".html,.htm,text/html" hidden /></label></div>
         <div class="hc-reports" id="hc-reports" aria-live="polite"></div>
       </div>
       <form class="sa-connect" id="sa-connect" autocomplete="off">
         <label class="field sa-key"><span>Customer's Checkmarx One API key</span><input type="password" id="sa-key" spellcheck="false" placeholder="Paste the API key (not kept: in memory for your session only)" autocomplete="off" /></label>
+        <label class="hc-remember"><input type="checkbox" id="sa-remember" /> Remember this key for the account <small>sealed on the server; the team refreshes in one click</small></label>
         <button type="submit" class="primary sm" id="sa-connect-go">Connect</button>
         <button type="button" class="ghost sm" id="sa-disconnect" hidden>Disconnect</button>
         <span class="status" id="sa-connect-status" aria-live="polite"></span>
@@ -58,6 +60,7 @@
   </div>
 </div>
 <dialog id="hc-cur-dialog" class="hc-dialog"><form method="dialog"><h2>Impact currency</h2><p id="hc-cur-why"></p><label class="field"><span>Currency for this account</span><select id="hc-cur-select"></select></label><p class="hint">Then set the minutes to triage and to remediate a finding and the developers' hourly rate on the <b>Impact</b> tab. The soft savings appear in the report and its PDF once Impact is on.</p><div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary" id="hc-cur-ok">Confirm and turn Impact on</button></div></form></dialog>
+<dialog id="hc-cv-dialog" class="hc-dialog hc-wide"><form method="dialog"><h2>The customer's version</h2><div id="hc-cv-body"></div><label class="hc-check"><input type="checkbox" id="hc-cv-primary" checked /> Make it the primary report (the dashboards then count it)</label><label class="hc-check"><input type="checkbox" id="hc-cv-prefs" checked /> Use their numbers in the calculator for this account from now on</label><label class="field"><span>Note <small>optional</small></span><input id="hc-cv-note" maxlength="300" placeholder="Worked out with their AppSec lead, 12 Nov" /></label><div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary" id="hc-cv-ok">Record their version</button></div></form></dialog>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <!--SCRIPTS-->
 </body>
