@@ -1,3 +1,5 @@
+import { workbook } from './xlsx-write.js';
+
 // FTR Credits Command Center: the dashboard. One page, routes in the hash (#/overview, #/accounts/<id>…), every
 // figure from the server's /api, everything written into the page escaped.
 
@@ -802,7 +804,7 @@ function peopleTable(d) {
   const teams = [...d.teams].sort((a, b) => a.path.localeCompare(b.path));
   let page = 0;
   $('#ptab').innerHTML = `<div class="panel">
-    <div class="flex"><h2 class="grow-h">People <small>everyone who can sign in, and what they may do</small></h2>${manage ? `<button class="primary" id="add-toggle">${icon('plus')}Add person</button>` : ''}</div>
+    <div class="flex"><h2 class="grow-h">People <small>everyone who can sign in, and what they may do</small></h2>${manage ? `<button id="import">${icon('download')}Import people &amp; teams</button><button class="primary" id="add-toggle">${icon('plus')}Add person</button>` : ''}</div>
     ${manage ? `<form class="form add-form" id="add" hidden autocomplete="off">
       <div class="row"><label class="f">Work email<input name="email" type="email" required /></label><label class="f">Name<input name="name" maxlength="120" /></label><label class="f">Title<input name="title" maxlength="120" placeholder="Sales Engineer" /></label></div>
       <div class="row"><label class="f">Role<select name="role">${roles.map((r) => `<option value="${esc(r.id)}"${r.id === 'se' ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
@@ -855,6 +857,7 @@ function peopleTable(d) {
   $('#next').onclick = () => (page++, render());
   if (manage) {
     $('#add-toggle').onclick = () => ($('#add').hidden = !$('#add').hidden);
+    $('#import').onclick = () => importPeople(d);
     $('#add-cancel').onclick = () => ($('#add').hidden = true);
     $('#gen').onclick = () => {
       const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -877,6 +880,97 @@ function peopleTable(d) {
     };
   }
   render();
+}
+
+// ---- Bulk onboarding: people and the team structure from one sheet; their temporary passwords back as a sheet ---------
+const saveBlob = (blob, name) => {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+};
+const HEADERS = { email: /^(e-?mail|work e-?mail|email address)$/, name: /^(name|full name|person)$/, title: /^(title|job title|position)$/, role: /^(role|access)$/, team: /^(team|team path|region|team \(path\))$/, leads: /^(leads?|leader|leads (the |their )?team|team leader)$/ };
+function sheetRows(sheet) {
+  const rows = sheet.rows.filter((r) => r.some((c) => c !== null && String(c).trim() !== ''));
+  if (!rows.length) return [];
+  const head = rows[0].map((c) => String(c ?? '').trim().toLowerCase());
+  const at = Object.fromEntries(Object.entries(HEADERS).map(([k, re]) => [k, head.findIndex((h) => re.test(h))]));
+  if (at.email < 0) throw new Error('The sheet needs an Email column (download the template to see the columns).');
+  return rows.slice(1).map((r) => Object.fromEntries(Object.entries(at).map(([k, i]) => [k, i < 0 ? '' : String(r[i] ?? '').trim()])));
+}
+function downloadTemplate(d) {
+  const top = state.me.scopeTeams.find((t) => !t.parentId)?.name ?? 'Global Sales Engineering';
+  const teams = [...d.teams].sort((a, b) => a.path.localeCompare(b.path)).map((t) => [t.path.replace(/ › /g, ' > '), t.leaders.map((l) => l.name).join(', '), t.members]);
+  saveBlob(workbook([
+    { name: 'People', widths: [32, 24, 22, 18, 52, 12], rows: [['Email', 'Name', 'Title', 'Role', 'Team', 'Leads team'], [`regional.lead@yourcompany.com`, 'Regional Lead', 'SE Director, EMEA', 'Leader', `${top} > EMEA Sales Engineering`, 'yes'], [`first.se@yourcompany.com`, 'First SE', 'Sales Engineer', 'Sales Engineer', `${top} > EMEA Sales Engineering`, ''], [`second.se@yourcompany.com`, 'Second SE', 'Sales Engineer', 'Sales Engineer', `${top} > EMEA Sales Engineering > EMEA North`, '']] },
+    { name: 'How to fill it', widths: [22, 90], rows: [['Column', 'What to put'], ['Email', 'Their work email: how they sign in. Required.'], ['Name', 'Their name, as shown everywhere.'], ['Title', 'Optional: Sales Engineer, SE Director…'], ['Role', `One of: ${d.roles.filter((r) => r.grantable).map((r) => r.name).join(', ')}. Blank: Sales Engineer.`], ['Team', 'The path from the top team to theirs, with > between teams, e.g. Global SE > EMEA SE > EMEA North. Teams that do not exist yet are created (Executives and Admins).'], ['Leads team', 'yes if they lead that team: they see it and every team below it (Executives and Admins set this).'], ['', ''], ['Afterwards', 'You get a sheet with each new person\u2019s temporary password. Give each one to its person over a channel only they read; they choose their own password at first sign-in. People who already have access are left as they are.']] },
+    { name: 'Teams now', widths: [60, 30, 10], rows: [['Team (path)', 'Leaders', 'People'], ...teams] },
+  ]), 'command-center-people-template.xlsx');
+}
+function importPeople(d) {
+  const dlg = document.createElement('dialog');
+  dlg.className = 'wide';
+  dlg.innerHTML = `<div class="dh"><h2>Import people &amp; teams</h2><p class="small muted">From one sheet (Excel or CSV): each person's email, name, title, role, team path and whether they lead it. Teams in the paths are created where missing. You get back a sheet with every new person's temporary password.</p></div>
+    <div class="db"><div class="flex"><button id="tpl">${icon('download')}Download the template</button><label class="btn primary file-btn">${icon('plus')}Choose the filled-in sheet<input type="file" id="file" accept=".xlsx,.csv,.tsv,.txt" hidden /></label><span class="small muted" id="fname"></span></div>
+    <div class="err mt" id="ierr"></div><div id="preview"></div></div>
+    <div class="df"><button class="ghost" id="iclose">Close</button><button class="primary" id="go" hidden>Create</button></div>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  let rows = [];
+  let welcome = false;
+  const close = () => (dlg.close(), dlg.remove(), viewPeople('people'));
+  $('#iclose', dlg).onclick = close;
+  $('#tpl', dlg).onclick = () => downloadTemplate(d);
+  const STATUS_CHIP = { create: ['ok', 'To create'], created: ['ok', 'Created'], exists: ['', 'Already has access'], error: ['bad', 'Not possible'] };
+  const table = (res) => `<div class="tw mt import-tw"><table><thead><tr><th>Row</th><th>Person</th><th>Role</th><th>Team</th><th>Leads</th><th>Result</th></tr></thead><tbody>${res.rows.map((x) => `<tr><td class="small muted">${x.row}</td><td><b>${esc(x.name || '—')}</b><span class="sub">${esc(x.email)}</span></td><td>${esc(x.role || '—')}</td><td class="small">${esc(x.team || '—')}${x.newTeams.length ? `<span class="sub"><span class="chip warn">new</span> ${esc(x.newTeams.join(' › '))}</span>` : ''}</td><td>${x.leads ? '<span class="chip star">Leads</span>' : ''}</td><td><span class="chip ${STATUS_CHIP[x.status][0]}"><i></i>${STATUS_CHIP[x.status][1]}</span>${x.message ? `<span class="sub">${esc(x.message)}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  $('#file', dlg).onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $('#fname', dlg).textContent = file.name;
+    $('#ierr', dlg).textContent = '';
+    try {
+      const book = await window.CxXlsx.readFile(file);
+      const sheet = book.find((sh) => /people/i.test(sh.name)) ?? book[0];
+      rows = sheetRows(sheet);
+      if (!rows.length) throw new Error('The sheet has no people in it.');
+      const res = await api('/api/people/import', { method: 'POST', body: { rows, dryRun: true } });
+      const s2 = res.summary;
+      $('#preview', dlg).innerHTML = `<div class="import-sum mt"><span class="chip ok"><i></i>${num(s2.create)} to create</span><span class="chip"><i></i>${num(s2.exists)} already have access</span>${s2.errors ? `<span class="chip bad"><i></i>${num(s2.errors)} not possible</span>` : ''}${s2.newTeams.length ? `<span class="chip warn"><i></i>${num(s2.newTeams.length)} team path${s2.newTeams.length === 1 ? '' : 's'} with new teams</span>` : ''}</div>${table(res)}
+        ${d.mail ? '<label class="check mt"><input type="checkbox" id="welcome" /><span>Also email each new person a welcome<small>Where to sign in, and how to set their password with "Forgot your password?". The temporary password is never emailed.</small></span></label>' : ''}`;
+      $('#go', dlg).hidden = !s2.create;
+      $('#go', dlg).textContent = `Create ${num(s2.create)} ${s2.create === 1 ? 'person' : 'people'}`;
+    } catch (error) {
+      $('#ierr', dlg).textContent = error.message;
+      $('#go', dlg).hidden = true;
+    }
+  };
+  $('#go', dlg).onclick = async () => {
+    welcome = Boolean($('#welcome', dlg)?.checked);
+    $('#go', dlg).disabled = true;
+    $('#go', dlg).innerHTML = '<span class="spinner"></span>Creating…';
+    try {
+      const res = await api('/api/people/import', { method: 'POST', body: { rows, dryRun: false } });
+      const made = res.rows.filter((x) => x.status === 'created');
+      const signIn = res.signInAt || location.origin;
+      const file = `command-center-new-people-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const blob = workbook([
+        { name: 'Temporary passwords', widths: [32, 24, 18, 52, 28, 40], rows: [['Email', 'Name', 'Role', 'Team', 'Temporary password', 'Sign in at'], ...made.map((x) => [x.email, x.name, x.role, x.team, x.temporary, signIn])] },
+        { name: 'Read me', widths: [100], rows: [['Give each person their own temporary password over a channel only they read (not this whole sheet).'], ['They sign in at the address given, choose their own password, accept the terms of use and see a quick guide.'], ['Delete this file once everyone has signed in: the passwords stop working as soon as they choose their own.'], [`Made ${new Date().toLocaleString()} by ${state.me.user.name}.`]] },
+        { name: 'All rows', widths: [8, 32, 24, 52, 22, 60], rows: [['Row', 'Email', 'Name', 'Team', 'Result', 'Note'], ...res.rows.map((x) => [x.row, x.email, x.name, x.team, x.status, x.message])] },
+      ]);
+      saveBlob(blob, file);
+      if (welcome) for (const x of made) api(`/api/people/${encodeURIComponent(x.id)}/welcome`, { method: 'POST', body: {} }).catch(() => {});
+      $('#preview', dlg).innerHTML = `<div class="callout mt"><b>${num(made.length)} ${made.length === 1 ? 'person' : 'people'} created${res.summary.newTeams.length ? ` and ${num(res.summary.newTeams.length)} team${res.summary.newTeams.length === 1 ? '' : 's'}` : ''}.</b> Their temporary passwords are in <b>${esc(file)}</b>, just downloaded: they are shown nowhere else and kept nowhere. <button class="sm" id="again">${icon('download')}Download it again</button></div>${table(res)}`;
+      $('#again', dlg).onclick = () => saveBlob(blob, file);
+      $('#go', dlg).hidden = true;
+      state.me = await api('/api/me');
+    } catch (error) {
+      $('#ierr', dlg).textContent = error.message;
+      $('#go', dlg).disabled = false;
+      $('#go', dlg).textContent = 'Create';
+    }
+  };
 }
 
 async function personAction(d, u, act) {

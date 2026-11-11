@@ -16,6 +16,7 @@ The **Cx Credits Calculator**, hosted for every Sales Engineer, with team-based 
 - **Single sign-on (SAML 2.0)** with Entra ID, Okta, Ping or ADFS. Signed assertions only; people can optionally be added on their first sign-in; passwords can be kept for Admins only.
 - **Updates with checksum checks and automatic rollback.** Releases come from GitHub Releases, checked against SHA256SUMS and a manifest of every file. A backup is taken before every switch. A version that does not come up is rolled back by itself. Roll back by hand to any version, and auto-update at a chosen hour.
 - **Backups, health and audit integrity.** Nightly backups, sealed with a passphrase if set, that can be restored. A chained audit log you can verify. A troubleshooting report with no secrets.
+- **Bulk onboarding.** Import people and the team structure from one Excel or CSV sheet, with a preview first, and get every new person's temporary password back as an Excel sheet.
 - **People & roles, as in MZ, for Leaders, Executives and Admins.** Add, filter, unlock, sign out, reset and turn off people within each manager's scope. Roles are shown as a permissions matrix, and there is a Sign-in tab.
 - **Background reads.** A Checkmarx One read keeps running when you leave the calculator. The dashboard shows its progress, and the data is applied to its account when you come back. Report generation never blocks the page.
 - **The two exports behind a flag**, off by default.

@@ -94,6 +94,12 @@ The projection is the primary report's total, so the account shows **sold so far
   - Filter by role, team and status: active, locked, off, or must set password.
   - **Manage** on a row: edit role, team or name; reset password; unlock now; sign out everywhere; turn access off; remove.
   - Leaders manage the people in the teams they lead; Executives and Admins manage everyone. Nobody can give a role with more than they hold.
+- **Import people & teams** (a whole region at once):
+  1. **Download the template.** It holds example rows, how to fill each column, the roles you can give, and your teams as they are now.
+  2. Fill it in: one row per person, with **Email**, **Name**, **Title**, **Role**, **Team** and **Leads team**. The team is the path from the top, with `>` between teams, e.g. `Global SE > EMEA SE > EMEA North`. Put **yes** in Leads team for a team's leader. Missing teams are created.
+  3. **Choose the filled-in sheet** (Excel or CSV). Every row is checked and shown: to create, already has access, or not possible, with the reason.
+  4. **Create.** An Excel sheet downloads with each new person's **temporary password** and the sign-in address. Give each person only their own password, over a channel only they read. Delete the file once everyone has signed in. The passwords are shown nowhere else.
+  Leaders import into the teams they lead. Only Executives and Admins create teams or choose leaders.
 - **Roles & permissions:**
   - the matrix of what each role may do, with search and "show only the differences";
   - Executives and Admins tick and **Save role changes**, or make a **New role** (optionally starting from another);

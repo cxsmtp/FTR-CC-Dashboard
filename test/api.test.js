@@ -302,3 +302,49 @@ test('credits sold: one or many sales per account, against its projection, rolle
   const viewer = await client(env.base, 'viewer@t.example');
   assert.equal((await viewer.post(`/api/cc/accounts/${id}/sales`, { credits: 1 })).status, 403);
 });
+
+test('bulk import: the team structure and people from one sheet, with temporary passwords back once', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const rows = [
+    { email: 'nina.north@t.example', name: 'Nina North', title: 'SE Director', role: 'Leader', team: 'Global Sales Engineering > EMEA > EMEA North', leads: 'yes' },
+    { email: 'olaf.north@t.example', name: 'Olaf North', role: 'Sales Engineer', team: 'Global Sales Engineering > EMEA > EMEA North' },
+    { email: 'se1@t.example', name: 'Already here', team: 'Global Sales Engineering > EMEA' },
+    { email: 'not-an-email', name: 'Bad' },
+    { email: 'olaf.north@t.example', name: 'Twice', team: 'Global Sales Engineering > EMEA' },
+    { email: 'zed@t.example', name: 'Zed', role: 'No such role', team: 'Global Sales Engineering' },
+  ];
+  const before = env.app.teams.list().length;
+  const preview = (await admin.post('/api/people/import', { rows, dryRun: true })).data;
+  assert.deepEqual([preview.summary.create, preview.summary.exists, preview.summary.errors], [2, 1, 3]);
+  assert.deepEqual(preview.rows[0].newTeams, ['EMEA North']);
+  assert.equal(env.app.teams.list().length, before, 'a preview changes nothing');
+  assert.equal(env.app.iam.byEmail('nina.north@t.example'), null);
+  const done = (await admin.post('/api/people/import', { rows, dryRun: false })).data;
+  assert.equal(done.summary.created, 2);
+  const nina = done.rows.find((x) => x.email === 'nina.north@t.example');
+  assert.match(nina.temporary, /^[\w]{5}(-[\w]{5}){3}$/);
+  const north = env.app.teams.list().find((t) => t.name === 'EMEA North');
+  assert.equal(north.parentId, env.teams.emea.id);
+  assert.ok(north.leaderIds.includes(nina.id));
+  assert.equal(env.app.iam.byEmail('olaf.north@t.example').teamId, north.id);
+  // They sign in with the temporary password and must choose their own.
+  const fresh = await client(env.base, 'olaf.north@t.example', done.rows.find((x) => x.email === 'olaf.north@t.example').temporary);
+  assert.equal(fresh.me.user.mustChangePassword, true);
+  // Nothing of the passwords is kept in the audit log.
+  const log = fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8');
+  assert.ok(!log.includes(nina.temporary));
+});
+
+test('bulk import by a leader: only into their teams, no new teams, no leaders, no higher roles', async () => {
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const res = (await lead.post('/api/people/import', { dryRun: true, rows: [
+    { email: 'l1@t.example', name: 'L1', team: 'Global Sales Engineering > EMEA' },
+    { email: 'l2@t.example', name: 'L2', team: 'Global Sales Engineering > APAC' },
+    { email: 'l3@t.example', name: 'L3', team: 'Global Sales Engineering > EMEA > Brand New' },
+    { email: 'l4@t.example', name: 'L4', team: 'Global Sales Engineering > EMEA', leads: 'yes' },
+    { email: 'l5@t.example', name: 'L5', role: 'Admin', team: 'Global Sales Engineering > EMEA' },
+  ] })).data;
+  assert.deepEqual(res.rows.map((r) => r.status), ['create', 'error', 'error', 'error', 'error']);
+  const se = await client(env.base, 'se1@t.example');
+  assert.equal((await se.post('/api/people/import', { rows: [{ email: 'x@t.example' }] })).status, 403);
+});

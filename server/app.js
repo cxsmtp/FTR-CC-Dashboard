@@ -655,6 +655,143 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'user.reset', target.email);
     return { temporary };
   });
+  /**
+   * Bulk onboarding: people and the team structure from one sheet (rows of email, name, title, role, team path, leads).
+   * `dryRun` checks every row and says what would happen; otherwise the rows that check out are created, teams in their
+   * paths made where missing (Executives and Admins), leaders set, and each new person's temporary password returned
+   * once, for the sheet the browser makes. Nothing about the passwords is kept or emailed.
+   */
+  r('POST', '/api/people/import', perm('users.manage'), async (req, ctx, body) => {
+    const input = Array.isArray(body?.rows) ? body.rows.slice(0, 1001) : [];
+    if (!input.length) throw fail(400, 'The sheet has no people in it.');
+    if (input.length > 1000) throw fail(413, 'At most 1,000 people at a time.');
+    const dryRun = body?.dryRun !== false;
+    const canTeams = ctx.permissions.has('teams.manage');
+    const roleByKey = new Map();
+    for (const [id, role] of Object.entries(iam.roles())) {
+      roleByKey.set(id.toLowerCase(), id);
+      roleByKey.set(role.name.toLowerCase(), id);
+    }
+    roleByKey.set('sales engineer', 'se');
+    roleByKey.set('se', 'se');
+    const all = () => teams.list();
+    const split = (pathText) => String(pathText ?? '').split(/\s*(?:>|›|\/|\\)\s*/).map((x) => clean(x, 80)).filter(Boolean).slice(0, 8);
+    /** The team at the end of a path: each step a team of that name below the one before (or a top team). */
+    const resolve = (parts, planned) => {
+      let parentId = null;
+      const missing = [];
+      let id = null;
+      for (let i = 0; i < parts.length; i++) {
+        const name = parts[i].toLowerCase();
+        const found = all().find((t) => (t.parentId ?? null) === parentId && t.name.toLowerCase() === name) ?? (planned.get(`${parentId}\u0000${name}`) ? { id: planned.get(`${parentId}\u0000${name}`) } : null);
+        if (!found) {
+          missing.push(parts.slice(i));
+          return { id: null, missing: parts.slice(i), parentId };
+        }
+        parentId = found.id;
+        id = found.id;
+      }
+      return { id, missing, parentId };
+    };
+    const yes = (v) => /^(y|yes|true|1|x|leader|leads)$/i.test(String(v ?? '').trim());
+    const seen = new Set();
+    const planned = new Map(); // `${parentId}\0${name}` -> new team id (on commit) or a placeholder (dry run)
+    const results = [];
+    const createdTeams = [];
+    for (let i = 0; i < input.length; i++) {
+      const row = input[i] ?? {};
+      const email = clean(row.email, 254).toLowerCase();
+      const out = { row: i + 2, email, name: clean(row.name, 120), title: clean(row.title, 120), team: '', role: '', leads: yes(row.leads), status: 'create', message: '', newTeams: [] };
+      results.push(out);
+      const err = (m) => Object.assign(out, { status: 'error', message: m });
+      if (!/^(?=[^]{3,254}$)[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email)) {
+        err('Not an email address.');
+        continue;
+      }
+      if (seen.has(email)) {
+        err('This email is in the sheet twice.');
+        continue;
+      }
+      seen.add(email);
+      if (iam.byEmail(email)) {
+        Object.assign(out, { status: 'exists', message: 'Already has access: left as they are.' });
+        continue;
+      }
+      const roleId = roleByKey.get(String(row.role ?? '').trim().toLowerCase() || 'se');
+      if (!roleId) {
+        err(`No role called "${clean(row.role, 60)}".`);
+        continue;
+      }
+      out.role = iam.roles()[roleId].name;
+      if (!iam.canGrant(roleId, ctx.permissions)) {
+        err(`You cannot give the ${out.role} role.`);
+        continue;
+      }
+      const parts = split(row.team);
+      if (!parts.length) {
+        err('Give their team, e.g. Global SE > EMEA SE.');
+        continue;
+      }
+      out.team = parts.join(' › ');
+      let { id: teamId, missing, parentId } = resolve(parts, planned);
+      if (missing.length) {
+        if (!canTeams) {
+          err(`No team "${missing[0]}" there: an Executive or Admin can create teams.`);
+          continue;
+        }
+        for (const name of missing) {
+          const key = `${parentId}\u0000${name.toLowerCase()}`;
+          if (dryRun) {
+            planned.set(key, `new:${key}`);
+            parentId = `new:${key}`;
+          } else {
+            const t = teams.create({ name, parentId });
+            createdTeams.push(teamPath(teams.list(), t.id).map((x) => x.name).join(' › '));
+            planned.set(key, t.id);
+            parentId = t.id;
+          }
+          out.newTeams.push(name);
+        }
+        teamId = parentId;
+      }
+      if (!dryRun && !ctx.permissions.has('scope.all') && !scopeOf(ctx.user, ctx.permissions, teams.list()).has(teamId)) {
+        err('That team is not one you work in.');
+        continue;
+      }
+      if (dryRun && !String(teamId).startsWith('new:') && !ctx.permissions.has('scope.all') && !ctx.scope.has(teamId)) {
+        err('That team is not one you work in.');
+        continue;
+      }
+      if (out.leads && !canTeams) {
+        err('Only Executives and Admins choose team leaders.');
+        continue;
+      }
+      if (dryRun) continue;
+      try {
+        const { user, temporary } = await iam.create({ email, name: out.name, title: out.title, role: roleId, teamId });
+        if (out.leads) {
+          const t = teams.get(teamId);
+          teams.update(teamId, { leaderIds: [...new Set([...(t.leaderIds ?? []), user.id])] });
+        }
+        Object.assign(out, { status: 'created', temporary, id: user.id });
+      } catch (error) {
+        err(error.message);
+      }
+    }
+    const count = (st) => results.filter((x) => x.status === st).length;
+    const summary = { create: count('create'), created: count('created'), exists: count('exists'), errors: count('error'), newTeams: dryRun ? [...new Set(results.flatMap((x) => x.newTeams.length ? [x.team] : []))] : createdTeams };
+    if (!dryRun) record(ctx, req, 'user.import', '', { created: summary.created, exists: summary.exists, errors: summary.errors, teams: createdTeams.length });
+    return { dryRun, summary, rows: results, signInAt: linkBase() || '' };
+  });
+  /** A welcome email to someone just added (bulk import asks for it per person, after creating them). */
+  r('POST', '/api/people/:id/welcome', perm('users.manage'), async (req, ctx, body, res, url, params) => {
+    const target = iam.byId(params.id);
+    if (!target || !canManage(ctx, target)) throw fail(404, 'That person is not one you can change.');
+    if (!resetReady().ready) throw fail(409, 'The email server is not set up and tested yet.');
+    await sendMail(target.email, systemEmail({ subject: 'You have access to the FTR Credits Command Center', lines: [`${ctx.user.name} gave you access to the FTR Credits Command Center as ${iam.roles()[target.role]?.name ?? target.role} in ${teams.get(target.teamId)?.name ?? 'your team'}.`, 'To set your password, open the link below, choose "Forgot your password?" and enter this address. Or sign in with the temporary password you were given.'], button: { label: 'Open the command center', url: `${linkBase()}/#/forgot?email=${encodeURIComponent(target.email)}` }, footer: 'The command center is for internal use only. You will be asked to accept its terms of use when you first sign in.' }));
+    record(ctx, req, 'user.welcome', target.email);
+    return { ok: true };
+  });
   r('POST', '/api/people/:id/unlock', perm('users.manage'), (req, ctx, body, res, url, params) => {
     const target = iam.byId(params.id);
     if (!target || !canManage(ctx, target)) throw fail(404, 'That person is not one you can change.');
@@ -1074,6 +1211,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (method === 'GET' && LEGAL[pathname]) {
       return send(res, 200, fs.readFileSync(path.join(config.root, LEGAL[pathname]), 'utf8'), { 'Content-Type': 'text/plain; charset=utf-8' });
     }
+    // MZ's .xlsx reader (from the calculator), for reading sheets people upload in the dashboard.
+    if (method === 'GET' && pathname === '/xlsx-lite.js') return serveStatic(path.join(config.root, 'vendor', 'mz', 'public', 'calculator', 'vendor'), req, res, 'xlsx-lite.js') || send(res, 404, 'Not found');
     if (method === 'GET' && pathname.startsWith('/calc-assets/samples/')) {
       const ctx = context(req);
       if (!ctx) return send(res, 401, { error: 'Sign in first.' });

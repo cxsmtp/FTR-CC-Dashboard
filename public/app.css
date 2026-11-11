@@ -398,3 +398,7 @@ details.menu > summary::-webkit-details-marker { display: none; }
 .sale-form { padding: 14px; border-radius: 14px; border: 1px dashed var(--line-hi); }
 tfoot td { border-bottom: 0; font-weight: 600; }
 @media (max-width: 900px) { .sold-strip { grid-template-columns: 1fr 1fr 1fr; } .sold-bar { grid-column: 1 / -1; } }
+dialog.wide { width: min(1100px, 96vw); }
+.import-tw { max-height: 46vh; overflow: auto; }
+.import-sum { display: flex; flex-wrap: wrap; gap: 8px; }
+.file-btn { cursor: pointer; }
