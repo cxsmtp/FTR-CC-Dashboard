@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.15.01 — 2026-11-11
+
+- **The version at the foot of the menu opens Versions and updates** (Settings → Updates) for Admins, on every page including the calculator; for everyone else it opens About.
+
 ## CC-01.15.00 — 2026-11-11
 
 - **Always on the newest version.** Auto-update can no longer be turned off or wait for an hour: the server looks for a new release every few minutes and switches to it by itself, without a restart. **Check for updates every … minutes** (15 unless an Admin sets 5 to 1,440) saves as you change it. **Check for updates** installs a newer release at once. A server that was told to wait for an hour (the old "At a set hour") now installs as soon as it finds one.

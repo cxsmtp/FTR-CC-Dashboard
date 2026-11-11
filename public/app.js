@@ -174,12 +174,12 @@ function shell(active, content) {
         <div class="who"><div class="avatar">${esc(initials(me.user.name))}</div><div><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></div></div>
         <div class="row"><button class="ghost sm" id="theme" title="Theme">${icon('theme')}Theme</button><button class="ghost sm" id="signout">${icon('out')}Sign out</button></div>
       </div>
-      <button class="ver" id="ver" title="About, version and what is new">${esc(me.versionLabel ?? '')}</button>
+      <button class="ver" id="ver" title="${can('system.update') ? 'Versions and updates' : 'About, version and what is new'}">${esc(me.versionLabel ?? '')}</button>
     </aside>
     <main class="main fade" id="main">${content}</main>`;
   watchWork();
   $('#theme').onclick = themePicker;
-  $('#ver').onclick = () => go('/about');
+  $('#ver').onclick = () => go(can('system.update') ? '/admin/updates' : '/about');
   $('#signout').onclick = signOut;
 }
 async function signOut() {

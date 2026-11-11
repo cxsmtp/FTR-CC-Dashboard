@@ -132,6 +132,7 @@ export async function startHosted() {
     $('cc-name').textContent = name;
     $('cc-role').textContent = `${cfg.roleName ?? ''}${cfg.teamName ? ` · ${cfg.teamName}` : ''}`;
     $('cc-ver').textContent = cfg.versionLabel ?? '';
+    if (perms.has('system.update')) Object.assign($('cc-ver'), { href: '/#/admin/updates', title: 'Versions and updates' });
   }
 
   // A Checkmarx One read on the server, as the dashboard's menu shows it: for another account than the one open.
