@@ -157,7 +157,45 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { token, session, user, permissions, scope, teams: allTeams };
   }
   const actorOf = (ctx) => (ctx ? { id: ctx.user.id, email: ctx.user.email, name: ctx.user.name } : null);
-  const record = (ctx, req, action, target = '', details = {}) => audit.record({ actor: actorOf(ctx), action, target, details, ip: ipOf(req) });
+  const record = (ctx, req, action, target = '', details = {}) => {
+    if (req) req.ccAudited = true;
+    audit.record({ actor: actorOf(ctx), action, target, details, ip: ipOf(req) });
+  };
+  // ---- Every action in the audit log: what a route does not record itself is recorded here, by the router --------
+  /** Asked for often while someone works, and change nothing: not recorded. */
+  const QUIET = new Set(['/api/projections/series', '/api/auth/reset/check', '/api/https/inspect', '/api/backups/inspect', '/api/https/browser-check', '/api/me/guide']);
+  /** Downloads and what is opened that matters: recorded as they are read. */
+  const READS = new Map([['/api/projections/reports/:id', 'report.open'], ['/api/projections/git/cloc-fusion', 'cloc-fusion.download']]);
+  const lastSeen = new Map();
+  const actionOf = (method, pattern) => {
+    const segs = pattern.replace(/^\/api\//, '').split('/');
+    const endsInParam = segs.at(-1).startsWith(':');
+    const name = segs.filter((x) => !x.startsWith(':')).join('.').replace(/^cc\./, '').replace(/^projections\b/, 'calculator');
+    if (method === 'GET') return `${name}.export`;
+    if (method === 'DELETE') return `${name}.delete`;
+    if (method === 'PUT') return `${name}.update`;
+    return endsInParam || segs.length === 1 ? `${name}.create` : name;
+  };
+  function auditRequest(req, ctx, method, pathname, match, outcome) {
+    if (req.ccAudited || !match) return;
+    const { pattern, params } = match;
+    // Sign-in, forgotten password and SSO record themselves, with more than the router knows.
+    if (PUBLIC_POSTS.has(pattern) || pattern.startsWith('/api/auth/')) return;
+    if (QUIET.has(pattern)) return;
+    let action = READS.get(pattern) ?? actionOf(method, pattern);
+    if (outcome.status >= 400) {
+      // Refused: by someone signed in, or a sign-in step (those record their own). Not anonymous noise.
+      if (!ctx) return;
+      action = `refused: ${action}`;
+    }
+    const target = params.id ? (accounts.accounts.meta?.(params.id)?.name ?? iam.byId?.(params.id)?.email ?? teams.get?.(params.id)?.name ?? params.id) : '';
+    // An autosave, a report opened again: once a minute per person is enough.
+    const key = `${ctx?.user?.id}|${action}|${target}`;
+    if (outcome.status < 400 && (method === 'PUT' || method === 'GET') && Date.now() - (lastSeen.get(key) ?? 0) < 60_000) return;
+    lastSeen.set(key, Date.now());
+    if (lastSeen.size > 5000) lastSeen.clear();
+    audit.record({ actor: actorOf(ctx), action, target: String(target), details: { method, path: pathname, ...(outcome.status >= 400 ? { status: outcome.status, error: String(outcome.error ?? '').slice(0, 200) } : {}) }, ip: ipOf(req) });
+  }
 
   const cookie = (value, maxAge, req) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict${config.secureCookies || req?.socket?.encrypted || httpsManager.mode === 'https' ? '; Secure' : ''}; Max-Age=${maxAge}`;
 
@@ -1095,9 +1133,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'audit.verify', result.ok ? 'intact' : 'broken', result);
     return result;
   });
-  r('GET', '/api/audit/export.csv', perm('audit.view'), (req, ctx) => {
-    const events = audit.recent({ limit: 100000 });
-    record(ctx, req, 'audit.export', '', { rows: events.length });
+  r('GET', '/api/audit/export.csv', perm('audit.view'), (req, ctx, body, res, url) => {
+    const events = audit.recent({ limit: 100000, filter: auditFilter(url.searchParams) });
+    record(ctx, req, 'audit.export', '', { rows: events.length, filters: Object.fromEntries(url.searchParams) });
     return { csv: csv(['When', 'Who', 'Email', 'Action', 'On', 'Details', 'Address'], events.map((e) => [e.at, e.actor?.name ?? '', e.actor?.email ?? '', e.action, e.target, JSON.stringify(e.details ?? {}), e.ip])), name: 'audit.csv' };
   });
 
@@ -1145,9 +1183,44 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { message: `A test message went to ${to}.` };
   });
 
+  /**
+   * The audit log, newest first, 200 at a time: search, who, what (an action or its group, such as "people"), when,
+   * and whether it was refused. `before` (the time of the last one shown) pages back.
+   */
+  const auditFilter = (sp) => {
+    const q = String(sp.get('q') ?? '').toLowerCase().slice(0, 100);
+    const who = String(sp.get('who') ?? '').toLowerCase().slice(0, 200);
+    const what = String(sp.get('what') ?? '').slice(0, 100);
+    const outcome = String(sp.get('outcome') ?? '');
+    const from = sp.get('from') ? Date.parse(sp.get('from')) : null;
+    const to = sp.get('to') ? Date.parse(sp.get('to')) + 24 * 3600 * 1000 : null;
+    const before = sp.get('before') ?? '';
+    const base = (a) => String(a).replace(/^refused: /, '');
+    const filter = (e) => {
+      if (before && e.at >= before) return false;
+      const t = Date.parse(e.at);
+      if (from && t < from) return false;
+      if (to && t >= to) return false;
+      if (who && String(e.actor?.email ?? '').toLowerCase() !== who) return false;
+      if (what && base(e.action) !== what && !base(e.action).startsWith(`${what}.`)) return false;
+      if (outcome === 'refused' && !String(e.action).startsWith('refused: ')) return false;
+      if (outcome === 'done' && String(e.action).startsWith('refused: ')) return false;
+      return !q || JSON.stringify(e).toLowerCase().includes(q);
+    };
+    return filter;
+  };
+  const auditBase = (a) => String(a).replace(/^refused: /, '');
   r('GET', '/api/audit', perm('audit.view'), (req, ctx, body, res, url) => {
-    const q = String(url.searchParams.get('q') ?? '').toLowerCase().slice(0, 100);
-    return { events: audit.recent({ limit: 500, filter: (e) => !q || JSON.stringify(e).toLowerCase().includes(q) }) };
+    const sp = url.searchParams;
+    const limit = Math.min(500, Math.max(1, Number(sp.get('limit')) || 200));
+    const filter = auditFilter(sp);
+    const base = auditBase;
+    const events = audit.recent({ limit: limit + 1, filter });
+    // For the filters: who and what appear in the log (the newest 5,000 events).
+    const seen = audit.recent({ limit: 5000 });
+    const people = [...new Map(seen.filter((e) => e.actor?.email).map((e) => [e.actor.email, { email: e.actor.email, name: e.actor.name ?? e.actor.email }])).values()].sort((a, b) => a.name.localeCompare(b.name));
+    const actions = [...new Set(seen.map((e) => base(e.action)))].sort();
+    return { events: events.slice(0, limit), more: events.length > limit, people, actions };
   });
 
   // ---- The calculator's API (/api/projections…), per team -----------------------------------------------------
@@ -1367,11 +1440,19 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       }
       let result;
       for (const h of match.handlers) result = await h(req, ctx, body, res, url, match.params);
+      const exported = result?.download !== undefined || result?.csv !== undefined;
+      if (method !== 'GET' || exported || READS.has(match.pattern)) auditRequest(req, ctx, method, pathname, match, { status: 200 });
       if (result?.download !== undefined) return send(res, 200, result.download, { 'Content-Type': `${result.type ?? 'application/octet-stream'}`, 'Content-Disposition': `attachment; filename="${result.name}"` });
       if (result?.csv !== undefined) return send(res, 200, result.csv, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${result.name}"` });
       if (pathname === '/healthz') return send(res, 200, result);
       return send(res, 200, result ?? { ok: true });
     } catch (error) {
+      // Refused changes, and anything refused for lack of permission, are in the audit log too.
+      if (error.status && (method !== 'GET' || error.status === 403)) {
+        try {
+          auditRequest(req, ctx, method, pathname, match, { status: error.status, error: error.message });
+        } catch {}
+      }
       if (error.status) return send(res, error.status, { error: error.message });
       log(`[error] ${req.method} ${pathname}: ${error.stack ?? error.message}`);
       return send(res, 500, { error: 'Something went wrong on the server: an Admin can find it in the server log.' });

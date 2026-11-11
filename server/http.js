@@ -67,7 +67,7 @@ export class Router {
   add(method, pattern, ...handlers) {
     const keys = [];
     const re = new RegExp(`^${pattern.replace(/\/:([a-zA-Z]+)/g, (_, k) => (keys.push(k), '/([^/]+)'))}$`);
-    this.#routes.push({ method, re, keys, handlers });
+    this.#routes.push({ method, pattern, re, keys, handlers });
   }
   match(method, pathname) {
     for (const r of this.#routes) {
@@ -82,7 +82,7 @@ export class Router {
             params[k] = '';
           }
         });
-        return { handlers: r.handlers, params };
+        return { handlers: r.handlers, params, pattern: r.pattern };
       }
     }
     return null;

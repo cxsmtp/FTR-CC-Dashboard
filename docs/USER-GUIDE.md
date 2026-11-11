@@ -129,7 +129,7 @@ Reading a large Checkmarx One tenant can take a while. It runs on the server, so
 - **Teams:** make the tree, choose each team's region and leaders.
 - **Settings & roles → Email server (SMTP):** the mail server, port, TLS, sign-in and from address. **Save**, then **Test connection**: nothing is sent until the test succeeds for exactly those settings. **Send test email** proves delivery. Choose who may reset a forgotten password by email (everyone; everyone but those who manage people; nobody). Links in emails point at the server's `PUBLIC_URL`. When email works, **Invite someone** can also send a welcome email (never the one-time password).
 - **Settings & roles:** the organisation name on reports; the Salesforce, Checkmarx One and git hosts the server may call; custom roles; **Download backup**.
-- **Audit log:** sign-ins, accounts and reports made, primary and shared marks, and every change to people, teams, roles and settings.
+- **Audit log:** every action, by everyone, and everything refused, with the reason. Filter by who, what, dates and outcome; **Older entries** pages back; **Check the log is intact** proves no entry was changed or removed; **Export CSV** exports what the filters show.
 - Locked out of every Admin account? On the server: `node scripts/reset-admin.mjs you@yourcompany.com`.
 
 ## 7. Good practice

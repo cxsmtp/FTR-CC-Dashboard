@@ -142,7 +142,7 @@ Making a release: bump `version` in package.json, add the CHANGELOG entry, and t
 
 - **Backups:** nightly, before every version switch, and **Back up now**. They hold everything except the versions folder. The newest 14 are kept in `DATA_DIR/backups`. Set `BACKUP_PASSPHRASE` to seal them (AES-256-GCM); keep the passphrase safe.
 - **Restore:** choose a backup file. It is checked, then a backup of what is there now is taken, then it is restored and the server restarts.
-- **Audit log:** each event is chained to the one before by SHA-256. **Health** shows whether the chain is intact, or where it breaks. The log can be exported as CSV.
+- **Audit log:** every action, by everyone, and everything refused, with the reason. Each event is chained to the one before by SHA-256: **Check the log is intact** (on the Audit log page) and **Health** show whether the chain is intact, or where it breaks. Filter by who, what, dates and outcome, and export what the filters show as CSV.
 - **Troubleshooting report:** versions, health, settings in force, update events, backups and recent errors. It holds no secrets, keys or customer data.
 
 ## Settings → General and Roles

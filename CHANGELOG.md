@@ -2,6 +2,16 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.10.00 — 2026-11-11
+
+- **Every action in the audit log.** Besides what was recorded before (sign-ins, accounts, reports, sales, people, teams, roles, settings, updates, backups), every other change is now recorded by the server itself, so nothing is missed: a theme changed, a Checkmarx One read started or disconnected, an account saved in the calculator (once a minute while it autosaves), a backup taken. So are exports and downloads (accounts and reports CSV, backups, the audit log itself, cloc-fusion) and every report opened. **Anything refused** is recorded too, with who tried, what, and the reason (for example an SE trying to change settings).
+- **A new Audit log page.**
+  - Filter by **who**, **what** (one action or a whole group, such as People or Checkmarx One), **from** and **to** dates, and **outcome** (done or refused), and search everything.
+  - Each entry says in words what was done, with its details.
+  - **Older entries** pages back through the whole log.
+  - **Check the log is intact** walks the chain of every entry and says whether any was changed or removed.
+  - **Export CSV** exports what the filters show.
+
 ## CC-01.09.00 — 2026-11-11
 
 - **Updates without a restart.** The launcher now holds the port itself and passes every connection to the version that answers. A new version (an update, a rollback, a restored backup, or **Reload the server**) is loaded beside the running one; the running one finishes what it is answering, stops writing and hands over what it holds in memory: each person's Checkmarx One connection, reads not yet put into their account, and reads still running (started again at once). Then the new version takes the connections. Nobody is signed out, the port never closes, and nothing has to be read again. Tested with 20 clients working without pause through two reloads, over http and HTTPS: no request failed, and the longest wait was under 2 seconds.

@@ -355,3 +355,22 @@ test('bulk import by a leader: only into their teams, no new teams, no leaders, 
   const se = await client(env.base, 'se1@t.example');
   assert.equal((await se.post('/api/people/import', { rows: [{ email: 'x@t.example' }] })).status, 403);
 });
+
+test('audit log: every change is recorded, refused attempts too, and it can be filtered', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const se = await client(env.base, 'se1@t.example');
+  // A change no route records by itself: the person's own theme.
+  assert.equal((await se.put('/api/me/prefs', { mode: 'dark' })).status, 200);
+  // Refused: an SE may not change settings.
+  assert.equal((await se.put('/api/settings', { organisationName: 'X' })).status, 403);
+  const all = (await admin.get('/api/audit?who=se1@t.example')).data;
+  assert.ok(all.events.some((e) => e.action === 'me.prefs.update'), JSON.stringify(all.events.map((e) => e.action)));
+  const refused = all.events.find((e) => e.action.startsWith('refused: '));
+  assert.ok(refused && refused.details.status === 403);
+  assert.ok(all.people.some((p) => p.email === 'se1@t.example'));
+  const onlyRefused = (await admin.get('/api/audit?outcome=refused&who=se1@t.example')).data.events;
+  assert.ok(onlyRefused.length && onlyRefused.every((e) => e.action.startsWith('refused: ')));
+  const csv = await admin.get('/api/audit/export.csv?outcome=refused');
+  assert.match(String(csv.data), /refused: /);
+  assert.equal((await se.get('/api/audit')).status, 403);
+});
