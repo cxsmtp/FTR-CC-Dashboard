@@ -2051,7 +2051,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       token = decodeURIComponent(String(req.url ?? '').slice(CHALLENGE_PREFIX.length).split('?')[0]);
     } catch {}
     const value = acme.challenge(token);
-    res.writeHead(value ? 200 : 404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    // Plain text for Let's Encrypt; the same protective headers as every other answer (nothing to run, no framing).
+    res.writeHead(value ? 200 : 404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'", 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=31536000' });
     return res.end(value ?? 'Not found');
   }
   /** The https:// address for a request that came over plain http while the server is HTTPS only. */

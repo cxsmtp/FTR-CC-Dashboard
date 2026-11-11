@@ -131,7 +131,7 @@ export class IntegrityService {
       if (!bundle) continue;
       const result = verifyBundle(bundle, { digest, trustedRoot: this.trustedRoot, repository: this.repository, workflow: WORKFLOW });
       if (result.ok) {
-        this.#remember(digest, result);
+        this.#remember(digest, bundle);
         return result;
       }
       firstReason ||= result.reason;
@@ -139,21 +139,28 @@ export class IntegrityService {
     return { ok: false, reachable: true, reason: firstReason || 'GitHub has no build attestation for this file list' };
   }
 
+  /**
+   * The signed bundle fetched before, verified again here (offline: its signature, certificate chain to the trusted
+   * root and Sigstore log entry). The file only saves asking GitHub again; what it holds is never trusted as it is.
+   */
   #cached(digest) {
     try {
       const all = JSON.parse(fs.readFileSync(this.#cacheFile, 'utf8'));
-      return all?.[digest]?.ok ? all[digest] : null;
+      const bundle = all?.[digest]?.bundle;
+      if (!bundle) return null;
+      const result = verifyBundle(bundle, { digest, trustedRoot: this.trustedRoot, repository: this.repository, workflow: WORKFLOW });
+      return result.ok ? result : null;
     } catch {
       return null;
     }
   }
 
-  #remember(digest, result) {
+  #remember(digest, bundle) {
     let all = {};
     try {
       all = JSON.parse(fs.readFileSync(this.#cacheFile, 'utf8')) ?? {};
     } catch {}
-    all[digest] = result;
+    all[digest] = { bundle };
     try {
       fs.writeFileSync(this.#cacheFile, JSON.stringify(Object.fromEntries(Object.entries(all).slice(-20))), { mode: 0o600 });
     } catch {}

@@ -1,5 +1,6 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -30,7 +31,8 @@ test('a key kept for an account: sealed, never sent to a browser, used by the te
   const { data } = await se1.post('/api/projections', { name: 'Kept Key Corp' }, h);
   const id = data.customer.id;
   await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
-  const secret = 'eu-key-SECRET-1234567890';
+  // Made up for this run (never a real key, and none kept in the source).
+  const secret = `eu-key-${randomBytes(12).toString('hex')}`;
   const r = await se1.post('/api/cc/cxone/connect', { apiKey: secret, remember: true, accountId: id });
   assert.equal(r.data.saved, true);
   // Not in clear on disk, not in any answer.

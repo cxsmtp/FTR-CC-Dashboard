@@ -392,6 +392,11 @@ async function stopImpersonating() {
   location.href = '/#/people';
   location.reload();
 }
+/** One CSV cell, quoted; one that a spreadsheet would read as a formula (= + - @, tab, return) is kept as text. */
+const csvCell = (v) => {
+  const t = String(v ?? '');
+  return `"${(/^[=+\-@\t\r]/.test(t) ? `'${t}` : t).replace(/"/g, '""')}"`;
+};
 async function signOut() {
   try {
     await api('/api/auth/signout', { method: 'POST', body: {} });
@@ -1448,7 +1453,7 @@ function peopleTable(d) {
       <div class="row"><label class="f">Work email<input name="email" type="email" required /></label><label class="f">Name<input name="name" maxlength="120" /></label><label class="f">Title<input name="title" maxlength="120" placeholder="Sales Engineer" /></label></div>
       <div class="row"><label class="f">Role<select name="role">${roles.map((r) => `<option value="${esc(r.id)}"${r.id === 'se' ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
       <label class="f">Team<select name="team" required>${teams.map((t) => `<option value="${esc(t.id)}"${t.id === state.me.team?.id ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label>
-      <label class="f">Temporary password <span class="muted">blank: one is made</span><span class="flex nowrap"><input name="password" autocomplete="off" spellcheck="false" placeholder="They choose their own at first sign-in" /><button type="button" class="sm" id="gen">Generate</button></span></label></div>
+      <label class="f">Temporary password <span class="muted">blank: one is made</span><span class="flex nowrap"><input name="password" autocomplete="off" spellcheck="false" placeholder="They choose their own at first sign-in" data-nodraft /><button type="button" class="sm" id="gen">Generate</button></span></label></div>
       <label class="check"><input type="checkbox" name="welcome" ${d.mail ? 'checked' : 'disabled'} /><span>Email them a welcome<small>${d.mail ? 'Where to sign in, and how to set their password with "Forgot your password?". The temporary password is never emailed.' : 'Needs the email server (Settings → Email).'}</small></span></label>
       <div class="flex"><button class="primary" type="submit">Add person</button><button type="button" class="ghost" id="add-cancel">Cancel</button><span class="err" id="add-err"></span></div><div id="add-secret"></div></form>` : ''}
     <div class="flex mt"><div class="search">${icon('search')}<input id="q" placeholder="Search people, emails, titles" /></div>
@@ -1597,7 +1602,7 @@ function peopleTable(d) {
       if (act === 'reset' && confirm(`Give ${n} a new temporary password? Their current ones stop working and they are signed out everywhere. The new ones download once, as a sheet.`)) {
         const done = await runBulk('Passwords reset', (u) => api(`${P(u)}/reset`, { method: 'POST', body: {} }));
         if (done.length) {
-          const csv = ['Name,Email,Temporary password', ...done.map(({ u, r }) => [u.name, u.email, r.temporary].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\r\n');
+          const csv = ['Name,Email,Temporary password', ...done.map(({ u, r }) => [u.name, u.email, r.temporary].map(csvCell).join(','))].join('\r\n');
           const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `temporary-passwords-${new Date().toISOString().slice(0, 10)}.csv` });
           a.click();
           setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -3583,7 +3588,9 @@ function enhanceTable(table) {
 // Settings save on the server as they change; everything else (a person being added, a sale being recorded, a team
 // being made…) is kept in this browser, so leaving the page, a reload or a dropped connection loses nothing.
 const DRAFT = 'cc-draft:';
-const draftable = (el) => el.form && el.name && !el.closest('[data-nodraft], .filters, .mpick') && !['password', 'file', 'hidden', 'submit', 'button', 'search'].includes(el.type) && !el.form.matches('#sf, #bf, #auto, #af, #actf');
+/** Fields that hold a secret (a password, token or key) are never kept as a draft, whatever their type. */
+const SECRET_FIELD = /pass(word)?|token|secret|api.?key|^key$/i;
+const draftable = (el) => el.form && el.name && !el.closest('[data-nodraft], .filters, .mpick') && !['password', 'file', 'hidden', 'submit', 'button', 'search'].includes(el.type) && !SECRET_FIELD.test(el.name) && !el.form.matches('#sf, #bf, #auto, #af, #actf');
 const draftKey = (el) => `${DRAFT}${location.hash.split('?')[0]}:${el.form.id || el.form.className}:${el.name}`;
 document.addEventListener('input', (e) => {
   const el = e.target;

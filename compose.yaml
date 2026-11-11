@@ -5,7 +5,9 @@ services:
     image: ftr-cc-dashboard:latest
     restart: unless-stopped
     ports:
-      - "7443:7443"
+      # Bound to every interface of the host on purpose (people reach it over the network); put an address in front,
+      # like "10.0.0.5:7443:7443", to take it to one interface only.
+      - "0.0.0.0:7443:7443"
     env_file: .env
     environment:
       BACKUP_DIR: /backups
@@ -18,6 +20,12 @@ services:
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "node", "scripts/healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
 volumes:
   ftr-cc-data:
   ftr-cc-backups:

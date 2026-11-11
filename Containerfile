@@ -3,7 +3,8 @@
 #   podman run -d --name ftr-cc --restart unless-stopped --health-on-failure=restart -p 7443:7443 -v ftr-cc-data:/data -v ftr-cc-backups:/backups -e BACKUP_DIR=/backups -e ADMIN_EMAIL=you@yourcompany.com --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true ftr-cc-dashboard
 FROM docker.io/library/node:22-alpine
 # git: Fusion · from Git counts code with it. tini: signals and zombie processes handled properly.
-RUN apk add --no-cache git tini
+# Pinned to their major versions (security fixes still arrive with each build).
+RUN apk add --no-cache "git~2" "tini~0.19"
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force

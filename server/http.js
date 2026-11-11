@@ -74,7 +74,7 @@ export class Router {
       if (r.method !== method) continue;
       const m = r.re.exec(pathname);
       if (m) {
-        const params = {};
+        const params = Object.create(null);
         r.keys.forEach((k, i) => {
           try {
             params[k] = decodeURIComponent(m[i + 1]);

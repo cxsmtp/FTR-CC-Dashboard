@@ -69,6 +69,12 @@ export function explainCall(e) {
   return { verdict: 'failed', why: `Checkmarx One answered ${s || 'nothing'}.`, done: 'Left out of this read; everything else went on.', next: 'Look at the troubleshooting report if it repeats.' };
 }
 
+/** A key from a tenant name or a request path: never one that reaches an object's prototype. */
+const safeKey = (v) => {
+  const k = String(v ?? '');
+  return k === '__proto__' || k === 'constructor' || k === 'prototype' ? `_${k}` : k;
+};
+
 export class CallMemory {
   constructor({ dataDir }) {
     this.file = path.join(dataDir, 'cxone-learned.json');
@@ -80,9 +86,12 @@ export class CallMemory {
     this.timer = null;
   }
   #tenant(t) {
-    const key = String(t || '-');
-    this.data.tenants[key] ??= { noSastMeta: [], skip: {}, slow: null, avoided: 0, learnedAt: null };
-    return this.data.tenants[key];
+    const key = safeKey(t || '-');
+    if (Object.getPrototypeOf(this.data.tenants) !== null) this.data.tenants = Object.assign(Object.create(null), this.data.tenants);
+    this.data.tenants[key] ??= { noSastMeta: [], skip: Object.create(null), slow: null, avoided: 0, learnedAt: null };
+    const t2 = this.data.tenants[key];
+    if (Object.getPrototypeOf(t2.skip ?? {}) !== null) t2.skip = Object.assign(Object.create(null), t2.skip);
+    return t2;
   }
   #save() {
     if (this.timer) return;

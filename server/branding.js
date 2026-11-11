@@ -8,6 +8,7 @@
  * is served with a policy that runs nothing in it.
  */
 import dns from 'node:dns/promises';
+import https from 'node:https';
 
 import { outboundUrlProblem } from '../vendor/mz/src/outbound-url.js';
 import { privateAddress } from './calculator.js';
@@ -43,8 +44,46 @@ export function imageFromUpload(value, what) {
   return imageFrom(Buffer.from(m ? m[1] : String(value ?? ''), 'base64'), what);
 }
 
+/**
+ * GET over https from the addresses already checked, and only those: the connection never asks DNS again, so a name
+ * that changes its answer after the check (DNS rebinding) cannot lead to a private address. The certificate is
+ * checked for the name; the body stops at `max` bytes.
+ */
+export function pinnedGet(u, addresses, { max = MAX_IMAGE, timeoutMs = 15_000, headers = {} } = {}) {
+  const pinned = addresses.map((a) => ({ address: a.address, family: a.family }));
+  return new Promise((resolve, reject) => {
+    const req = https.get(u, {
+      headers,
+      timeout: timeoutMs,
+      lookup: (host, options, done) => (options?.all ? done(null, pinned) : done(null, pinned[0].address, pinned[0].family)),
+    }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400) {
+        res.resume();
+        return reject(Object.assign(new Error('redirect'), { cause: { code: 'REDIRECT' } }));
+      }
+      if (Number(res.headers['content-length'] ?? 0) > max) {
+        res.destroy();
+        return resolve({ ok: false, status: 413, tooLarge: true });
+      }
+      const parts = [];
+      let size = 0;
+      res.on('data', (chunk) => {
+        size += chunk.length;
+        if (size > max) {
+          res.destroy();
+          resolve({ ok: false, status: 413, tooLarge: true });
+        } else parts.push(chunk);
+      });
+      res.on('end', () => resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body: Buffer.concat(parts) }));
+      res.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(Object.assign(new Error('timeout'), { cause: { code: 'ETIMEDOUT' } })));
+    req.on('error', reject);
+  });
+}
+
 /** An image at an https address: fetched once, here, and kept. */
-export async function imageFromUrl(url, what, { fetchImpl = globalThis.fetch } = {}) {
+export async function imageFromUrl(url, what, { fetchImpl = null } = {}) {
   const problem = outboundUrlProblem(url, { allowLoopbackHttp: false });
   if (problem) throw fail(400, `${what}: ${problem}`);
   const u = new URL(url);
@@ -52,16 +91,21 @@ export async function imageFromUrl(url, what, { fetchImpl = globalThis.fetch } =
   const addresses = await dns.lookup(u.hostname, { all: true }).catch(() => []);
   if (!addresses.length) throw fail(400, `${what}: ${u.hostname} cannot be found.`);
   if (addresses.some((a) => privateAddress(a.address))) throw fail(400, `${what}: ${u.hostname} is a private address.`);
+  const headers = { Accept: 'image/*', 'User-Agent': 'ftr-cc-dashboard-branding' };
   let res;
   try {
-    res = await fetchImpl(u, { redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { Accept: 'image/*', 'User-Agent': 'ftr-cc-dashboard-branding' } });
+    if (fetchImpl) {
+      // Tests pass their own fetch.
+      const r = await fetchImpl(u, { redirect: 'error', signal: AbortSignal.timeout(15_000), headers });
+      const body = r.ok ? Buffer.from(await r.arrayBuffer()) : Buffer.alloc(0);
+      res = { ok: r.ok, status: r.status, tooLarge: body.length > MAX_IMAGE || Number(r.headers.get('content-length') ?? 0) > MAX_IMAGE, body };
+    } else res = await pinnedGet(u, addresses, { headers });
   } catch (error) {
     throw fail(502, `${what}: ${u.hostname} could not be reached (${error.cause?.code ?? error.message}).`);
   }
+  if (res.tooLarge) throw fail(413, `${what} is larger than 200 KB.`);
   if (!res.ok) throw fail(502, `${what}: ${u.hostname} answered ${res.status}.`);
-  if (Number(res.headers.get('content-length') ?? 0) > MAX_IMAGE) throw fail(413, `${what} is larger than 200 KB.`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  return { ...imageFrom(buf, what), from: u.href };
+  return { ...imageFrom(res.body, what), from: u.href };
 }
 
 /** The colour as #rrggbb, or '' for the look's own. */

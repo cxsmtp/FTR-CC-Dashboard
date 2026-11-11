@@ -20,15 +20,18 @@ const USERS = Number(process.env.USERS ?? 200);
 const SECONDS = Number(process.env.SECONDS ?? 120);
 const RAMP = Number(process.env.RAMP ?? 20) * 1000;
 const THINK = Number(process.env.THINK_MS ?? 1500);
-const PASSWORD = process.env.BENCH_PASSWORD ?? 'Bench-Password-2026';
 const PID = Number(process.env.SERVER_PID ?? 0);
 const people = JSON.parse(fs.readFileSync(path.join(process.env.DATA_DIR, 'bench-people.json'), 'utf8'));
+// The password seed.mjs chose for every simulated person (BENCH_PASSWORD, or one made for the run): never in the source.
+const PASSWORD = process.env.BENCH_PASSWORD || fs.readFileSync(path.join(process.env.DATA_DIR, 'bench-password.txt'), 'utf8').trim();
 const reportData = JSON.parse(fs.readFileSync(path.join(HERE, 'fixtures', 'report-data.json'), 'utf8'));
 // A save the size a read of a large tenant makes: 300 Fusion projects.
 const fusionSave = { fusion: { periodMonths: 12, projects: Array.from({ length: 300 }, (_, i) => ({ id: `p${i}`, name: `Project ${i}`, loc: 20000 + i * 137, criticality: 1 + (i % 3), frequency: ['daily', 'weekly', 'monthly'][i % 3], scansPerWeek: (i % 7) + 1, scanCount: 40 + (i % 50), source: 'scan', applications: [`App ${i % 20}`], included: true })) } };
 
 const lib = BASE.protocol === 'https:' ? https : http;
-const agent = new lib.Agent({ keepAlive: true, maxSockets: USERS * 2, rejectUnauthorized: false });
+// The certificate is checked: the server's own self-signed one (DATA_DIR/tls) is the one trusted, or CA_FILE.
+const caFile = process.env.CA_FILE || path.join(process.env.DATA_DIR, 'tls', 'self-signed.crt');
+const agent = new lib.Agent({ keepAlive: true, maxSockets: USERS * 2, ...(BASE.protocol === 'https:' && fs.existsSync(caFile) ? { ca: fs.readFileSync(caFile) } : {}) });
 const stats = new Map();
 const note = (name, ms, ok, status) => {
   const s = stats.get(name) ?? { times: [], errors: 0, codes: {} };

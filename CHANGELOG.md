@@ -2,6 +2,22 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.54.00 — 2026-11-11
+
+Security: a full Checkmarx One scan (SAST, SCA, IaC, containers, secrets, API security) and every real finding fixed.
+
+- **Email library updated** (nodemailer 10.5.0): an address-parsing flaw (CVE-2026-125755, high) could send mail meant for one address to another domain.
+- **Sign-in lock holds under a burst.** Wrong passwords sent all at once are counted while they are checked, so no more than 5 are tried before the account waits 15 minutes.
+- **Logo and icon fetched from an address**: the server connects only to the addresses it checked (no second DNS answer can lead it to a private address), and stops reading at 200 KB.
+- **Mail server test**: only mail ports (25, 465, 587, 2525, 1025), so it cannot be used to knock on other services. A port already saved stays as it is.
+- **Signed release check**: the cached GitHub attestation is verified again (signature, certificate chain, transparency log) each time, never trusted from the file as it is.
+- **Single sign-on errors**: why the identity provider's answer was refused goes to the server log for the Admin; the person sees that it failed.
+- **The temporary password typed for a new person is never kept as a draft** in the browser, nor is any field named like a password, token or key.
+- **Temporary-password sheets** (People → Reset passwords): a cell a spreadsheet would read as a formula is written as text.
+- **Hardening**: the router's and the CxOne API audit's lookups cannot reach an object's prototype; the Let's Encrypt challenge answer carries the same protective headers as every other.
+- **Container and CI**: a health check in `compose.yaml`; the port binding written out; `git` and `tini` pinned to their major versions; GitHub Actions pinned to the commits of the versions used.
+- **Load test tool**: no password in the source (one is made per run) and the server's own certificate is checked instead of turning checks off. The test fixtures no longer carry anything shaped like a key or a password in a link.
+
 ## CC-01.53.00 — 2026-11-11
 
 - **False positives: one small box.** The calculator's four "False positives %" fields (one per severity) and the report's four false-positive sliders are now a single small **False positives [30] %** box beside the per-severity results (in the report, beside "Count the findings still to come"). It sets every severity at once; 30% as before. The report no longer repeats it under the answer or on the key slide: it is said once, in the assumptions, and in the appendix.

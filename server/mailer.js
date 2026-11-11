@@ -60,11 +60,18 @@ export class Secrets {
 const int = (v, d) => (Number.isInteger(Number(v)) ? Number(v) : d);
 const plain = (v, max = 254) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
 
+/** The ports mail servers listen on (1025: a local test server). */
+export const SMTP_PORTS = [25, 465, 587, 2525, 1025];
+
 /** The settings as changed by what an Admin sent; a password left empty keeps the one kept (null clears it). */
 export function mergeSmtp(current, input = {}) {
   const smtp = { ...DEFAULT_SMTP, ...current };
   if ('host' in input) smtp.host = plain(input.host).toLowerCase();
-  if ('port' in input) smtp.port = Math.min(65535, Math.max(1, int(input.port, smtp.port)));
+  if ('port' in input) {
+    smtp.port = Math.min(65535, Math.max(1, int(input.port, smtp.port)));
+    // Mail ports only: the connection test must not become a way to knock on other services inside the network.
+    if (!SMTP_PORTS.includes(smtp.port) && smtp.port !== current.port) throw new MailError(`Port ${smtp.port} is not a mail port: use 587 (STARTTLS), 465 (implicit TLS), 25 or 2525.`);
+  }
   if ('secure' in input) smtp.secure = Boolean(input.secure);
   if ('requireAuth' in input) smtp.requireAuth = Boolean(input.requireAuth);
   if ('user' in input) smtp.user = plain(input.user);

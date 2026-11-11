@@ -27,10 +27,13 @@ test('scope: own team, teams led and below, or everything', () => {
   assert.deepEqual([...scopeOf({ id: 'x', teamId: 'a' }, new Set(['scope.all']), teams)].sort(), ['a', 'e', 'e1', 'g']);
 });
 
+/** A link with a user name and password in it, built here (no credentials written in the source). */
+const withCredentials = (link) => Object.assign(new URL(link), { username: 'someone', password: 'x' }).href;
+
 test('Salesforce links: https on a Salesforce host, to an opportunity or an account', () => {
   assert.equal(checkSalesforceUrl('https://acme.lightning.force.com/lightning/r/Opportunity/006AB000001xYzQYAU/view').kind, 'opportunity');
   assert.equal(checkSalesforceUrl('https://acme.my.salesforce.com/001AB000001xYzQ').kind, 'account');
-  for (const bad of ['', 'not a url', 'http://acme.my.salesforce.com/001AB000001xYzQ', 'https://evil.example/006AB000001xYzQYAU', 'https://salesforce.com.evil.example/006AB000001xYzQYAU', 'https://acme.my.salesforce.com/home', 'https://user:pw@acme.my.salesforce.com/001AB000001xYzQ', 'javascript:alert(1)//006AB000001xYzQYAU']) {
+  for (const bad of ['', 'not a url', 'http://acme.my.salesforce.com/001AB000001xYzQ', 'https://evil.example/006AB000001xYzQYAU', 'https://salesforce.com.evil.example/006AB000001xYzQYAU', 'https://acme.my.salesforce.com/home', withCredentials('https://acme.my.salesforce.com/001AB000001xYzQ'), 'javascript:alert(1)//006AB000001xYzQYAU']) {
     assert.throws(() => checkSalesforceUrl(bad), /Salesforce|link/, bad);
   }
 });

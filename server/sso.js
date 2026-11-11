@@ -142,7 +142,9 @@ export class Sso {
     try {
       ({ profile } = await this.#client().validatePostResponseAsync({ SAMLResponse: String(samlResponse ?? '') }));
     } catch (error) {
-      throw fail(401, `The identity provider’s answer was not accepted: ${String(error.message).slice(0, 200)}`);
+      // The details (which check failed) are for the Admin, in the server log; the person sees that it failed.
+      console.warn(`[sso] SAML response refused: ${String(error.message).replace(/[\r\n]+/g, ' ').slice(0, 300)}`);
+      throw fail(401, 'The identity provider’s answer was not accepted. Try again; if it keeps failing, an Admin can see why in the server log.');
     }
     if (!profile) throw fail(401, 'The identity provider signed nobody in.');
     const c = this.config();

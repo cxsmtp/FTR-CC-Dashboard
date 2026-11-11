@@ -56,6 +56,8 @@ export function passwordProblem(password, email = '') {
 const tokenHash = (token) => createHash('sha256').update(String(token)).digest('hex');
 
 export class Iam {
+  /** Sign-in attempts being checked now, per person (see signIn). */
+  #checking = new Map();
   constructor(dataDir) {
     this.doc = new Doc(path.join(dataDir, 'iam.json'), () => ({ roles: {}, users: [] }));
     this.sessions = new Doc(path.join(dataDir, 'sessions.json'), () => ({ sessions: {} }));
@@ -268,7 +270,20 @@ export class Iam {
       throw wrong;
     }
     if (user.lockedUntil > Date.now()) throw fail(429, 'Too many attempts: try again in 15 minutes, or ask an Admin to reset your password.');
-    const ok = await checkPassword(password, user.passwordHash);
+    // Attempts still being checked count as misses: guesses sent all at once cannot slip past the lock while the
+    // passwords are hashed (each check waits on scrypt).
+    const pending = this.#checking.get(user.id) ?? 0;
+    if ((user.failed ?? 0) + pending >= MAX_FAILED) throw fail(429, 'Too many attempts: try again in 15 minutes, or ask an Admin to reset your password.');
+    this.#checking.set(user.id, pending + 1);
+    let ok;
+    try {
+      ok = await checkPassword(password, user.passwordHash);
+    } finally {
+      const left = (this.#checking.get(user.id) ?? 1) - 1;
+      if (left > 0) this.#checking.set(user.id, left);
+      else this.#checking.delete(user.id);
+    }
+    if (user.lockedUntil > Date.now()) throw fail(429, 'Too many attempts: try again in 15 minutes, or ask an Admin to reset your password.');
     if (!ok) {
       user.failed = (user.failed ?? 0) + 1;
       if (user.failed >= MAX_FAILED) Object.assign(user, { failed: 0, lockedUntil: Date.now() + LOCK_MS });
