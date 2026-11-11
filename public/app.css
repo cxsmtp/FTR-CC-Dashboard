@@ -853,3 +853,9 @@ table.versions:not(.show-all) tr.v-older { display: none; }
 .co-grip { cursor: grab; color: var(--muted); user-select: none; }
 .co-row .link { padding: 0 4px; font-size: 11px; color: var(--muted); }
 .co-row:first-child [data-up], .co-row:last-child [data-down] { visibility: hidden; }
+
+/* Fusion engines & rates */
+table.rates input { width: 100%; }
+table.rates td.num input, #team-rows input, .det-admin, .det-team { max-width: 150px; text-align: right; }
+table.rates td.c, table.rates th.c { text-align: center; }
+input.need { border-color: var(--amber) !important; }

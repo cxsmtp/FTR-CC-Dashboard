@@ -18,6 +18,7 @@ import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } fro
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
+import { FusionRates, engineKey, rateModels, withRates } from './fusion-rates.js';
 import { IntegrityService } from './integrity/service.js';
 import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
@@ -59,6 +60,14 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     git: config.gitHosts ?? (settings.value.gitHosts?.length ? settings.value.gitHosts : DEFAULT_GIT_HOSTS),
   });
   const calc = calculatorService ?? new CalculatorService({ cxoneHosts: hosts().cxone, gitHosts: hosts().git, log });
+  // Fusion's engines and their rates (Fusion rates page): what applies to a person is their team's, else a team above, else the Admin's.
+  const fusionRates = new FusionRates(settings);
+  const ratesForTeam = (teamId) => fusionRates.effective(teamPath(teams.list(), teamId));
+  const ratesFor = (userId) => ratesForTeam(iam.byId(userId)?.teamId);
+  calc.rates = {
+    rate: (userId, models) => rateModels(models ?? [], ratesFor(userId)),
+    detected: (userId, names, tenant) => fusionRates.noteDetected(names, { by: iam.byId(userId)?.name ?? '', tenant }),
+  };
   // Checkmarx One activity (server/activity.js): every call to a customer's tenant, per person and account.
   const activity = new ActivityLog({ dataDir: config.dataDir });
   calc.activity = activity;
@@ -1443,7 +1452,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/projections', calcTeam, (req, ctx, body) => {
     const a = accounts.create({ name: body?.name, teamId: ctx.team, user: ctx.user });
     record(ctx, req, 'account.create', a.name, { id: a.id, team: teams.get(ctx.team)?.name });
-    return { customer: a };
+    return { customer: withRates(a, ratesFor(ctx.user.id)) };
   });
   r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../vendor/mz/src/standalone-calculator.js')).reportRuntime());
   r('GET', '/api/projections/reports', calcTeam, (req, ctx, body, res, url) => ({ reports: accounts.reportsOf(ctx.teamSet, String(url.searchParams.get('customer') ?? '')) }));
@@ -1578,7 +1587,38 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/api/projections/git/cloc-fusion', calcTeam, () => calc.clocFusion());
   /** An account for the calculator: never with its kept Checkmarx One key, sealed or not. */
   const forBrowser = ({ cxone, ...a }) => ({ ...a, cxone: cxone ? { tenant: cxone.tenant, savedBy: cxone.savedBy, savedAt: cxone.savedAt, lastReadAt: cxone.lastReadAt ?? null } : null });
-  r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: forBrowser(accounts.get(params.id, ctx.teamSet)) }));
+  // ---- Fusion rates: the Admin's engines and default engine, each team's own, and engines seen without a rate ----
+  const ratesView = (ctx) => {
+    const admin = ctx.permissions.has('settings.manage');
+    const mine = ctx.teams.filter((t) => ctx.scope.has(t.id));
+    return {
+      admin: fusionRates.admin,
+      detected: fusionRates.detected,
+      canAdmin: admin,
+      canTeams: ctx.permissions.has('users.manage') || admin,
+      teams: mine.map((t) => ({ id: t.id, name: t.name, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), own: fusionRates.teams[t.id] ?? null, effective: ratesForTeam(t.id) })),
+      myTeamId: ctx.user.teamId,
+    };
+  };
+  r('GET', '/api/fusion-rates', signedIn, (req, ctx) => ratesView(ctx));
+  r('PUT', '/api/fusion-rates', perm('settings.manage'), (req, ctx, body) => {
+    const { before, after } = fusionRates.setAdmin({ models: body?.models, defaultModel: body?.defaultModel });
+    const was = new Map(before.models.map((m) => [engineKey(m.name), m.creditsPer10k]));
+    const changes = after.models.filter((m) => was.get(engineKey(m.name)) !== m.creditsPer10k).map((m) => `${m.name} ${was.has(engineKey(m.name)) ? `${was.get(engineKey(m.name)) ?? '—'} → ` : 'added at '}${m.creditsPer10k ?? '—'}`);
+    for (const m of before.models) if (!after.models.some((x) => engineKey(x.name) === engineKey(m.name))) changes.push(`${m.name} removed`);
+    if (before.defaultModel !== after.defaultModel) changes.push(`default engine ${before.defaultModel || '—'} → ${after.defaultModel || '—'}`);
+    record(ctx, req, 'fusion.rates', changes.join('; ') || 'no change', { models: after.models, defaultModel: after.defaultModel });
+    return ratesView(ctx);
+  });
+  r('PUT', '/api/fusion-rates/teams/:teamId', signedIn, (req, ctx, body, res, url, params) => {
+    if (!ctx.permissions.has('users.manage') && !ctx.permissions.has('settings.manage')) throw fail(403, 'Leaders and above set a team\u2019s rates.');
+    needTeam(ctx.scope, String(params.teamId));
+    const own = fusionRates.setTeam(String(params.teamId), { rates: body?.rates, defaultModel: body?.defaultModel });
+    const what = [...Object.entries(body?.rates ?? {}).map(([n, v]) => `${n} ${v === null || v === '' ? '→ the Admin\u2019s rate' : `→ ${v}`}`), ...(body?.defaultModel !== undefined ? [`default engine → ${body.defaultModel || 'the Admin\u2019s'}`] : [])];
+    record(ctx, req, 'fusion.rates.team', `${teams.get(String(params.teamId))?.name ?? params.teamId}: ${what.join('; ')}`, { teamId: params.teamId, own });
+    return ratesView(ctx);
+  });
+  r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: forBrowser(withRates(accounts.get(params.id, ctx.teamSet), ratesFor(ctx.user.id))) }));
   r('PUT', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
     const patch = {};
     for (const key of ['name', 'tr', 'fusion', 'fusionNew', 'totals', 'scope', 'impact']) if (body?.[key] !== undefined) patch[key] = body[key];

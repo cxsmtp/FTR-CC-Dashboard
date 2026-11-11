@@ -119,7 +119,7 @@ export class Iam {
     const wanted = cleanPermissions(permissions);
     if (wanted.some((p) => !granterPermissions.has(p))) throw fail(403, 'A role cannot be given permissions you do not hold.');
     if (wanted.some((p) => ADMIN_ONLY.includes(p))) throw fail(403, 'HTTPS, single sign-on, updates, backups and settings stay with the Admin role: no other role can hold them.');
-    if (home !== undefined && !HOMES.includes(home)) throw fail(400, 'Choose a home page: Overview, Calculator, Accounts, Checkmarx One activity or Quick guide.');
+    if (home !== undefined && !HOMES.includes(home)) throw fail(400, 'Choose a home page: Overview, Calculator, Accounts, CxOne API audit or Quick guide.');
     roles[key] = { ...(roles[key] ?? { builtin: false }), name: clean(name, 60) || roles[key]?.name || 'New role', description: clean(description, 300), permissions: wanted, ...(home !== undefined ? { home } : {}) };
     this.save();
     return { id: key, ...roles[key] };

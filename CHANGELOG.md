@@ -2,6 +2,15 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.31.00 — 2026-11-11
+
+- **Fusion engines & rates** (Administration → Fusion engines & rates, for leaders and above): the credits per 10K lines of code for each AI engine, applied by the calculator by itself.
+  - **For everyone (Admin):** Opus 5.5 = 2, Opus 4.7 = 2.5, Haiku 4.5 = 1.5 to start, and the **default engine** for Fusion (Opus 5.5). Add an engine, change a rate or the default: it saves as you type, and a change that does not work goes back to the last good one.
+  - **For a team (leaders and above):** a team’s own rate for any engine and its own default engine, used by its people and the teams below it. **↺ Back to the Admin’s rate** removes the team’s own. The page shows the rate that applies and where it comes from.
+  - **Seen without a rate:** an engine a customer’s Checkmarx One offers that has no rate is listed (first and last seen, tenant, by whom), to set for everyone or for a team. Opus 5.0 and Mythos 5.1 start listed as needing a rate.
+  - **In the calculator:** each engine gets its rate when Checkmarx One is read and when an account opens; a new account starts on the team’s default engine; a rate typed in the calculator for one customer is kept. Every change is in the audit log.
+- **CxOne API audit** (was Checkmarx One activity) now sits under **Work**.
+
 ## CC-01.30.00 — 2026-11-11
 
 - **Overview cards in your order.** **Cards ▾** now lists the cards in the order shown: tick to show, drag ⠿ or use ▲ ▼ to move them. **Default** goes back to the standard set.

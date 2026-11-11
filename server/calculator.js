@@ -259,7 +259,16 @@ export class CalculatorService {
     this.#note(userId, { kind: 'read', tenant: state.connection?.tenant, ok: true, detail: 'started' });
     Promise.all([
       readTenant(client, { branches: branchScopeOf(input?.branches), maxProjects: readLimit(input?.maxProjects), onProgress: readProgressOf(job), live: job.live }),
-      readFusionOffer(client).catch(() => ({ models: [], remainingCredits: null })).then((offer) => Object.assign(job.live ?? {}, { offer }) && offer),
+      readFusionOffer(client)
+        .catch(() => ({ models: [], remainingCredits: null }))
+        .then((offer) => {
+          // Each engine with the rate that applies (Fusion rates); one with none is noted for a rate to be set.
+          const rated = this.rates ? { ...offer, models: this.rates.rate(userId, offer.models) } : offer;
+          const unrated = rated.models.filter((m) => !(Number(m.creditsPer10k) > 0)).map((m) => m.name);
+          if (this.rates && unrated.length) this.rates.detected(userId, unrated, state.connection?.tenant ?? '');
+          Object.assign(job.live ?? {}, { offer: rated });
+          return rated;
+        }),
     ])
       .then(([{ perProject, ...tenant }, offer]) => {
         state.read.save(perProject);

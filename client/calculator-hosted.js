@@ -173,6 +173,7 @@ export async function startHosted() {
   // ---- The command center's menu, as on every dashboard page --------------------------------------
   function renderMenu() {
     const ICONS = {
+      engine: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
       overview: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
       accounts: '<path d="M3 7h18M3 12h18M3 17h12"/>',
       calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h4"/>',
@@ -190,12 +191,13 @@ export async function startHosted() {
     $('cc-nav').innerHTML = `<div class="cc-label">Insight</div>
       ${link('/#/overview', 'overview', 'Overview', can('dashboard.view'))}
       ${link('/#/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
-      ${link('/#/activity', 'pulse', 'Checkmarx One activity')}
       ${link('/#/people', 'people', can('users.manage') ? 'People &amp; roles' : 'People')}
       <div class="cc-label">Work</div>
       ${link('/calculator', 'calc', 'Calculator', true, true)}
+      ${link('/#/activity', 'pulse', 'CxOne API audit')}
       ${admin ? '<div class="cc-label">Administration</div>' : ''}
       ${link('/#/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
+      ${link('/#/rates', 'engine', 'Fusion engines &amp; rates', can('users.manage') || settings)}
       ${link('/#/admin', 'admin', 'Settings', settings)}
       ${link('/#/audit', 'audit', 'Audit log', can('audit.view'))}`;
     $('cc-guide-nav').innerHTML = `<a href="/calculator" id="cc-side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/#/guide', 'guide', 'Quick guide')}`;
@@ -987,7 +989,7 @@ export async function startHosted() {
   const jump = () => {
     const dlg = $('cc-jump-dialog');
     const can = (p) => perms.has(p);
-    const pages = [['Overview', '/#/overview', can('dashboard.view')], ['Accounts', '/#/accounts', can('dashboard.view')], ['Checkmarx One activity', '/#/activity', true], ['People & roles', '/#/people', true], ['Teams', '/#/teams', true], ['Settings', '/#/admin', ADMIN_PERMS.some(can)], ['Updates', '/#/admin/updates', can('system.update')], ['Audit log', '/#/audit', can('audit.view')], ['Quick guide', '/#/guide', true], ['About', '/#/about', true]].filter((x) => x[2]).map(([t, href]) => ({ t, sub: 'Page', href }));
+    const pages = [['Overview', '/#/overview', can('dashboard.view')], ['Accounts', '/#/accounts', can('dashboard.view')], ['CxOne API audit', '/#/activity', true], ['Fusion engines & rates', '/#/rates', can('users.manage') || ADMIN_PERMS.some(can)], ['People & roles', '/#/people', true], ['Teams', '/#/teams', true], ['Settings', '/#/admin', ADMIN_PERMS.some(can)], ['Updates', '/#/admin/updates', can('system.update')], ['Audit log', '/#/audit', can('audit.view')], ['Quick guide', '/#/guide', true], ['About', '/#/about', true]].filter((x) => x[2]).map(([t, href]) => ({ t, sub: 'Page', href }));
     const accts = names().map((x) => ({ t: x.name, sub: 'Account · open in the calculator', id: x.id }));
     let sel = 0;
     let items = [];
