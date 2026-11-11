@@ -11,10 +11,10 @@
  * - **Switch and roll back.** The launcher (server/launch.js) starts the chosen version. A version that does not come
  *   up within 150 s, or stops within 2 minutes of a switch, is rolled back by itself and never auto-installed again.
  *   Any installed version, or the built-in one, can be switched to by hand.
- * - **Checked every 15 minutes**, whether or not auto-update is on (a minute after start, then every 15 minutes), so
- *   Settings → Updates always says what is new.
- * - **Auto-update** (on unless an Admin turns it off): a newer release is installed and switched to as soon as it is
- *   found, or at the hour chosen.
+ * - **Checked every few minutes** (15 unless an Admin sets another number, 5 to 1440), whether or not auto-update is
+ *   on, and a minute after start, so Settings → Updates always says what is new.
+ * - **Always on the newest version**: a newer release is installed and switched to as soon as it is found, without a
+ *   restart. A rollback by hand holds back the version it left (and older ones) until a release newer than it comes.
  * - **Trusted checksums.** The first time a release is seen, its archive's SHA-256 and the SHA-256 of its SHA256SUMS
  *   are kept in DATA_DIR/app/state.json (trust on first use). A release whose checksums later differ from what was kept
  *   (re-published or changed) is never installed, by hand or by itself, and is shown as such. Installed versions are
@@ -85,12 +85,13 @@ export class VersionStore {
     fs.mkdirSync(this.versionsDir, { recursive: true, mode: 0o700 });
     this.builtInDir = builtInDir;
     this.builtInVersion = builtInVersion;
-    this.doc = new Doc(path.join(this.root, 'state.json'), () => ({ current: null, previous: null, trialUntil: 0, failed: [], events: [], auto: { enabled: true, mode: 'asap', hour: 2 }, trusted: {}, lastCheck: null }));
+    this.doc = new Doc(path.join(this.root, 'state.json'), () => ({ current: null, previous: null, trialUntil: 0, failed: [], events: [], auto: { enabled: true, everyMinutes: 15 }, trusted: {}, lastCheck: null }));
     // Before CC 1.8 auto-update was off by default and only ran at an hour: on, as soon as found, unless an Admin chose otherwise.
     const st = this.doc.value;
-    if (!st.auto?.mode) {
-      const chosen = (st.events ?? []).some((e) => e.type === 'auto');
-      st.auto = { enabled: chosen ? Boolean(st.auto?.enabled) : true, mode: chosen ? 'hour' : 'asap', hour: st.auto?.hour ?? 2 };
+    // Before CC 1.8 auto-update was off by default and ran at an hour; before 1.15 it could wait for an hour. Now it
+    // checks every few minutes and installs as soon as it finds a release: on, unless an Admin turned it off.
+    if (!st.auto?.everyMinutes) {
+      st.auto = { enabled: true, everyMinutes: 15 };
       st.trusted ??= {};
       this.doc.save();
     }
@@ -254,7 +255,8 @@ export class UpdateService {
       previous: s.previous,
       auto: s.auto,
       lastCheck: s.lastCheck,
-      checkEveryMinutes: 15,
+      checkEveryMinutes: s.auto?.everyMinutes ?? 15,
+      heldUpTo: s.heldUpTo ?? null,
       trusted: Object.entries(s.trusted ?? {}).map(([version, t]) => ({ version, sha256: t.archive, sums: t.sums, firstSeen: t.firstSeen, tampered: Boolean(t.tampered) })).sort((a, b) => compareVersions(b.version, a.version)),
       events: (s.events ?? []).slice(0, 30),
       releases: (this.cache ?? []).map((r) => ({ ...r, installed: installed.includes(r.version), runningNow: r.version === this.running, failed: (s.failed ?? []).includes(r.version) })),
@@ -329,38 +331,48 @@ export class UpdateService {
     s.current = builtIn ? { version: this.store.builtInVersion, source: 'built-in' } : { version, source: 'installed' };
     s.trialUntil = Date.now() + 2 * 60_000;
     s.failed = (s.failed ?? []).filter((v) => v !== s.current.version);
+    // A rollback by hand: what it left is not installed again by itself, until something newer comes. Moving forward
+    // by hand (or by itself) lifts that.
+    if (reason === 'rollback by hand' && compareVersions(this.running, s.current.version) > 0) s.heldUpTo = this.running;
+    else if (s.heldUpTo && compareVersions(s.current.version, s.heldUpTo) >= 0) s.heldUpTo = null;
     this.store.record({ type: 'switch', from: this.running, to: s.current.version, by, reason, backup });
     this.log(`[updates] Switching from ${this.running} to ${s.current.version} (${reason}).`);
     setTimeout(() => this.exit(SWITCH_EXIT_CODE), 300).unref?.();
     return { switching: true, to: s.current.version };
   }
 
-  setAuto({ enabled, hour, mode }, { by = '' } = {}) {
-    const auto = { ...this.store.state.auto };
-    if (enabled !== undefined) auto.enabled = Boolean(enabled);
-    if (mode !== undefined) {
-      if (!['asap', 'hour'].includes(mode)) throw fail(400, 'Choose as soon as found, or at an hour.');
-      auto.mode = mode;
-    }
-    if (hour !== undefined) {
-      const h = Number(hour);
-      if (!(Number.isInteger(h) && h >= 0 && h <= 23)) throw fail(400, 'Choose an hour from 0 to 23.');
-      auto.hour = h;
+  setAuto({ everyMinutes }, { by = '' } = {}) {
+    const auto = { ...this.store.state.auto, enabled: true };
+    if (everyMinutes !== undefined) {
+      const m = Number(everyMinutes);
+      if (!(Number.isInteger(m) && m >= 5 && m <= 1440)) throw fail(400, 'Check every 5 to 1,440 minutes.');
+      auto.everyMinutes = m;
+      this.#schedule();
     }
     this.store.state.auto = auto;
     this.store.record({ type: 'auto', by, ...auto });
     return auto;
   }
 
-  /** Auto-update: a minute after start, then every 15 minutes. */
+  /** A minute after start, then every few minutes (as the Admin set). */
   start() {
-    const tick = () => this.autoTick().catch((error) => this.log(`[updates] ${error.message}`));
-    setTimeout(tick, 60_000).unref?.();
-    this.#timer = setInterval(tick, 15 * 60_000);
+    this.#started = true;
+    this.#schedule(60_000);
+  }
+  #started = false;
+  #schedule(first) {
+    clearTimeout(this.#timer);
+    if (!this.#started) return;
+    const every = Math.max(5, Number(this.store.state.auto?.everyMinutes) || 15) * 60_000;
+    this.#timer = setTimeout(async () => {
+      await this.autoTick().catch((error) => this.log(`[updates] ${error.message}`));
+      this.#schedule();
+    }, first ?? every);
     this.#timer.unref?.();
   }
   stop() {
-    clearInterval(this.#timer);
+    this.#started = false;
+    clearTimeout(this.#timer);
   }
   /** Every 15 minutes: look for releases (always), check what is installed, and auto-update when it is on. */
   async autoTick(now = new Date()) {
@@ -374,11 +386,12 @@ export class UpdateService {
       throw error;
     }
     this.#verifyInstalled();
-    const { auto, failed = [] } = this.store.state;
+    const { failed = [], heldUpTo = null } = this.store.state;
     const newest = releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.pinError && !failed.includes(r.version));
     if (!newest || compareVersions(newest.version, this.running) <= 0) return null;
-    if (!auto?.enabled || !this.supervised) return { available: newest.version };
-    if (auto.mode === 'hour' && now.getHours() !== auto.hour) return { waiting: newest.version };
+    // Rolled back by hand: not back to that version, only to a newer one.
+    if (heldUpTo && compareVersions(newest.version, heldUpTo) <= 0) return { held: newest.version };
+    if (!this.supervised) return { available: newest.version };
     if (!this.store.installed().includes(newest.version)) await this.install(newest.version, { by: 'auto-update' });
     return this.switchTo(newest.version, { by: 'auto-update', reason: 'auto-update' });
   }

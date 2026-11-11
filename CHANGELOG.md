@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.15.00 — 2026-11-11
+
+- **Always on the newest version.** Auto-update can no longer be turned off or wait for an hour: the server looks for a new release every few minutes and switches to it by itself, without a restart. **Check for updates every … minutes** (15 unless an Admin sets 5 to 1,440) saves as you change it. **Check for updates** installs a newer release at once. A server that was told to wait for an hour (the old "At a set hour") now installs as soon as it finds one.
+- **One Versions table, on the trusted checksums.** Releases, Roll back and Trusted checksums are now one table: each version with the SHA-256 kept the first time it was seen, when, and its state (running, built in, installed and verified, failed to start, checksum changed). Its one action: **Update now** for a newer version, **Roll back to this** for an older one, the built-in version included. Release notes show in short, with **more**, instead of raw text.
+- **A rollback by hand stays put.** The version you rolled back from is not installed again by itself; the next newer release is.
+
 ## CC-01.14.00 — 2026-11-11
 
 - **Every table sorts and filters.** Click a column’s heading (or ⇅) to sort low to high, again for high to low, again to clear: numbers, credits, percentages and dates sort as such, and words such as "No report" go last. The ⏷ by each heading filters the column by its values, several at once, with counts, a search and All / None; a bar above the table says how many rows show and clears the filters. It works on every table with headings: Accounts, the account’s reports and sales, Overview, People, the import check, Updates, Audit log and Checkmarx One activity; a sort stays as more rows are loaded.

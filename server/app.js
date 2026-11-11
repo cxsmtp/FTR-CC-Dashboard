@@ -1075,13 +1075,15 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/updates/check', updPerm, async (req, ctx) => {
     await updates.check();
     record(ctx, req, 'updates.check');
-    return updates.status();
+    // A newer release: installed and switched to now, not at the next check.
+    const tick = await updates.autoTick().catch((error) => ({ error: error.message }));
+    return { ...updates.status(), ...(tick?.switching ? { switching: true, to: tick.to } : {}), ...(tick?.error ? { installError: tick.error } : {}) };
   });
   r('POST', '/api/updates/install', updPerm, async (req, ctx, body) => {
     const done = await updates.install(String(body?.version ?? ''), { by: ctx.user.email });
     record(ctx, req, 'updates.install', done.version, { sha256: done.sha256, files: done.files });
     if (body?.switch === true) {
-      await updates.switchTo(done.version, { by: ctx.user.email });
+      await updates.switchTo(done.version, { by: ctx.user.email, reason: body?.rollback === true ? 'rollback by hand' : 'by hand' });
       record(ctx, req, 'updates.switch', done.version);
     }
     return updates.status();
@@ -1092,8 +1094,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { ...updates.status(), ...out };
   });
   r('PUT', '/api/updates/auto', updPerm, (req, ctx, body) => {
-    const auto = updates.setAuto({ enabled: body?.enabled, hour: body?.hour, mode: body?.mode }, { by: ctx.user.email });
-    record(ctx, req, 'updates.auto', auto.enabled ? `on at ${auto.hour}:00` : 'off');
+    const auto = updates.setAuto({ everyMinutes: body?.everyMinutes }, { by: ctx.user.email });
+    record(ctx, req, 'updates.auto', `every ${auto.everyMinutes} minutes`);
     return updates.status();
   });
   r('POST', '/api/system/restart', updPerm, (req, ctx) => {

@@ -492,3 +492,15 @@ th.tx-filtered { color: var(--text); }
 .tx-pop-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; }
 .tx-sorts { display: inline-flex; gap: 4px; }
 .mp-list label em { margin-left: auto; font-style: normal; color: var(--muted); font-size: 12px; }
+
+.inline-num { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
+.inline-num input { width: 90px; }
+.rel-notes > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; list-style: none; margin-top: 4px; }
+.rel-notes > summary::-webkit-details-marker { display: none; }
+.rel-notes > summary::after { content: " \25BE more"; color: var(--cyan); }
+.rel-notes[open] > summary::after { content: " \25B4 less"; }
+.rel-notes .md { font-size: 13px; margin-top: 6px; }
+.wide-panel { grid-column: 1 / -1; }
+table.versions .rel-notes > summary { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; max-width: 760px; }
+table.versions .rel-notes[open] > summary { -webkit-line-clamp: unset; }
+table.versions td:first-child { min-width: 320px; }

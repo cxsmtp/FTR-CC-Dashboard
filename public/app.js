@@ -1608,16 +1608,37 @@ const ADMIN_VIEWS = {
     $('#tab').innerHTML = `<div class="grid g2">
       <div class="panel"><h2>This server <span class="chip ok"><i></i>${esc(state.me.versionLabel)}</span></h2>
         <dl class="kv"><dt>Running</dt><dd>${esc(u.running)} (${esc(u.source)})</dd><dt>Built-in</dt><dd>${esc(u.builtIn)}</dd><dt>Releases from</dt><dd><a href="https://github.com/${esc(u.repo)}/releases" target="_blank" rel="noopener noreferrer">github.com/${esc(u.repo)}</a></dd><dt>Checks</dt><dd>Every ${u.checkEveryMinutes ?? 15} minutes, by itself</dd><dt>Last check</dt><dd>${esc(u.lastCheck?.at ? `${dateTime(u.lastCheck.at)} · newest ${u.lastCheck.newest ?? '—'}` : 'not yet')}${u.lastCheck?.error && u.lastCheck.failedAt > (u.lastCheck.at ?? '') ? `<br><span class="chip bad"><i></i>Last try ${esc(dateTime(u.lastCheck.failedAt))}: ${esc(u.lastCheck.error)}</span>` : ''}</dd></dl>
-        ${(() => { const n = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.runningNow && !r.failed && cmpVer(r.version, u.running) > 0); return n ? `<div class="callout mt"><b>${esc(n.version)} is available.</b> ${u.auto?.enabled && u.supervised ? (u.auto.mode === 'hour' ? `It is installed at ${String(u.auto.hour).padStart(2, '0')}:00.` : 'It is installed within 15 minutes.') : 'Install it below, or turn auto-update on.'}</div>` : ''; })()}
+        ${(() => { const n = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.runningNow && !r.failed && cmpVer(r.version, u.running) > 0); return n ? `<div class="callout mt"><b>${esc(n.version)} is available.</b> ${u.auto?.enabled && u.supervised ? (u.heldUpTo && cmpVer(n.version, u.heldUpTo) <= 0 ? `Held back: you rolled back from ${esc(u.heldUpTo)}, so it is not installed by itself until a newer release comes. Or now:` : `It is installed at the next check, within ${u.checkEveryMinutes ?? 15} minutes, or now:`) : 'Install it now:'} <button class="sm primary" data-update-now="${esc(n.version)}">Update to ${esc(n.version)} now</button></div>` : ''; })()}
         ${u.supervised ? '' : '<div class="callout warn mt">Not started by the launcher (<code>npm start</code> / the container’s command), so versions can be installed but not switched to from here.</div>'}
         <div class="flex mt"><button class="primary" id="chk">Check for updates</button>${u.supervised ? '<button id="restart" class="ghost">Reload the server</button>' : ''}</div>
         <h3 class="mt">Auto-update</h3>
-        <form class="flex" id="auto"><label class="check"><input type="checkbox" name="enabled" ${u.auto?.enabled ? 'checked' : ''} /><span>Install new releases by themselves</span></label><label class="f">When<select name="mode"><option value="asap"${u.auto?.mode !== 'hour' ? ' selected' : ''}>As soon as found</option><option value="hour"${u.auto?.mode === 'hour' ? ' selected' : ''}>At a set hour</option></select></label><label class="f">at<select name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${u.auto?.hour === h ? ' selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select></label><button>Save</button></form>
-        <p class="muted small">The server looks for new releases every 15 minutes whether or not auto-update is on. The first time a release is seen, its SHA-256 checksums are kept below; if they ever change, that release is never installed. Every release is checked against its SHA-256 and the manifest of its files before it is installed, and again before it starts. A backup is taken before every switch. A version that does not come up, or stops within two minutes, is rolled back by itself and never installed automatically again.</p></div>
-      <div class="panel"><h2>Releases</h2>
-        ${u.releases.length ? `<div class="tw"><table><thead><tr><th>Version</th><th>Published</th><th></th></tr></thead><tbody>${u.releases.map((r) => `<tr data-v="${esc(r.version)}"><td><b>${esc(r.version)}</b> ${r.runningNow ? '<span class="chip ok"><i></i>Running</span>' : r.installed ? '<span class="chip"><i></i>Installed</span>' : ''}${r.failed ? '<span class="chip bad"><i></i>Failed to start</span>' : ''}${r.prerelease ? '<span class="chip warn"><i></i>Pre-release</span>' : ''}${r.tampered ? '<span class="chip bad"><i></i>Checksum changed: refused</span>' : ''}<span class="sub">${esc(r.notes.split('\n').find((l) => l.trim().startsWith('-'))?.replace(/^[-*]\s*/, '') ?? '')}</span></td><td>${esc(date(r.publishedAt))}</td><td class="actions">${r.runningNow ? '' : !r.installable ? '<span class="muted small">no checksummed archive</span>' : r.tampered ? '<span class="muted small">not trusted</span>' : r.installed ? `<button class="sm" data-act="switch">${icon('send')}Switch to</button>` : `<button class="sm" data-act="install">Install</button><button class="sm primary" data-act="installswitch">Install and switch</button>`}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No releases listed yet</b>Check for updates.</div>'}
-        ${u.installed.length || u.source !== 'built-in' ? `<h3 class="mt">Roll back</h3><div class="flex">${u.source !== 'built-in' ? `<button class="sm" data-roll="built-in">Back to the built-in ${esc(u.builtIn)}</button>` : ''}${u.installed.filter((i) => i.version !== u.running).map((i) => `<button class="sm" data-roll="${esc(i.version)}" ${i.verified ? '' : 'disabled title="Its files changed: it would not start"'}>Switch to ${esc(i.version)}</button>`).join('')}</div>` : ''}</div>
-      <div class="panel"><h2>Trusted checksums <small>kept the first time each release was seen</small></h2>${u.trusted?.length ? `<div class="tw"><table><thead><tr><th>Version</th><th>Archive SHA-256</th><th>First seen</th></tr></thead><tbody>${u.trusted.map((t) => `<tr><td><b>${esc(t.version)}</b> ${t.tampered ? '<span class="chip bad"><i></i>Changed since: refused</span>' : '<span class="chip ok"><i></i>Trusted</span>'}</td><td><code class="small" title="${esc(t.sha256)}">${esc(t.sha256.slice(0, 16))}…${esc(t.sha256.slice(-8))}</code></td><td class="small">${esc(dateTime(t.firstSeen))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None yet: they are kept at the first check.</p>'}</div>
+        <form class="flex" id="auto"><span class="chip ok"><i></i>Always on the newest version</span><label class="f">Check for updates every<span class="inline-num"><input type="number" name="everyMinutes" min="5" max="1440" step="1" value="${esc(u.checkEveryMinutes ?? 15)}" /> minutes</span></label><span class="small muted" id="auto-saved"></span></form>
+        <p class="muted small">Saved as you change it. The server looks for a new release that often and switches to it by itself, with no restart. Each release must match the SHA-256 checksums kept the first time it was seen, and every file its manifest lists; a backup is taken before every switch, and a version that does not come up is rolled back by itself.</p></div>
+      <div class="panel wide-panel"><h2>Versions <small>each with the checksum kept the first time it was seen: update or roll back from here</small></h2>
+        ${(() => {
+          const rel = new Map(u.releases.map((r) => [r.version, r]));
+          const trusted = new Map((u.trusted ?? []).map((t) => [t.version, t]));
+          const inst = new Map(u.installed.map((i) => [i.version, i]));
+          const all = [...new Set([...trusted.keys(), ...inst.keys(), ...rel.keys(), u.builtIn, u.running])].sort((x, y) => cmpVer(y, x));
+          if (!all.length) return '<div class="empty"><b>No versions yet</b>Check for updates.</div>';
+          return `<div class="tw"><table class="versions"><thead><tr><th>Version</th><th>SHA-256 (kept)</th><th>First seen</th><th>State</th><th></th></tr></thead><tbody>${all.map((v) => {
+            const r = rel.get(v);
+            const t = trusted.get(v);
+            const i = inst.get(v);
+            const builtIn = v === u.builtIn;
+            const running = v === u.running;
+            const failed = (u.failed ?? []).includes(v);
+            const tampered = t?.tampered || r?.tampered;
+            const can = builtIn || i?.verified || (r?.installable && !tampered);
+            const act = builtIn ? 'builtin' : i?.verified ? 'switch' : 'installswitch';
+            const newer = cmpVer(v, u.running) > 0;
+            const state = [running ? '<span class="chip ok"><i></i>Running</span>' : '', builtIn ? '<span class="chip"><i></i>Built in</span>' : '', i ? `<span class="chip ${i.verified ? '' : 'bad'}"><i></i>${i.verified ? 'Installed · files verified' : 'Files changed: will not start'}</span>` : '', failed ? '<span class="chip bad"><i></i>Failed to start</span>' : '', tampered ? '<span class="chip bad"><i></i>Checksum changed: refused</span>' : '', r?.prerelease ? '<span class="chip warn"><i></i>Pre-release</span>' : '', t && !tampered ? '<span class="chip ok"><i></i>Trusted</span>' : ''].join('');
+            const action = running ? '' : !can ? `<span class="muted small">${tampered ? 'not trusted' : 'not available'}</span>` : newer ? `<button class="sm primary" data-act="${act}">Update now</button>` : `<button class="sm" data-act="${act}" data-rollback="1">Roll back to this</button>`;
+            const notes = r?.notes ? `<details class="rel-notes"><summary>${md((r.notes.split('\n').find((l) => l.trim().startsWith('-')) ?? '').replace(/^\s*[-*]\s*/, '').split(/(?<=[.!?])\s/)[0]).replace(/^<p>|<\/p>$/g, '')}</summary><div class="md">${md(r.notes.replace(/^## .*\n/, ''))}</div></details>` : '';
+            return `<tr data-v="${esc(v)}"><td><b>${esc(v)}</b>${r?.publishedAt ? `<span class="sub">published ${esc(date(r.publishedAt))}</span>` : ''}${notes}</td><td>${t ? `<code class="small" title="${esc(t.sha256)}">${esc(t.sha256.slice(0, 12))}…${esc(t.sha256.slice(-6))}</code>` : '<span class="muted small">—</span>'}</td><td class="small">${t ? esc(dateTime(t.firstSeen)) : ''}</td><td>${state}</td><td class="actions">${action}</td></tr>`;
+          }).join('')}</tbody></table></div>`;
+        })()}
+        <p class="muted small mt">Always on the newest version: a newer release is installed and switched to by itself. <b>Roll back to this</b> moves to an older one (a backup is taken first, and there is no restart); the version you left is then not put back by itself until a newer release comes.</p></div>
       <div class="panel"><h2>Recent events</h2>${u.events.length ? `<div class="tw"><table><tbody>${u.events.map((e) => `<tr><td class="small">${esc(dateTime(e.at))}</td><td><span class="chip ${/fail|refused|rolled|changed/.test(e.type) ? 'bad' : 'ok'}"><i></i>${esc(ev[e.type] ?? e.type)}</span></td><td class="small">${esc([e.version, e.from && `from ${e.from}`, e.to && `to ${e.to}`, e.why || e.error || e.reason, e.by && `by ${e.by}`].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Nothing yet.</p>'}</div>
     </div>`;
     const busy = (b, text) => {
@@ -1627,7 +1648,9 @@ const ADMIN_VIEWS = {
     $('#chk').onclick = async (e) => {
       busy(e.target, 'Checking…');
       try {
-        await api('/api/updates/check', { method: 'POST', body: {} });
+        const r = await api('/api/updates/check', { method: 'POST', body: {} });
+        if (r.switching) return waitForRestart(r.to);
+        if (r.installError) toast(r.installError, 'bad');
       } catch (error) {
         toast(error.message, 'bad');
       }
@@ -1644,12 +1667,35 @@ const ADMIN_VIEWS = {
       }
       location.reload();
     };
+    for (const b of $$('[data-update-now]')) b.onclick = async () => {
+      busy(b, 'Updating…');
+      try {
+        const row = u.releases.find((r) => r.version === b.dataset.updateNow);
+        if (row?.installed) await api('/api/updates/switch', { method: 'POST', body: { version: row.version } });
+        else await api('/api/updates/install', { method: 'POST', body: { version: b.dataset.updateNow, switch: true } });
+        return waitForRestart(b.dataset.updateNow);
+      } catch (error) {
+        toast(error.message, 'bad');
+        viewAdmin('updates');
+      }
+    };
     for (const b of $$('[data-act]')) b.onclick = async () => {
       const v = b.closest('tr').dataset.v;
+      if (b.dataset.rollback && !confirm(`Roll back to ${v}? A backup is taken first, and it takes over without a restart. Going back to an older version can leave newer data it does not know.`)) return;
+      if (b.dataset.act === 'builtin') {
+        busy(b, 'Switching…');
+        try {
+          await api('/api/updates/switch', { method: 'POST', body: { version: 'built-in', reason: b.dataset.rollback ? 'rollback' : 'by hand' } });
+          return waitForRestart(v);
+        } catch (error) {
+          toast(error.message, 'bad');
+          return viewAdmin('updates');
+        }
+      }
       busy(b, b.dataset.act === 'switch' ? 'Switching…' : 'Installing…');
       try {
-        if (b.dataset.act === 'switch') await api('/api/updates/switch', { method: 'POST', body: { version: v } });
-        else await api('/api/updates/install', { method: 'POST', body: { version: v, switch: b.dataset.act === 'installswitch' } });
+        if (b.dataset.act === 'switch') await api('/api/updates/switch', { method: 'POST', body: { version: v, ...(b.dataset.rollback ? { reason: 'rollback' } : {}) } });
+        else await api('/api/updates/install', { method: 'POST', body: { version: v, switch: b.dataset.act === 'installswitch', rollback: Boolean(b.dataset.rollback) } });
         if (b.dataset.act !== 'install') return waitForRestart(v);
         toast(`${v} installed and verified.`, 'ok');
       } catch (error) {
@@ -1666,10 +1712,17 @@ const ADMIN_VIEWS = {
         toast(error.message, 'bad');
       }
     };
-    $('#auto').onsubmit = async (e) => {
-      e.preventDefault();
-      const f = new FormData(e.target);
-      await api('/api/updates/auto', { method: 'PUT', body: { enabled: f.get('enabled') === 'on', mode: f.get('mode'), hour: Number(f.get('hour')) } }).then(() => toast('Saved.', 'ok'), (x) => toast(x.message, 'bad'));
+    // Auto-update saves as it is changed.
+    $('#auto').onsubmit = (e) => e.preventDefault();
+    $('#auto').onchange = async () => {
+      const f = new FormData($('#auto'));
+      try {
+        const r = await api('/api/updates/auto', { method: 'PUT', body: { everyMinutes: Number(f.get('everyMinutes')) } });
+        $('#auto-saved').textContent = `Saved \u2713 · every ${r.auto?.everyMinutes ?? f.get('everyMinutes')} minutes`;
+      } catch (x) {
+        toast(x.message, 'bad');
+        viewAdmin('updates');
+      }
     };
     if ($('#restart')) $('#restart').onclick = async () => {
       if (!confirm('Reload the server? It loads again beside the running one and takes over without a restart: nobody is signed out.')) return;

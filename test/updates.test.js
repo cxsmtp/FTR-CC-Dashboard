@@ -129,11 +129,14 @@ test('the audit log is chained: a changed line is found', () => {
   assert.equal(v.brokenAt, 3);
 });
 
-test('checks for releases every tick even with auto-update off, and keeps their checksums', async () => {
+test('checks for releases every few minutes (an Admin sets how many), and keeps their checksums', async () => {
   const { store, svc } = service(release);
   assert.equal(store.state.auto.enabled, true);
-  assert.equal(store.state.auto.mode, 'asap');
-  svc.setAuto({ enabled: false });
+  assert.equal(store.state.auto.everyMinutes, 15);
+  svc.setAuto({ everyMinutes: 30 });
+  assert.equal(store.state.auto.everyMinutes, 30);
+  assert.throws(() => svc.setAuto({ everyMinutes: 2 }), /5 to 1,440/);
+  // Not under the launcher: found, not switched to.
   const out = await svc.autoTick();
   assert.deepEqual(out, { available: '9.9.9' });
   assert.ok(store.state.lastCheck.at);
@@ -157,13 +160,19 @@ test('a release whose checksums changed after it was first seen is never install
   assert.ok(store.state.events.some((e) => e.type === 'checksum-changed'));
 });
 
-test('auto-update installs as soon as found, or waits for its hour', async () => {
+test('always on the newest version; a rollback by hand holds back what it left until something newer', async () => {
   const exits = [];
   const { store, svc } = service(release, { supervised: true, exit: (c) => exits.push(c) });
-  svc.setAuto({ mode: 'hour', hour: (new Date().getHours() + 1) % 24 });
-  assert.deepEqual(await svc.autoTick(), { waiting: '9.9.9' });
-  svc.setAuto({ mode: 'asap' });
   const out = await svc.autoTick();
   assert.equal(out.to, '9.9.9');
   assert.equal(store.state.current.version, '9.9.9');
+  // Now running 9.9.9, rolled back by hand to the built-in one: 9.9.9 is not put back by itself.
+  const later = new UpdateService({ store, runningVersion: '9.9.9', repo: 'x/y', fetchImpl: fakeGithub(release), log: () => {}, supervised: true, exit: (c) => exits.push(c), backup: async () => null });
+  await later.switchTo('built-in', { reason: 'rollback by hand' });
+  assert.equal(store.state.heldUpTo, '9.9.9');
+  const back = new UpdateService({ store, runningVersion: '1.0.0', repo: 'x/y', fetchImpl: fakeGithub(release), log: () => {}, supervised: true, exit: (c) => exits.push(c) });
+  assert.deepEqual(await back.autoTick(), { held: '9.9.9' });
+  // Moving forward by hand lifts the hold.
+  await back.switchTo('9.9.9', { reason: 'by hand' });
+  assert.equal(store.state.heldUpTo, null);
 });
