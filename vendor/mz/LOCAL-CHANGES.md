@@ -22,3 +22,8 @@
   center's **+ New**.
 - **`load({ fresh: true })`** (`page.js`): lists the customers and opens none, for the command center's Calculator,
   which always starts a new calculation unless a link names an account.
+- **One false-positive box** (`page.js` `fpOne`, `[data-fp-one]`; `report.js` lever `fpall`; `report-live.js`
+  `applyLever` case `fpall`): one % for every severity in place of a field (calculator) and a slider (report) per
+  severity. The line under the answer (`falsePositiveLine`) and the key slide's note no longer repeat it.
+- **Smooth levers** (`report.js` `leversOnly`; `report-live.js` `figures`): while a slider is dragged only the panel's
+  figures follow; the body is written again once it rests (220 ms) or on change, and the scroll position is kept.

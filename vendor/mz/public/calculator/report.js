@@ -186,7 +186,6 @@ function story(data, L) {
         <tr><td>${w('To remediate (true positives)')}</td><td>${num(f.truePositives)}</td></tr>
         <tr class="sum gold"><td>${w('Triage & remediation credits')}</td><td>${num(f.credits, 1)}</td></tr>
       </table>
-      ${falsePositiveLine(tr, L) ? `<p class="sub">${falsePositiveLine(tr, L)}</p>` : ''}
     </div>`);
   }
   if (data.fusion) {
@@ -571,6 +570,8 @@ footer{color:var(--muted);font-size:12px;max-width:1000px;margin:0 auto;padding:
 .lv-pick{font:inherit;font-size:13px;padding:3px 4px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);max-width:16ch}
 .lv-row{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin-top:10px;font-size:13px} .lv-row label{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px}
 .lv-check input{accent-color:var(--accent)}
+.lv-slide input[type=range]{touch-action:none;cursor:grab} .lv-slide input[type=range]:active{cursor:grabbing} .lv-slide output{font-variant-numeric:tabular-nums;min-width:7ch;display:inline-block} [data-out]{font-variant-numeric:tabular-nums}
+.lv-fp{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)} .lv-fp .lv-num{width:56px;padding:2px 6px;font-size:12px}
 .lv-field{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;margin:8px 0 0;font-size:13px}
 .lv-field select{font:inherit;font-size:13px;padding:3px 4px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
 .lv-note{margin:0 0 8px;padding:10px 12px;border-radius:8px;background:var(--soft);border:1px solid var(--soft-line);font-size:13px}
@@ -693,11 +694,13 @@ function leversPanel(data, live, L) {
     const r = tr.rows[s];
     return `<tr><th scope="row"><i class="dot" style="background:${SEVERITY_COLOURS[s]}"></i>${w(s)}</th>
       <td data-label="${w('Backlog to include')}">${slider(`sel.${s}`, r.selected, r.backlog, w('{0}: backlog to include', w(s)), w('{0} of {1}', num(r.selected), num(r.backlog)))}</td>
-      <td data-label="${w('False positives')}">${slider(`fp.${s}`, r.fp, 100, w('{0}: false positives %', w(s)), `${num(r.fp)}%`)}</td>
       <td data-label="${w('Credits to triage one')}">${box(`tc.${s}`, r.triageCost, w('{0}: credits to triage one finding', w(s)), ' readonly tabindex="-1" data-fixed title="Set by Checkmarx"')}</td>
       <td data-label="${w('Credits to remediate one')}">${box(`rc.${s}`, r.remediationCost, w('{0}: credits to remediate one finding', w(s)), ' readonly tabindex="-1" data-fixed title="Set by Checkmarx"')}</td></tr>`;
   }).join('') : '';
   const ahead = tr?.ahead ?? {};
+  // One false-positive % for every severity: the one most severities have.
+  const fps = tr ? SEVERITIES.map((s) => tr.rows[s].fp) : [];
+  const fpAll = fps.reduce((best, v) => (fps.filter((x) => x === v).length > fps.filter((x) => x === best).length ? v : best), fps[0] ?? 30);
   const periods = [...new Set([3, 6, 12, 18, 24, 36, live.inputs.months])].sort((a, b) => a - b);
   const changed = JSON.stringify(live.inputs) !== JSON.stringify(live.sentInputs);
   // Folded to one line (the total of your version beside it) until opened, so the answer stays first.
@@ -712,8 +715,9 @@ function leversPanel(data, live, L) {
   </div>
   <div class="lv-grid">
     ${tr && plan ? `<fieldset class="lv-card lv-wide"><legend>${w('Triage & remediation, by severity')}</legend>
-      <div class="lv-scroll"><table class="lv-sev"><thead><tr><th></th><th>${w('Backlog to include')}</th><th>${w('False positives')}</th><th>${w('Credits to triage one')}</th><th>${w('Credits to remediate one')}</th></tr></thead><tbody>${sevRows}</tbody></table></div>
+      <div class="lv-scroll"><table class="lv-sev"><thead><tr><th></th><th>${w('Backlog to include')}</th><th>${w('Credits to triage one')}</th><th>${w('Credits to remediate one')}</th></tr></thead><tbody>${sevRows}</tbody></table></div>
       <div class="lv-row">
+        <label class="lv-fp">${w('False positives')} ${box('fpall', fpAll, w('False positives % (every severity)'), ' max="100" step="1"')}%</label>
         <label class="lv-check"><input type="checkbox" data-lever="future"${ahead.includeFuture !== false ? ' checked' : ''}> ${w('Count the findings still to come')}</label>
         <label>${w('New findings counted')} ${slider('pace', ahead.newPacePercent ?? 100, 200, w('New findings counted'), w('{0}% of the last months\' pace', num(ahead.newPacePercent ?? 100)))}</label>
         <label>${w('New findings fall with AI')} ${slider('ai', ahead.aiDeclinePercent ?? 0, 90, w('New findings fall with AI'), w('{0}% over a year', num(ahead.aiDeclinePercent ?? 0)))}</label>
@@ -733,6 +737,11 @@ function leversPanel(data, live, L) {
   </div>
 </details></section>
 <p class="lv-pill" aria-hidden="true"><span>${w('Your version')}</span> <b data-out="pill">${num(sum.total)}</b> ${w('credits')}</p>`;
+}
+
+/** Only the levers' panel (its figures), cheap enough to work out at every step of a slider being dragged. */
+export function leversOnly(raw, { t, lang = 'en', live } = {}) {
+  return leversPanel(countedFusion(raw), live, wording({ t, lang }));
 }
 
 /** The body of the report: the runtime renders it again when a lever moves. */

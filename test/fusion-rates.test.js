@@ -185,3 +185,35 @@ test('an Executive mutes an account from the forecast: the dashboards leave it o
   assert.equal((await ex.get('/api/dashboard')).data.totals.accounts, before.accounts);
   assert.match(JSON.stringify((await ex.get('/api/audit?limit=50')).data), /account\.mute/);
 });
+
+test('an Admin signs in as someone: their view, recorded as the Admin acting as them; their own things stay theirs', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const se = (await admin.get('/api/people')).data.people.find((u) => u.email === 'se1@t.example');
+  // Only the Admin may, and never as themself.
+  assert.equal((await lead.post(`/api/people/${se.id}/impersonate`)).status, 403);
+  assert.equal((await admin.post(`/api/people/${admin.me.user.id}/impersonate`)).status, 400);
+  const r = await admin.post(`/api/people/${se.id}/impersonate`);
+  assert.equal(r.status, 200);
+  let me = (await admin.get('/api/me')).data;
+  assert.equal(me.user.email, 'se1@t.example');
+  assert.equal(me.impersonating.by.email, 'admin@t.example');
+  assert.ok(!me.permissions.includes('users.manage'));
+  // No chains, and the person's password, profile, sessions and terms stay theirs.
+  assert.equal((await admin.post(`/api/people/${se.id}/impersonate`)).status, 403);
+  assert.equal((await admin.post('/api/me/password', { current: 'x', next: 'y' })).status, 403);
+  assert.equal((await admin.put('/api/me/profile', { name: 'Changed' })).status, 403);
+  assert.equal((await admin.post('/api/me/signout-others')).status, 403);
+  // Back to their own account.
+  assert.equal((await admin.post('/api/auth/impersonate/stop')).status, 200);
+  me = (await admin.get('/api/me')).data;
+  assert.equal(me.user.email, 'admin@t.example');
+  assert.equal(me.impersonating, null);
+  const { events } = (await admin.get('/api/audit')).data;
+  const start = events.find((e) => e.action === 'auth.impersonate.start');
+  assert.equal(start.actor.email, 'admin@t.example');
+  assert.equal(start.target, 'se1@t.example');
+  assert.ok(events.some((e) => e.action === 'auth.impersonate.stop'));
+  const refused = events.find((e) => e.action.startsWith('refused') && e.actor?.as?.email === 'se1@t.example');
+  assert.ok(refused, 'what was done while signed in as them is recorded as the Admin acting as them');
+});

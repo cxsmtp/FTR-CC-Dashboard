@@ -4,7 +4,7 @@
 // anywhere: the file's content security policy allows this script alone and no connection at all.
 // "Download my version" saves the report as it now stands, with the plan as sent kept to go back to.
 
-import { buildReport, reportFileName, reportMain } from './report.js';
+import { buildReport, leversOnly, reportFileName, reportMain } from './report.js';
 import { slidesFileName, slidesPdf } from './slides.js';
 import { changePeriod, leverData } from './levers.js';
 import { amount, wholeNumber } from './model.js';
@@ -21,6 +21,7 @@ export function applyLever(inputs, key, value, checked) {
   switch (kind) {
     case 'sel': if (plan) plan.selected[id] = wholeNumber(value) ?? 0; break;
     case 'fp': if (plan) plan.fpPercent[id] = amount(value) ?? 0; break;
+    case 'fpall': if (plan) { const v = Math.min(100, Math.max(0, amount(value) ?? 0)); for (const s of Object.keys(plan.fpPercent)) plan.fpPercent[s] = v; } break;
     case 'tc': if (plan) plan.triageCost[id] = amount(value); break;
     case 'rc': if (plan) plan.remediationCost[id] = amount(value); break;
     case 'future': if (plan) plan.includeFuture = Boolean(checked); break;
@@ -58,6 +59,7 @@ function start() {
     // The levers opened stay open when the body is written again (the period redraws the panel too).
     const opened = main.querySelector('.levers .lv-fold')?.open === true;
     const tpl = document.createElement('template');
+    const y = window.scrollY;
     tpl.innerHTML = reportMain(leverData(state.base, inputs), { ...view, live: live() });
     const fresh = tpl.content.querySelector('.levers');
     const old = main.querySelector('.levers');
@@ -72,10 +74,26 @@ function start() {
     main.replaceChildren(tpl.content);
     const fold = main.querySelector('.levers .lv-fold');
     if (fold && opened) fold.open = true;
-    if (focused) main.querySelector(`[data-lever="${CSS.escape(focused)}"]`)?.focus();
+    if (focused) main.querySelector(`[data-lever="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
+    // The page stays where it was: the body written again does not move what is being looked at.
+    if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+  };
+
+  /** While a slider is dragged: only the panel's own figures follow, at once; the body follows when it rests. */
+  const figures = () => {
+    const old = main.querySelector('.levers');
+    if (!old) return render();
+    const tpl = document.createElement('template');
+    tpl.innerHTML = leversOnly(leverData(state.base, inputs), { ...view, live: live() });
+    for (const out of tpl.content.querySelectorAll('[data-out]')) {
+      for (const mine of main.querySelectorAll(`[data-out="${CSS.escape(out.dataset.out)}"]`)) if (mine.textContent !== out.textContent) mine.textContent = out.textContent;
+    }
+    const reset = old.querySelector('[data-act="reset"]');
+    if (reset) reset.disabled = tpl.content.querySelector('[data-act="reset"]')?.disabled ?? reset.disabled;
   };
 
   let queued = null;
+  let resting = null;
   const moved = (event) => {
     const el = event.target.closest('[data-lever]');
     if (!el) return;
@@ -84,6 +102,13 @@ function start() {
     inputs = applyLever(inputs, el.dataset.lever, el.value, el.checked);
     const panel = el.dataset.lever === 'months';
     cancelAnimationFrame(queued);
+    clearTimeout(resting);
+    // Dragging or typing in the panel: its figures follow at each step (smooth); the whole body once it rests.
+    if (event.type === 'input' && el.closest('.levers') && !panel) {
+      queued = requestAnimationFrame(figures);
+      resting = setTimeout(() => render(), 220);
+      return;
+    }
     queued = requestAnimationFrame(() => render({ panel }));
   };
   // The small total at the bottom shows only while the panel with the total is out of sight.

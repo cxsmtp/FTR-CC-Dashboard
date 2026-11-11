@@ -112,6 +112,17 @@ export async function startHosted() {
   // In a meeting with the customer: only the calculator, its projections and the report, nothing of ours around it.
   const meeting = params.get('meeting') === '1';
   if (meeting) document.documentElement.dataset.meeting = 'on';
+  if (cfg.impersonating && !meeting) {
+    const bar = document.createElement('div');
+    bar.className = 'imp-bar';
+    bar.setAttribute('role', 'status');
+    bar.innerHTML = `<span class="imp-dot"></span><span>You are signed in as <b>${esc(cfg.user?.name)}</b> (${esc(cfg.roleName)}): recorded as ${esc(cfg.impersonating.by.name || cfg.impersonating.by.email)} acting as them.</span><button type="button" class="sm">Back to my own account</button>`;
+    bar.querySelector('button').onclick = async () => {
+      await fetch('/api/auth/impersonate/stop', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cfg.csrf ?? '' }, body: '{}' }).catch(() => {});
+      location.href = '/#/people';
+    };
+    document.body.prepend(bar);
+  }
   let toastTimer = null;
   const toast = (message, kind = '', ms = 6000) => {
     const el = $('toast');

@@ -242,6 +242,7 @@ function shell(active, content) {
       <div class="side-lic">PolyForm Internal Use 1.0.0 · internal use only</div>
     </aside>
     <div class="col">
+      ${me.impersonating ? `<div class="imp-bar" role="status"><span class="imp-dot"></span><span>You are signed in as <b>${esc(me.user.name)}</b> (${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}): you see and work as they do, recorded as ${esc(me.impersonating.by.name || me.impersonating.by.email)} acting as them.</span><button type="button" class="sm" id="imp-stop">Back to my own account</button></div>` : ''}
       <header class="topbar">
         <button class="jump" id="jump" title="Jump to a page, an account or a person">${icon('search')}<span>Jump to…</span><kbd>Ctrl K</kbd></button>
         <span class="tb-grow"></span>
@@ -256,6 +257,7 @@ function shell(active, content) {
   opsClock();
   watchWork();
   wireTopbar();
+  if ($('#imp-stop')) $('#imp-stop').onclick = stopImpersonating;
   $('#theme').onclick = () => {
     $('#tb-menu').hidden = true;
     themePicker();
@@ -381,6 +383,14 @@ function opsClock() {
   };
   tick();
   opsTimer = setInterval(tick, 1000);
+}
+/** Sign in as: back to the Admin's own account, on the People page. */
+async function stopImpersonating() {
+  try {
+    await api('/api/auth/impersonate/stop', { method: 'POST', body: {} });
+  } catch {}
+  location.href = '/#/people';
+  location.reload();
 }
 async function signOut() {
   try {
@@ -1476,6 +1486,7 @@ function peopleTable(d) {
       const [kind, label] = STATUS[u.status] ?? STATUS.active;
       const acts = u.manageable ? `<details class="menu"><summary class="btn sm">Manage</summary><div class="menu-list">
         <button type="button" data-act="edit">Edit role, team, name</button>
+        ${can('users.impersonate') && !state.me.impersonating && u.id !== state.me.user.id && u.active ? `<button type="button" data-act="impersonate">Sign in as ${esc(u.name)}</button>` : ''}
         <button type="button" data-act="reset">Reset password</button>
         ${u.status === 'locked' ? '<button type="button" data-act="unlock">Unlock now</button>' : ''}
         ${u.sessions ? `<button type="button" data-act="signout">Sign out everywhere (${num(u.sessions)})</button>` : ''}
@@ -1719,6 +1730,13 @@ async function personAction(d, u, act) {
   const path = `/api/people/${encodeURIComponent(u.id)}`;
   try {
     if (act === 'edit') return editPerson(d, u);
+    if (act === 'impersonate') {
+      if (!confirm(`Sign in as ${u.name}? You see and work as they do for up to an hour; everything you do is recorded as you acting as them. Their password, profile and sessions stay theirs.`)) return;
+      const r = await api(`${path}/impersonate`, { method: 'POST', body: {} });
+      location.href = r.home === 'calculator' ? '/calculator' : `/#/${r.home || 'overview'}`;
+      if (r.home !== 'calculator') location.reload();
+      return;
+    }
     if (act === 'reset') {
       if (!confirm(`Give ${u.name} a new temporary password? Their current one stops working and they are signed out everywhere.`)) return;
       const r = await api(`${path}/reset`, { method: 'POST', body: {} });

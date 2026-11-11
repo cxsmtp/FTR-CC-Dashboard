@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.53.00 — 2026-11-11
+
+- **False positives: one small box.** The calculator's four "False positives %" fields (one per severity) and the report's four false-positive sliders are now a single small **False positives [30] %** box beside the per-severity results (in the report, beside "Count the findings still to come"). It sets every severity at once; 30% as before. The report no longer repeats it under the answer or on the key slide: it is said once, in the assumptions, and in the appendix.
+- **Smoother levers in the report.** Dragging a slider now updates the panel's figures at every step and works the whole report out again once you let go or pause, instead of rewriting the report (charts and appendix) at every step. The page no longer moves while you drag.
+- **Sign in as (Admin).** People → Manage → **Sign in as …**: an Admin sees and works in the Command Center exactly as that person does, for up to an hour, with an orange bar on every page and **Back to my own account**. Everything done meanwhile is recorded in the audit log as the Admin acting as that person; the person's password, profile, sessions and terms stay theirs, and it cannot be chained. A new Admin-only permission, "Sign in as someone else"; no other role gets it.
+
 ## CC-01.52.00 — 2026-11-11
 
 - **In a meeting with the customer: choose where the data comes from.** The **Data from** choice (Checkmarx One, **Git**, cloc-fusion) now sits under the customer's name in the meeting view, so a Fusion-only opportunity can be worked out there: choose **Git**, take the customer's read-only token and connect, or choose cloc-fusion to bring in their report. The matching Fusion tab (from Git, or from cloc-fusion) opens with it. Nothing else of the frame is shown; "Remember for the account" stays out of the meeting view.

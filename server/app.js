@@ -190,14 +190,36 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const token = cookies(req)[COOKIE];
     const session = iam.session(token);
     if (!session) return null;
-    const user = iam.byId(session.userId);
-    if (!user || user.active === false) return null;
+    const real = iam.byId(session.userId);
+    if (!real || real.active === false) return null;
+    // An Admin signed in as someone else (Sign in as): the person's view and permissions, the Admin's name in the audit.
+    let user = real;
+    let impersonator = null;
+    if (session.actAs) {
+      const target = iam.byId(session.actAs.userId);
+      if (target && target.active !== false && target.id !== real.id && Date.now() < session.actAs.until && iam.permissionsOf(real).has('users.impersonate')) {
+        user = target;
+        impersonator = real;
+      } else endActAs(session);
+    }
     const permissions = iam.permissionsOf(user);
     const allTeams = teams.list();
     const scope = scopeOf(user, permissions, allTeams);
-    return { token, session, user, permissions, scope, teams: allTeams };
+    return { token, session, user, permissions, scope, teams: allTeams, impersonator };
   }
-  const actorOf = (ctx) => (ctx ? { id: ctx.user.id, email: ctx.user.email, name: ctx.user.name } : null);
+  /** Sign in as: back to the Admin's own account (the session stays theirs). */
+  function endActAs(session) {
+    if (!session?.actAs) return;
+    delete session.actAs;
+    iam.sessions.save();
+  }
+  const IMPERSONATE_MS = 60 * 60 * 1000;
+  const actorOf = (ctx) => {
+    if (!ctx) return null;
+    // Who really acted: the Admin, as the person they signed in as.
+    if (ctx.impersonator) return { id: ctx.impersonator.id, email: ctx.impersonator.email, name: `${ctx.impersonator.name || ctx.impersonator.email} as ${ctx.user.name || ctx.user.email}`, as: { id: ctx.user.id, email: ctx.user.email, name: ctx.user.name } };
+    return { id: ctx.user.id, email: ctx.user.email, name: ctx.user.name };
+  };
   const record = (ctx, req, action, target = '', details = {}) => {
     if (req) req.ccAudited = true;
     audit.record({ actor: actorOf(ctx), action, target, details, ip: ipOf(req) });
@@ -243,6 +265,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // Guards: signed in; then (for everything but the first-sign-in steps) a password of their own and the terms.
   const signedIn = (req, ctx) => {
     if (!ctx) throw fail(401, 'Sign in first.');
+  };
+  /** Their password, profile, sessions and terms stay the person's own: not changed by an Admin signed in as them. */
+  const ownSelf = (req, ctx) => {
+    signedIn(req, ctx);
+    if (ctx.impersonator) throw fail(403, `This stays ${ctx.user.name || ctx.user.email}'s own: go back to your own account first.`);
   };
   const ready2 = (req, ctx) => {
     signedIn(req, ctx);
@@ -369,7 +396,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/auth/signout', (req, ctx, body, res) => {
     if (ctx) {
       iam.endSession(ctx.token);
-      if (!iam.sessions.value || !Object.values(iam.sessions.value.sessions).some((s) => s.userId === ctx.user.id)) calc.forget(ctx.user.id);
+      // The calculator's memory is the one of whoever signed in (an Admin signed in as someone leaves theirs alone).
+      const own = ctx.session.userId;
+      if (!iam.sessions.value || !Object.values(iam.sessions.value.sessions).some((s) => s.userId === own)) calc.forget(own);
       record(ctx, req, 'auth.signout');
     }
     res.setHeader('Set-Cookie', cookie('', 0, req));
@@ -526,10 +555,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       support: supportChannel(),
       picture: ctx.user.picture ? `/api/people/${ctx.user.id}/picture?v=${encodeURIComponent(ctx.user.picture.at)}` : null,
       sessions: iam.sessionsOf(ctx.user.id),
+      impersonating: ctx.impersonator ? { by: { name: ctx.impersonator.name, email: ctx.impersonator.email }, until: new Date(ctx.session.actAs.until).toISOString() } : null,
       mz: MZ_SOURCE.label,
     };
   });
-  r('POST', '/api/me/password', signedIn, async (req, ctx, body) => {
+  r('POST', '/api/me/password', ownSelf, async (req, ctx, body) => {
     await iam.setPassword(ctx.user.id, body?.current, body?.next);
     passwordResets.revokeUser(ctx.user.id);
     iam.endSessionsOf(ctx.user.id, { except: ctx.session.id });
@@ -539,7 +569,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { ok: true };
   });
   r('GET', '/api/terms', () => ({ version: terms.version, text: terms.text }));
-  r('POST', '/api/terms/accept', signedIn, (req, ctx) => {
+  r('POST', '/api/terms/accept', ownSelf, (req, ctx) => {
     if (ctx.user.mustChangePassword) throw fail(403, 'Choose your own password first.');
     terms.accept(ctx.user.id, ipOf(req));
     record(ctx, req, 'terms.accept', '', { version: terms.version, hash: terms.hash });
@@ -549,7 +579,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const THEME_MODES = ['light', 'dark', 'system'];
   const ACCENTS = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite', 'command'];
   // ---- Your profile: your name, picture, time zone and Impact figures ----------------------------------------------
-  r('PUT', '/api/me/profile', signedIn, (req, ctx, body) => {
+  r('PUT', '/api/me/profile', ownSelf, (req, ctx, body) => {
     const u = ctx.user;
     const changed = [];
     if (body?.name !== undefined) {
@@ -598,7 +628,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return send(res, 200, Buffer.from(u.picture.data, 'base64'), { ...imageHeaders(u.picture), 'Cache-Control': 'private, max-age=86400' });
   });
   /** Sign out everywhere else (this browser stays signed in). */
-  r('POST', '/api/me/signout-others', signedIn, (req, ctx) => {
+  r('POST', '/api/me/signout-others', ownSelf, (req, ctx) => {
     iam.endSessionsOf(ctx.user.id, { except: ctx.session.id });
     record(ctx, req, 'me.signout.others', ctx.user.email);
     return { ok: true };
@@ -1048,6 +1078,24 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (!resetReady().ready) throw fail(409, 'The email server is not set up and tested yet.');
     await sendMail(target.email, systemEmail({ subject: 'You have access to the FTR Credits Command Center', lines: [`${ctx.user.name} gave you access to the FTR Credits Command Center as ${iam.roles()[target.role]?.name ?? target.role} in ${teams.get(target.teamId)?.name ?? 'your team'}.`, 'To set your password, open the link below, choose "Forgot your password?" and enter this address. Or sign in with the temporary password you were given.'], button: { label: 'Open the command center', url: `${linkBase()}/#/forgot?email=${encodeURIComponent(target.email)}` }, footer: 'The command center is for internal use only. You will be asked to accept its terms of use when you first sign in.' }));
     record(ctx, req, 'user.welcome', target.email);
+    return { ok: true };
+  });
+  // ---- Sign in as: an Admin sees and works as another person, recorded as the Admin acting as them ----
+  r('POST', '/api/people/:id/impersonate', perm('users.impersonate'), (req, ctx, body, res, url, params) => {
+    if (ctx.impersonator) throw fail(409, 'Go back to your own account first.');
+    const target = iam.byId(params.id);
+    if (!target) throw fail(404, 'That person no longer has access.');
+    if (target.id === ctx.user.id) throw fail(400, 'That is you.');
+    if (target.active === false) throw fail(409, 'Their access is turned off: turn it on first.');
+    ctx.session.actAs = { userId: target.id, at: Date.now(), until: Date.now() + IMPERSONATE_MS };
+    iam.sessions.save();
+    record(ctx, req, 'auth.impersonate.start', target.email, { id: target.id, role: target.role, minutes: IMPERSONATE_MS / 60_000 });
+    return { ok: true, home: homeOf(target.role, iam.roles()[target.role]) };
+  });
+  r('POST', '/api/auth/impersonate/stop', signedIn, (req, ctx) => {
+    if (!ctx.impersonator) return { ok: true };
+    record(ctx, req, 'auth.impersonate.stop', ctx.user.email, { id: ctx.user.id, minutes: Math.round((Date.now() - ctx.session.actAs.at) / 60_000) });
+    endActAs(ctx.session);
     return { ok: true };
   });
   r('POST', '/api/people/:id/unlock', perm('users.manage'), (req, ctx, body, res, url, params) => {
@@ -1712,6 +1760,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/api/cc/calc-config', perm('calculator.use'), (req, ctx) => ({
     csrf: ctx.session.csrf,
     user: { id: ctx.user.id, name: ctx.user.name },
+    impersonating: ctx.impersonator ? { by: { name: ctx.impersonator.name, email: ctx.impersonator.email } } : null,
     roleName: iam.roles()[ctx.user.role]?.name ?? '',
     role: ctx.user.role,
     permissions: [...ctx.permissions],

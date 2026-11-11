@@ -603,6 +603,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       </section>
       <details class="panel calc-edit calc-custom" open>
         <summary><h2>Customize per severity</h2><span class="hint">How many of the backlog to triage, the false positives expected, and the credits each step takes. Everything starts from the defaults.</span></summary>
+        <label class="calc-fp-one" title="Your estimate for this customer: the share of findings triaged that are false positives (triaged, never remediated). The same for every severity."><span>False positives</span><input type="number" min="0" max="100" step="1" inputmode="decimal" value="${esc(fpOne())}" data-fp-one aria-label="False positives % (every severity)" /><span>%</span></label>
         <div class="calc-sev-grid">${SEVERITIES.map((s) => {
           const d = c.draft[s];
           const open = analysis.perSeverity[s].current;
@@ -613,13 +614,12 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
             <div class="calc-row"><input type="number" min="0" max="${esc(open)}" value="${esc(chosen)}" data-f="selected" aria-label="${s}: to triage" />
               <span><button type="button" class="ghost small-btn" data-set="0">None</button><button type="button" class="ghost small-btn" data-set="all">All</button></span></div>
             <label class="calc-row"><span>Credits per triage</span><input type="number" min="0" step="0.5" value="${esc(d.triageCost)}" data-f="triageCost" disabled title="Set by the Admin for everyone" /></label>
-            <label class="calc-row"><span>False positives %</span><input type="number" min="0" max="100" step="1" value="${esc(d.fpPercent)}" data-f="fpPercent" /></label>
             <label class="calc-row"><span>Credits per remediation</span><input type="number" min="0" step="0.5" value="${esc(d.remediationCost)}" data-f="remediationCost" disabled title="Set by the Admin for everyone" /></label>
             <p class="calc-sev-result"><span>To triage</span> <b>${num(R[s].toTriage)}</b> · <span>to remediate</span> <b>${num(R[s].truePositives)}</b> · <b class="calc-gold">${num(R[s].credits, 1)}</b> <span>credits</span></p>
             <button type="button" class="${c.dirty[s] ? 'primary' : 'secondary'} calc-apply" data-apply${c.dirty[s] ? '' : ' disabled'}>${c.dirty[s] ? 'Apply' : 'Applied'}</button>
           </div>`;
         }).join('')}</div>
-        <p class="hint">Credits per triage and per remediation start at Checkmarx One's 1 and 3: set them to the customer's agreement. The false-positive rate is your estimate for this customer.</p>
+        <p class="hint">Credits per triage and per remediation start at Checkmarx One's 1 and 3: set them to the customer's agreement. The false positives (one % for every severity, above) are your estimate for this customer.</p>
       </details>
       ${debtFixSection(analysis, f.weekly)}
       <section class="panel">
@@ -738,6 +738,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
 
   /** What the report keeps of the analysis for one severity (or the total). */
 
+  /** One false-positive % for every severity: the one most severities have (30% unless changed). */
+  function fpOne() {
+    const all = SEVERITIES.map((s) => Number(tr()?.fpPercent?.[s] ?? DEFAULT_TR.fpPercent[s]));
+    const most = all.reduce((best, v) => (all.filter((x) => x === v).length > all.filter((x) => x === best).length ? v : best), all[0]);
+    return Number.isFinite(most) ? most : DEFAULT_TR.fpPercent.Critical;
+  }
+
   /** How far along its track a slider's thumb is, for the filled part (0 is at the very start). */
   const fill = (value, max) => (max > 0 ? Math.round((Math.min(value, max) / max) * 1000) / 10 : 0);
 
@@ -808,6 +815,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       c.open.tr = { ...tr(), engines: chosen };
       save({ tr: c.open.tr });
       return applyScope();
+    }
+    if (event.target.matches('[data-fp-one]')) {
+      const v = Math.min(100, Math.max(0, amount(event.target.value) ?? DEFAULT_TR.fpPercent.Critical));
+      c.open.tr = { ...tr(), fpPercent: Object.fromEntries(SEVERITIES.map((s) => [s, v])) };
+      for (const s of SEVERITIES) if (c.draft?.[s]) c.draft[s].fpPercent = v;
+      save({ tr: c.open.tr });
+      return renderTr();
     }
     const key = event.target.dataset.ahead;
     if (!key) return;

@@ -10,7 +10,7 @@
 import { FREQUENCIES, HOURS_A_YEAR, SEVERITIES, aheadMonths, creditSummary, fusionTotal } from './model.js';
 import { allSections, moneyText } from './explain.js';
 import { forecastChart } from './charts.js';
-import { assumptionItems, countedFusion, falsePositiveLine, reportFileName, scopeLines, trFigures, wording } from './report.js';
+import { assumptionItems, countedFusion, reportFileName, scopeLines, trFigures, wording } from './report.js';
 import { NEXTGEN_ACCENTS, lookPalette, reportLook } from '../look.js';
 
 /** The page size in PDF points (16:9, as a presentation) and the drawing size in pixels. */
@@ -95,7 +95,7 @@ export function slideContent(raw, { t, lang = 'en', calculations = false } = {})
         // Still to come only when it is counted.
         ...(tr.ahead?.includeFuture === false ? [] : [{ label: tr.ahead?.aiDeclinePercent ? w('Still to come, {0}% fewer over a year with AI', num(tr.ahead.aiDeclinePercent)) : w('Still to come, at the current pace'), value: `+${num(f.future)}` }]),
         { label: w('To triage'), value: num(f.toTriage), notes: [w('{0} to remediate', num(f.truePositives)), ...scopeLines(tr, L).map(plain)] },
-        { label: w('Triage & remediation credits'), value: num(f.credits), key: true, notes: [plain(falsePositiveLine(tr, L))].filter(Boolean) },
+        { label: w('Triage & remediation credits'), value: num(f.credits), key: true },
       ],
       chart: tr.forecast?.length ? { kind: 'forecast', points: tr.forecast, title: w('Backlog trend and forecast'), legend: [[w('Backlog'), C.backlog ?? C.ink, false], [w('If nothing changes'), C.forecast ?? '#dc2626', true], [w('With this plan'), C.plan ?? C.accent, true]] } : null,
       lines,
