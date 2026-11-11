@@ -1665,15 +1665,39 @@ const ADMIN_VIEWS = {
   async updates() {
     const u = await api('/api/updates');
     const ev = { installed: 'Installed', 'install-failed': 'Install refused', switch: 'Switched', 'rolled-back': 'Rolled back', started: 'Started', refused: 'Not started', auto: 'Auto-update', trusted: 'Checksum kept', 'checksum-changed': 'Checksum changed: refused', 'changed-on-disk': 'Changed on disk' };
-    $('#tab').innerHTML = `<div class="grid g2">
-      <div class="panel"><h2>This server <span class="chip ok"><i></i>${esc(state.me.versionLabel)}</span></h2>
-        <dl class="kv"><dt>Running</dt><dd>${esc(u.running)} (${esc(u.source)})</dd><dt>Built-in</dt><dd>${esc(u.builtIn)}</dd><dt>Releases from</dt><dd><a href="https://github.com/${esc(u.repo)}/releases" target="_blank" rel="noopener noreferrer">github.com/${esc(u.repo)}</a></dd><dt>Checks</dt><dd>Every ${u.checkEveryMinutes ?? 15} minutes, by itself</dd><dt>Last check</dt><dd>${esc(u.lastCheck?.at ? `${dateTime(u.lastCheck.at)} · newest ${u.lastCheck.newest ?? '—'}` : 'not yet')}${u.lastCheck?.error && u.lastCheck.failedAt > (u.lastCheck.at ?? '') ? `<br><span class="chip bad"><i></i>Last try ${esc(dateTime(u.lastCheck.failedAt))}: ${esc(u.lastCheck.error)}</span>` : ''}</dd></dl>
-        ${(() => { const n = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.runningNow && !r.failed && cmpVer(r.version, u.running) > 0); return n ? `<div class="callout mt"><b>${esc(n.version)} is available.</b> ${u.auto?.enabled && u.supervised ? (u.heldUpTo && cmpVer(n.version, u.heldUpTo) <= 0 ? `Held back: you rolled back from ${esc(u.heldUpTo)}, so it is not installed by itself until a newer release comes. Or now:` : `It is installed at the next check, within ${u.checkEveryMinutes ?? 15} minutes, or now:`) : 'Install it now:'} <button class="sm primary" data-update-now="${esc(n.version)}">Update to ${esc(n.version)} now</button></div>` : ''; })()}
+    const integ = await api('/api/integrity').catch(() => ({ state: 'checking', summary: '' }));
+    const label = (v) => `CC-${String(v).split('.').map((n) => n.padStart(2, '0')).join('.')}`;
+    const newest = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered);
+    const avail = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.failed && cmpVer(r.version, u.running) > 0);
+    const lastSwitch = (u.events ?? []).find((e) => e.type === 'switch' && e.to === u.running);
+    const INTEG = { genuine: ['ok', 'Genuine'], unconfirmed: ['warn', 'Not confirmed yet'], unsigned: ['', 'Built from the source'], tampered: ['bad', 'Changed'], 'not-genuine': ['bad', 'Not genuine'], checking: ['', 'Checking…'] };
+    const [ic, il] = INTEG[integ.state] ?? ['', integ.state];
+    const o = integ.origin?.ok ? integ.origin : null;
+    $('#tab').innerHTML = `<div class="saved-banner">✓ Changes save as you type.</div>
+      <div class="panel"><h2>Update &amp; recovery</h2>
+        <div class="ur-cards">
+          <div class="ur-card"><small>Running</small><b>${esc(label(u.running))}</b><span>${u.source === 'built-in' ? 'Built into this server' : 'Installed from a release'}</span>${lastSwitch ? `<span class="faint">Switched to it ${esc(dateTime(lastSwitch.at))}${lastSwitch.by ? ` · ${esc(lastSwitch.by)}` : ''}</span>` : ''}</div>
+          <div class="ur-card"><small>Latest published</small><b>${newest ? esc(label(newest.version)) : '—'}</b><span>${avail ? `${esc(label(avail.version))} is ready.` : 'Up to date.'} ${u.lastCheck?.at ? `Checked ${esc(dateTime(u.lastCheck.at))}` : 'Not checked yet'}</span>${avail ? `<button class="sm primary mt" data-update-now="${esc(avail.version)}">Update now</button>` : ''}${u.lastCheck?.error && u.lastCheck.failedAt > (u.lastCheck.at ?? '') ? `<span class="bad-t">Last try: ${esc(u.lastCheck.error)}</span>` : ''}</div>
+          <div class="ur-card"><small>Auto-update</small><b class="ok-t">Always on the newest</b>
+            <form id="auto" class="inline-num">Check every <input type="number" name="everyMinutes" min="5" max="1440" step="1" value="${esc(u.checkEveryMinutes ?? 15)}" /> minutes</form>
+            <span class="faint" id="auto-saved">Installed without a restart; a version that fails to start is rolled back and never installed again by itself.</span></div>
+        </div>
+        <div class="integ"><div class="integ-h"><b>Software integrity</b><span class="chip ${ic}"><i></i>${esc(il)}</span><span class="spacer"></span><button class="sm" id="integ-check">Check now</button></div>
+          <p>${esc(integ.summary ?? '')}</p>
+          ${integ.digest ? `<dl class="kv">
+            <dt>Version</dt><dd>${esc(integ.version ? label(integ.version) : '—')}</dd>
+            ${o ? `<dt>Built from</dt><dd><a href="https://github.com/${esc(o.repository)}/commit/${esc(o.commit)}" target="_blank" rel="noopener noreferrer">${esc(o.repository)} · ${esc(o.ref.replace(/^refs\/(heads|tags)\//, ''))} · ${esc(o.commit.slice(0, 12))}</a></dd>
+            <dt>Workflow run</dt><dd>${/^https:\/\/github\.com\//.test(o.run ?? '') ? `<a href="${esc(o.run)}" target="_blank" rel="noopener noreferrer">${esc(o.run.replace('https://github.com/', ''))}</a>` : esc(o.run ?? '')}</dd>
+            <dt>Signed</dt><dd>${esc(dateTime(o.signedAt))}${Number.isFinite(o.logIndex) ? ` · <a href="https://search.sigstore.dev/?logIndex=${esc(o.logIndex)}" target="_blank" rel="noopener noreferrer">Sigstore log entry ${esc(o.logIndex)}</a>` : ''}</dd>` : ''}
+            <dt>Files</dt><dd>${num(integ.files?.checked)} checked${integ.files && !integ.files.ok ? ` · ${num(integ.files.counts.changed)} changed, ${num(integ.files.counts.missing)} missing, ${num(integ.files.counts.extra)} added` : ''}</dd>
+            <dt>File list SHA-256</dt><dd class="mono small">${esc(integ.digest)}</dd>
+            <dt>Checked</dt><dd>${esc(dateTime(integ.at))}</dd></dl>` : ''}
+          ${integ.files && !integ.files.ok ? `<p class="small bad-t">${esc([...integ.files.changed.map((f) => `changed ${f}`), ...integ.files.missing.map((f) => `missing ${f}`), ...integ.files.extra.map((f) => `added ${f}`)].slice(0, 8).join(' · '))}</p>` : ''}
+        </div>
         ${u.supervised ? '' : '<div class="callout warn mt">Not started by the launcher (<code>npm start</code> / the container’s command), so versions can be installed but not switched to from here.</div>'}
-        <div class="flex mt"><button class="primary" id="chk">Check for updates</button>${u.supervised ? '<button id="restart" class="ghost">Reload the server</button>' : ''}</div>
-        <h3 class="mt">Auto-update</h3>
-        <form class="flex" id="auto"><span class="chip ok"><i></i>Always on the newest version</span><label class="f">Check for updates every<span class="inline-num"><input type="number" name="everyMinutes" min="5" max="1440" step="1" value="${esc(u.checkEveryMinutes ?? 15)}" /> minutes</span></label><span class="small muted" id="auto-saved"></span></form>
-        <p class="muted small">Saved as you change it. The server looks for a new release that often and switches to it by itself, with no restart. Each release must match the SHA-256 checksums kept the first time it was seen, and every file its manifest lists; a backup is taken before every switch, and a version that does not come up is rolled back by itself.</p></div>
+        <div class="flex mt"><button class="primary" id="chk">Check for updates</button>${u.supervised ? '<button id="restart">Reload the server</button>' : ''}<button id="diag2">${icon('download')}Download troubleshooting report</button></div>
+      </div>
+      <div class="grid g2 mt">
       <div class="panel wide-panel"><h2>Versions <small>each with the checksum kept the first time it was seen: update or roll back from here</small></h2>
         ${(() => {
           const rel = new Map(u.releases.map((r) => [r.version, r]));
@@ -1705,6 +1729,16 @@ const ADMIN_VIEWS = {
       b.disabled = true;
       b.innerHTML = `<span class="spinner"></span>${esc(text)}`;
     };
+    $('#integ-check').onclick = async (e) => {
+      busy(e.target, 'Checking…');
+      try {
+        await api('/api/integrity/check', { method: 'POST', body: {} });
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+      viewAdmin('updates');
+    };
+    $('#diag2').onclick = () => download('/api/system/diagnostics', 'cc-troubleshooting.json').catch((x) => toast(x.message, 'bad'));
     $('#chk').onclick = async (e) => {
       busy(e.target, 'Checking…');
       try {

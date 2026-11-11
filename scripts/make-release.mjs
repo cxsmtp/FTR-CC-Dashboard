@@ -4,6 +4,7 @@
  *   dist/ftr-cc-dashboard-<version>.tar.gz   the app (server, public, client, vendor, docs, production node_modules)
  *                                            with MANIFEST.json: every file and its SHA-256
  *   dist/SHA256SUMS                          the archive's SHA-256
+ *   dist/MANIFEST.json                       the same file list as in the archive, for the workflow to sign
  * Run after `npm ci --omit=dev`. The release workflow (.github/workflows/release.yml) runs it on a v* tag and
  * attaches both files to the GitHub release.
  */
@@ -29,7 +30,9 @@ const walk = (rel) => {
   else if (st.isFile() && !rel.endsWith('.tmp')) files[rel] = fs.readFileSync(abs);
 };
 for (const item of INCLUDE) walk(item);
-files['MANIFEST.json'] = Buffer.from(`${JSON.stringify({ version, built: new Date().toISOString(), files: Object.fromEntries(Object.entries(files).map(([k, v]) => [k, sha(v)])) }, null, 1)}\n`);
+// The file list the release workflow signs (a GitHub build attestation): the server checks its files against it and
+// the signature with GitHub (server/integrity). Written beside the archive too, so the workflow signs these bytes.
+files['MANIFEST.json'] = Buffer.from(`${JSON.stringify({ version, built: new Date().toISOString(), commit: process.env.GITHUB_SHA ?? '', repository: process.env.GITHUB_REPOSITORY ?? '', files: Object.fromEntries(Object.entries(files).map(([k, v]) => [k, sha(v)])) }, null, 1)}\n`);
 
 // A plain ustar archive, every file under ftr-cc-dashboard-<version>/ (long paths in pax headers).
 const blocks = [];
@@ -69,4 +72,5 @@ fs.mkdirSync(OUT, { recursive: true });
 const asset = `ftr-cc-dashboard-${version}.tar.gz`;
 fs.writeFileSync(path.join(OUT, asset), archive);
 fs.writeFileSync(path.join(OUT, 'SHA256SUMS'), `${sha(archive)}  ${asset}\n`);
+fs.writeFileSync(path.join(OUT, 'MANIFEST.json'), files['MANIFEST.json']);
 console.log(`${asset}: ${Object.keys(files).length} files, ${(archive.length / 1024 / 1024).toFixed(1)} MB, sha256 ${sha(archive)}`);

@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.17.00 — 2026-11-11
+
+- **Update & recovery, laid out as in CxMissionZero.** Three cards on top: **Running**, **Latest published** (with **Update now** when a newer one is ready) and **Auto-update** (always on the newest; how often to check, saved as you type). Then **Software integrity**, the **Versions** table to update or roll back, and **Check for updates**, **Reload the server** and **Download troubleshooting report** together.
+- **Software integrity: signed releases.** Each release’s file list (MANIFEST.json) is now signed by the release workflow with a GitHub build attestation (Sigstore, recorded in its public log). The server checks every running file against that list, and the list’s signature with GitHub, a few seconds after starting, every 6 hours and with **Check now**: **Genuine** shows the repository, branch and commit it was built from, the workflow run, when it was signed and its Sigstore log entry, how many files were checked and the list’s SHA-256. A changed, missing or added file, or a list nobody signed, is shown and recorded in the audit log. A copy built from the source (such as a podman build of the repository) says so; the next update installs a signed release. The signature checker is CxMissionZero’s.
+
 ## CC-01.16.01 — 2026-11-11
 
 - **The look for everyone, chosen by sight.** Settings → General shows the same Light / Dark / System and palette swatches as **Theme**, Command Center included, and you see the change at once. **Apply to everyone now** replaces each person’s own choice with it; they can still choose again.

@@ -18,6 +18,7 @@ import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } fro
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore } from './updates.js';
 import { ActivityLog } from './activity.js';
+import { IntegrityService } from './integrity/service.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
 import { recoverDataDir } from './recover.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
@@ -1086,6 +1087,20 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const versionStore = new VersionStore({ dataDir: config.dataDir, builtInDir: process.env.CC_BUILTIN_DIR || config.root, builtInVersion: process.env.CC_BUILTIN_VERSION || VERSION });
   const updates = updateService ?? new UpdateService({ store: versionStore, runningVersion: VERSION, repo: String(config.env?.UPDATE_REPO || 'cxsmtp/FTR-CC-Dashboard'), token: String(config.env?.UPDATE_GITHUB_TOKEN ?? ''), backup: async (reason) => takeBackup(reason), log, supervised, exit: (code) => (code === 75 ? reload('update') : process.exit(code)) });
   const updPerm = perm('system.update');
+  // Software integrity (server/integrity): the running files against the release's signed file list.
+  const integrity = new IntegrityService({
+    appDir: config.root,
+    dataDir: config.dataDir,
+    repository: String(config.env?.UPDATE_REPO || 'cxsmtp/FTR-CC-Dashboard'),
+    token: String(config.env?.UPDATE_GITHUB_TOKEN ?? ''),
+    record: (r) => audit.record({ action: r.state === 'genuine' ? 'integrity.genuine' : r.state === 'unsigned' ? 'integrity.unsigned' : `integrity.${r.state}`, target: r.version ?? VERSION, details: { summary: r.summary, digest: r.digest ?? '' } }),
+  });
+  r('GET', '/api/integrity', updPerm, () => integrity.last ?? { state: 'checking', summary: 'Checking\u2026' });
+  r('POST', '/api/integrity/check', updPerm, async (req, ctx) => {
+    const result = await integrity.check({ reason: 'by hand' });
+    record(ctx, req, 'integrity.check', result.state);
+    return result;
+  });
   r('GET', '/api/updates', updPerm, () => updates.status());
   r('POST', '/api/updates/check', updPerm, async (req, ctx) => {
     await updates.check();
@@ -1121,6 +1136,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
   startJobs.push(() => {
     updates.start();
+    integrity.start();
+    stopJobs.push(() => integrity.stop());
     stopJobs.push(() => updates.stop());
   });
 
