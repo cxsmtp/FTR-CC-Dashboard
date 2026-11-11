@@ -2,6 +2,14 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.22.00 — 2026-11-11
+
+- **A compact Overview.** The heading and its controls share one line, and the seven numbers are small tiles with a picture each (a ring for what is sold, still needed, accounts with a report and shared; a split for T&R and Fusion; an icon for the rest), so they take a fifth of the screen instead of nearly half. **Cards ▾** chooses which tiles you see; your choice is kept for you, on every device. The top bar is slimmer too.
+- **A home page per role, set in Roles & permissions.** Each role has a **Home page** (Overview, Calculator, Accounts, Checkmarx One activity or Quick guide): Sales Engineers land in the calculator, leaders, executives and Admins on the Overview, Sales on Accounts. Change it under People & roles → Roles & permissions → Rename/Edit; the matrix shows each role’s home.
+- **Settings, reordered, with About in it.** General · Branding · Email (SMTP) · Single sign-on · HTTPS · Updates · Backups & health · About. Settings stays for Admins only; everyone else finds About at the foot of the menu.
+- **Updates shows the newest three versions**, with **Show older versions** for the rest.
+- **A default logo and browser icon**: `public/brand/default-logo.png`, when the build carries it, is used wherever Branding sets none.
+
 ## CC-01.21.00 — 2026-11-11
 
 - **About, laid out as in CxMissionZero.** One panel: what the command center is for, then its facts (version, calculator, licence, project, the terms you accepted and when, the organisation), the note that your data stays on your own server, and the terms card. Below it, **What is new**: every version, the newest open.

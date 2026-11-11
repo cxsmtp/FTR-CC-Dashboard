@@ -725,3 +725,45 @@ dialog.docd:not([open]) { display: none; }
 .doc-foot { padding: 10px 16px; border-top: 1px solid var(--line); background: var(--panel-hi); }
 .side-links a[data-doc] { cursor: pointer; }
 input.drafted, textarea.drafted, select.drafted { box-shadow: inset 3px 0 0 var(--amber); }
+
+/* ---- A compact Overview: one-line header, small tiles with a picture each ---------------------------------------- */
+.head.compact { margin-bottom: 14px; align-items: center; }
+.head.compact .ht { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.head.compact h1 { font-size: clamp(22px, 2.2vw, 28px); }
+.head.compact .crumbs { margin: 0; }
+.head.compact .tools select { max-width: 220px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tile { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(12px); min-width: 0; }
+.tile.hero { grid-column: span 2; background: linear-gradient(135deg, color-mix(in srgb, var(--cyan) 12%, transparent), color-mix(in srgb, var(--violet) 14%, transparent)), var(--panel); }
+.tile-t { display: grid; min-width: 0; }
+.tile .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .v { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.tile.hero .v { font-size: 26px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tile.warn .v { color: var(--amber); }
+.tile .s { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-g { flex: none; }
+.ring { --p: 0; position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: conic-gradient(var(--cyan) calc(var(--p) * 1%), var(--line) 0); }
+.ring::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--panel-solid); }
+.ring b { position: relative; font-size: 10.5px; font-weight: 600; }
+.ring.ok { background: conic-gradient(var(--green) calc(var(--p) * 1%), var(--line) 0); }
+.ring.need { background: conic-gradient(var(--violet) calc(var(--p) * 1%), var(--line) 0); }
+.glyph { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: color-mix(in srgb, var(--cyan) 12%, transparent); color: var(--cyan); }
+.glyph svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.glyph.ok { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
+.glyph.bad { background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); }
+.split { display: block; width: 44px; height: 44px; border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--violet) 45%, transparent); position: relative; }
+.split i { position: absolute; left: 0; bottom: 0; width: 100%; height: calc(var(--w) * 1%); background: var(--grad); }
+.cards-pop { position: absolute; z-index: 60; display: grid; gap: 6px; min-width: 240px; }
+@media (max-width: 700px) { .tile.hero { grid-column: span 1; } }
+/* A slimmer top bar */
+.topbar { padding: 6px clamp(16px, 3vw, 40px); gap: 6px; }
+.jump { padding: 5px 12px; min-width: 220px; }
+.tb-icon { padding: 5px; }
+.tb-light { padding: 4px 10px; font-size: 12px; }
+.tb-who { padding: 2px 10px 2px 2px; }
+.tb-who .avatar.sm { width: 26px; height: 26px; font-size: 11px; }
+.tb-who b { font-size: 12.5px; }
+.tb-who small { font-size: 11px; }
+.main { padding-top: 16px; }
+
+table.versions:not(.show-all) tr.v-older { display: none; }

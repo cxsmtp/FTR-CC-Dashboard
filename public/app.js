@@ -78,6 +78,7 @@ function toast(message, kind = '') {
 
 const can = (p) => state.me?.permissions?.includes(p);
 const go = (path) => {
+  if (path === '/calculator') return location.assign('/calculator');
   if (location.hash !== `#${path}`) location.hash = `#${path}`;
   else route();
 };
@@ -182,7 +183,7 @@ function themePicker() {
 function shell(active, content) {
   const me = state.me;
   const link = (path, name, label, show = true) => (show ? `<a href="#${path}" class="${active === name ? 'on' : ''}">${icon(name)}<span>${label}</span></a>` : '');
-  const admin = can('users.manage') || can('teams.manage') || ADMIN_TABS.some(([, , p]) => can(p)) || can('audit.view');
+  const admin = can('users.manage') || can('teams.manage') || ADMIN_TABS.some(([, , p]) => p && can(p)) || can('audit.view');
   $('#app').className = 'app';
   $('#app').innerHTML = `
     <aside class="side">
@@ -197,7 +198,7 @@ function shell(active, content) {
         ${can('calculator.use') ? `<a href="/calculator">${icon('calc')}<span>Calculator</span></a>` : ''}
         ${admin ? '<div class="label">Administration</div>' : ''}
         ${link('/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
-        ${link('/admin', 'admin', 'Settings', ADMIN_TABS.some(([, , p]) => can(p)))}
+        ${link('/admin', 'admin', 'Settings', ADMIN_TABS.some(([, , p]) => p && can(p)))}
         ${link('/audit', 'audit', 'Audit log', can('audit.view'))}
       </nav>
       <a class="bgwork" id="bgwork" hidden></a>
@@ -295,7 +296,7 @@ async function jumpTo() {
   const pages = [
     ['Overview', '/overview', 'overview', can('dashboard.view')], ['Accounts', '/accounts', 'accounts', can('dashboard.view')], ['Checkmarx One activity', '/activity', 'pulse', true],
     ['People & roles', '/people', 'people', true], ['Calculator', '/calculator', 'calc', can('calculator.use')], ['Teams', '/teams', 'teams', can('teams.manage') || can('dashboard.view')],
-    ['Settings', '/admin', 'admin', ADMIN_TABS.some(([, , p]) => can(p))], ['Updates', '/admin/updates', 'admin', can('system.update')], ['Audit log', '/audit', 'audit', can('audit.view')],
+    ['Settings', '/admin', 'admin', ADMIN_TABS.some(([, , p]) => p && can(p))], ['Updates', '/admin/updates', 'admin', can('system.update')], ['Audit log', '/audit', 'audit', can('audit.view')],
     ['Quick guide', '/guide', 'guide', true], ['About', '/about', 'guide', true],
   ].filter((x) => x[3]).map(([t, href, ic]) => ({ t, sub: 'Page', href, ic }));
   let items = pages;
@@ -515,7 +516,15 @@ async function viewReset(params) {
 }
 
 const firstStepsDone = () => state.me && !state.me.user.mustChangePassword && state.me.terms.accepted && state.me.guideSeen;
-const home = () => (can('dashboard.view') ? '/overview' : '/guide');
+const HOME_PAGES = [['overview', 'Overview'], ['calculator', 'Calculator'], ['accounts', 'Accounts'], ['activity', 'Checkmarx One activity'], ['guide', 'Quick guide']];
+/** Where this person lands: their role's home page (set in Roles & permissions), if they may open it. */
+const home = () => {
+  const h = state.me?.role?.home;
+  if (h === 'calculator' && can('calculator.use')) return '/calculator';
+  if ((h === 'overview' || h === 'accounts') && can('dashboard.view')) return `/${h}`;
+  if (h === 'activity' || h === 'guide') return `/${h}`;
+  return can('dashboard.view') ? '/overview' : '/guide';
+};
 
 // ---- First sign-in: password, terms, quick guide ----------------------------------------------------------
 async function viewWelcome() {
@@ -674,6 +683,58 @@ function teamSelect(id, selected, { all = true } = {}) {
   return `<select id="${id}">${all ? '<option value="">All my teams</option>' : ''}${teams.map((t) => `<option value="${esc(t.id)}"${t.id === selected ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select>`;
 }
 
+// ---- The Overview's cards: small, each with a picture of its number; everyone chooses which they see ------------------
+const ring = (p, kind = '') => `<span class="ring ${kind}" style="--p:${Math.max(0, Math.min(100, p))}"><b>${p}%</b></span>`;
+const glyph = (name, kind = '') => `<span class="glyph ${kind}">${icon(name)}</span>`;
+const OV_CARDS = [
+  ['projected', 'Projected credits', (t) => ({ v: num(Math.round(t.credits)), s: `T&R ${num(Math.round(t.trCredits))} · Fusion ${num(Math.round(t.fusionCredits))}`, g: `<span class="split" title="T&R and Fusion"><i style="--w:${pct(t.trCredits, t.credits)}"></i></span>`, hero: true })],
+  ['sold', 'Credits sold', (t) => ({ v: num(Math.round(t.sold)), s: `${num(t.accountsWithSales)} account${t.accountsWithSales === 1 ? '' : 's'}`, g: ring(pct(t.sold, t.credits), 'ok') })],
+  ['needed', 'Still needed', (t) => ({ v: num(Math.round(t.remaining)), s: 'projected, not sold yet', g: ring(pct(t.remaining, t.credits), 'need') })],
+  ['accounts', 'Accounts', (t) => ({ v: num(t.accounts), s: `${num(t.withReport)} with a report`, g: ring(pct(t.withReport, t.accounts)) })],
+  ['reports', 'Reports', (t) => ({ v: num(t.reports), s: `${num(t.primaryMarked)} with a primary`, g: glyph('send') })],
+  ['shared', 'Shared', (t) => ({ v: num(t.sharedReports), s: `${num(t.accountsShared)} of ${num(t.accounts)} accounts`, g: ring(pct(t.accountsShared, t.accounts)) })],
+  ['missing', 'No Salesforce link', (t) => ({ v: num(t.missingSalesforce), s: t.missingSalesforce ? 'no report possible yet' : 'all tied to Salesforce', g: glyph('ext', t.missingSalesforce ? 'bad' : 'ok'), warn: t.missingSalesforce > 0 })],
+];
+const myCards = () => (Array.isArray(state.me.prefs?.cards) && state.me.prefs.cards.length ? state.me.prefs.cards : OV_CARDS.map(([id]) => id)).filter((id) => OV_CARDS.some(([c]) => c === id));
+function overviewTiles(t) {
+  const chosen = new Set(myCards());
+  return `<div class="tiles">${OV_CARDS.filter(([id]) => chosen.has(id)).map(([id, label, f]) => {
+    const c = f(t);
+    return `<div class="tile${c.hero ? ' hero' : ''}${c.warn ? ' warn' : ''}" data-card="${id}"><div class="tile-g">${c.g}</div><div class="tile-t"><span class="k">${esc(label)}</span><b class="v">${c.v}</b><span class="s">${c.s}</span></div></div>`;
+  }).join('')}</div>`;
+}
+function cardsPicker(onDone) {
+  document.querySelector('.cards-pop')?.remove();
+  const chosen = new Set(myCards());
+  const pop = document.createElement('div');
+  pop.className = 'cards-pop mp-menu';
+  pop.innerHTML = `<b>Cards on your Overview</b><div class="mp-list">${OV_CARDS.map(([id, label]) => `<label><input type="checkbox" value="${id}" ${chosen.has(id) ? 'checked' : ''} /><span>${esc(label)}</span></label>`).join('')}</div><div class="mp-acts"><button type="button" class="link" data-all>All</button><span class="muted small">Saved for you, on every device</span></div>`;
+  document.body.append(pop);
+  const r = $('#cards-btn').getBoundingClientRect();
+  pop.style.top = `${window.scrollY + r.bottom + 6}px`;
+  pop.style.left = `${Math.max(8, window.scrollX + r.right - pop.offsetWidth)}px`;
+  const save = async () => {
+    const cards = [...pop.querySelectorAll('input:checked')].map((i) => i.value);
+    state.me.prefs = { ...(state.me.prefs ?? {}), cards };
+    onDone();
+    try {
+      await api('/api/me/prefs', { method: 'PUT', body: { cards } });
+    } catch {}
+  };
+  pop.addEventListener('change', save);
+  pop.querySelector('[data-all]').onclick = () => {
+    for (const i of pop.querySelectorAll('input')) i.checked = true;
+    save();
+  };
+  setTimeout(() => {
+    const close = (e) => {
+      if (pop.contains(e.target) || e.target.closest('#cards-btn')) return;
+      pop.remove();
+      document.removeEventListener('click', close);
+    };
+    document.addEventListener('click', close);
+  });
+}
 async function viewOverview(params) {
   const focus = params.get('team') ?? '';
   shell('overview', loading());
@@ -692,17 +753,9 @@ async function viewOverview(params) {
   };
   for (const r of roots.sort((a, b) => b.credits - a.credits)) walk(r, 0);
   $('#main').innerHTML = `
-    <div class="head"><div><div class="crumbs">${esc(scopeName)}</div><h1 class="serif">Overview</h1><p>The credits projected for every account from its primary report, how many reports were made and shared with customers, and where something is missing.</p></div>
-      <div class="tools">${teamSelect('focus', focus)}${can('dashboard.export') ? `<a class="btn" href="/api/export/accounts.csv" download>${icon('download')}Accounts CSV</a><a class="btn ghost" href="/api/export/reports.csv" download>${icon('download')}Reports CSV</a>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('calc')}Open calculator</a>` : ''}</div></div>
-    <div class="kpis">
-      <div class="kpi hero"><div class="k">Projected credits · primary reports</div><div class="v">${num(Math.round(t.credits))}</div><div class="s">T&amp;R ${num(Math.round(t.trCredits))} · Fusion ${num(Math.round(t.fusionCredits))} · across ${num(t.withReport)} account${t.withReport === 1 ? '' : 's'}</div></div>
-      <div class="kpi sold"><div class="k">Credits sold</div><div class="v">${num(Math.round(t.sold))}</div><div class="s">${pct(t.sold, t.credits)}% of the projection · ${num(t.accountsWithSales)} account${t.accountsWithSales === 1 ? '' : 's'}</div><div class="meter"><i data-w="${pct(t.sold, t.credits)}"></i></div></div>
-      <div class="kpi need"><div class="k">Still needed</div><div class="v">${num(Math.round(t.remaining))}</div><div class="s">projected and not sold yet</div></div>
-      <div class="kpi"><div class="k">Accounts</div><div class="v">${num(t.accounts)}</div><div class="s">${num(t.withReport)} with a report</div><div class="meter"><i data-w="${pct(t.withReport, t.accounts)}"></i></div></div>
-      <div class="kpi"><div class="k">Reports generated</div><div class="v">${num(t.reports)}</div><div class="s">${num(t.primaryMarked)} account${t.primaryMarked === 1 ? '' : 's'} with a primary marked</div></div>
-      <div class="kpi"><div class="k">Shared with customers</div><div class="v">${num(t.sharedReports)}</div><div class="s">${num(t.accountsShared)} of ${num(t.accounts)} accounts</div><div class="meter"><i data-w="${pct(t.accountsShared, t.accounts)}"></i></div></div>
-      <div class="kpi ${t.missingSalesforce ? 'warn' : ''}"><div class="k">Missing Salesforce link</div><div class="v">${num(t.missingSalesforce)}</div><div class="s">${t.missingSalesforce ? 'No report can be made for them yet' : 'Every account is tied to Salesforce'}</div></div>
-    </div>
+    <div class="head compact"><div class="ht"><h1 class="serif">Overview</h1><span class="crumbs">${esc(scopeName)}</span></div>
+      <div class="tools">${teamSelect('focus', focus)}<button type="button" class="ghost" id="cards-btn" title="Choose the cards you see">${icon('overview')}Cards ▾</button>${can('dashboard.export') ? `<a class="btn ghost" href="/api/export/accounts.csv" download title="Every account, as a spreadsheet">${icon('download')}Accounts</a><a class="btn ghost" href="/api/export/reports.csv" download title="Every report, as a spreadsheet">${icon('download')}Reports</a>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('calc')}Open calculator</a>` : ''}</div></div>
+    ${overviewTiles(t)}
     <div class="grid g3">
       <div class="panel"><h2>Teams <small>credits from primary reports, teams below rolled up</small></h2>
         ${treeRows.length ? `<div class="tree ov">${treeRows.map(({ node, depth }) => `<div class="node" data-team="${esc(node.id)}"><div class="t"><span class="indent" data-indent="${depth}"></span>${depth ? '<span class="twig"></span>' : ''}<div><b>${esc(node.name)}</b><small>${node.leaders.length ? ` · led by ${esc(node.leaders.join(', '))}` : ''}</small><div class="meta">${num(node.people)} people · ${num(node.accounts)} accounts · ${num(node.shared)} shared · <span class="sold-t">${num(Math.round(node.sold))} sold</span> · ${num(Math.round(node.remaining))} to go</div><div class="bar"><div class="track"><i data-w="${pct(node.credits, maxTeam)}"></i></div></div></div></div><span class="credits">${num(Math.round(node.credits))}</span></div>`).join('')}</div>` : '<div class="empty"><b>No teams yet</b>An Admin sets them up under Teams.</div>'}
@@ -721,6 +774,13 @@ async function viewOverview(params) {
       ${d.recent.length ? `<div class="tw"><table><thead><tr><th>Account</th><th>Team</th><th>Made by</th><th>When</th><th class="num">Credits</th><th>Customer</th></tr></thead><tbody>${d.recent.map((x) => `<tr class="click" data-account="${esc(x.customerId)}"><td><b>${esc(x.customer)}</b></td><td>${esc(x.team)}</td><td>${esc(x.createdBy)}</td><td>${esc(ago(x.createdAt))}</td><td class="num credits">${num(Math.round(x.totalCredits))}</td><td>${x.sharedAt ? `<span class="chip ok"><i></i>Shared ${esc(date(x.sharedAt))}</span>` : '<span class="chip"><i></i>Not shared</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>Nothing yet</b></div>'}
     </div>`;
   paint();
+  $('#cards-btn').onclick = (e) => {
+    e.stopPropagation();
+    cardsPicker(() => {
+      const el = document.querySelector('#main .tiles');
+      if (el) el.outerHTML = overviewTiles(t);
+    });
+  };
   $('#focus').onchange = (e) => go(`/overview${e.target.value ? `?team=${encodeURIComponent(e.target.value)}` : ''}`);
   for (const el of $$('[data-team]')) el.onclick = () => go(`/accounts?team=${encodeURIComponent(el.dataset.team)}`);
   for (const el of $$('[data-person]')) el.onclick = () => go(`/accounts?owner=${encodeURIComponent(el.dataset.person)}`);
@@ -1301,7 +1361,7 @@ function rolesMatrix(d) {
   const editable = (r, p) => edit && !r.locked && !p.special && can(p.id);
   $('#ptab').innerHTML = `<div class="panel"><div class="flex"><h2 class="grow-h">Roles &amp; permissions <small>changes apply at once to everyone with the role · <span class="chip">Admin only</span> stays with Admins</small></h2>${edit ? `<button id="newrole">${icon('plus')}New role</button>` : ''}</div>
     <div class="flex mt"><div class="search">${icon('search')}<input id="pq" placeholder="Find a permission" /></div><label class="check inline"><input type="checkbox" id="diff" /><span>Show only the differences</span></label><span class="spacer"></span>${edit ? '<span class="small muted" id="dirty"></span><button class="primary" id="save" disabled>Save role changes</button><button class="ghost" id="discard" disabled>Discard</button>' : '<span class="small muted">Read only: an Executive or Admin changes roles.</span>'}</div>
-    <div class="tw mt matrix-wrap"><table class="matrix"><thead><tr><th>Permission</th>${d.roles.map((r) => `<th class="rc" title="${esc(r.description)}">${esc(r.name)}<span class="sub">${num(r.holders)} ${r.holders === 1 ? 'person' : 'people'}</span>${edit ? `<button class="sm ghost" data-role-edit="${esc(r.id)}" title="${r.builtin ? 'Rename this role (its permissions stay as ticked below)' : 'Rename, describe or remove this role'}">${r.builtin ? 'Rename' : 'Edit'}</button>` : ''}</th>`).join('')}</tr></thead><tbody id="mx"></tbody></table></div></div>`;
+    <div class="tw mt matrix-wrap"><table class="matrix"><thead><tr><th>Permission</th>${d.roles.map((r) => `<th class="rc" title="${esc(r.description)}">${esc(r.name)}<span class="sub">${num(r.holders)} ${r.holders === 1 ? 'person' : 'people'} · home: ${esc(HOME_PAGES.find(([id]) => id === r.home)?.[1] ?? 'Overview')}</span>${edit ? `<button class="sm ghost" data-role-edit="${esc(r.id)}" title="${r.builtin ? 'Rename this role (its permissions stay as ticked below)' : 'Rename, describe or remove this role'}">${r.builtin ? 'Rename' : 'Edit'}</button>` : ''}</th>`).join('')}</tr></thead><tbody id="mx"></tbody></table></div></div>`;
   const render = () => {
     const q = $('#pq').value.trim().toLowerCase();
     const diff = $('#diff').checked;
@@ -1328,7 +1388,7 @@ function rolesMatrix(d) {
     $('#discard').onclick = () => viewPeople('roles');
     $('#save').onclick = async () => {
       try {
-        for (const r of changed()) await api(`/api/roles/${encodeURIComponent(r.id)}`, { method: 'PUT', body: { name: r.name, description: r.description, permissions: [...draft[r.id]] } });
+        for (const r of changed()) await api(`/api/roles/${encodeURIComponent(r.id)}`, { method: 'PUT', body: { name: r.name, description: r.description, home: r.home, permissions: [...draft[r.id]] } });
         toast('Roles saved.', 'ok');
         viewPeople('roles');
       } catch (error) {
@@ -1337,7 +1397,7 @@ function rolesMatrix(d) {
     };
     const roleForm = (r) => {
       const dlg = document.createElement('dialog');
-      dlg.innerHTML = `<form class="form" id="rf"><div class="dh"><h2>${r ? `${r.builtin ? 'Rename' : 'Edit'} ${esc(r.name)}` : 'New role'}</h2><p class="small muted">${r ? (r.locked ? 'The name everyone sees. This role always holds every permission.' : 'The name everyone sees, on People, invitations and the import sheet. Who holds it and what it allows stay the same.') : 'Then tick its permissions in the matrix.'}</p></div><div class="db form"><label class="f">Name<input name="name" required maxlength="60" value="${esc(r?.name ?? '')}" /></label><label class="f">Description<input name="desc" maxlength="300" value="${esc(r?.description ?? '')}" /></label>${r ? '' : `<label class="f">Start from<select name="from"><option value="">Nothing</option>${d.roles.filter((x) => !x.locked).map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>`}<div class="err" id="rerr"></div></div>
+      dlg.innerHTML = `<form class="form" id="rf"><div class="dh"><h2>${r ? `${r.builtin ? 'Rename' : 'Edit'} ${esc(r.name)}` : 'New role'}</h2><p class="small muted">${r ? (r.locked ? 'The name everyone sees. This role always holds every permission.' : 'The name everyone sees, on People, invitations and the import sheet. Who holds it and what it allows stay the same.') : 'Then tick its permissions in the matrix.'}</p></div><div class="db form"><label class="f">Name<input name="name" required maxlength="60" value="${esc(r?.name ?? '')}" /></label><label class="f">Description<input name="desc" maxlength="300" value="${esc(r?.description ?? '')}" /></label><label class="f">Home page <small class="muted">where people with this role land after signing in</small><select name="home">${HOME_PAGES.map(([id, label]) => `<option value="${id}"${(r?.home ?? 'overview') === id ? ' selected' : ''}>${label}</option>`).join('')}</select></label>${r ? '' : `<label class="f">Start from<select name="from"><option value="">Nothing</option>${d.roles.filter((x) => !x.locked).map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>`}<div class="err" id="rerr"></div></div>
         <div class="df">${r && !r.builtin ? '<button type="button" class="danger" id="rdel">Remove</button><span class="spacer"></span>' : ''}<button type="button" class="ghost" id="rclose">Cancel</button><button class="primary" type="submit">${r ? 'Save' : 'Create role'}</button></div></form>`;
       document.body.append(dlg);
       dlg.showModal();
@@ -1348,7 +1408,7 @@ function rolesMatrix(d) {
         const f = new FormData(e.target);
         const from = d.roles.find((x) => x.id === f.get('from'));
         try {
-          await api(`/api/roles/${encodeURIComponent(r?.id ?? 'new')}`, { method: 'PUT', body: { name: f.get('name'), description: f.get('desc'), permissions: r ? [...draft[r.id]] : (from?.permissions ?? []).filter((p) => can(p) && !d.permissions.find((x) => x.id === p)?.special) } });
+          await api(`/api/roles/${encodeURIComponent(r?.id ?? 'new')}`, { method: 'PUT', body: { name: f.get('name'), description: f.get('desc'), home: f.get('home'), permissions: r ? [...draft[r.id]] : (from?.permissions ?? []).filter((p) => can(p) && !d.permissions.find((x) => x.id === p)?.special) } });
           close();
           viewPeople('roles');
         } catch (error) {
@@ -1525,13 +1585,15 @@ async function viewTeams() {
 let adminTab = 'general';
 const cmpVer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
 const ADMIN_TABS = [
-  ['branding', 'Branding', 'settings.manage'],
   ['general', 'General', 'settings.manage'],
+  ['branding', 'Branding', 'settings.manage'],
   ['email', 'Email (SMTP)', 'settings.manage'],
   ['sso', 'Single sign-on', 'security.sso'],
   ['https', 'HTTPS', 'security.https'],
   ['updates', 'Updates', 'system.update'],
   ['backups', 'Backups & health', 'backup.manage'],
+  // About: for whoever sees Settings (everyone else finds it at the foot of the menu).
+  ['about', 'About', null],
 ];
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
@@ -1552,11 +1614,11 @@ async function download(path, fallbackName) {
 }
 
 async function viewAdmin(tab = adminTab) {
-  const tabs = ADMIN_TABS.filter(([, , p]) => can(p));
+  const tabs = ADMIN_TABS.filter(([, , p]) => p && can(p)).length ? ADMIN_TABS.filter(([, , p]) => !p || can(p)) : [];
   if (!tabs.length) return go(home());
   adminTab = tabs.some(([id]) => id === tab) ? tab : tabs[0][0];
   if (location.hash !== `#/admin/${adminTab}`) history.replaceState(null, '', `#/admin/${adminTab}`);
-  shell('admin', `<div class="head"><div><h1 class="serif">Settings</h1><p>Admin settings for the whole command center. Leaders and Sales Engineers do not see them.</p></div><div class="tools"><a class="btn ghost" href="#/about">${esc(state.me.versionLabel ?? '')} · About</a></div></div>
+  shell('admin', `<div class="head compact"><div class="ht"><h1 class="serif">Settings</h1><span class="crumbs">for the whole command center \u00b7 Admins only</span></div></div>
     <nav class="tabs" role="tablist">${tabs.map(([id, label]) => `<a role="tab" href="#/admin/${id}" class="${id === adminTab ? 'on' : ''}" aria-selected="${id === adminTab}">${esc(label)}</a>`).join('')}</nav><div id="tab">${loading()}</div>`);
   try {
     await ADMIN_VIEWS[adminTab]();
@@ -1566,6 +1628,9 @@ async function viewAdmin(tab = adminTab) {
 }
 
 const ADMIN_VIEWS = {
+  async about() {
+    $('#tab').innerHTML = await aboutHtml();
+  },
   async branding() {
     const [s, b] = await Promise.all([api('/api/settings'), api('/api/branding')]);
     const look = { accent: b.look ?? 'aurora', mode: b.mode ?? 'light' };
@@ -1919,7 +1984,7 @@ const ADMIN_VIEWS = {
           const inst = new Map(u.installed.map((i) => [i.version, i]));
           const all = [...new Set([...trusted.keys(), ...inst.keys(), ...rel.keys(), u.builtIn, u.running])].sort((x, y) => cmpVer(y, x));
           if (!all.length) return '<div class="empty"><b>No versions yet</b>Check for updates.</div>';
-          return `<div class="tw"><table class="versions"><thead><tr><th>Version</th><th>SHA-256 (kept)</th><th>First seen</th><th>State</th><th></th></tr></thead><tbody>${all.map((v) => {
+          return `<div class="tw"><table class="versions" id="versions-t"><thead><tr><th>Version</th><th>SHA-256 (kept)</th><th>First seen</th><th>State</th><th></th></tr></thead><tbody>${all.map((v, idx) => {
             const r = rel.get(v);
             const t = trusted.get(v);
             const i = inst.get(v);
@@ -1933,8 +1998,9 @@ const ADMIN_VIEWS = {
             const state = [running ? '<span class="chip ok"><i></i>Running</span>' : '', builtIn ? '<span class="chip"><i></i>Built in</span>' : '', i ? `<span class="chip ${i.verified ? '' : 'bad'}"><i></i>${i.verified ? 'Installed · files verified' : 'Files changed: will not start'}</span>` : '', failed ? '<span class="chip bad"><i></i>Failed to start</span>' : '', tampered ? '<span class="chip bad"><i></i>Checksum changed: refused</span>' : '', r?.prerelease ? '<span class="chip warn"><i></i>Pre-release</span>' : '', t && !tampered ? '<span class="chip ok"><i></i>Trusted</span>' : ''].join('');
             const action = running ? '' : !can ? `<span class="muted small">${tampered ? 'not trusted' : 'not available'}</span>` : newer ? `<button class="sm primary" data-act="${act}">Update now</button>` : `<button class="sm" data-act="${act}" data-rollback="1">Roll back to this</button>`;
             const notes = r?.notes ? `<details class="rel-notes"><summary>${md((r.notes.split('\n').find((l) => l.trim().startsWith('-')) ?? '').replace(/^\s*[-*]\s*/, '').split(/(?<=[.!?])\s/)[0]).replace(/^<p>|<\/p>$/g, '')}</summary><div class="md">${md(r.notes.replace(/^## .*\n/, ''))}</div></details>` : '';
-            return `<tr data-v="${esc(v)}"><td><b>${esc(v)}</b>${r?.publishedAt ? `<span class="sub">published ${esc(date(r.publishedAt))}</span>` : ''}${notes}</td><td>${t ? `<code class="small" title="${esc(t.sha256)}">${esc(t.sha256.slice(0, 12))}…${esc(t.sha256.slice(-6))}</code>` : '<span class="muted small">—</span>'}</td><td class="small">${t ? esc(dateTime(t.firstSeen)) : ''}</td><td>${state}</td><td class="actions">${action}</td></tr>`;
-          }).join('')}</tbody></table></div>`;
+            // The newest three, and the running one; older ones folded away.
+            return `<tr data-v="${esc(v)}"${idx >= 3 && !running ? ' class="v-older"' : ''}><td><b>${esc(v)}</b>${r?.publishedAt ? `<span class="sub">published ${esc(date(r.publishedAt))}</span>` : ''}${notes}</td><td>${t ? `<code class="small" title="${esc(t.sha256)}">${esc(t.sha256.slice(0, 12))}…${esc(t.sha256.slice(-6))}</code>` : '<span class="muted small">—</span>'}</td><td class="small">${t ? esc(dateTime(t.firstSeen)) : ''}</td><td>${state}</td><td class="actions">${action}</td></tr>`;
+          }).join('')}</tbody></table></div>${all.filter((v, i) => i >= 3 && v !== u.running).length ? `<button type="button" class="link mt" id="v-more">Show ${all.filter((v, i) => i >= 3 && v !== u.running).length} older versions \u25be</button>` : ''}`;
         })()}
         <p class="muted small mt">Always on the newest version: a newer release is installed and switched to by itself. <b>Roll back to this</b> moves to an older one (a backup is taken first, and there is no restart); the version you left is then not put back by itself until a newer release comes.</p></div>
       <div class="panel"><h2>Recent events</h2>${u.events.length ? `<div class="tw"><table><tbody>${u.events.map((e) => `<tr><td class="small">${esc(dateTime(e.at))}</td><td><span class="chip ${/fail|refused|rolled|changed/.test(e.type) ? 'bad' : 'ok'}"><i></i>${esc(ev[e.type] ?? e.type)}</span></td><td class="small">${esc([e.version, e.from && `from ${e.from}`, e.to && `to ${e.to}`, e.why || e.error || e.reason, e.by && `by ${e.by}`].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Nothing yet.</p>'}</div>
@@ -1943,6 +2009,11 @@ const ADMIN_VIEWS = {
       b.disabled = true;
       b.innerHTML = `<span class="spinner"></span>${esc(text)}`;
     };
+    $('#v-more')?.addEventListener('click', (e) => {
+      const t = $('#versions-t');
+      t.classList.toggle('show-all');
+      e.target.textContent = t.classList.contains('show-all') ? 'Show only the newest \u25b4' : e.target.textContent.replace('\u25b4', '\u25be');
+    });
     $('#integ-check').onclick = async (e) => {
       busy(e.target, 'Checking…');
       try {
@@ -2391,15 +2462,14 @@ function md(text) {
   if (list) out.push('</ul>');
   return out.join('');
 }
-async function viewAbout(params) {
-  shell('', loading());
+/** About, as CxMissionZero lays it out: one panel of facts and the terms card, then every version. */
+async function aboutHtml() {
   const me = state.me;
   const b = state.branding ?? {};
   const log = await fetch('/legal/changelog').then((r) => r.text()).catch(() => '');
   const versions = log.replace(/^# .*\n/, '').split(/\n(?=## )/).filter((x) => x.startsWith('## '));
   const accepted = me.terms?.accepted;
-  $('#main').innerHTML = `<div class="head"><div><h1 class="serif">About</h1><p>${esc(b.appName ?? 'FTR Credits')} ${esc(b.tagline ?? 'Command Center')}, with the Cx Credits Calculator from CxMissionZero.</p></div></div>
-    <div class="panel about">
+  return `<div class="panel about">
       <h2>About ${esc(b.appName ?? 'FTR Credits')} ${esc(b.tagline ?? 'Command Center')}</h2>
       <p class="muted">Where every Sales Engineer works out the credits an account needs, keeps each projection report and what was shared with the customer, and where leaders see the whole picture across every team and region.</p>
       <dl class="about-facts">
@@ -2417,6 +2487,12 @@ async function viewAbout(params) {
     </div>
     <div class="panel mt"><h2>What is new <small>every version, newest first</small></h2>
       <div class="versions-log">${versions.map((v, i) => `<details ${i === 0 ? 'open' : ''}><summary>${esc(v.split('\n')[0].replace(/^## /, ''))}</summary><div class="md">${md(v.split('\n').slice(1).join('\n'))}</div></details>`).join('')}</div></div>`;
+}
+async function viewAbout(params) {
+  // Whoever sees Settings finds About there, with the other tabs.
+  if (ADMIN_TABS.some(([, , p]) => p && can(p)) && !params?.get?.('doc')) return go('/admin/about');
+  shell('', loading());
+  $('#main').innerHTML = `<div class="head compact"><div class="ht"><h1 class="serif">About</h1></div></div>${await aboutHtml()}`;
   if (params?.get?.('doc')) openDoc(params.get('doc'));
 }
 /** Terms of use, the licence and the user guide: read here, in the app’s own look, never as a bare file in a new tab. */

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { APP_CSP, RateLimit, Router, SECURITY_HEADERS, cookies, readBody, send, serveStatic } from './http.js';
 import { AuditLog, Doc, fail } from './store.js';
 import { Iam, clean, publicUser } from './iam.js';
-import { PERMISSIONS, need, needTeam, peopleInScope, scopeOf, subtree, teamPath } from './rbac.js';
+import { PERMISSIONS, need, needTeam, peopleInScope, scopeOf, subtree, teamPath, homeOf } from './rbac.js';
 import { Teams } from './teams.js';
 import { Accounts, DEFAULT_SALESFORCE_HOSTS } from './accounts.js';
 import { Terms } from './terms.js';
@@ -240,11 +240,21 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/healthz', () => ({ ok: true, version: VERSION, mz: MZ_SOURCE.label }));
   // ---- Branding (Settings → Branding, server/branding.js): what every page shows, even before signing in ------------
   const branding = () => ({ ...DEFAULT_BRANDING, ...(settings.value.branding ?? {}) });
-  const brandingView = () => publicBranding(branding(), settings.value.theme);
+  const brandingView = () => {
+    const v = publicBranding(branding(), settings.value.theme);
+    // With no logo of the organisation's, the default one (when the build carries it).
+    if (!v.logo && fs.existsSync(path.join(config.root, 'public', 'brand', 'default-logo.png'))) v.logo = '/brand/logo?v=default';
+    if (!v.icon && fs.existsSync(path.join(config.root, 'public', 'brand', 'default-logo.png'))) v.icon = '/brand/icon?v=default';
+    return v;
+  };
   r('GET', '/api/branding', () => brandingView());
+  // The command center's own logo and icon when Branding sets none: public/brand/default-logo.png, when it is there.
+  const DEFAULT_LOGO = path.join(config.root, 'public', 'brand', 'default-logo.png');
+  const hasDefaultLogo = () => fs.existsSync(DEFAULT_LOGO);
   const brandImage = (key, fallback) => (req, ctx, body, res) => {
     const img = branding()[key];
     if (img?.data) return send(res, 200, Buffer.from(img.data, 'base64'), imageHeaders(img));
+    if (hasDefaultLogo()) return send(res, 200, fs.readFileSync(DEFAULT_LOGO), { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600' });
     if (fallback) return send(res, 200, fs.readFileSync(path.join(PUBLIC_DIR, fallback)), { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=3600' });
     return send(res, 404, { error: 'No logo is set.' });
   };
@@ -470,7 +480,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return {
       user: publicUser(ctx.user),
       csrf: ctx.session.csrf,
-      role: { id: ctx.user.role, name: iam.roles()[ctx.user.role]?.name ?? ctx.user.role },
+      role: { id: ctx.user.role, name: iam.roles()[ctx.user.role]?.name ?? ctx.user.role, home: homeOf(ctx.user.role, iam.roles()[ctx.user.role]) },
       permissions: [...ctx.permissions],
       team: team ? { id: team.id, name: team.name, path: teamPath(ctx.teams, team.id).map((x) => x.name).join(' › ') } : null,
       leads: ctx.teams.filter((t) => t.leaderIds?.includes(ctx.user.id)).map((t) => t.id),
@@ -516,6 +526,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       prefs.accent = body.accent;
     }
     if (body?.seenVersion !== undefined) prefs.seenVersion = String(body.seenVersion).slice(0, 20);
+    // The Overview cards this person chose to see (Cards ▾).
+    if (body?.cards !== undefined) {
+      if (!Array.isArray(body.cards)) throw fail(400, 'Choose the cards as a list.');
+      prefs.cards = [...new Set(body.cards.map(String).filter((c) => /^[a-z]{2,20}$/.test(c)))].slice(0, 20);
+    }
     ctx.user.prefs = prefs;
     iam.save();
     return { prefs };
@@ -728,7 +743,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const visiblePeople = (ctx) => (ctx.permissions.has('scope.all') ? iam.users() : peopleInScope(ctx.user, ctx.scope, iam.users()));
   r('GET', '/api/people', ready2, (req, ctx) => ({
     people: visiblePeople(ctx).map((u) => ({ ...publicUser(u), roleName: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, u.teamId).map((t) => t.name).join(' › '), leads: ctx.teams.filter((t) => t.leaderIds?.includes(u.id)).map((t) => t.name), manageable: canManage(ctx, u) && u.id !== ctx.user.id, sessions: canManage(ctx, u) ? iam.sessionsOf(u.id) : undefined })),
-    roles: Object.entries(iam.roles()).map(([id, role]) => ({ id, ...role, grantable: iam.canGrant(id, ctx.permissions), holders: iam.users().filter((u) => u.role === id).length })),
+    roles: Object.entries(iam.roles()).map(([id, role]) => ({ id, ...role, home: homeOf(id, role), grantable: iam.canGrant(id, ctx.permissions), holders: iam.users().filter((u) => u.role === id).length })),
     teams: ctx.teams.filter((t) => ctx.scope.has(t.id) || ctx.permissions.has('teams.manage')).map((t) => ({ ...t, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaders: (t.leaderIds ?? []).map((id) => ({ id, name: userName(id) })), members: iam.users().filter((u) => u.teamId === t.id).length })),
     permissions: PERMISSIONS,
     mail: resetReady().ready,

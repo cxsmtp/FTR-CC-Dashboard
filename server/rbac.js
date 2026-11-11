@@ -38,14 +38,14 @@ export const PERMISSIONS = [
 export const PERMISSION_IDS = PERMISSIONS.map((p) => p.id);
 
 export const DEFAULT_ROLES = {
-  admin: { name: 'Admin', description: 'Everything: people, teams, roles, settings and every account.', permissions: PERMISSION_IDS, builtin: true, locked: true },
-  executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true },
-  leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports, and their people (invite, change, reset, turn off).', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'users.manage'], builtin: true },
-  se: { name: 'Sales Engineer', description: 'Their team’s accounts: generate projections, mark the primary report and record what was shared with the customer.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'dashboard.view'], builtin: true },
+  admin: { name: 'Admin', description: 'Everything: people, teams, roles, settings and every account.', permissions: PERMISSION_IDS, builtin: true, locked: true, home: 'overview' },
+  executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true, home: 'overview' },
+  leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports, and their people (invite, change, reset, turn off).', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'users.manage'], builtin: true, home: 'overview' },
+  se: { name: 'Sales Engineer', description: 'Their team’s accounts: generate projections, mark the primary report and record what was shared with the customer.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'dashboard.view'], builtin: true, home: 'calculator' },
   // For when the sales team joins: what was projected and sold for their teams' accounts, and recording sales.
-  sales: { name: 'Sales', description: 'Account executives: the dashboards and accounts of their team, every projection and report, and recording the credits sold. Not the calculator.', permissions: ['dashboard.view', 'dashboard.export', 'sales.record'], builtin: true },
-  salesLeader: { name: 'Sales Leader', description: 'Sales leaders: what Sales sees for every team below the ones they lead, recording sales, and managing their sales people.', permissions: ['dashboard.view', 'dashboard.export', 'sales.record', 'users.manage'], builtin: true },
-  viewer: { name: 'Viewer', description: 'Read only: the dashboards of their team (and teams they lead).', permissions: ['dashboard.view'], builtin: true },
+  sales: { name: 'Sales', description: 'Account executives: the dashboards and accounts of their team, every projection and report, and recording the credits sold. Not the calculator.', permissions: ['dashboard.view', 'dashboard.export', 'sales.record'], builtin: true, home: 'accounts' },
+  salesLeader: { name: 'Sales Leader', description: 'Sales leaders: what Sales sees for every team below the ones they lead, recording sales, and managing their sales people.', permissions: ['dashboard.view', 'dashboard.export', 'sales.record', 'users.manage'], builtin: true, home: 'overview' },
+  viewer: { name: 'Viewer', description: 'Read only: the dashboards of their team (and teams they lead).', permissions: ['dashboard.view'], builtin: true, home: 'overview' },
 };
 
 export const cleanPermissions = (list) => [...new Set((Array.isArray(list) ? list : []).filter((p) => PERMISSION_IDS.includes(p)))];
@@ -117,3 +117,8 @@ export function need(permissions, id) {
 export function needTeam(scope, teamId) {
   if (!teamId || !scope.has(teamId)) throw fail(403, 'That team is not one you work in.');
 }
+
+/** Where a role lands after signing in (Roles & permissions → Home page). */
+export const HOMES = ['overview', 'calculator', 'accounts', 'activity', 'guide'];
+/** A role's home page: its own, else what its built-in kind would have (an SE works in the calculator). */
+export const homeOf = (id, role) => (HOMES.includes(role?.home) ? role.home : id === 'se' ? 'calculator' : id === 'sales' ? 'accounts' : role?.permissions?.includes?.('dashboard.view') ? 'overview' : 'guide');

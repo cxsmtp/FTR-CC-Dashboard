@@ -9,7 +9,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 import { Doc, fail } from './store.js';
-import { ADMIN_ONLY, DEFAULT_ROLES, PERMISSION_IDS, cleanPermissions } from './rbac.js';
+import { ADMIN_ONLY, DEFAULT_ROLES, PERMISSION_IDS, cleanPermissions, HOMES } from './rbac.js';
 
 const scrypt = promisify(scryptCb);
 
@@ -107,19 +107,20 @@ export class Iam {
     const role = this.doc.value.roles[user?.role];
     return new Set(user?.active === false ? [] : role?.permissions ?? []);
   }
-  saveRole(id, { name, description, permissions }, granterPermissions) {
+  saveRole(id, { name, description, permissions, home }, granterPermissions) {
     const roles = this.doc.value.roles;
     const key = id ?? `role-${randomUUID().slice(0, 8)}`;
     // The Admin role can be renamed and described, but always holds every permission.
     if (roles[key]?.locked) {
-      roles[key] = { ...roles[key], name: clean(name, 60) || roles[key].name, description: description === undefined ? roles[key].description : clean(description, 300) };
+      roles[key] = { ...roles[key], name: clean(name, 60) || roles[key].name, description: description === undefined ? roles[key].description : clean(description, 300), ...(HOMES.includes(home) ? { home } : {}) };
       this.save();
       return { id: key, ...roles[key] };
     }
     const wanted = cleanPermissions(permissions);
     if (wanted.some((p) => !granterPermissions.has(p))) throw fail(403, 'A role cannot be given permissions you do not hold.');
     if (wanted.some((p) => ADMIN_ONLY.includes(p))) throw fail(403, 'HTTPS, single sign-on, updates, backups and settings stay with the Admin role: no other role can hold them.');
-    roles[key] = { ...(roles[key] ?? { builtin: false }), name: clean(name, 60) || roles[key]?.name || 'New role', description: clean(description, 300), permissions: wanted };
+    if (home !== undefined && !HOMES.includes(home)) throw fail(400, 'Choose a home page: Overview, Calculator, Accounts, Checkmarx One activity or Quick guide.');
+    roles[key] = { ...(roles[key] ?? { builtin: false }), name: clean(name, 60) || roles[key]?.name || 'New role', description: clean(description, 300), permissions: wanted, ...(home !== undefined ? { home } : {}) };
     this.save();
     return { id: key, ...roles[key] };
   }
