@@ -1026,11 +1026,11 @@ async function viewAccounts(params) {
         <div class="search">${icon('search')}<input id="q" placeholder="Search accounts, SEs, Salesforce ids" /></div>
         <div>${teamSelect('team', focus)}</div>
         <div><select id="owner"><option value="">Every SE</option>${owners.map(([id, name]) => `<option value="${esc(id)}"${id === params.get('owner') ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select></div>
-        <div><select id="status"><option value="">Any status</option><option value="nosf">Missing Salesforce link</option><option value="noreport">No report yet</option><option value="notshared">Report not shared</option><option value="shared">Shared with customer</option><option value="unsold">Projected, nothing sold yet</option><option value="partly">Partly sold</option><option value="sold">Fully sold</option><option value="noprimary">No primary marked</option></select></div>
+        <div><select id="status"><option value="">Any status</option><option value="muted">Muted from the forecast</option><option value="nosf">Missing Salesforce link</option><option value="noreport">No report yet</option><option value="notshared">Report not shared</option><option value="shared">Shared with customer</option><option value="unsold">Projected, nothing sold yet</option><option value="partly">Partly sold</option><option value="sold">Fully sold</option><option value="noprimary">No primary marked</option></select></div>
         <span class="spacer"></span><span class="muted small" id="count"></span>
       </div>
       <div class="tw mt"><table><thead><tr>
-        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th>Salesforce</th><th class="sort num" data-k="tr">T&amp;R</th><th class="sort num" data-k="fusion">Fusion</th><th class="sort num" data-k="credits">Total credits</th><th class="sort num" data-k="sold">Sold</th><th class="sort num" data-k="remaining">Still needed</th><th class="sort num" data-k="reports">Reports</th><th>Customer</th><th class="sort" data-k="last">Last report</th>${can('calculator.use') ? '<th></th>' : ''}
+        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th>Salesforce</th><th class="sort num" data-k="tr">T&amp;R</th><th class="sort num" data-k="fusion">Fusion</th><th class="sort num" data-k="credits">Total credits</th><th class="sort num" data-k="sold">Sold</th><th class="sort num" data-k="remaining">Still needed</th><th class="sort num" data-k="reports">Reports</th><th>Customer</th><th class="sort" data-k="last">Last report</th>${can('calculator.use') || can('forecast.mute') ? '<th></th>' : ''}
       </tr></thead><tbody id="rows"></tbody></table></div>
     </div>`;
   const val = (a, k) => ({ name: a.name.toLowerCase(), owner: String(a.owner).toLowerCase(), tr: a.primary?.trCredits ?? -1, fusion: a.primary?.fusionCredits ?? -1, credits: a.primary?.totalCredits ?? -1, reports: a.reportCount, sold: a.sold ?? 0, remaining: a.remaining ?? -1, last: a.lastReportAt ?? '' })[k];
@@ -1042,12 +1042,13 @@ async function viewAccounts(params) {
       .filter((a) => !q || [a.name, a.owner, a.team, a.salesforceId].some((s) => String(s ?? '').toLowerCase().includes(q)))
       .filter((a) => !owner || a.ownerId === owner)
       .filter((a) => !['unsold', 'partly', 'sold'].includes(status) || (status === 'unsold' ? a.primary && !a.sold : status === 'partly' ? a.sold > 0 && a.remaining > 0 : a.sold > 0 && a.remaining === 0))
-      .filter((a) => !status || ['unsold', 'partly', 'sold'].includes(status) || (status === 'nosf' ? !a.salesforceUrl : status === 'noreport' ? !a.primary : status === 'notshared' ? a.primary && !a.sharedCount : status === 'shared' ? a.sharedCount > 0 : a.primary && a.primary.how !== 'marked'))
+      .filter((a) => status !== 'muted' || a.muted)
+      .filter((a) => !status || status === 'muted' || ['unsold', 'partly', 'sold'].includes(status) || (status === 'nosf' ? !a.salesforceUrl : status === 'noreport' ? !a.primary : status === 'notshared' ? a.primary && !a.sharedCount : status === 'shared' ? a.sharedCount > 0 : a.primary && a.primary.how !== 'marked'))
       .sort((a, b) => (val(a, sort.key) > val(b, sort.key) ? 1 : val(a, sort.key) < val(b, sort.key) ? -1 : 0) * sort.dir);
     $('#count').textContent = `${num(list.length)} of ${num(accounts.length)} accounts`;
     $('#rows').innerHTML = list.length
-      ? list.map((a) => `<tr class="click" data-account="${esc(a.id)}">
-        <td data-edit="name" title="Double-click to rename"><b>${esc(a.name)}</b><span class="sub">${esc(a.teamPath)}</span></td>
+      ? list.map((a) => `<tr class="click${a.muted ? ' muted-row' : ''}" data-account="${esc(a.id)}">
+        <td data-edit="name" title="Double-click to rename"><b>${esc(a.name)}</b>${a.muted ? ` <span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}<span class="sub">${esc(a.teamPath)}</span></td>
         <td data-edit="owner" title="Double-click to change the accountable SE"><div class="flex"><span class="avatar sm">${esc(initials(a.owner))}</span>${esc(a.owner)}</div></td>
         <td>${sfChip(a)}</td>
         <td class="num">${a.primary ? num(Math.round(a.primary.trCredits ?? 0)) : '—'}</td>
@@ -1058,8 +1059,22 @@ async function viewAccounts(params) {
         <td class="num">${num(a.reportCount)}</td>
         <td data-edit="shared" title="Double-click: the primary report shared with the customer (to whom), or not">${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>${a.primary?.sharedWith?.length ? `<span class="sub">${esc(a.primary.sharedWith.join(', '))}</span>` : ''}` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
         <td>${esc(ago(a.lastReportAt))}</td>
-        ${can('calculator.use') ? `<td class="actions"><a class="btn sm primary calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator">${icon('calc')}Open in calculator</a></td>` : ''}</tr>`).join('')
-      : `<tr><td colspan="${can('calculator.use') ? 12 : 11}"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>`;
+        ${can('calculator.use') || can('forecast.mute') ? `<td class="actions">${can('forecast.mute') ? `<button type="button" class="sm ${a.muted ? '' : 'ghost'} mute-btn" data-mute="${a.muted ? 'off' : 'on'}" title="${a.muted ? 'Bring it back into the dashboards' : 'Leave it out of the dashboards (it stays here, marked muted)'}">${a.muted ? 'Unmute' : 'Mute from forecast'}</button>` : ''}${can('calculator.use') ? `<a class="btn sm primary calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator">${icon('calc')}Open in calculator</a>` : ''}</td>` : ''}</tr>`).join('')
+      : `<tr><td colspan="${can('calculator.use') || can('forecast.mute') ? 12 : 11}"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>`;
+    for (const b of $$('#rows [data-mute]')) {
+      b.onclick = async (e) => {
+        e.stopPropagation();
+        const a = accounts.find((x) => x.id === b.closest('tr').dataset.account);
+        const on = b.dataset.mute === 'on';
+        try {
+          await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/mute`, { method: 'POST', body: { muted: on } });
+          toast(on ? `${a.name} is muted from the forecast: the dashboards leave it out.` : `${a.name} is back in the forecast.`, 'ok');
+          await reload();
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      };
+    }
     // One click opens the account; a double-click edits the cell (the click waits a moment to tell them apart).
     for (const el of $$('[data-account]')) {
       let timer = null;

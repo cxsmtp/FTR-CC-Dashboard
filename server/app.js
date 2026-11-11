@@ -654,6 +654,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         salesforceId: a.salesforceId,
         updatedAt: a.updatedAt,
         reportCount: own.length,
+        muted: Boolean(a.muted),
+        mutedAt: a.mutedAt ?? null,
+        mutedBy: a.mutedById ? userName(a.mutedById) : '',
         sharedCount: own.filter((x) => x.sharedAt).length,
         lastReportAt: own[0]?.createdAt ?? null,
         sold: a.soldCredits ?? 0,
@@ -669,7 +672,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/api/dashboard', perm('dashboard.view'), (req, ctx, body, res, url) => {
     const focus = url.searchParams.get('team') || '';
     if (focus) needTeam(ctx.scope, focus);
-    const { teamIds, accounts: list, reports } = rows(ctx, focus);
+    const all = rows(ctx, focus);
+    const teamIds = all.teamIds;
+    // Accounts muted from the forecast (by an Executive) are left out of every figure here, their reports too.
+    const muted = new Set(all.accounts.filter((a) => a.muted).map((a) => a.id));
+    const list = all.accounts.filter((a) => !muted.has(a.id));
+    const reports = all.reports.filter((x) => !muted.has(x.customerId));
     const sum = (xs) => xs.reduce((n, a) => n + (Number(a.primary?.totalCredits) || 0), 0);
     const sumOf = (xs, k) => xs.reduce((n, a) => n + (Number(a.primary?.[k]) || 0), 0);
     const totals = {
@@ -782,6 +790,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const sale = accounts.removeSale(params.id, ctx.scope, params.sale, { user: ctx.user, any: ctx.permissions.has('reports.delete') });
     record(ctx, req, 'sale.remove', accounts.accounts.meta(params.id)?.name ?? '', { id: sale.id, credits: sale.credits, date: sale.date });
     return accountDetail(ctx, params.id);
+  });
+  r('POST', '/api/cc/accounts/:id/mute', perm('forecast.mute'), (req, ctx, body, res, url, params) => {
+    const a = accounts.setMuted(params.id, ctx.scope, body?.muted !== false, ctx.user);
+    record(ctx, req, a.muted ? 'account.mute' : 'account.unmute', a.name, { id: a.id });
+    return { ok: true, muted: Boolean(a.muted) };
   });
   r('POST', '/api/cc/reports/:id/primary', perm('reports.share'), (req, ctx, body, res, url, params) => {
     const rep = accounts.report(params.id, ctx.scope);

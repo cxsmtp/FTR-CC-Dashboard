@@ -87,6 +87,12 @@ export class Iam {
       raw.migrations.push('cc-1.2-people');
       this.migrated = true;
     }
+    // A new permission for the Executive role (the Admin holds every one): muting accounts from the forecast.
+    if (!raw.migrations.includes('cc-1.47-mute')) {
+      if (roles.executive) roles.executive.permissions = [...new Set([...roles.executive.permissions, 'forecast.mute'])];
+      raw.migrations.push('cc-1.47-mute');
+      this.migrated = true;
+    }
     if (!raw.migrations.includes('cc-1.3-sales')) {
       for (const id of ['executive', 'leader', 'se']) if (roles[id]) roles[id].permissions = [...new Set([...roles[id].permissions, 'sales.record'])];
       raw.migrations.push('cc-1.3-sales');

@@ -81,6 +81,9 @@ const accountMeta = (a) => ({
   salesforceId: a.salesforceId ?? '',
   primaryReportId: a.primaryReportId ?? null,
   impactEnabled: Boolean(a.impactEnabled),
+  muted: Boolean(a.muted),
+  mutedAt: a.mutedAt ?? null,
+  mutedById: a.mutedById ?? null,
   cxone: a.cxone ? { tenant: a.cxone.tenant, baseUrl: a.cxone.baseUrl, savedBy: a.cxone.savedBy, savedAt: a.cxone.savedAt, lastReadAt: a.cxone.lastReadAt ?? null } : null,
   soldCredits: (a.sales ?? []).reduce((n, x) => n + (Number(x.credits) || 0), 0),
   salesCount: (a.sales ?? []).length,
@@ -264,6 +267,13 @@ export class Accounts {
       Object.assign(report, { sharedAt: new Date().toISOString(), sharedById: user.id, sharedWith: emails, sharedNote: String(note ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300) });
     } else Object.assign(report, { sharedAt: null, sharedById: null, sharedWith: [], sharedNote: '' });
     return this.reports.put(report);
+  }
+  /** Left out of the forecast (the dashboards), or back in. */
+  setMuted(id, teamIds, muted, user) {
+    const account = this.get(id, teamIds);
+    if (muted) Object.assign(account, { muted: true, mutedAt: new Date().toISOString(), mutedById: user.id });
+    else Object.assign(account, { muted: false, mutedAt: null, mutedById: null });
+    return this.accounts.put(account);
   }
   setPrimary(customerId, reportId, teamIds) {
     const account = this.get(customerId, teamIds);

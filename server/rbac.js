@@ -23,6 +23,7 @@ export const PERMISSIONS = [
   { id: 'reports.delete', group: 'Projections', label: 'Delete any report', description: 'Delete projection reports of the teams in scope. Without it, people can delete only their own reports not yet shared with a customer.' },
   { id: 'accounts.delete', group: 'Projections', label: 'Delete accounts', description: 'Delete an account and every report made for it.' },
   { id: 'dashboard.view', group: 'Dashboards', label: 'See the dashboards', description: 'The overview, teams, people and accounts in their scope.' },
+  { id: 'forecast.mute', group: 'Dashboards', label: 'Mute accounts from the forecast', description: 'Leave an account out of the dashboards (its credits, sales and reports), and bring it back. It stays in the Accounts list, marked muted.' },
   { id: 'dashboard.export', group: 'Dashboards', label: 'Export', description: 'Download the accounts and reports in scope as CSV.' },
   { id: 'scope.all', group: 'Scope', label: 'See every team', description: 'Every team and account, whatever team they are in (Executives, Admins).' },
   { id: 'teams.manage', group: 'Administration', label: 'Manage teams', description: 'Create, rename, move and remove teams and choose their leaders.' },
@@ -39,7 +40,7 @@ export const PERMISSION_IDS = PERMISSIONS.map((p) => p.id);
 
 export const DEFAULT_ROLES = {
   admin: { name: 'Admin', description: 'Everything: people, teams, roles, settings and every account.', permissions: PERMISSION_IDS, builtin: true, locked: true, home: 'overview' },
-  executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true, home: 'overview' },
+  executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'forecast.mute', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true, home: 'overview' },
   leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports, and their people (invite, change, reset, turn off).', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'users.manage'], builtin: true, home: 'overview' },
   se: { name: 'Sales Engineer', description: 'Their team’s accounts: generate projections, mark the primary report and record what was shared with the customer.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'dashboard.view'], builtin: true, home: 'calculator' },
   // Customer Success: works out projections for an account, for the Sales Engineer they name as accountable.

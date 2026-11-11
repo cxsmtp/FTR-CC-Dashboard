@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.47.00 — 2026-11-11
+
+- **Mute an account from the forecast (Executives).** In the Accounts list, **Mute from forecast** leaves an account out of every dashboard figure: projected credits, sold, still needed, shared, the teams, the SEs and the largest projections. The account stays in the Accounts list, dimmed and marked **Muted** (who and when on hover), and **Unmute** brings it back. **Status → Muted from the forecast** lists them. A new permission, **Mute accounts from the forecast**, given to the Executive role (the Admin holds every permission); it can be given to other roles under Roles & permissions. Every mute and unmute is in the audit log.
+
 ## CC-01.46.00 — 2026-11-11
 
 - **Open in calculator, right from the Accounts list.** Every row has its own **Open in calculator** button: one click and that account is open in the calculator, without going through its page first.

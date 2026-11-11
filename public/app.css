@@ -968,3 +968,9 @@ details.why[open] > summary { white-space: normal; margin-bottom: 4px; }
 .team-three .bar .track { width: auto !important; max-width: none !important; }
 .calc-open { white-space: nowrap; }
 td .calc-open svg { width: 15px; height: 15px; }
+
+/* Accounts muted from the forecast: still listed, quietly */
+tr.muted-row td { opacity: .55; }
+tr.muted-row td.actions { opacity: 1; }
+.chip.muted-chip { font-size: 11px; padding: 1px 8px; color: var(--muted); border: 1px dashed var(--line-hi); background: transparent; }
+td.actions .mute-btn { margin-right: 6px; }

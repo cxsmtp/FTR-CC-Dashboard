@@ -157,3 +157,31 @@ test('a leader changes the accountable SE of a projection someone else made; tha
   assert.deepEqual(shared.data.reports.find((r) => r.id === rep).sharedWith, ['cfo@customer.example']);
   assert.equal((await viewer.post(`/api/cc/reports/${rep}/shared`, { shared: false })).status, 403);
 });
+
+test('an Executive mutes an account from the forecast: the dashboards leave it out, the list keeps it', async () => {
+  const { reportData, SF } = await import('./helpers.js');
+  const exec = (await env.app.iam.create({ email: 'exec@t.example', name: 'Eve Exec', role: 'executive', teamId: env.teams.global.id })).user;
+  const { hashPassword } = await import('../server/iam.js');
+  Object.assign(exec, { passwordHash: await hashPassword('Test-Password-For-Tests-1'), mustChangePassword: false, guideSeenAt: new Date().toISOString() });
+  env.app.iam.save();
+  env.app.terms.accept(exec.id);
+  const ex = await client(env.base, 'exec@t.example');
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const se = await client(env.base, 'se1@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const id = (await se.post('/api/projections', { name: 'Mute Me Co' }, h)).data.customer.id;
+  await se.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+  await se.post('/api/projections/reports', { customerId: id, data: reportData(70000, 30000) }, h);
+  const before = (await ex.get('/api/dashboard')).data.totals;
+  assert.equal((await lead.post(`/api/cc/accounts/${id}/mute`, { muted: true })).status, 403);
+  assert.equal((await ex.post(`/api/cc/accounts/${id}/mute`, { muted: true })).status, 200);
+  const after = (await ex.get('/api/dashboard')).data.totals;
+  assert.equal(after.accounts, before.accounts - 1);
+  assert.ok(after.credits < before.credits);
+  const listed = (await ex.get('/api/accounts')).data.accounts.find((a) => a.id === id);
+  assert.equal(listed.muted, true);
+  assert.equal(listed.mutedBy, 'Eve Exec');
+  assert.equal((await ex.post(`/api/cc/accounts/${id}/mute`, { muted: false })).status, 200);
+  assert.equal((await ex.get('/api/dashboard')).data.totals.accounts, before.accounts);
+  assert.match(JSON.stringify((await ex.get('/api/audit?limit=50')).data), /account\.mute/);
+});
