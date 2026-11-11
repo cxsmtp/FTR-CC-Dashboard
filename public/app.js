@@ -852,6 +852,22 @@ function cardsPicker(onDone) {
     document.addEventListener('click', close);
   });
 }
+/**
+ * The Overview's teams: the team at the top (Global Solution Engineering: everything rolls up into it) as one fixed
+ * line, then the three teams below it with the most projected credits, each with its share; the rest on Teams.
+ */
+function topTeams(roots, kids) {
+  const top = [...roots].sort((a, b) => b.credits - a.credits)[0];
+  const below = roots.length > 1 ? roots.filter((x) => x !== top) : kids(top.id);
+  const three = [...below].sort((a, b) => b.credits - a.credits).slice(0, 3);
+  const more = below.length - three.length;
+  const total = Math.max(1, top.credits);
+  const meta = (n) => `${num(n.people)} people · ${num(n.accounts)} accounts · ${num(n.shared)} shared · <span class="sold-t">${num(Math.round(n.sold))} sold</span> · ${num(Math.round(n.remaining))} to go`;
+  return `<div class="team-top" data-team="${esc(top.id)}"><div><b>${esc(top.name)}</b><small>${top.leaders.length ? ` · led by ${esc(top.leaders.join(', '))}` : ''}</small><div class="meta">${meta(top)}</div></div><span class="credits">${num(Math.round(top.credits))}</span></div>
+    ${three.length ? `<div class="team-three">${three.map((n, i) => `<div class="node" data-team="${esc(n.id)}"><div class="t3-head"><span class="rank">${i + 1}</span><b title="${esc(n.name)}">${esc(n.name)}</b><span class="credits">${num(Math.round(n.credits))}<small>${pct(n.credits, total)}%</small></span></div>${n.leaders.length ? `<small class="t3-lead">led by ${esc(n.leaders.join(', '))}</small>` : ''}<div class="meta">${num(n.people)} people · ${num(n.accounts)} accounts · ${num(n.shared)} shared<br /><span class="sold-t">${num(Math.round(n.sold))} sold</span> · ${num(Math.round(n.remaining))} to go</div><div class="bar"><div class="track"><i data-w="${pct(n.credits, total)}"></i></div></div></div>`).join('')}</div>` : ''}
+    ${more > 0 ? `<a class="small team-more" href="#/teams">+${num(more)} more team${more === 1 ? '' : 's'} on Teams →</a>` : ''}`;
+}
+
 async function viewOverview(params) {
   const focus = params.get('team') ?? '';
   shell('overview', loading());
@@ -873,11 +889,11 @@ async function viewOverview(params) {
     <div class="head compact"><div class="ht"><h1 class="serif">Overview</h1><span class="crumbs">${esc(scopeName)}</span></div>
       <div class="tools">${teamSelect('focus', focus)}<button type="button" class="ghost" id="cards-btn" title="Choose the cards you see">${icon('overview')}Cards ▾</button>${can('dashboard.export') ? `<a class="btn ghost" href="/api/export/accounts.csv" download title="Every account, as a spreadsheet">${icon('download')}Accounts</a><a class="btn ghost" href="/api/export/reports.csv" download title="Every report, as a spreadsheet">${icon('download')}Reports</a>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('calc')}Open calculator</a>` : ''}</div></div>
     ${overviewTiles(t)}
-    <div class="grid g3">
+    <div>
       <div class="panel"><h2>Teams <small>credits from primary reports, teams below rolled up</small></h2>
-        ${treeRows.length ? `<div class="tree ov">${treeRows.map(({ node, depth }) => `<div class="node" data-team="${esc(node.id)}"><div class="t"><span class="indent" data-indent="${depth}"></span>${depth ? '<span class="twig"></span>' : ''}<div><b>${esc(node.name)}</b><small>${node.leaders.length ? ` · led by ${esc(node.leaders.join(', '))}` : ''}</small><div class="meta">${num(node.people)} people · ${num(node.accounts)} accounts · ${num(node.shared)} shared · <span class="sold-t">${num(Math.round(node.sold))} sold</span> · ${num(Math.round(node.remaining))} to go</div><div class="bar"><div class="track"><i data-w="${pct(node.credits, maxTeam)}"></i></div></div></div></div><span class="credits">${num(Math.round(node.credits))}</span></div>`).join('')}</div>` : '<div class="empty"><b>No teams yet</b>An Admin sets them up under Teams.</div>'}
+        ${treeRows.length ? topTeams(roots, kids) : '<div class="empty"><b>No teams yet</b>An Admin sets them up under Teams.</div>'}
       </div>
-      <div class="panel chart"><h2>Activity <small>last 12 months</small></h2>${monthsChart(d.months)}<div class="legend"><span><i class="lg-a"></i>Reports generated</span><span><i class="lg-b"></i>Shared with customer</span></div></div>
+
     </div>
     <div class="grid g2 mt">
       <div class="panel"><h2>Sales Engineers <small>accounts they are accountable for</small></h2>

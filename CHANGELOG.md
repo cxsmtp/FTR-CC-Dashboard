@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.45.00 — 2026-11-11
+
+- **Overview · Teams: the top team and its three biggest.** The team everything rolls up into (Global Solution Engineering) is one fixed line with its totals; below it, the three teams with the most projected credits, side by side, each with its share, people, accounts, shared, sold and to go. Other teams are a click away on Teams. No more scrolling inside the panel.
+- **The Activity chart is gone from the Overview**: Teams takes the full width.
+
 ## CC-01.44.00 — 2026-11-11
 
 - **The calculator always opens on a new calculation.** From the menu, the home page, **Open calculator** on the Overview or **New in calculator** on the Accounts page (and on a reload), nothing of the last calculation is shown: no account is open, the customer’s Checkmarx One key and git tokens from before are dropped, and the page waits for the new account’s name. Type a name to start one, or pick an existing account by its name. **Open in calculator** on an account page still opens that account.
