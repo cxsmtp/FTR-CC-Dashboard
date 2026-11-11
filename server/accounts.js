@@ -13,6 +13,7 @@
  * customer.
  */
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 import { impactSettings } from '../vendor/mz/public/calculator/model.js';
 import { MAX_PROFILES, migrate, newProfile, newReport, patchProfile, reportMeta, summary } from '../vendor/mz/public/calculator/profiles.js';
@@ -56,6 +57,9 @@ const accountMeta = (a) => ({
   salesforceId: a.salesforceId ?? '',
   primaryReportId: a.primaryReportId ?? null,
   impactEnabled: Boolean(a.impactEnabled),
+  soldCredits: (a.sales ?? []).reduce((n, x) => n + (Number(x.credits) || 0), 0),
+  salesCount: (a.sales ?? []).length,
+  lastSaleAt: (a.sales ?? []).map((x) => x.date).sort().at(-1) ?? null,
   impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed),
 });
 
@@ -132,6 +136,34 @@ export class Accounts {
     this.get(id, teamIds);
     for (const r of this.reports.list().filter((x) => x.customerId === id)) this.reports.remove(r.id);
     this.accounts.remove(id);
+  }
+
+  // ---- Credits sold: one or many sales per account, against its projection --------------------------------------
+  addSale(id, teamIds, { credits, date, reference = '', note = '', reportId = null }, user) {
+    const account = this.get(id, teamIds);
+    const n = Number(credits);
+    if (!Number.isFinite(n) || n <= 0 || n > 1e10) throw fail(400, 'Give the credits sold: a number above zero.');
+    const day = String(date ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(Date.parse(day))) throw fail(400, 'Give the date of the sale.');
+    if (Date.parse(day) > Date.now() + 86400e3) throw fail(400, 'A sale cannot be in the future.');
+    if (reportId) {
+      const r = this.reports.meta(reportId);
+      if (!r || r.customerId !== id) throw fail(400, 'That report is not one of this account\u2019s.');
+    }
+    const plain = (v, max) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
+    const sale = { id: randomUUID(), credits: Math.round(n), date: day, reference: plain(reference, 120), note: plain(note, 300), reportId: reportId || null, byId: user.id, by: user.name, at: new Date().toISOString() };
+    account.sales = [...(account.sales ?? []), sale].slice(-500);
+    this.accounts.put(account);
+    return sale;
+  }
+  removeSale(id, teamIds, saleId, { user, any }) {
+    const account = this.get(id, teamIds);
+    const sale = (account.sales ?? []).find((x) => x.id === saleId);
+    if (!sale) throw fail(404, 'That sale is no longer recorded.');
+    if (!any && sale.byId !== user.id) throw fail(403, 'You can remove only the sales you recorded.');
+    account.sales = account.sales.filter((x) => x.id !== saleId);
+    this.accounts.put(account);
+    return sale;
   }
 
   // ---- Reports ----------------------------------------------------------------------------------

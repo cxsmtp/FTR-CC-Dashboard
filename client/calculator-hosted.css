@@ -41,6 +41,7 @@
 .hc-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); }
 .hc-pill.ok { color: #047857; border-color: rgba(4, 120, 87, .35); }
 .hc-pill.warn { color: #b45309; border-color: rgba(180, 83, 9, .35); }
+.hc-sold b { color: #047857; }
 .hc-pill.bad { color: #b91c1c; border-color: rgba(185, 28, 28, .35); }
 @media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; } }
 

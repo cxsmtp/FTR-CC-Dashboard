@@ -264,3 +264,41 @@ test('background work: what runs for this person, for the dashboard', async () =
   const viewer = await client(env.base, 'viewer@t.example');
   assert.equal((await viewer.get('/api/cc/work')).status, 403);
 });
+
+test('credits sold: one or many sales per account, against its projection, rolled up', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const se2 = await client(env.base, 'se2@t.example');
+  const h = team(env.teams.emea.id);
+  const { data } = await se1.post('/api/projections', { name: 'Sold Corp' }, h);
+  const id = data.customer.id;
+  await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+  const rep = (await se1.post('/api/projections/reports', { customerId: id, data: reportData(80000, 20000) }, h)).data.report;
+  assert.equal(rep.totalCredits, 110000);
+  assert.equal((await se1.post(`/api/cc/accounts/${id}/sales`, { credits: 0 })).status, 400);
+  assert.equal((await se1.post(`/api/cc/accounts/${id}/sales`, { credits: 10, date: '2999-01-01' })).status, 400);
+  let a = (await se1.post(`/api/cc/accounts/${id}/sales`, { credits: 50000, date: '2026-10-01', reference: '006AB000001xYzQ', reportId: rep.id })).data;
+  assert.equal(a.account.sold, 50000);
+  assert.equal(a.account.remaining, 60000);
+  // A teammate records the second sale; they cannot remove the first, which is not theirs.
+  a = (await se2.post(`/api/cc/accounts/${id}/sales`, { credits: 25000, note: 'Expansion' })).data;
+  assert.equal(a.account.sold, 75000);
+  assert.equal(a.sales.length, 2);
+  const first = a.sales.find((x) => x.credits === 50000);
+  assert.equal((await se2.del(`/api/cc/accounts/${id}/sales/${first.id}`)).status, 403);
+  const listed = (await se1.get('/api/accounts')).data.accounts.find((x) => x.id === id);
+  assert.equal(listed.sold, 75000);
+  assert.equal(listed.remaining, 35000);
+  const vp = await client(env.base, 'vp@t.example');
+  const dash = (await vp.get('/api/dashboard')).data;
+  assert.ok(dash.totals.sold >= 75000);
+  assert.ok(dash.teams.find((t) => t.id === env.teams.emea.id).sold >= 75000);
+  assert.match((await vp.get('/api/export/accounts.csv')).data, /Credits sold,Still needed/);
+  // Another team cannot see or record.
+  const apac = await client(env.base, 'apac@t.example');
+  assert.equal((await apac.post(`/api/cc/accounts/${id}/sales`, { credits: 1 })).status, 404);
+  // The leader (Delete any report) can remove anyone's; viewers cannot record.
+  const lead = await client(env.base, 'emea.lead@t.example');
+  assert.equal((await lead.del(`/api/cc/accounts/${id}/sales/${first.id}`)).status, 200);
+  const viewer = await client(env.base, 'viewer@t.example');
+  assert.equal((await viewer.post(`/api/cc/accounts/${id}/sales`, { credits: 1 })).status, 403);
+});

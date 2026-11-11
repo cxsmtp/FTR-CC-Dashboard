@@ -378,3 +378,23 @@ details.menu > summary::-webkit-details-marker { display: none; }
 .flex > select, .flex select { width: auto; flex: 0 0 auto; }
 .bgwork .orbit.sm { overflow: visible; }
 .bgwork > span:last-child { min-width: 0; flex: 1; }
+
+/* Credits sold */
+@media (min-width: 1280px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.kpi.sold .v { color: var(--green); }
+.kpi.need .v { color: var(--violet); }
+.sold-t { color: var(--green); }
+.sold-m { color: var(--green) !important; }
+.tree.ov .node { grid-template-columns: 1fr auto; }
+.tree.ov .node .t > div { min-width: 0; flex: 1; }
+.node .meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.sold-strip { display: grid; grid-template-columns: repeat(3, minmax(120px, 180px)) 1fr; gap: 12px; align-items: center; }
+.sold-strip > div:not(.sold-bar) { padding: 12px 14px; border-radius: 14px; background: var(--panel-hi); border: 1px solid var(--line); }
+.sold-strip small { display: block; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; }
+.sold-strip b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.sold-bar .track { display: block; height: 12px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.sold-bar .track i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #10b981, #22d3ee); transition: width .7s; }
+.sold-bar small { margin-top: 8px; text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.sale-form { padding: 14px; border-radius: 14px; border: 1px dashed var(--line-hi); }
+tfoot td { border-bottom: 0; font-weight: 600; }
+@media (max-width: 900px) { .sold-strip { grid-template-columns: 1fr 1fr 1fr; } .sold-bar { grid-column: 1 / -1; } }

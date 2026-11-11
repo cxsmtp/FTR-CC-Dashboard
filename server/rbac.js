@@ -19,6 +19,7 @@ import { fail } from './store.js';
 export const PERMISSIONS = [
   { id: 'calculator.use', group: 'Projections', label: 'Use the calculator', description: 'Open the Cx Credits Calculator, add accounts and generate projection reports for the accounts of the teams they work in.' },
   { id: 'reports.share', group: 'Projections', label: 'Mark reports shared and primary', description: 'Mark which report is the primary one for an account and record when a report was shared with the customer.' },
+  { id: 'sales.record', group: 'Projections', label: 'Record credits sold', description: 'Record the credits actually sold for an account (one or many sales), so what is still needed against its projection is known. People remove their own records; with "Delete any report" anyone\u2019s.' },
   { id: 'reports.delete', group: 'Projections', label: 'Delete any report', description: 'Delete projection reports of the teams in scope. Without it, people can delete only their own reports not yet shared with a customer.' },
   { id: 'accounts.delete', group: 'Projections', label: 'Delete accounts', description: 'Delete an account and every report made for it.' },
   { id: 'dashboard.view', group: 'Dashboards', label: 'See the dashboards', description: 'The overview, teams, people and accounts in their scope.' },
@@ -38,9 +39,9 @@ export const PERMISSION_IDS = PERMISSIONS.map((p) => p.id);
 
 export const DEFAULT_ROLES = {
   admin: { name: 'Admin', description: 'Everything: people, teams, roles, settings and every account.', permissions: PERMISSION_IDS, builtin: true, locked: true },
-  executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true },
-  leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports, and their people (invite, change, reset, turn off).', permissions: ['calculator.use', 'reports.share', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'users.manage'], builtin: true },
-  se: { name: 'Sales Engineer', description: 'Their team’s accounts: generate projections, mark the primary report and record what was shared with the customer.', permissions: ['calculator.use', 'reports.share', 'dashboard.view'], builtin: true },
+  executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true },
+  leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports, and their people (invite, change, reset, turn off).', permissions: ['calculator.use', 'reports.share', 'sales.record', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'users.manage'], builtin: true },
+  se: { name: 'Sales Engineer', description: 'Their team’s accounts: generate projections, mark the primary report and record what was shared with the customer.', permissions: ['calculator.use', 'reports.share', 'sales.record', 'dashboard.view'], builtin: true },
   viewer: { name: 'Viewer', description: 'Read only: the dashboards of their team (and teams they lead).', permissions: ['dashboard.view'], builtin: true },
 };
 

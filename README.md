@@ -6,6 +6,7 @@ The **Cx Credits Calculator**, hosted for every Sales Engineer, with team-based 
 
 - **The same calculator.** The page, the projection, the Checkmarx One reads, Fusion from git and cloc-fusion, and the reports and PDF are CxMissionZero's code, copied unchanged into `vendor/mz/` (currently **MZ-01.01.08**, the same code as the released FTR-CreditCalculator).
 - **Accounts tied to Salesforce.** Every account carries its Salesforce **opportunity or account link**. It is required before a report can be generated, and it is one click away (new tab) everywhere.
+- **Credits sold vs projected.** Record the credits actually sold per account, as one sale or many. Sold, still needed and % sold show on the account, roll up the team tree, and appear in the accounts list and CSV.
 - **Many reports, one primary.** SEs generate as many reports as they need and mark one **primary**; otherwise the **latest** counts. They also record which reports were **shared with the customer**.
 - **Team structure and RBAC.** Teams form a tree (Global → regions → teams). Everyone in a team works on all of its accounts together. Leaders see every team below them; Executives and Admins see every team. Other teams' accounts are invisible. There are five roles (Admin, Executive, Leader, Sales Engineer, Viewer) plus custom roles, and nobody can grant what they do not hold.
 - **Dashboards.** Projected credits from primary reports (T&R and Fusion), rolled up the team tree; per SE, per account, the largest projections, activity by month, accounts missing a Salesforce link; CSV export.

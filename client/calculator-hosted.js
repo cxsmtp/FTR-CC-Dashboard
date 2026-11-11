@@ -269,7 +269,8 @@ export function startHosted() {
       else parts.push(`<span class="hc-pill ok">${esc(a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account')} ${esc(a.salesforceId)}</span>`);
       parts.push(`<span><b>${num(a.reportCount)}</b> report${a.reportCount === 1 ? '' : 's'}, <b>${num(a.sharedCount)}</b> shared with the customer</span>`);
       if (p) parts.push(`<span>${p.how === 'marked' ? 'Primary' : 'Primary (latest, none marked)'}: <b>${num(p.totalCredits)}</b> credits · ${esc(fmtDateTime(p.createdAt))} by ${esc(p.createdBy)}</span>`);
-      parts.push(`<a href="/#/accounts/${encodeURIComponent(a.id)}">Mark primary and shared →</a>`);
+      if (p) parts.push(`<span class="hc-sold">Sold <b>${num(a.sold)}</b> · still needed <b>${num(a.remaining)}</b></span>`);
+      parts.push(`<a href="/#/accounts/${encodeURIComponent(a.id)}">Mark primary and shared, record sales →</a>`);
       $('hc-reports').innerHTML = parts.join('');
       $('hc-impact').disabled = false;
       $('hc-impact').checked = Boolean(a.impactEnabled);

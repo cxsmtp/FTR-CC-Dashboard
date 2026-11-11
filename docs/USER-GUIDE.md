@@ -74,9 +74,15 @@ Open **Accounts**, then the account:
 - **Mark shared** records that you sent that report to the customer, with an optional note ("Emailed to the CISO, 12 Nov"). Leaders see how many reports went to customers.
 - **Delete:** your own reports that were not shared yet. Leaders can delete any in their teams.
 
+### Credits sold
+
+On the account page, **Credits sold** keeps what was actually sold, as one sale or many. Enter the credits, the date, and optionally the Salesforce opportunity or order, the report it was sold against, and a note. **Sold…** on a report row fills that report in. **Fill in what is still needed** puts the remainder in the credits box.
+
+The projection is the primary report's total, so the account shows **sold so far**, **still needed** and **% sold**. Remove a sale you recorded with the bin icon; Leaders and above can remove anyone's.
+
 ## 5. Dashboards (leaders)
 
-- **Overview:** the credits projected from each account's primary report (T&R and Fusion), accounts with a report, reports generated, reports shared with customers, and accounts still missing a Salesforce link. The team tree rolls up every team below. **Click a team** to see its accounts, or **an SE** to see theirs. **All my teams ▾** narrows everything to one team.
+- **Overview:** the credits projected from each account's primary report (T&R and Fusion), **credits sold** and **still needed**, accounts with a report, reports generated, reports shared with customers, and accounts still missing a Salesforce link. The team tree rolls up every team below. **Click a team** to see its accounts, or **an SE** to see theirs. **All my teams ▾** narrows everything to one team.
 - **Accounts:** search and filter by team, SE and status (missing Salesforce link, no report, not shared, shared, no primary). The **Opportunity/Account** chip opens Salesforce in a new tab. Click a row for the account's reports.
 - **Accounts CSV / Reports CSV:** export what you see, for a forecast call or a spreadsheet.
 

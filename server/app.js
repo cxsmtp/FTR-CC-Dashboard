@@ -430,6 +430,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         reportCount: own.length,
         sharedCount: own.filter((x) => x.sharedAt).length,
         lastReportAt: own[0]?.createdAt ?? null,
+        sold: a.soldCredits ?? 0,
+        salesCount: a.salesCount ?? 0,
+        lastSaleAt: a.lastSaleAt ?? null,
+        remaining: p ? Math.max(0, Math.round((Number(p.totalCredits) || 0) - (a.soldCredits ?? 0))) : null,
         primary: p ? { id: p.id, how, createdAt: p.createdAt, createdBy: p.createdBy, createdById: p.createdById, trCredits: p.trCredits, fusionCredits: p.fusionCredits, totalCredits: p.totalCredits, bundles: p.bundles, sharedAt: p.sharedAt } : null,
       };
     });
@@ -451,6 +455,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       accountsShared: list.filter((a) => a.sharedCount > 0).length,
       primaryMarked: list.filter((a) => a.primary?.how === 'marked').length,
       credits: sum(list),
+      sold: list.reduce((n, a) => n + (a.sold || 0), 0),
+      remaining: list.reduce((n, a) => n + (a.remaining || 0), 0),
+      accountsWithSales: list.filter((a) => a.sold > 0).length,
       trCredits: sumOf(list, 'trCredits'),
       fusionCredits: sumOf(list, 'fusionCredits'),
     };
@@ -460,13 +467,13 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       const below = subtree(ctx.teams, t.id);
       const mine = list.filter((a) => below.has(a.teamId));
       const people = iam.users().filter((u) => below.has(u.teamId) && u.active !== false);
-      return { id: t.id, name: t.name, region: t.region, parentId: teamIds.has(t.parentId) ? t.parentId : null, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaders: (t.leaderIds ?? []).map(userName), people: people.length, accounts: mine.length, withReport: mine.filter((a) => a.primary).length, shared: mine.filter((a) => a.sharedCount > 0).length, missingSalesforce: mine.filter((a) => !a.salesforceUrl).length, credits: sum(mine) };
+      return { id: t.id, name: t.name, region: t.region, parentId: teamIds.has(t.parentId) ? t.parentId : null, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaders: (t.leaderIds ?? []).map(userName), people: people.length, accounts: mine.length, withReport: mine.filter((a) => a.primary).length, shared: mine.filter((a) => a.sharedCount > 0).length, missingSalesforce: mine.filter((a) => !a.salesforceUrl).length, credits: sum(mine), sold: mine.reduce((n, a) => n + (a.sold || 0), 0), remaining: mine.reduce((n, a) => n + (a.remaining || 0), 0) };
     });
     // Each person in view: what they own and what they made.
     const people = peopleInScope(ctx.user, teamIds, iam.users()).filter((u) => u.active !== false && teamIds.has(u.teamId)).map((u) => {
       const owned = list.filter((a) => a.ownerId === u.id);
       const made = reports.filter((x) => x.createdById === u.id);
-      return { id: u.id, name: u.name, title: u.title, role: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamId: u.teamId, accounts: owned.length, withReport: owned.filter((a) => a.primary).length, reports: made.length, shared: made.filter((x) => x.sharedAt).length, missingSalesforce: owned.filter((a) => !a.salesforceUrl).length, credits: sum(owned), lastReportAt: made[0]?.createdAt ?? null };
+      return { id: u.id, name: u.name, title: u.title, role: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamId: u.teamId, accounts: owned.length, withReport: owned.filter((a) => a.primary).length, reports: made.length, shared: made.filter((x) => x.sharedAt).length, missingSalesforce: owned.filter((a) => !a.salesforceUrl).length, credits: sum(owned), sold: owned.reduce((n, a) => n + (a.sold || 0), 0), remaining: owned.reduce((n, a) => n + (a.remaining || 0), 0), lastReportAt: made[0]?.createdAt ?? null };
     });
     // Reports a month, the last 12 months.
     const months = [];
@@ -496,10 +503,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const members = iam.users().filter((u) => u.active !== false && u.teamId === a.teamId).map((u) => ({ id: u.id, name: u.name }));
     if (a.ownerId && !members.some((m) => m.id === a.ownerId)) members.push({ id: a.ownerId, name: userName(a.ownerId) });
     return {
-      account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, impactEnabled: Boolean(a.impactEnabled), impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed), impactCurrency: a.impact?.currency ?? 'USD', reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
+      account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, sold: (a.sales ?? []).reduce((n, x) => n + x.credits, 0), remaining: p ? Math.max(0, Math.round(p.totalCredits - (a.sales ?? []).reduce((n, x) => n + x.credits, 0))) : null, impactEnabled: Boolean(a.impactEnabled), impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed), impactCurrency: a.impact?.currency ?? 'USD', reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
       reports: reps,
+      sales: [...(a.sales ?? [])].sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.at).localeCompare(String(x.at))),
       members,
-      can: { edit: ctx.permissions.has('calculator.use'), share: ctx.permissions.has('reports.share'), deleteAccount: ctx.permissions.has('accounts.delete') },
+      can: { edit: ctx.permissions.has('calculator.use'), share: ctx.permissions.has('reports.share'), deleteAccount: ctx.permissions.has('accounts.delete'), sell: ctx.permissions.has('sales.record'), removeAnySale: ctx.permissions.has('reports.delete'), me: ctx.user.id },
     };
   };
   r('GET', '/api/cc/accounts/:id', ready2, (req, ctx, body, res, url, params) => accountDetail(ctx, params.id));
@@ -533,6 +541,17 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     accounts.remove(params.id, ctx.scope);
     record(ctx, req, 'account.delete', a.name, { id: a.id });
     return { ok: true };
+  });
+  r('POST', '/api/cc/accounts/:id/sales', perm('sales.record'), (req, ctx, body, res, url, params) => {
+    const sale = accounts.addSale(params.id, ctx.scope, { credits: body?.credits, date: body?.date, reference: body?.reference, note: body?.note, reportId: body?.reportId }, ctx.user);
+    const a = accounts.accounts.meta(params.id);
+    record(ctx, req, 'sale.record', a.name, { id: sale.id, credits: sale.credits, date: sale.date, reference: sale.reference, reportId: sale.reportId });
+    return accountDetail(ctx, params.id);
+  });
+  r('DELETE', '/api/cc/accounts/:id/sales/:sale', perm('sales.record'), (req, ctx, body, res, url, params) => {
+    const sale = accounts.removeSale(params.id, ctx.scope, params.sale, { user: ctx.user, any: ctx.permissions.has('reports.delete') });
+    record(ctx, req, 'sale.remove', accounts.accounts.meta(params.id)?.name ?? '', { id: sale.id, credits: sale.credits, date: sale.date });
+    return accountDetail(ctx, params.id);
   });
   r('POST', '/api/cc/reports/:id/primary', perm('reports.share'), (req, ctx, body, res, url, params) => {
     const rep = accounts.report(params.id, ctx.scope);
@@ -569,7 +588,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/api/export/accounts.csv', perm('dashboard.export'), (req, ctx, body, res) => {
     const { accounts: list } = rows(ctx);
     record(ctx, req, 'export.accounts', '', { rows: list.length });
-    return { csv: csv(['Account', 'Team', 'Accountable SE', 'Salesforce', 'Salesforce record', 'Primary report', 'Primary is', 'T&R credits', 'Fusion credits', 'Total credits', 'Bundles', 'Reports', 'Shared with customer', 'Last report'], list.map((a) => [a.name, a.teamPath, a.owner, a.salesforceUrl, a.salesforceId, a.primary?.createdAt ?? '', a.primary?.how ?? '', a.primary?.trCredits ?? '', a.primary?.fusionCredits ?? '', a.primary?.totalCredits ?? '', a.primary?.bundles ?? '', a.reportCount, a.sharedCount, a.lastReportAt ?? ''])), name: 'accounts.csv' };
+    return { csv: csv(['Account', 'Team', 'Accountable SE', 'Salesforce', 'Salesforce record', 'Primary report', 'Primary is', 'T&R credits', 'Fusion credits', 'Total credits', 'Bundles', 'Credits sold', 'Still needed', 'Sales', 'Last sale', 'Reports', 'Shared with customer', 'Last report'], list.map((a) => [a.name, a.teamPath, a.owner, a.salesforceUrl, a.salesforceId, a.primary?.createdAt ?? '', a.primary?.how ?? '', a.primary?.trCredits ?? '', a.primary?.fusionCredits ?? '', a.primary?.totalCredits ?? '', a.primary?.bundles ?? '', a.sold, a.remaining ?? '', a.salesCount, a.lastSaleAt ?? '', a.reportCount, a.sharedCount, a.lastReportAt ?? ''])), name: 'accounts.csv' };
   });
   r('GET', '/api/export/reports.csv', perm('dashboard.export'), (req, ctx) => {
     const { reports } = rows(ctx);

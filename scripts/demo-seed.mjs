@@ -85,6 +85,18 @@ for (const region of regions) {
         last = rep;
       }
       if (last && rand() < 0.6) accounts.setPrimary(a.id, last.id, new Set([team.id]));
+      // Some of what was projected has been sold: one sale or several.
+      const primary = accounts.primaryOf(accounts.accounts.meta(a.id)).report;
+      if (primary && rand() < 0.65) {
+        let left = primary.totalCredits * (0.25 + rand() * 0.85);
+        const parts = 1 + Math.floor(rand() * 3);
+        for (let k = 0; k < parts && left > 1000; k++) {
+          const credits = Math.round((k === parts - 1 ? left : left * (0.3 + rand() * 0.4)) / 1000) * 1000;
+          left -= credits;
+          const day = new Date(Date.now() - rand() * 120 * 86400e3).toISOString().slice(0, 10);
+          accounts.addSale(a.id, new Set([team.id]), { credits, date: day, reference: `${sfId('006').slice(0, 15)}`, note: pick(['Year 1', 'Initial bundle', 'Expansion', 'Q4 order']), reportId: primary.id }, se);
+        }
+      }
     }
   }
 }

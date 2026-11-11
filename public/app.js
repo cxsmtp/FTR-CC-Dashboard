@@ -454,6 +454,8 @@ async function viewOverview(params) {
       <div class="tools">${teamSelect('focus', focus)}${can('dashboard.export') ? `<a class="btn" href="/api/export/accounts.csv" download>${icon('download')}Accounts CSV</a><a class="btn ghost" href="/api/export/reports.csv" download>${icon('download')}Reports CSV</a>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('calc')}Open calculator</a>` : ''}</div></div>
     <div class="kpis">
       <div class="kpi hero"><div class="k">Projected credits · primary reports</div><div class="v">${num(Math.round(t.credits))}</div><div class="s">T&amp;R ${num(Math.round(t.trCredits))} · Fusion ${num(Math.round(t.fusionCredits))} · across ${num(t.withReport)} account${t.withReport === 1 ? '' : 's'}</div></div>
+      <div class="kpi sold"><div class="k">Credits sold</div><div class="v">${num(Math.round(t.sold))}</div><div class="s">${pct(t.sold, t.credits)}% of the projection · ${num(t.accountsWithSales)} account${t.accountsWithSales === 1 ? '' : 's'}</div><div class="meter"><i data-w="${pct(t.sold, t.credits)}"></i></div></div>
+      <div class="kpi need"><div class="k">Still needed</div><div class="v">${num(Math.round(t.remaining))}</div><div class="s">projected and not sold yet</div></div>
       <div class="kpi"><div class="k">Accounts</div><div class="v">${num(t.accounts)}</div><div class="s">${num(t.withReport)} with a report</div><div class="meter"><i data-w="${pct(t.withReport, t.accounts)}"></i></div></div>
       <div class="kpi"><div class="k">Reports generated</div><div class="v">${num(t.reports)}</div><div class="s">${num(t.primaryMarked)} account${t.primaryMarked === 1 ? '' : 's'} with a primary marked</div></div>
       <div class="kpi"><div class="k">Shared with customers</div><div class="v">${num(t.sharedReports)}</div><div class="s">${num(t.accountsShared)} of ${num(t.accounts)} accounts</div><div class="meter"><i data-w="${pct(t.accountsShared, t.accounts)}"></i></div></div>
@@ -461,16 +463,16 @@ async function viewOverview(params) {
     </div>
     <div class="grid g3">
       <div class="panel"><h2>Teams <small>credits from primary reports, teams below rolled up</small></h2>
-        ${treeRows.length ? `<div class="tree">${treeRows.map(({ node, depth }) => `<div class="node" data-team="${esc(node.id)}"><div class="t"><span class="indent" data-indent="${depth}"></span>${depth ? '<span class="twig"></span>' : ''}<div><b>${esc(node.name)}</b><small>${node.leaders.length ? ` · led by ${esc(node.leaders.join(', '))}` : ''}</small><div class="bar"><div class="track"><i data-w="${pct(node.credits, maxTeam)}"></i></div></div></div></div><span class="m">${num(node.people)} people</span><span class="m">${num(node.accounts)} accounts · ${num(node.shared)} shared</span><span class="credits">${num(Math.round(node.credits))}</span></div>`).join('')}</div>` : '<div class="empty"><b>No teams yet</b>An Admin sets them up under Teams.</div>'}
+        ${treeRows.length ? `<div class="tree ov">${treeRows.map(({ node, depth }) => `<div class="node" data-team="${esc(node.id)}"><div class="t"><span class="indent" data-indent="${depth}"></span>${depth ? '<span class="twig"></span>' : ''}<div><b>${esc(node.name)}</b><small>${node.leaders.length ? ` · led by ${esc(node.leaders.join(', '))}` : ''}</small><div class="meta">${num(node.people)} people · ${num(node.accounts)} accounts · ${num(node.shared)} shared · <span class="sold-t">${num(Math.round(node.sold))} sold</span> · ${num(Math.round(node.remaining))} to go</div><div class="bar"><div class="track"><i data-w="${pct(node.credits, maxTeam)}"></i></div></div></div></div><span class="credits">${num(Math.round(node.credits))}</span></div>`).join('')}</div>` : '<div class="empty"><b>No teams yet</b>An Admin sets them up under Teams.</div>'}
       </div>
       <div class="panel chart"><h2>Activity <small>last 12 months</small></h2>${monthsChart(d.months)}<div class="legend"><span><i class="lg-a"></i>Reports generated</span><span><i class="lg-b"></i>Shared with customer</span></div></div>
     </div>
     <div class="grid g2 mt">
       <div class="panel"><h2>Sales Engineers <small>accounts they are accountable for</small></h2>
-        ${sePeople.length ? `<div class="bars">${sePeople.slice(0, 12).map((p) => `<div class="bar click" data-person="${esc(p.id)}"><div class="name"><div class="flex"><span class="avatar sm">${esc(initials(p.name))}</span><div>${esc(p.name)}<small>${esc(p.team)} · ${num(p.accounts)} accounts · ${num(p.reports)} reports · ${num(p.shared)} shared${p.missingSalesforce ? ` · <span class="warn-t">${num(p.missingSalesforce)} no SF</span>` : ''}</small></div></div></div><div class="track"><i data-w="${pct(p.credits, maxPerson)}"></i></div><div class="val">${num(Math.round(p.credits))}</div></div>`).join('')}</div>${sePeople.length > 12 ? `<a class="more" href="#/accounts">${num(sePeople.length - 12)} more: see every account →</a>` : ''}` : '<div class="empty"><b>No accounts yet</b>They appear once Sales Engineers add accounts in the calculator.</div>'}
+        ${sePeople.length ? `<div class="bars">${sePeople.slice(0, 12).map((p) => `<div class="bar click" data-person="${esc(p.id)}"><div class="name"><div class="flex"><span class="avatar sm">${esc(initials(p.name))}</span><div>${esc(p.name)}<small>${esc(p.team)} · ${num(p.accounts)} accounts · ${num(p.reports)} reports · ${num(p.shared)} shared · <span class="sold-t">${num(Math.round(p.sold))} sold</span>${p.missingSalesforce ? ` · <span class="warn-t">${num(p.missingSalesforce)} no SF</span>` : ''}</small></div></div></div><div class="track"><i data-w="${pct(p.credits, maxPerson)}"></i></div><div class="val">${num(Math.round(p.credits))}</div></div>`).join('')}</div>${sePeople.length > 12 ? `<a class="more" href="#/accounts">${num(sePeople.length - 12)} more: see every account →</a>` : ''}` : '<div class="empty"><b>No accounts yet</b>They appear once Sales Engineers add accounts in the calculator.</div>'}
       </div>
       <div class="panel"><h2>Largest projections <small>primary report per account</small></h2>
-        ${d.top.length ? `<div class="tw"><table><thead><tr><th>Account</th><th>SE</th><th class="num">Credits</th><th></th></tr></thead><tbody>${d.top.map((a) => `<tr class="click" data-account="${esc(a.id)}"><td><b>${esc(a.name)}</b><span class="sub">${esc(a.team)}</span></td><td>${esc(a.owner)}</td><td class="num"><span class="credits big">${num(Math.round(a.primary.totalCredits))}</span></td><td>${sfChip(a)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No reports yet</b>Generate the first one in the calculator.</div>'}
+        ${d.top.length ? `<div class="tw"><table><thead><tr><th>Account</th><th>SE</th><th class="num">Credits</th><th class="num">Sold</th><th></th></tr></thead><tbody>${d.top.map((a) => `<tr class="click" data-account="${esc(a.id)}"><td><b>${esc(a.name)}</b><span class="sub">${esc(a.team)}</span></td><td>${esc(a.owner)}</td><td class="num"><span class="credits big">${num(Math.round(a.primary.totalCredits))}</span></td><td class="num">${soldCell(a)}</td><td>${sfChip(a)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No reports yet</b>Generate the first one in the calculator.</div>'}
       </div>
     </div>
     <div class="panel mt"><h2>Latest reports <small>${num(d.recent.length)} most recent</small></h2>
@@ -520,6 +522,14 @@ function monthsChart(months) {
 
 const sfChip = (a) => (a.salesforceUrl ? `<a class="chip sf" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open in Salesforce (new tab)">${icon('ext')}${a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account'}</a>` : '<span class="chip bad"><i></i>No SF link</span>');
 
+/** Credits sold for an account, and how far that goes against its projection. */
+const soldCell = (a) => {
+  const total = Number(a.primary?.totalCredits) || 0;
+  if (!a.sold) return '<span class="muted">—</span>';
+  const p = total ? Math.min(100, Math.round((a.sold / total) * 100)) : 100;
+  return `<span class="credits">${num(Math.round(a.sold))}</span><span class="sub">${total ? `${p}%` : ''}${a.salesCount > 1 ? ` · ${num(a.salesCount)} sales` : ''}</span>`;
+};
+
 // ---- Accounts --------------------------------------------------------------------------------------------
 async function viewAccounts(params) {
   const focus = params.get('team') ?? '';
@@ -536,14 +546,14 @@ async function viewAccounts(params) {
         <div class="search">${icon('search')}<input id="q" placeholder="Search accounts, SEs, Salesforce ids" /></div>
         <div>${teamSelect('team', focus)}</div>
         <div><select id="owner"><option value="">Every SE</option>${owners.map(([id, name]) => `<option value="${esc(id)}"${id === params.get('owner') ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select></div>
-        <div><select id="status"><option value="">Any status</option><option value="nosf">Missing Salesforce link</option><option value="noreport">No report yet</option><option value="notshared">Report not shared</option><option value="shared">Shared with customer</option><option value="noprimary">No primary marked</option></select></div>
+        <div><select id="status"><option value="">Any status</option><option value="nosf">Missing Salesforce link</option><option value="noreport">No report yet</option><option value="notshared">Report not shared</option><option value="shared">Shared with customer</option><option value="unsold">Projected, nothing sold yet</option><option value="partly">Partly sold</option><option value="sold">Fully sold</option><option value="noprimary">No primary marked</option></select></div>
         <span class="spacer"></span><span class="muted small" id="count"></span>
       </div>
       <div class="tw mt"><table><thead><tr>
-        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th>Salesforce</th><th class="sort num" data-k="tr">T&amp;R</th><th class="sort num" data-k="fusion">Fusion</th><th class="sort num" data-k="credits">Total credits</th><th class="sort num" data-k="reports">Reports</th><th>Customer</th><th class="sort" data-k="last">Last report</th>
+        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th>Salesforce</th><th class="sort num" data-k="tr">T&amp;R</th><th class="sort num" data-k="fusion">Fusion</th><th class="sort num" data-k="credits">Total credits</th><th class="sort num" data-k="sold">Sold</th><th class="sort num" data-k="remaining">Still needed</th><th class="sort num" data-k="reports">Reports</th><th>Customer</th><th class="sort" data-k="last">Last report</th>
       </tr></thead><tbody id="rows"></tbody></table></div>
     </div>`;
-  const val = (a, k) => ({ name: a.name.toLowerCase(), owner: String(a.owner).toLowerCase(), tr: a.primary?.trCredits ?? -1, fusion: a.primary?.fusionCredits ?? -1, credits: a.primary?.totalCredits ?? -1, reports: a.reportCount, last: a.lastReportAt ?? '' })[k];
+  const val = (a, k) => ({ name: a.name.toLowerCase(), owner: String(a.owner).toLowerCase(), tr: a.primary?.trCredits ?? -1, fusion: a.primary?.fusionCredits ?? -1, credits: a.primary?.totalCredits ?? -1, reports: a.reportCount, sold: a.sold ?? 0, remaining: a.remaining ?? -1, last: a.lastReportAt ?? '' })[k];
   const render = () => {
     const q = $('#q').value.trim().toLowerCase();
     const owner = $('#owner').value;
@@ -551,7 +561,8 @@ async function viewAccounts(params) {
     const list = accounts
       .filter((a) => !q || [a.name, a.owner, a.team, a.salesforceId].some((s) => String(s ?? '').toLowerCase().includes(q)))
       .filter((a) => !owner || a.ownerId === owner)
-      .filter((a) => !status || (status === 'nosf' ? !a.salesforceUrl : status === 'noreport' ? !a.primary : status === 'notshared' ? a.primary && !a.sharedCount : status === 'shared' ? a.sharedCount > 0 : a.primary && a.primary.how !== 'marked'))
+      .filter((a) => !['unsold', 'partly', 'sold'].includes(status) || (status === 'unsold' ? a.primary && !a.sold : status === 'partly' ? a.sold > 0 && a.remaining > 0 : a.sold > 0 && a.remaining === 0))
+      .filter((a) => !status || ['unsold', 'partly', 'sold'].includes(status) || (status === 'nosf' ? !a.salesforceUrl : status === 'noreport' ? !a.primary : status === 'notshared' ? a.primary && !a.sharedCount : status === 'shared' ? a.sharedCount > 0 : a.primary && a.primary.how !== 'marked'))
       .sort((a, b) => (val(a, sort.key) > val(b, sort.key) ? 1 : val(a, sort.key) < val(b, sort.key) ? -1 : 0) * sort.dir);
     $('#count').textContent = `${num(list.length)} of ${num(accounts.length)} accounts`;
     $('#rows').innerHTML = list.length
@@ -562,10 +573,12 @@ async function viewAccounts(params) {
         <td class="num">${a.primary ? num(Math.round(a.primary.trCredits ?? 0)) : '—'}</td>
         <td class="num">${a.primary ? num(Math.round(a.primary.fusionCredits ?? 0)) : '—'}</td>
         <td class="num">${a.primary ? `<span class="credits big">${num(Math.round(a.primary.totalCredits))}</span>${a.primary.how === 'latest' ? '<span class="sub">latest · none marked</span>' : '<span class="sub">primary</span>'}` : '<span class="muted">No report</span>'}</td>
+        <td class="num">${soldCell(a)}</td>
+        <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td class="num">${num(a.reportCount)}</td>
         <td>${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
         <td>${esc(ago(a.lastReportAt))}</td></tr>`).join('')
-      : '<tr><td colspan="9"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>';
+      : '<tr><td colspan="11"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>';
     for (const el of $$('[data-account]')) el.onclick = (e) => !e.target.closest('a') && go(`/accounts/${encodeURIComponent(el.dataset.account)}`);
   };
   for (const th of $$('th.sort')) th.onclick = () => {
@@ -615,14 +628,16 @@ async function viewAccount(id) {
         ${d.can.deleteAccount ? '<div class="mt"><button class="danger sm" id="del-acct">Delete account and its reports</button></div>' : ''}
       </div>
     </div>
+    ${salesPanel(a, d)}
     <div class="panel mt"><h2>Reports <small>download them from the calculator's Saved reports list</small></h2>
       ${d.reports.length ? `<div class="tw"><table><thead><tr><th></th><th>Made</th><th>By</th><th class="num">T&amp;R</th><th class="num">Fusion</th><th class="num">Total</th><th>Shared with customer</th><th></th></tr></thead><tbody>${d.reports.map((r) => {
         const primary = a.primary?.id === r.id;
         return `<tr data-id="${esc(r.id)}"><td>${primary ? `<span class="chip star">${icon('star')}${a.primary.how === 'marked' ? 'Primary' : 'Latest'}</span>` : ''}</td><td>${esc(dateTime(r.createdAt))}</td><td>${esc(r.createdBy)}</td><td class="num">${num(Math.round(r.trCredits ?? 0))}</td><td class="num">${num(Math.round(r.fusionCredits ?? 0))}</td><td class="num credits">${num(Math.round(r.totalCredits))}</td><td>${r.sharedAt ? `<span class="chip ok"><i></i>${esc(date(r.sharedAt))}</span><span class="sub">${esc(r.sharedByName)}${r.sharedNote ? ` · ${esc(r.sharedNote)}` : ''}</span>` : '<span class="muted">—</span>'}</td>
-        <td class="actions">${d.can.share ? `${a.primaryReportId === r.id ? '<button class="sm ghost" data-act="unprimary">Unmark primary</button>' : `<button class="sm" data-act="primary">${icon('star')}Make primary</button>`}${r.sharedAt ? '<button class="sm ghost" data-act="unshare">Unmark shared</button>' : `<button class="sm" data-act="share">${icon('send')}Mark shared</button>`}` : ''}<button class="sm ghost icon" data-act="delete" title="Delete report">${icon('trash')}</button></td></tr>`;
+        <td class="actions">${d.can.share ? `${a.primaryReportId === r.id ? '<button class="sm ghost" data-act="unprimary">Unmark primary</button>' : `<button class="sm" data-act="primary">${icon('star')}Make primary</button>`}${r.sharedAt ? '<button class="sm ghost" data-act="unshare">Unmark shared</button>' : `<button class="sm" data-act="share">${icon('send')}Mark shared</button>`}` : ''}${d.can.sell ? `<button class="sm ghost" data-sell="${esc(r.id)}" title="Record credits sold against this report">Sold…</button>` : ''}<button class="sm ghost icon" data-act="delete" title="Delete report">${icon('trash')}</button></td></tr>`;
       }).join('')}</tbody></table></div>` : '<div class="empty"><b>No reports yet</b></div>'}
     </div>`;
   if (p) countUp($('#bigc'), Math.round(p.totalCredits), ' credits');
+  wireSales(a, d);
   const form = $('#acct');
   if (form && d.can.edit) form.onsubmit = async (e) => {
     e.preventDefault();
@@ -668,6 +683,68 @@ async function viewAccount(id) {
       toast(error.message, 'bad');
     }
   };
+}
+
+// ---- Credits sold: one or many sales per account, against the projection of its primary report --------------------
+function salesPanel(a, d) {
+  const projected = Math.round(Number(a.primary?.totalCredits) || 0);
+  const p = projected ? Math.min(100, Math.round((a.sold / projected) * 100)) : 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const reportName = (id) => {
+    const r = d.reports.find((x) => x.id === id);
+    return r ? `${date(r.createdAt)} · ${num(Math.round(r.totalCredits))}` : 'a deleted report';
+  };
+  return `<div class="panel mt" id="sales"><h2>Credits sold <small>one or many sales, against the projection of the primary report</small></h2>
+    <div class="sold-strip">
+      <div><small>Projected</small><b>${projected ? num(projected) : '—'}</b></div>
+      <div><small>Sold so far</small><b class="sold-t">${num(a.sold)}</b></div>
+      <div><small>Still needed</small><b>${a.remaining === null ? '—' : num(a.remaining)}</b></div>
+      <div class="sold-bar"><span class="track"><i data-w="${p}"></i></span><small>${projected ? `${p}% of the projection sold` : 'No projection yet: the primary report sets it'}${projected && a.sold > projected ? ` · ${num(a.sold - projected)} more than projected` : ''}</small></div>
+    </div>
+    ${d.can.sell ? `<form class="form sale-form mt" id="sale"><div class="row">
+      <label class="f">Credits sold<input name="credits" type="number" min="1" step="1" required placeholder="e.g. 50000" /></label>
+      <label class="f">Date of the sale<input name="date" type="date" value="${today}" max="${today}" required /></label>
+      <label class="f">Salesforce opportunity or order <span class="muted">optional</span><input name="reference" maxlength="120" placeholder="006… or order number" /></label>
+      <label class="f">Against the report <span class="muted">optional</span><select name="reportId"><option value="">None in particular</option>${d.reports.map((r) => `<option value="${esc(r.id)}"${r.id === a.primary?.id ? ' selected' : ''}>${esc(date(r.createdAt))} · ${esc(num(Math.round(r.totalCredits)))} credits${r.id === a.primary?.id ? ' (primary)' : ''}</option>`).join('')}</select></label></div>
+      <label class="f">Note <span class="muted">optional</span><input name="note" maxlength="300" placeholder="First year of a 3-year deal, bundle of 5…" /></label>
+      <div class="flex"><button class="primary" type="submit">${icon('plus')}Record the sale</button>${a.remaining ? `<button type="button" class="ghost" id="sale-rest">Fill in what is still needed (${num(a.remaining)})</button>` : ''}<span class="err" id="sale-err"></span></div></form>` : ''}
+    ${d.sales.length ? `<div class="tw mt"><table><thead><tr><th>Date</th><th class="num">Credits</th><th>Salesforce / order</th><th>Against</th><th>Note</th><th>Recorded by</th><th></th></tr></thead><tbody>${d.sales.map((x) => `<tr data-sale="${esc(x.id)}"><td>${esc(date(x.date))}</td><td class="num credits">${num(x.credits)}</td><td class="mono small">${esc(x.reference || '—')}</td><td class="small">${x.reportId ? esc(reportName(x.reportId)) : '—'}</td><td class="small">${esc(x.note || '')}</td><td class="small">${esc(x.by)}<span class="sub">${esc(ago(x.at))}</span></td><td class="actions">${d.can.removeAnySale || x.byId === d.can.me ? `<button class="sm ghost icon" data-unsell title="Remove this sale">${icon('trash')}</button>` : ''}</td></tr>`).join('')}</tbody><tfoot><tr><td><b>Total</b></td><td class="num credits">${num(a.sold)}</td><td colspan="5"></td></tr></tfoot></table></div>` : '<p class="muted small mt">No sales recorded yet.</p>'}
+  </div>`;
+}
+function wireSales(a, d) {
+  const form = $('#sale');
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(form);
+      try {
+        await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/sales`, { method: 'POST', body: { credits: Number(f.get('credits')), date: f.get('date'), reference: f.get('reference'), note: f.get('note'), reportId: f.get('reportId') || null } });
+        toast(`${num(Number(f.get('credits')))} credits recorded as sold.`, 'ok');
+        viewAccount(a.id);
+      } catch (error) {
+        $('#sale-err').textContent = error.message;
+      }
+    };
+    if ($('#sale-rest')) $('#sale-rest').onclick = () => (form.credits.value = a.remaining);
+  }
+  for (const b of $$('[data-sell]')) b.onclick = () => {
+    if (!form) return;
+    form.reportId.value = b.dataset.sell;
+    $('#sales').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    form.credits.focus();
+  };
+  for (const b of $$('[data-unsell]')) b.onclick = async () => {
+    const id = b.closest('tr').dataset.sale;
+    const x = d.sales.find((s) => s.id === id);
+    if (!confirm(`Remove the sale of ${num(x.credits)} credits on ${date(x.date)}?`)) return;
+    try {
+      await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/sales/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      viewAccount(a.id);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+  paint();
 }
 
 function countUp(el, to, suffix = '') {
