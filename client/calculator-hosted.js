@@ -552,6 +552,8 @@ export async function startHosted() {
   };
   async function showAccount(id) {
     const bar = $('hc-account');
+    // No account open: nothing of a projection on the page (it waits for a name).
+    document.documentElement.toggleAttribute('data-no-account', !id);
     if (!id) {
       account = null;
       bar.classList.remove('missing-sf');
@@ -946,12 +948,32 @@ export async function startHosted() {
       $('hc-name').dispatchEvent(new Event('change'));
     }
   });
-  $('hc-new').addEventListener('click', () => {
+  // + New: a clean page for a new calculation. The open projection is saved and closed, the account panel emptied,
+  // the customer's Checkmarx One key and git tokens dropped (a new customer is a new tenant); then the new name.
+  $('hc-new').addEventListener('click', async () => {
     naming = true;
+    try {
+      localStorage.removeItem(OPEN_KEY);
+    } catch {}
+    calculator.close?.();
+    if (cxState.connected) {
+      try {
+        showState(await server('/api/cc/cxone/disconnect', { method: 'POST', body: {} }));
+      } catch {}
+    }
+    for (const t of [...(calculator.git?.list?.() ?? [])].reverse()) calculator.git.remove?.(calculator.git.list().indexOf(t));
+    for (const id of ['sa-key', 'hc-git-token', 'hc-git-address', 'sa-base', 'sa-iam', 'sa-tenant']) if ($(id)) $(id).value = '';
+    for (const id of ['sa-connect-status', 'hc-git-status']) if ($(id)) $(id).textContent = '';
+    gitShow?.();
+    gitList?.();
+    fold(false);
+    await showAccount(null);
+    syncName();
     const field = $('hc-name');
     field.value = '';
     field.placeholder = 'The new account\u2019s name, as in Salesforce, then Enter';
     field.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
   $('hc-name').addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && naming) {

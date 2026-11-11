@@ -681,3 +681,6 @@ html[data-cc] .calc-report-go > button { height: var(--hc-h) !important; min-hei
 .hc-meta #hc-kept { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* MZ's "Customer view" toggle: replaced by "In meeting with the customer" (a tab of its own). */
 html[data-cc] #calc-present { display: none !important; }
+/* No account open (after + New): the projection area waits, empty, for the new account's name. */
+html[data-no-account] .content > main > * { display: none !important; }
+html[data-no-account] .content > main::before { content: "A new calculation: type the account’s name at the top, as in Salesforce, then Enter."; display: block; margin: 18px auto; max-width: 640px; padding: 28px 24px; text-align: center; border: 1px dashed var(--line-hi, var(--border)); border-radius: 16px; color: var(--muted); font-size: var(--hc-fs, 14px); }

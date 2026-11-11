@@ -3702,6 +3702,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       if (!reading.timer && c.open) applyAll({ read: true });
     },
     refresh: () => c.open && show(c.open),
+    // Close the customer open (the command center's + New): nothing of it stays on the page; it stays saved.
+    close: () => {
+      if (c.pending) flush();
+      show(null);
+      const picker = $('calc-customer');
+      if (picker) picker.value = '';
+    },
     autoRead,
     git: { add: addGitToken, count: () => autoCount(), counting: () => Boolean(git.run || git.autoBusy), list: gitTokens, remove: removeGitToken, detect: detectProvider, onChange: (fn) => (git.onTokens = fn), open: () => document.querySelector('[data-ptabs] [data-pt="fusion-git"]')?.click() },
   };

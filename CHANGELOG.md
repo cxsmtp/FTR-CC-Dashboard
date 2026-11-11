@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.41.00 — 2026-11-11
+
+- **+ New starts a clean calculation.** The open projection is saved and closed, and nothing of it stays on the page: the account panel is emptied (name, Salesforce link, SE, reports), the customer’s Checkmarx One key and git tokens are dropped (a new customer is a new tenant), and the projection area waits for the new account’s name. Type it, Enter, and the new account opens on its own, clean. The previous account stays saved and opens again from its name.
+
 ## CC-01.40.00 — 2026-11-11
 
 - **Triage & remediation credits are one rate for everyone, set by the Admin.** Under **Fusion engines & rates → Triage & remediation credits**, the Admin sets the credits to triage one finding and to remediate one, per severity (they save as you type). Everywhere else they are shown, never changed: the calculator’s **Customize per severity** and the report’s own levers are read-only, every projection uses the Admin’s figures whatever is sent, and a customer’s version never brings its own. They start at today’s figures (1 to triage, 3 to remediate), so nothing changes until the Admin changes them; every change is in the audit log.

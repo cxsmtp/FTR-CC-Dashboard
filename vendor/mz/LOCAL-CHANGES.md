@@ -18,3 +18,5 @@
 - **Triage and remediation credits are the Admin's**: shown, not changed — `page.js` (Customize per severity: the two
   inputs disabled) and `report.js` (the report's levers: read-only). The server applies the Admin's figures to every
   projection (server/app.js `withTrRates`).
+- **`close()`** on what `initCalculator` returns (`page.js`): closes the open customer (saved first), for the command
+  center's **+ New**.
