@@ -1173,7 +1173,7 @@ async function viewAccount(id) {
         <form class="form" id="acct">
           <label class="f">Salesforce opportunity or account link <b>required</b><input name="sf" type="url" value="${esc(a.salesforceUrl)}" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" ${d.can.edit ? '' : 'disabled'} /></label>
           <div class="row">
-            <label class="f">Accountable SE<select name="owner" ${d.can.edit ? '' : 'disabled'}>${d.members.map((m) => `<option value="${esc(m.id)}"${m.id === a.ownerId ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+            <label class="f">Accountable SE<select name="owner" ${d.can.edit || d.can.assign ? '' : 'disabled'}>${d.members.map((m) => `<option value="${esc(m.id)}"${m.id === a.ownerId ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
             <label class="f">Team${teamSelect('acct-team', a.teamId, { all: false }).replace('<select', `<select name="team" ${d.can.edit ? '' : 'disabled'}`)}</label>
           </div>
           ${d.can.edit ? '<div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="err"></span></div>' : ''}
@@ -1200,6 +1200,16 @@ async function viewAccount(id) {
   };
   if ($('#cv-file')) $('#cv-file').onchange = (e) => customerVersion(a, e.target.files[0]);
   const form = $('#acct');
+  // Leaders and above without the calculator: the accountable SE alone, saved as it is chosen.
+  if (form && !d.can.edit && d.can.assign) form.elements.owner.onchange = async (e) => {
+    try {
+      await api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'PUT', body: { ownerId: e.target.value } });
+      toast(`Accountable SE: ${e.target.selectedOptions[0].textContent}.`, 'ok');
+      viewAccount(a.id);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
   if (form && d.can.edit) form.onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(form);

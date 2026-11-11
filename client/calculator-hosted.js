@@ -344,7 +344,7 @@ export async function startHosted() {
         tr.insertBefore(cell, tr.lastElementChild);
       }
       const s = sharedOf.get(tr.dataset.report);
-      const can = perms.has('reports.share');
+      const can = perms.has('reports.share') || (account?.ownerId && account.ownerId === cfg.user?.id);
       cell.innerHTML = s?.sharedAt
         ? `<span class="hc-pill ok" title="${esc((s.with ?? []).join(', '))}">✓ ${esc(new Date(s.sharedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}${s.with?.length ? ` · ${esc(s.with[0])}${s.with.length > 1 ? ` +${s.with.length - 1}` : ''}` : ''}</span>${can ? ' <button type="button" class="link" data-unshare>Undo</button>' : ''}`
         : can ? '<button type="button" class="secondary sm" data-mark-shared title="Mark this report shared with the customer">Mark</button>' : '<span class="hc-pill">Not yet</span>';
@@ -440,7 +440,7 @@ export async function startHosted() {
         o.querySelector('.hc-note').textContent = text ?? '';
         o.querySelectorAll('.hc-steps li').forEach((li) => li.classList.add('on'));
         // Right here, as it is made: was it shared with the customer, and is it the one that stands for the account?
-        if (ok && report?.id && perms.has('reports.share') && !meeting) return shareChoice(o, report);
+        if (ok && report?.id && (perms.has('reports.share') || account?.ownerId === cfg.user?.id) && !meeting) return shareChoice(o, report);
         setTimeout(() => o.remove(), ok ? 1300 : 3500);
       }, wait);
     };

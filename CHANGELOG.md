@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.42.00 — 2026-11-11
+
+- **Leaders change the accountable SE**, whoever made the projection: in the calculator, on the account page or in the Accounts list (double-click). Leaders and above may do it even where their role does not use the calculator; it is in the audit log.
+- **The accountable SE records what was shared**: once they generate a report (or on any report of their account, whoever made it), they mark it shared with whom, from the Report ready card, Generated reports, the account page or the Accounts list, even where their role could not otherwise share reports. Everyone else keeps exactly the permissions they had.
+
 ## CC-01.41.00 — 2026-11-11
 
 - **+ New starts a clean calculation.** The open projection is saved and closed, and nothing of it stays on the page: the account panel is emptied (name, Salesforce link, SE, reports), the customer’s Checkmarx One key and git tokens are dropped (a new customer is a new tenant), and the projection area waits for the new account’s name. Type it, Enter, and the new account opens on its own, clean. The previous account stays saved and opens again from its name.

@@ -135,3 +135,25 @@ test('triage and remediation credits: the Admin’s, in every projection, whatev
   assert.match(JSON.stringify((await admin.get('/api/audit?limit=50')).data), /tr\.rates/);
   await admin.put('/api/tr-rates', { triageCost: { Critical: 1 }, remediationCost: { Low: 3 } });
 });
+
+test('a leader changes the accountable SE of a projection someone else made; that SE records what was shared', async () => {
+  const { reportData, SF } = await import('./helpers.js');
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const se1 = await client(env.base, 'se1@t.example');
+  const se2 = await client(env.base, 'se2@t.example');
+  const viewer = await client(env.base, 'viewer@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const made = await se1.post('/api/projections', { name: 'Handover Co' }, h);
+  const id = made.data.customer.id;
+  await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+  assert.equal((await viewer.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se2.id })).status, 403);
+  assert.equal((await lead.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se2.id })).status, 200);
+  const detail = await se2.get(`/api/cc/accounts/${id}`);
+  assert.equal(detail.data.account.ownerId, env.users.se2.id);
+  assert.equal(detail.data.can.share, true);
+  const rep = (await se2.post('/api/projections/reports', { customerId: id, data: reportData() }, h)).data.report.id;
+  const shared = await se2.post(`/api/cc/reports/${rep}/shared`, { shared: true, sharedWith: 'cfo@customer.example' });
+  assert.equal(shared.status, 200);
+  assert.deepEqual(shared.data.reports.find((r) => r.id === rep).sharedWith, ['cfo@customer.example']);
+  assert.equal((await viewer.post(`/api/cc/reports/${rep}/shared`, { shared: false })).status, 403);
+});

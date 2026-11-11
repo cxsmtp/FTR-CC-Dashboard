@@ -734,7 +734,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       reports: reps,
       sales: [...(a.sales ?? [])].sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.at).localeCompare(String(x.at))),
       members,
-      can: { edit: ctx.permissions.has('calculator.use'), share: ctx.permissions.has('reports.share'), deleteAccount: ctx.permissions.has('accounts.delete'), sell: ctx.permissions.has('sales.record'), removeAnySale: ctx.permissions.has('reports.delete'), me: ctx.user.id },
+      can: { edit: ctx.permissions.has('calculator.use'), assign: ctx.permissions.has('calculator.use') || ctx.permissions.has('users.manage'), share: ctx.permissions.has('reports.share') || a.ownerId === ctx.user.id, deleteAccount: ctx.permissions.has('accounts.delete'), sell: ctx.permissions.has('sales.record'), removeAnySale: ctx.permissions.has('reports.delete'), me: ctx.user.id },
     };
   };
   r('GET', '/api/cc/accounts/:id', ready2, (req, ctx, body, res, url, params) => accountDetail(ctx, params.id));
@@ -743,8 +743,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const a = accounts.get(params.id, ctx.scope);
     return suggestCurrency({ accountName: a.name, teamNames: teamPath(ctx.teams, a.teamId).reverse().flatMap((t) => [t.name, t.region].filter(Boolean)), timeZone: String(url.searchParams.get('tz') ?? '').slice(0, 64) });
   });
-  r('PUT', '/api/cc/accounts/:id', perm('calculator.use'), (req, ctx, body, res, url, params) => {
+  r('PUT', '/api/cc/accounts/:id', signedIn, (req, ctx, body, res, url, params) => {
     const before = accounts.get(params.id, ctx.scope);
+    // The calculator's people change an account; leaders and above may change its accountable SE, whoever made it.
+    const onlyOwner = body && Object.keys(body).every((k) => k === 'ownerId');
+    if (!ctx.permissions.has('calculator.use') && !(onlyOwner && ctx.permissions.has('users.manage'))) throw fail(403, 'You may not change this account.');
     const patch = {};
     if (body?.salesforceUrl !== undefined) patch.salesforceUrl = body.salesforceUrl;
     if (body?.name !== undefined) patch.name = body.name;
@@ -786,7 +789,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, body?.primary === false ? 'report.unprimary' : 'report.primary', rep.customer, { id: rep.id, totalCredits: rep.totalCredits });
     return accountDetail(ctx, rep.customerId);
   });
-  r('POST', '/api/cc/reports/:id/shared', perm('reports.share'), (req, ctx, body, res, url, params) => {
+  r('POST', '/api/cc/reports/:id/shared', signedIn, (req, ctx, body, res, url, params) => {
+    {
+      const r0 = accounts.report(params.id, ctx.scope);
+      const owner = accounts.accounts.meta(r0.customerId)?.ownerId;
+      if (!ctx.permissions.has('reports.share') && owner !== ctx.user.id) throw fail(403, 'Only the accountable SE, or someone who may share reports, records what was shared.');
+    }
     const rep = accounts.markShared(params.id, ctx.scope, { shared: body?.shared !== false, note: body?.note, sharedWith: body?.sharedWith }, ctx.user);
     record(ctx, req, rep.sharedAt ? 'report.shared' : 'report.unshared', rep.customer, { id: rep.id, sharedWith: rep.sharedWith, note: rep.sharedNote });
     return accountDetail(ctx, rep.customerId);
