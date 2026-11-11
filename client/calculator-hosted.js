@@ -565,7 +565,7 @@ export async function startHosted() {
       $('hc-impact').checked = false;
       $('hc-impact').disabled = true;
       $('hc-kept').textContent = '';
-      $('hc-refresh').hidden = $('hc-forget').hidden = $('hc-upload-l').hidden = true;
+      $('hc-refresh').hidden = $('hc-forget').hidden = $('hc-upload-l').hidden = $('hc-prev-l').hidden = true;
       $('hc-currency').hidden = true;
       renderStatus();
       return;
@@ -593,6 +593,7 @@ export async function startHosted() {
       $('hc-refresh').hidden = !a.cxone;
       $('hc-forget').hidden = !a.cxone;
       $('hc-upload-l').hidden = false;
+      $('hc-prev-l').hidden = !a.salesforceUrl;
       if (autoRefresh && a.cxone) {
         autoRefresh = false;
         refreshFromKept();
@@ -722,6 +723,42 @@ export async function startHosted() {
     } catch (error) {
       toast(error.message, 'bad');
     }
+  });
+  // A report generated before (a quote already given): checked, shown, then kept with its own date.
+  $('hc-prev').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !account) return;
+    const html = await file.text();
+    let preview;
+    try {
+      preview = await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/previous-report`, { method: 'POST', body: { html, dryRun: true } });
+    } catch (error) {
+      return toast(error.message, 'bad', 9000);
+    }
+    const dlg = document.createElement('dialog');
+    dlg.className = 'hc-dialog hc-wide';
+    dlg.innerHTML = `<form method="dialog"><h2>A previous report for ${esc(account.name)}</h2>
+      <dl class="hc-prev-facts"><dt>Made for</dt><dd>${esc(preview.customer || '—')}${preview.sameName ? '' : ' <b class="hc-req">not this account’s name</b>'}</dd><dt>Made on</dt><dd>${esc(preview.madeAt ? fmtDateTime(preview.madeAt) : 'unknown')}</dd><dt>Credits</dt><dd><b>${num(preview.total)}</b></dd></dl>
+      <label class="field"><span>Shared with <small>optional: the email address(es) it was given to</small></span><input id="hc-prev-who" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="name@customer.com" /></label>
+      <p class="hint">It is kept as a <b>previous quote</b>, with its own date and figures, exactly as it was given. The account’s settings are not changed.</p>
+      <div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary">${preview.sameName ? 'Keep it' : 'Keep it here anyway'}</button></div></form>`;
+    document.body.append(dlg);
+    dlg.addEventListener('close', async () => {
+      const ok = dlg.returnValue === 'ok';
+      const who = dlg.querySelector('#hc-prev-who').value.trim();
+      dlg.remove();
+      if (!ok) return;
+      try {
+        await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/previous-report`, { method: 'POST', body: { html, dryRun: false, confirm: true, sharedWith: who } });
+        toast(`The previous report (${num(preview.total)} credits${preview.madeAt ? `, ${fmtDateTime(preview.madeAt)}` : ''}) is kept with ${account.name}${who ? `, shared with ${who}` : ''}.`, 'ok', 9000);
+        showAccount(account.id);
+        calculator.refresh?.();
+      } catch (error) {
+        toast(error.message, 'bad', 9000);
+      }
+    });
+    dlg.showModal();
   });
   $('hc-upload').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];

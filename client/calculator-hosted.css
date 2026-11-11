@@ -684,3 +684,11 @@ html[data-cc] #calc-present { display: none !important; }
 /* No account open (after + New): the projection area waits, empty, for the new account's name. */
 html[data-no-account] .content > main > * { display: none !important; }
 html[data-no-account] .content > main::before { content: "A new calculation: type the account’s name at the top, as in Salesforce, then Enter."; display: block; margin: 18px auto; max-width: 640px; padding: 28px 24px; text-align: center; border: 1px dashed var(--line-hi, var(--border)); border-radius: 16px; color: var(--muted); font-size: var(--hc-fs, 14px); }
+
+/* A previous report: beside the customer's version, the same height, quieter */
+.hc-meta #hc-prev-l { order: 6; height: var(--hc-h) !important; display: inline-flex !important; align-items: center; padding: 0 clamp(12px, 1vw, 18px) !important; border-radius: 10px; border: 1px solid var(--line-hi, var(--border)); background: var(--cc-panel, var(--surface)); font-weight: 600; font-size: var(--hc-fs); cursor: pointer; white-space: nowrap; }
+.hc-meta #hc-prev-l[hidden] { display: none !important; }
+.hc-meta #hc-upload-l { order: 6; }
+.hc-prev-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 8px 0 14px; }
+.hc-prev-facts dt { color: var(--muted); }
+.hc-prev-facts dd { margin: 0; }

@@ -21,6 +21,7 @@ import { ActivityLog } from './activity.js';
 import { CallMemory, explainCall } from './resilience.js';
 import { FusionRates, engineKey, rateModels, withRates } from './fusion-rates.js';
 import { DEFAULT_TR } from '../vendor/mz/public/calculator/model.js';
+import { leverData } from '../vendor/mz/public/calculator/levers.js';
 import { IntegrityService } from './integrity/service.js';
 import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
@@ -1784,6 +1785,27 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'report.customerVersion', account.name, { id: rep.id, total: rep.totalCredits, sentTotal: figures.sentTotal, changes: changes.length, primary: body?.makePrimary !== false, preferences: body?.applyPreferences !== false });
     return { ...preview, report: { id: rep.id, totalCredits: rep.totalCredits }, ...accountDetail(ctx, account.id) };
   });
+  /**
+   * A report generated earlier for this account (a quote already given): read from its file, kept as it was, with its
+   * own date; optionally marked shared with whom it was given to. The account's settings are not changed.
+   */
+  r('POST', '/api/cc/accounts/:id/previous-report', perm('calculator.use'), (req, ctx, body, res, url, params) => {
+    const account = accounts.get(params.id, ctx.scope);
+    if (!account.salesforceUrl) throw fail(409, 'Save the account\u2019s Salesforce opportunity or account link first.');
+    const live = readCustomerVersion(body?.html);
+    const figures = customerFigures(live);
+    const madeAt = live.base?.generatedAt ?? null;
+    const sameName = figures.customer.trim().toLowerCase() === account.name.trim().toLowerCase();
+    const preview = { customer: figures.customer, sameName, total: figures.sentTotal ?? figures.total, madeAt };
+    if (body?.dryRun !== false) return { dryRun: true, ...preview };
+    if (!sameName && body?.confirm !== true) throw fail(409, `This report was made for "${figures.customer}", not ${account.name}. Confirm to keep it here anyway.`);
+    // The quote as it was given: the report's own figures, before anyone moved a lever.
+    const data = live.sentInputs ? { ...leverData(live.base, live.sentInputs), levers: live.sentInputs } : figures.data;
+    let rep = accounts.addPreviousReport({ customerId: account.id, data, user: ctx.user, madeAt, note: body?.note }, ctx.scope);
+    if (String(body?.sharedWith ?? '').trim()) rep = accounts.markShared(rep.id, ctx.scope, { shared: true, sharedWith: body.sharedWith, note: 'A quote given before, brought in' }, ctx.user);
+    record(ctx, req, 'report.previous', account.name, { id: rep.id, total: rep.totalCredits, madeAt, sharedWith: rep.sharedWith ?? [] });
+    return { ...preview, report: { id: rep.id, totalCredits: rep.totalCredits }, ...accountDetail(ctx, account.id) };
+  });
   r('POST', '/api/cc/cxone/disconnect', perm('calculator.use'), (req, ctx) => calc.disconnect(ctx.user.id));
   r('GET', '/api/cc/cxone/status', perm('calculator.use'), (req, ctx) => calc.status(ctx.user.id));
 
@@ -1860,7 +1882,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         const origin = req.headers.origin;
         // The page's own address (whatever name or IP it was opened by), or PUBLIC_URL (behind a proxy that changes Host).
         if (origin && !sameSite(origin, req)) throw fail(403, 'That request came from another site.');
-        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') ? CALC_LIMIT : pathname === '/api/settings/branding' || pathname === '/api/me/profile' ? 512 * 1024 : BODY_LIMIT);
+        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') || pathname.endsWith('/previous-report') ? CALC_LIMIT : pathname === '/api/settings/branding' || pathname === '/api/me/profile' ? 512 * 1024 : BODY_LIMIT);
       }
       let result;
       for (const h of match.handlers) result = await h(req, ctx, body, res, url, match.params);

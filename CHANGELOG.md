@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.48.00 — 2026-11-11
+
+- **Bring in a report generated before** (a quote already given), so every quote is kept. Once the account has its name and Salesforce link, **⇪ A previous report** in the calculator takes the report file: it shows whom it was made for (and says so when the name differs), when it was made and its credits; add whom it was shared with (optional) and keep it. It is kept as a **Previous quote**, with its own date and figures exactly as given: the account’s settings and today’s rates do not change it. It shows among the account’s reports, and the audit log records it.
+
 ## CC-01.47.00 — 2026-11-11
 
 - **Mute an account from the forecast (Executives).** In the Accounts list, **Mute from forecast** leaves an account out of every dashboard figure: projected credits, sold, still needed, shared, the teams, the SEs and the largest projections. The account stays in the Accounts list, dimmed and marked **Muted** (who and when on hover), and **Unmute** brings it back. **Status → Muted from the forecast** lists them. A new permission, **Mute accounts from the forecast**, given to the Executive role (the Admin holds every permission); it can be given to other roles under Roles & permissions. Every mute and unmute is in the audit log.

@@ -201,6 +201,15 @@ export class Accounts {
     return this.reports.put({ ...full, source: 'customer', customerNote: String(note ?? '').slice(0, 300), sentTotal: Number.isFinite(sentTotal) ? sentTotal : null, changes: (changes ?? []).slice(0, 60).map((c) => String(c).slice(0, 200)) });
   }
 
+  /** A report made earlier (a quote already given), brought in: its own figures, its own date. */
+  addPreviousReport({ customerId, data, user, madeAt, note }, teamIds) {
+    const report = this.addReport({ customerId, data, user }, teamIds);
+    const full = this.reports.get(report.id);
+    const when = Date.parse(madeAt);
+    const created = Number.isFinite(when) && when <= Date.now() ? new Date(when).toISOString() : full.createdAt;
+    return this.reports.put({ ...full, source: 'previous', createdAt: created, importedAt: new Date().toISOString(), customerNote: String(note ?? '').slice(0, 300) });
+  }
+
   // ---- Credits sold: one or many sales per account, against its projection --------------------------------------
   addSale(id, teamIds, { credits, date, reference = '', note = '', reportId = null, opportunityUrl = '' }, user, hosts) {
     const account = this.get(id, teamIds);
