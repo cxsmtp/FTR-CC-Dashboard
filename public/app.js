@@ -1540,7 +1540,7 @@ const ADMIN_VIEWS = {
         <dl class="kv"><dt>Running</dt><dd>${esc(u.running)} (${esc(u.source)})</dd><dt>Built-in</dt><dd>${esc(u.builtIn)}</dd><dt>Releases from</dt><dd><a href="https://github.com/${esc(u.repo)}/releases" target="_blank" rel="noopener noreferrer">github.com/${esc(u.repo)}</a></dd><dt>Checks</dt><dd>Every ${u.checkEveryMinutes ?? 15} minutes, by itself</dd><dt>Last check</dt><dd>${esc(u.lastCheck?.at ? `${dateTime(u.lastCheck.at)} · newest ${u.lastCheck.newest ?? '—'}` : 'not yet')}${u.lastCheck?.error && u.lastCheck.failedAt > (u.lastCheck.at ?? '') ? `<br><span class="chip bad"><i></i>Last try ${esc(dateTime(u.lastCheck.failedAt))}: ${esc(u.lastCheck.error)}</span>` : ''}</dd></dl>
         ${(() => { const n = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.runningNow && !r.failed && cmpVer(r.version, u.running) > 0); return n ? `<div class="callout mt"><b>${esc(n.version)} is available.</b> ${u.auto?.enabled && u.supervised ? (u.auto.mode === 'hour' ? `It is installed at ${String(u.auto.hour).padStart(2, '0')}:00.` : 'It is installed within 15 minutes.') : 'Install it below, or turn auto-update on.'}</div>` : ''; })()}
         ${u.supervised ? '' : '<div class="callout warn mt">Not started by the launcher (<code>npm start</code> / the container’s command), so versions can be installed but not switched to from here.</div>'}
-        <div class="flex mt"><button class="primary" id="chk">Check for updates</button>${u.supervised ? '<button id="restart" class="ghost">Restart the server</button>' : ''}</div>
+        <div class="flex mt"><button class="primary" id="chk">Check for updates</button>${u.supervised ? '<button id="restart" class="ghost">Reload the server</button>' : ''}</div>
         <h3 class="mt">Auto-update</h3>
         <form class="flex" id="auto"><label class="check"><input type="checkbox" name="enabled" ${u.auto?.enabled ? 'checked' : ''} /><span>Install new releases by themselves</span></label><label class="f">When<select name="mode"><option value="asap"${u.auto?.mode !== 'hour' ? ' selected' : ''}>As soon as found</option><option value="hour"${u.auto?.mode === 'hour' ? ' selected' : ''}>At a set hour</option></select></label><label class="f">at<select name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${u.auto?.hour === h ? ' selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select></label><button>Save</button></form>
         <p class="muted small">The server looks for new releases every 15 minutes whether or not auto-update is on. The first time a release is seen, its SHA-256 checksums are kept below; if they ever change, that release is never installed. Every release is checked against its SHA-256 and the manifest of its files before it is installed, and again before it starts. A backup is taken before every switch. A version that does not come up, or stops within two minutes, is rolled back by itself and never installed automatically again.</p></div>
@@ -1564,7 +1564,7 @@ const ADMIN_VIEWS = {
       viewAdmin('updates');
     };
     const waitForRestart = async (to) => {
-      shell('admin', `<div class="loading"><div class="orbit"><i></i><i></i><i></i></div><b>Switching to ${esc(to)}…</b><span class="muted">A backup was taken. The page comes back by itself in a few seconds.</span></div>`);
+      shell('admin', `<div class="loading"><div class="orbit"><i></i><i></i><i></i></div><b>Switching to ${esc(to)}…</b><span class="muted">A backup was taken. The new version loads beside this one and takes over without a restart: nobody is signed out and nothing is lost.</span></div>`);
       for (let i = 0; i < 90; i++) {
         await new Promise((r) => setTimeout(r, 2000));
         try {
@@ -1602,7 +1602,7 @@ const ADMIN_VIEWS = {
       await api('/api/updates/auto', { method: 'PUT', body: { enabled: f.get('enabled') === 'on', mode: f.get('mode'), hour: Number(f.get('hour')) } }).then(() => toast('Saved.', 'ok'), (x) => toast(x.message, 'bad'));
     };
     if ($('#restart')) $('#restart').onclick = async () => {
-      if (!confirm('Restart the server? Everyone sees "reconnecting" for a few seconds.')) return;
+      if (!confirm('Reload the server? It loads again beside the running one and takes over without a restart: nobody is signed out.')) return;
       await api('/api/system/restart', { method: 'POST', body: {} });
       waitForRestart(u.running);
     };
@@ -1640,7 +1640,7 @@ const ADMIN_VIEWS = {
         const info = await api('/api/backups/inspect', { method: 'POST', body });
         if (!confirm(`Restore the backup of ${dateTime(info.at)} (${info.files} files: ${info.accounts} accounts, ${info.reports} reports)?\n\nEverything here is replaced. A backup of what is here now is taken first.`)) return;
         const r = await api('/api/backups/restore', { method: 'POST', body: { ...body, confirm: true } });
-        $('#rsres').textContent = r.restarting ? 'Restored. The server restarts to read it…' : 'Restored. Restart the server to read it.';
+        $('#rsres').textContent = r.restarting ? 'Restored. The command center is loading it, without a restart…' : 'Restored. Restart the server to read it.';
         if (r.restarting) setTimeout(() => location.reload(), 6000);
       } catch (error) {
         $('#rsres').textContent = error.message;
@@ -1788,24 +1788,6 @@ async function viewAbout() {
     <div class="panel"><h2>Version</h2><dl class="kv"><dt>Command center</dt><dd>${esc(state.me.versionLabel)} (${esc(state.me.version)})</dd><dt>Calculator</dt><dd>CxMissionZero ${esc(state.me.mz)}</dd><dt>Licence</dt><dd>PolyForm Internal Use 1.0.0: internal business use only</dd></dl>
     <p class="muted small mt">An independent project, not a Checkmarx product. Figures are supporting information only: Checkmarx's own records are authoritative.</p>${can('system.update') ? '<a class="btn mt" href="#/admin/updates">Updates and rollback</a>' : ''}</div></div>`;
 }
-/** Once per new version: what changed, in a dialog. */
-async function whatsNew() {
-  const me = state.me;
-  if (!me || me.prefs?.seenVersion === me.version) return;
-  const first = !me.prefs?.seenVersion;
-  me.prefs = { ...(me.prefs ?? {}), seenVersion: me.version };
-  api('/api/me/prefs', { method: 'PUT', body: { seenVersion: me.version } }).catch(() => {});
-  if (first) return;
-  const log = await fetch('/legal/changelog').then((r) => r.text()).catch(() => '');
-  const section = log.split(/\n(?=## )/).find((x) => x.startsWith('## ')) ?? '';
-  if (!section) return;
-  const dlg = document.createElement('dialog');
-  dlg.innerHTML = `<form method="dialog"><div class="dh"><span class="chip star">${esc(me.versionLabel)}</span><h2 class="mt">What is new</h2></div><div class="db md">${md(section)}</div><div class="df"><a class="btn ghost" href="#/about">Every version</a><button value="ok" class="primary">Got it</button></div></form>`;
-  document.body.append(dlg);
-  dlg.addEventListener('close', () => dlg.remove());
-  dlg.showModal();
-}
-
 // ---- Router ---------------------------------------------------------------------------------------------------
 async function route() {
   const [pathPart, query = ''] = location.hash.replace(/^#/, '').split('?');
@@ -1824,7 +1806,6 @@ async function route() {
   applyMyTheme();
   if (path === '/login') return go(firstStepsDone() ? home() : '/welcome');
   if (!firstStepsDone()) return viewWelcome();
-  whatsNew();
   try {
     if (path === '/' || path === '/welcome') return go(home());
     if (path === '/overview') return await viewOverview(params);

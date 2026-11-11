@@ -152,6 +152,42 @@ export class CalculatorService {
     return this.#links.get(userId);
   }
 
+  /**
+   * An update without a restart (server/launch.js): what this server holds in memory only, for the version taking over.
+   * Each person's Checkmarx One connection (with its key: it goes from this process to the next over the launcher's
+   * private channel, never to disk), a finished read not yet put into its account, the read the scope is worked out
+   * from, and reads still running (started again there with the same connection).
+   */
+  handoff() {
+    const people = [];
+    for (const [userId, l] of this.#links) {
+      if (!l.connection) continue;
+      const job = l.job ? { ...l.job, live: null } : null;
+      people.push({ userId, connection: l.connection, job: job?.state === 'running' ? null : job, rerun: job?.state === 'running' ? { input: job.input, account: job.account } : null, read: l.read.get() });
+    }
+    return { people, interrupted: [...this.interrupted] };
+  }
+  /** After handing over: this process lets go, so reads still finishing here change nothing. */
+  release() {
+    this.onFinish = () => {};
+    this.#links.clear();
+    this.interrupted.clear();
+  }
+  /** The other half of handoff(), in the version taking over. */
+  adopt(state) {
+    for (const p of state?.people ?? []) {
+      try {
+        const link = this.#link(p.userId);
+        Object.assign(link, { client: this.connect(p.connection), connection: p.connection, job: p.job ?? null });
+        if (p.read?.weeks) link.read.save({ readAt: p.read.readAt, weeks: p.read.weeks, byProject: Object.entries(p.read.series ?? {}) });
+        if (p.rerun) this.startRead(p.userId, p.rerun.input, p.rerun.account);
+      } catch (error) {
+        this.log(`! [handover] ${error.message}`);
+      }
+    }
+    for (const [userId, cut] of state?.interrupted ?? []) this.interrupted.set(userId, cut);
+  }
+
   /** Signed out, deactivated or removed: their key and what was read go. */
   forget(userId) {
     this.#links.delete(userId);
@@ -190,7 +226,7 @@ export class CalculatorService {
     if (!state.client) throw fail(409, 'Connect to Checkmarx One first: paste the customer\u2019s API key at the top. For a prospect who is not on Checkmarx One, use Fusion · from Git or Fusion · cloc-fusion.');
     if (state.job?.state === 'running') return readJobView(state.job);
     // The read runs here, on the server: the person can leave the calculator; it is followed again when they come back.
-    const job = { id: randomUUID(), state: 'running', step: 'projects', done: 0, total: 0, read: 0, found: 0, startedAt: new Date().toISOString(), live: {}, account, applied: false };
+    const job = { id: randomUUID(), state: 'running', step: 'projects', done: 0, total: 0, read: 0, found: 0, startedAt: new Date().toISOString(), live: {}, account, applied: false, input: { branches: input?.branches, maxProjects: input?.maxProjects } };
     state.job = job;
     const client = state.client;
     Promise.all([

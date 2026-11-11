@@ -119,3 +119,17 @@ test('an invite can send a welcome email, never the one-time password', async ()
   assert.ok(!sent[0].html.includes(r.data.temporary));
   void PASSWORD;
 });
+
+test('an Admin resets a password from the address the page was opened by, even when PUBLIC_URL names another', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  // The browser says where the page is: here the server's own address, not PUBLIC_URL (https://cc.example).
+  const ownOrigin = { Origin: env.base };
+  const r = await admin.post(`/api/people/${env.users.se2.id}/reset`, {}, ownOrigin);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(r.data.temporary);
+  // PUBLIC_URL itself is accepted too, and any other site is not.
+  assert.equal((await admin.post(`/api/people/${env.users.se2.id}/unlock`, {}, { Origin: 'https://cc.example' })).status, 200);
+  const evil = await admin.post(`/api/people/${env.users.se2.id}/reset`, {}, { Origin: 'https://evil.example' });
+  assert.equal(evil.status, 403);
+  assert.match(evil.data.error, /another site/);
+});

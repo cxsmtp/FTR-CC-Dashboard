@@ -990,7 +990,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const before = takeBackup(`before restoring a backup from ${bundle.at}`);
     restoreBackup(bundle, { dataDir: config.dataDir });
     record(ctx, req, 'backup.restore', bundle.at, { ...describeBackup(bundle), before });
-    if (supervised) setTimeout(() => process.exit(75), 300).unref?.();
+    if (supervised) {
+      // Nothing more is written by this process: the version taking over reads what was restored.
+      frozen = 'A backup was just restored: the command center is loading it. Try again in a few seconds.';
+      setTimeout(() => reload('backup restored'), 300).unref?.();
+    }
     return { restored: describeBackup(bundle), before, restarting: supervised };
   });
   startJobs.push(() => {
@@ -1011,8 +1015,14 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
 
   // ---- Updates and rollback (server/updates.js, server/launch.js) ------------------------------------------------------
   const supervised = process.env.CC_SUPERVISOR === '1';
+  let frozen = null;
+  /** Load a version (this one again, or another): the launcher starts it beside this one and hands it the traffic, with no restart. */
+  const reload = (reason) => {
+    if (process.env.CC_LAUNCHER_SOCKETS === '1' && process.send) process.send({ type: 'reload', reason });
+    else process.exit(75);
+  };
   const versionStore = new VersionStore({ dataDir: config.dataDir, builtInDir: process.env.CC_BUILTIN_DIR || config.root, builtInVersion: process.env.CC_BUILTIN_VERSION || VERSION });
-  const updates = updateService ?? new UpdateService({ store: versionStore, runningVersion: VERSION, repo: String(config.env?.UPDATE_REPO || 'cxsmtp/FTR-CC-Dashboard'), token: String(config.env?.UPDATE_GITHUB_TOKEN ?? ''), backup: async (reason) => takeBackup(reason), log, supervised });
+  const updates = updateService ?? new UpdateService({ store: versionStore, runningVersion: VERSION, repo: String(config.env?.UPDATE_REPO || 'cxsmtp/FTR-CC-Dashboard'), token: String(config.env?.UPDATE_GITHUB_TOKEN ?? ''), backup: async (reason) => takeBackup(reason), log, supervised, exit: (code) => (code === 75 ? reload('update') : process.exit(code)) });
   const updPerm = perm('system.update');
   r('GET', '/api/updates', updPerm, () => updates.status());
   r('POST', '/api/updates/check', updPerm, async (req, ctx) => {
@@ -1042,7 +1052,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/system/restart', updPerm, (req, ctx) => {
     if (!supervised) throw fail(409, 'This server was not started by the launcher: restart it where it runs.');
     record(ctx, req, 'system.restart');
-    setTimeout(() => process.exit(75), 300).unref?.();
+    setTimeout(() => reload('reload by hand'), 300).unref?.();
     return { restarting: true };
   });
   startJobs.push(() => {
@@ -1287,11 +1297,22 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
 
   const PUBLIC_POSTS = new Set(['/api/auth/signin', '/api/auth/forgot', '/api/auth/reset/check', '/api/auth/reset/confirm']);
 
+  const sameSite = (origin, req) => {
+    let o;
+    try {
+      o = new URL(origin);
+    } catch {
+      return false;
+    }
+    if (config.publicUrl && o.origin === new URL(config.publicUrl).origin) return true;
+    return o.host === req.headers.host;
+  };
   async function handle(req, res) {
     await ready;
     const url = new URL(req.url, 'http://local');
     const pathname = url.pathname;
     const method = req.method === 'HEAD' ? 'GET' : req.method;
+    if (frozen && method !== 'GET') return send(res, 503, { error: frozen }, { 'Retry-After': '5' });
     if (method === 'GET' && pathname.startsWith(CHALLENGE_PREFIX)) return acmeChallenge(req, res);
     if (method === 'POST' && pathname === '/saml/acs') return samlAcs(req, res);
     if (req.socket.encrypted) {
@@ -1340,8 +1361,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
           if (!ctx || req.headers['x-csrf-token'] !== ctx.session.csrf) throw fail(ctx ? 403 : 401, ctx ? 'Reload the page: the request did not come from it.' : 'Sign in first.');
         }
         const origin = req.headers.origin;
-        if (origin && config.publicUrl && origin !== new URL(config.publicUrl).origin) throw fail(403, 'That request came from another site.');
-        if (origin && !config.publicUrl && new URL(origin).host !== req.headers.host) throw fail(403, 'That request came from another site.');
+        // The page's own address (whatever name or IP it was opened by), or PUBLIC_URL (behind a proxy that changes Host).
+        if (origin && !sameSite(origin, req)) throw fail(403, 'That request came from another site.');
         body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') ? CALC_LIMIT : BODY_LIMIT);
       }
       let result;
@@ -1403,6 +1424,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   };
   async function resumeReads() {
     for (const [userId, p] of Object.entries(pendingReads.value.reads)) {
+      // Handed over by the version before, still connected: nothing to start again.
+      if (calc.work(userId).read) continue;
       const user = iam.byId(userId);
       if (!user || user.active === false || Date.now() - Date.parse(p.startedAt) > 24 * 3600 * 1000) {
         forgetPending(userId);
@@ -1447,6 +1470,20 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   }
   stopJobs.push(() => acme.stop(), () => httpsManager.stop());
   const stop = () => stopJobs.forEach((j) => j());
+  /** An update without a restart: this process stops writing and gives what it holds in memory to the next. */
+  const handoff = () => {
+    stop();
+    frozen = frozen ?? 'The command center is moving to its new version: try again in a moment.';
+    return { calc: calc.handoff() };
+  };
+  /** The next version did not come up: carry on as before. */
+  const resume = () => {
+    frozen = null;
+    for (const job of startJobs) job();
+    acme.startRenewal();
+    httpsManager.watch();
+  };
+  const adopt = (state) => state?.calc && calc.adopt(state.calc);
 
-  return { handle, httpsOnly, started, stop, https: httpsManager, acme, version: VERSION, versionLabel: versionLabel(), ready, iam, teams, accounts, audit, terms, settings, calc, SECURITY_HEADERS, APP_CSP };
+  return { handle, httpsOnly, started, stop, handoff, resume, adopt, release: () => calc.release(), https: httpsManager, acme, version: VERSION, versionLabel: versionLabel(), ready, iam, teams, accounts, audit, terms, settings, calc, SECURITY_HEADERS, APP_CSP };
 }

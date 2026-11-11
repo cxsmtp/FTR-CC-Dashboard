@@ -127,13 +127,14 @@ Releases come from this repository's GitHub Releases (`UPDATE_REPO`; `UPDATE_GIT
 - **Install** downloads `ftr-cc-dashboard-<version>.tar.gz` and `SHA256SUMS`. The archive must match its SHA-256, and every file must match the `MANIFEST.json` inside it, with nothing extra; otherwise the release is refused, with the reason. Files are checked again before every start.
 - **Switch to** (or **Install and switch**):
   1. a backup is taken;
-  2. the launcher starts the new version on trial;
+  2. the launcher loads the new version beside the running one, on trial, and hands it the traffic when it is up (no restart);
   3. if it does not come up within 150 s (`UPDATE_START_TIMEOUT_SECONDS`), or stops within 2 minutes, it is **rolled back by itself** to the version before. It is marked failed and never installed automatically again.
 - **Roll back** to the built-in version or to any installed one, with **Switch to**.
 - **Checks every 15 minutes**, by itself, whether or not auto-update is on (and a minute after each start). A newer release is shown at the top of the tab.
 - **Auto-update** (on by default): a newer release is installed and switched to **as soon as found** (within 15 minutes), or **at a set hour** if you choose it under **When**. Untick it to only be told.
 - **Trusted checksums:** the first time a release is seen, its archive's SHA-256 and its `SHA256SUMS` are kept on the server (`DATA_DIR/app/state.json`) and listed. If they ever change afterwards (a re-published or tampered release), the release is marked **Checksum changed: refused** and is never installed, by hand or automatically. Installed versions are re-checked file by file at each check; a change is recorded under Recent events, and that version will not start.
-- **Restart the server** restarts it under the launcher.
+- **Reload the server** loads it again beside the running one and hands over, without a restart.
+- **No restart, ever.** The launcher holds the port and passes every connection on. Every switch (an update, a rollback, a restored backup, a reload) loads the new version beside the running one; the running one finishes what it is answering and hands over each person's Checkmarx One connection and their reads; then the new one takes over. Nobody is signed out and the port never closes. If the new version does not come up, the running one carries on.
 
 Making a release: bump `version` in package.json, add the CHANGELOG entry, and tag `v<version>`. The release workflow runs the tests, builds the archive (`scripts/make-release.mjs`) and publishes it. Behind a company proxy, set `HTTPS_PROXY`; the launcher sends the server's own calls through it.
 

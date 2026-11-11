@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.09.00 — 2026-11-11
+
+- **Updates without a restart.** The launcher now holds the port itself and passes every connection to the version that answers. A new version (an update, a rollback, a restored backup, or **Reload the server**) is loaded beside the running one; the running one finishes what it is answering, stops writing and hands over what it holds in memory: each person's Checkmarx One connection, reads not yet put into their account, and reads still running (started again at once). Then the new version takes the connections. Nobody is signed out, the port never closes, and nothing has to be read again. Tested with 20 clients working without pause through two reloads, over http and HTTPS: no request failed, and the longest wait was under 2 seconds.
+- **If the new version does not come up, the running one carries on**, with nothing lost; the new one is marked failed and never installed automatically again.
+- **No "What is new" pop-up after an update.** What changed is under **About** (the version at the bottom of the menu) for anyone who wants it.
+- **Fixed: "That request came from another site."** With `PUBLIC_URL` set, changes such as **Reset password** were refused when the command center was opened by another name or address (an IP address, for example). Changes from the address the page was opened by are now accepted, as well as from `PUBLIC_URL`; other sites are still refused, and every change still needs the session's own token.
+
 ## CC-01.08.00 — 2026-11-11
 
 - **The calculator is part of the dashboard.** It opens inside the command center's own menu, as every other page does: Overview, Accounts, People, Calculator, Quick guide, Teams, Settings and Audit log, with your name, **Theme**, **Sign out** and the version at the bottom.
