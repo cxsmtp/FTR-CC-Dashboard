@@ -239,16 +239,16 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
 .cc-logo svg { width: 20px; height: 20px; }
 .cc-brand b { display: block; font-size: 15px; font-family: var(--font); }
 .cc-brand small { display: block; color: var(--muted); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; }
-.cc-nav { display: grid; gap: 2px; }
+.cc-nav { display: grid; gap: 0; }
 .cc-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; color: var(--muted); font-weight: 500; text-decoration: none; transition: background .15s, color .15s; }
 .cc-nav a:hover { background: var(--cc-panel-hi); color: var(--text); }
 .cc-nav a.on { color: var(--text); background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 16%, transparent), color-mix(in srgb, var(--violet) 10%, transparent)); box-shadow: inset 2px 0 0 var(--cyan); }
 .cc-nav svg, .cc-row svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.cc-row svg { width: 15px; height: 15px; }
+.cc-row svg { width: 16px; height: 16px; }
 .cc-nav .cc-label { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 10px 12px 4px; }
 .cc-me { margin-top: auto; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--cc-panel); display: grid; gap: 8px; }
 .cc-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.cc-who b { display: block; font-size: 13.5px; }
+.cc-who b { display: block; font-size: 14px; line-height: 21px; }
 .cc-who small { display: block; color: var(--muted); font-size: 12px; }
 .cc-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 13px; color: #fff; background: var(--grad); flex: none; }
 .cc-row { display: flex; gap: 6px; }
@@ -257,7 +257,7 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
 .cc-ver:hover { color: var(--cyan); }
 .cc-work { display: flex; gap: 10px; align-items: center; margin-top: auto; margin-bottom: 8px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line-hi); background: var(--cc-panel); color: var(--text); font-size: 12.5px; text-decoration: none; }
 .cc-work[hidden] { display: none; }
-.cc-work + .cc-me { margin-top: 0; }
+.cc-work:not([hidden]) + .cc-me { margin-top: 0; }
 .cc-work b, .cc-work small { display: block; }
 .cc-work small { color: var(--muted); }
 .cc-work.running { background: linear-gradient(120deg, color-mix(in srgb, var(--cyan) 14%, transparent), color-mix(in srgb, var(--violet) 14%, transparent)), var(--cc-panel); }
@@ -313,3 +313,7 @@ html[data-cc] .shell.standalone .sa-top .title-row h1 { white-space: nowrap; }
 html[data-cc] .shell.standalone .sa-top .topbar-title { flex: 1 1 100%; }
 @media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; grid-template-areas: "name" "sf" "team" "owner"; } }
 html[data-cc] .shell.standalone .sa-top .title-row { flex: none; } html[data-cc] .shell.standalone .sa-top .topbar-title { flex-wrap: wrap; gap: 4px 20px; align-items: baseline; } html[data-cc] .shell.standalone .sa-sub { flex: 1 1 380px; }
+/* The menu exactly as on the dashboard: same type, same line height, so nothing moves between pages. */
+html[data-cc] .cc-side { font: 14px/1.5 var(--font); letter-spacing: normal; }
+html[data-cc] .cc-side b { font-weight: 600; }
+html[data-cc] .cc-me .cc-row button { font-size: 12.5px; padding: 5px 10px; min-height: 0; line-height: 1.5; }

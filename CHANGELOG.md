@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.11.01 — 2026-11-11
+
+- **Fixed: the menu moved on the calculator page.** Your name, Theme and Sign out sat higher in the calculator's menu than on the dashboard, and the menu items were spaced differently, so the menu jumped when moving between pages. It is now the same, to the pixel, on every page.
+
 ## CC-01.11.00 — 2026-11-11
 
 - **The customer's name, as in Salesforce, before the Salesforce link.** The calculator's **Customer ▾** picker is gone. In the account bar, type the account's name as Salesforce has it: your team's accounts are suggested as you type, and picking one opens it; **+ New** starts another account; changing the name of the open account renames it. The name and the Salesforce link now share the first row, with the team and the accountable SE below.
