@@ -820,3 +820,26 @@ table.versions:not(.show-all) tr.v-older { display: none; }
 .sf-hint { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); font-weight: 400; }
 .sf-hint.ok { color: var(--green); }
 .sf-hint.bad { color: var(--red); }
+
+/* An account: its facts in one strip, its settings and the sale form folded away */
+.head.compact { margin-bottom: 4px; }
+.acct-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.acct-strip { display: grid; grid-template-columns: minmax(280px, 2.2fr) repeat(4, minmax(120px, 1fr)); gap: 10px; }
+.acct-strip > div { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius, 14px); background: var(--panel); }
+.acct-strip small { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.acct-strip b { font-size: 22px; font-weight: 700; }
+.acct-strip .sub { font-size: 12px; color: var(--muted); }
+.acct-strip .as-main .credits.big { font-size: 30px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-strip button { align-self: flex-start; margin-top: 2px; }
+.ok-t { color: var(--green); } .warn-t { color: var(--amber); }
+.acct-edit > summary { cursor: pointer; list-style: none; }
+.acct-edit > summary::-webkit-details-marker { display: none; }
+.acct-edit > summary h2 { margin: 0; display: flex; align-items: baseline; justify-content: flex-start; gap: 12px; }
+.acct-edit > summary h2 small { margin-left: auto; }
+.acct-edit > summary h2::before { content: "▸ "; color: var(--muted); }
+.acct-edit[open] > summary h2::before { content: "▾ "; }
+.acct-edit[open] > summary { margin-bottom: 12px; }
+.sold-bar.wide { display: grid; gap: 6px; margin-top: 4px; }
+.sale-fold > summary { list-style: none; display: inline-flex; cursor: pointer; }
+.sale-fold > summary::-webkit-details-marker { display: none; }
+@media (max-width: 1100px) { .acct-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .acct-strip .as-main { grid-column: 1 / -1; } }

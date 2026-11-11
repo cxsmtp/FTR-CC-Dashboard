@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.29.00 — 2026-11-11
+
+- **Mark a report shared right as it is made.** When a report is ready, the calculator asks **Shared with the customer?** with an optional note (how and to whom) and **Make it the account’s primary report** (ticked). Choose **✓ Shared with the customer** or **Not yet**.
+- **Generated reports shows what was shared**: a **Shared** column with the date, **Mark** for those not shared yet, and **Undo**. The account page and the overview follow at once.
+- **The account page, compact.** One strip with the primary report’s credits (T&R and Fusion beneath), whether it was shared (with **Mark shared**), sold, still needed and the reports. The Salesforce link, SE, Checkmarx One key and Impact sit as chips under the name; **Account details** (edit the link, SE, team, the key, delete) and **Record a sale** are folded away; the repeated tiles are gone.
+- The demo organisation script works again with the stricter Salesforce link checks.
+
 ## CC-01.28.00 — 2026-11-11
 
 - **Reports follow the platform’s theme.** The projection report, its live levers and the PDF summary are made in the command center’s own theme (Aurora, Ocean, Emerald, Sunset, Royal, Graphite or Command Center in its chosen colour), and open light or dark as you have it. The reader can still switch Light, Dark or Auto in the report.

@@ -985,16 +985,17 @@ async function viewAccount(id) {
   const calcHref = `/calculator?team=${encodeURIComponent(a.teamId)}&account=${encodeURIComponent(a.id)}`;
   $('#main').innerHTML = `
     <div class="crumbs"><a href="#/accounts">Accounts</a> › ${esc(a.teamPath)}</div>
-    <div class="head"><div><h1 class="serif">${esc(a.name)}</h1><p>Accountable SE <b>${esc(a.owner)}</b> · ${num(a.reportCount)} report${a.reportCount === 1 ? '' : 's'} · ${num(a.sharedCount)} shared with the customer</p></div>
-      <div class="tools">${a.salesforceUrl ? `<a class="btn" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer">${icon('ext')}Open in Salesforce</a>` : ''}${d.can.edit ? `<a class="btn primary" href="${esc(calcHref)}">${icon('calc')}Open in calculator</a>` : ''}</div></div>
-    ${a.salesforceUrl ? '' : `<div class="callout warn">This account has no Salesforce opportunity or account link: no report can be generated until it is given.${d.can.edit ? ' Add it below.' : ''}</div>`}
-    <div class="hero-card mt">
-      <div class="panel"><h2>Primary report <small>${p ? (p.how === 'marked' ? 'marked primary' : 'the latest: none marked, so the latest stands for the account') : 'none yet'}</small></h2>
-        ${p ? `<div class="flex"><span class="credits big serif" id="bigc"></span></div>
-        <div class="figure"><div><small>Triage &amp; remediation</small><b>${num(Math.round(p.trCredits ?? 0))}</b></div><div><small>Fusion</small><b>${num(Math.round(p.fusionCredits ?? 0))}</b></div><div><small>Total${p.extraPercent ? ` (+${num(p.extraPercent, 1)}%)` : ''}</small><b>${num(Math.round(p.totalCredits))}</b></div></div>
-        <p class="muted small mt">Made ${esc(dateTime(p.createdAt))} by ${esc(p.createdBy)}${p.bundles ? ` · ${num(p.bundles)} bundle${p.bundles === 1 ? '' : 's'}` : ''} · ${p.sharedAt ? `<span class="chip ok"><i></i>Shared ${esc(date(p.sharedAt))}</span>` : '<span class="chip warn"><i></i>Not shared yet</span>'}</p>` : '<div class="empty"><b>No report yet</b>Open the account in the calculator and generate one.</div>'}
-      </div>
-      <div class="panel"><h2>Account</h2>
+    <div class="head compact"><div><h1 class="serif">${esc(a.name)}</h1><p class="acct-meta">${a.salesforceUrl ? `<a class="chip sf" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer">${esc(a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account')} <span class="mono">${esc(a.salesforceId)}</span> ↗</a>` : '<span class="chip warn"><i></i>No Salesforce link</span>'}<span>SE <b>${esc(a.owner)}</b></span>${a.cxone ? `<span class="chip ok" title="Last read ${esc(a.cxone.lastReadAt ? ago(a.cxone.lastReadAt) : 'never')}"><i></i>Checkmarx One key kept · ${esc(a.cxone.tenant)}</span>` : ''}${a.impactEnabled ? `<span class="chip">Impact ${esc(a.impactCurrency)}</span>` : ''}</p></div>
+      <div class="tools">${d.can.edit ? `<a class="btn primary" href="${esc(calcHref)}">${icon('calc')}Open in calculator</a>` : ''}</div></div>
+    ${a.salesforceUrl ? '' : `<div class="callout warn">This account has no Salesforce opportunity or account link: no report can be generated until it is given.${d.can.edit ? ' Add it under Account details.' : ''}</div>`}
+    <div class="acct-strip mt">
+      <div class="as-main"><small>Primary report · ${p ? (p.how === 'marked' ? 'marked' : 'the latest (none marked)') : 'none yet'}</small>${p ? `<span class="credits big serif" id="bigc"></span><span class="sub">T&amp;R ${num(Math.round(p.trCredits ?? 0))} · Fusion ${num(Math.round(p.fusionCredits ?? 0))}${p.extraPercent ? ` · +${num(p.extraPercent, 1)}%` : ''}${p.bundles ? ` · ${num(p.bundles)} bundle${p.bundles === 1 ? '' : 's'}` : ''} · ${esc(date(p.createdAt))} by ${esc(p.createdBy)}</span>` : `<b>—</b><span class="sub">Open the account in the calculator and generate one.</span>`}</div>
+      <div><small>Shared with the customer</small>${p ? (p.sharedAt ? `<b class="ok-t">✓ ${esc(date(p.sharedAt))}</b>` : `<b class="warn-t">Not yet</b>${d.can.share ? `<button class="sm" id="share-primary">${icon('send')}Mark shared</button>` : ''}`) : '<b>—</b>'}</div>
+      <div><small>Sold</small><b class="sold-t">${num(a.sold)}</b><span class="sub">${p ? `${Math.min(100, Math.round((a.sold / Math.max(1, p.totalCredits)) * 100))}% of the projection` : ''}</span></div>
+      <div><small>Still needed</small><b>${a.remaining === null ? '—' : num(a.remaining)}</b></div>
+      <div><small>Reports</small><b>${num(a.reportCount)}</b><span class="sub">${num(a.sharedCount)} shared</span></div>
+    </div>
+    <details class="panel mt acct-edit"${a.salesforceUrl ? '' : ' open'}><summary><h2>Account details <small>Salesforce link, accountable SE, team, Checkmarx One key, Impact</small></h2></summary>
         <form class="form" id="acct">
           <label class="f">Salesforce opportunity or account link <b>required</b><input name="sf" type="url" value="${esc(a.salesforceUrl)}" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" ${d.can.edit ? '' : 'disabled'} /></label>
           <div class="row">
@@ -1003,10 +1004,9 @@ async function viewAccount(id) {
           </div>
           ${d.can.edit ? '<div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="err"></span></div>' : ''}
         </form>
-        ${a.salesforceUrl ? `<dl class="kv mt"><dt>Salesforce</dt><dd>${esc(a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account')} <span class="mono">${esc(a.salesforceId)}</span></dd><dt>Created</dt><dd>${esc(dateTime(a.createdAt))} by ${esc(a.createdBy)}</dd><dt>Updated</dt><dd>${esc(dateTime(a.updatedAt))}</dd><dt>Checkmarx One</dt><dd>${a.cxone ? `Key kept for <b>${esc(a.cxone.tenant)}</b> by ${esc(a.cxone.savedBy)} · ${a.cxone.lastReadAt ? `last read ${esc(ago(a.cxone.lastReadAt))}` : 'not read since'}${d.can.edit ? ` · <a href="${esc(calcHref)}&amp;refresh=1">↻ Refresh in the calculator</a> · <a href="#" id="forget-key">Forget the key</a>` : ''}` : 'No key kept: tick "Remember this key" when connecting in the calculator, to refresh in one click later.'}</dd><dt>Impact <span class="chip star">beta</span></dt><dd>${a.impactEnabled ? `On · soft savings in ${esc(a.impactCurrency)} go into its reports` : 'Off: turn it on in the calculator for soft savings in the reports'}</dd></dl>` : ''}
+        ${a.salesforceUrl ? `<dl class="kv mt"><dt>Created</dt><dd>${esc(dateTime(a.createdAt))} by ${esc(a.createdBy)}</dd><dt>Updated</dt><dd>${esc(dateTime(a.updatedAt))}</dd><dt>Checkmarx One</dt><dd>${a.cxone ? `Key kept for <b>${esc(a.cxone.tenant)}</b> by ${esc(a.cxone.savedBy)} · ${a.cxone.lastReadAt ? `last read ${esc(ago(a.cxone.lastReadAt))}` : 'not read since'}${d.can.edit ? ` · <a href="${esc(calcHref)}&amp;refresh=1">↻ Refresh in the calculator</a> · <a href="#" id="forget-key">Forget the key</a>` : ''}` : 'No key kept: tick "Remember this key" when connecting in the calculator, to refresh in one click later.'}</dd><dt>Impact <span class="chip star">beta</span></dt><dd>${a.impactEnabled ? `On · soft savings in ${esc(a.impactCurrency)} go into its reports` : 'Off: turn it on in the calculator for soft savings in the reports'}</dd></dl>` : ''}
         ${d.can.deleteAccount ? '<div class="mt"><button class="danger sm" id="del-acct">Delete account and its reports</button></div>' : ''}
-      </div>
-    </div>
+    </details>
     ${salesPanel(a, d)}
     <div class="panel mt"><h2>Reports <small>download them from the calculator's Saved reports list</small>${d.can.edit ? `<label class="btn sm file-btn">⇪ Upload the customer's version<input type="file" id="cv-file" accept=".html,.htm,text/html" hidden /></label>` : ''}</h2>
       ${d.reports.length ? `<div class="tw"><table><thead><tr><th></th><th>Made</th><th>By</th><th class="num">T&amp;R</th><th class="num">Fusion</th><th class="num">Total</th><th>Shared with customer</th><th></th></tr></thead><tbody>${d.reports.map((r) => {
@@ -1016,6 +1016,17 @@ async function viewAccount(id) {
       }).join('')}</tbody></table></div>` : '<div class="empty"><b>No reports yet</b></div>'}
     </div>`;
   if (p) countUp($('#bigc'), Math.round(p.totalCredits), ' credits');
+  if ($('#share-primary')) $('#share-primary').onclick = async () => {
+    const note = await ask('Mark shared with the customer', 'How and to whom was it shared? (optional) For example: emailed to the CISO, 12 Nov.');
+    if (note === null) return;
+    try {
+      await api(`/api/cc/reports/${encodeURIComponent(p.id)}/shared`, { method: 'POST', body: { shared: true, note } });
+      toast('Marked shared with the customer.', 'ok');
+      viewAccount(a.id);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
   wireSales(a, d);
   if ($('#forget-key')) $('#forget-key').onclick = async (e) => {
     e.preventDefault();
@@ -1081,20 +1092,15 @@ function salesPanel(a, d) {
     return r ? `${date(r.createdAt)} · ${num(Math.round(r.totalCredits))}` : 'a deleted report';
   };
   return `<div class="panel mt" id="sales"><h2>Credits sold <small>one or many sales, against the projection of the primary report</small></h2>
-    <div class="sold-strip">
-      <div><small>Projected</small><b>${projected ? num(projected) : '—'}</b></div>
-      <div><small>Sold so far</small><b class="sold-t">${num(a.sold)}</b></div>
-      <div><small>Still needed</small><b>${a.remaining === null ? '—' : num(a.remaining)}</b></div>
-      <div class="sold-bar"><span class="track"><i data-w="${p}"></i></span><small>${projected ? `${p}% of the projection sold` : 'No projection yet: the primary report sets it'}${projected && a.sold > projected ? ` · ${num(a.sold - projected)} more than projected` : ''}</small></div>
-    </div>
-    ${d.can.sell ? `<form class="form sale-form mt" id="sale"><div class="row">
+    <div class="sold-bar wide"><span class="track"><i data-w="${p}"></i></span><small>${projected ? `${num(a.sold)} of ${num(projected)} credits sold · ${p}%` : 'No projection yet: the primary report sets it'}${projected && a.sold > projected ? ` · ${num(a.sold - projected)} more than projected` : ''}</small></div>
+    ${d.can.sell ? `<details class="sale-fold mt"><summary class="btn sm">${icon('plus')}Record a sale</summary><form class="form sale-form mt" id="sale"><div class="row">
       <label class="f">Credits sold<input name="credits" type="number" min="1" step="1" required placeholder="e.g. 50000" /></label>
       <label class="f">Date of the sale<input name="date" type="date" value="${today}" max="${today}" required /></label>
       <label class="f">Salesforce opportunity link <b>required</b><input name="opportunityUrl" type="url" required value="${a.salesforceKind === 'opportunity' ? esc(a.salesforceUrl) : ''}" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><small class="sf-hint" id="sale-sf-hint">${a.salesforceKind === 'opportunity' ? `✓ Opportunity ${esc(a.salesforceId)} (the account’s own link)` : 'The opportunity this sale was won on'}</small></label>
       <label class="f">Order number <span class="muted">optional</span><input name="reference" maxlength="120" placeholder="Order or PO number" /></label>
       <label class="f">Against the report <span class="muted">optional</span><select name="reportId"><option value="">None in particular</option>${d.reports.map((r) => `<option value="${esc(r.id)}"${r.id === a.primary?.id ? ' selected' : ''}>${esc(date(r.createdAt))} · ${esc(num(Math.round(r.totalCredits)))} credits${r.id === a.primary?.id ? ' (primary)' : ''}</option>`).join('')}</select></label></div>
       <label class="f">Note <span class="muted">optional</span><input name="note" maxlength="300" placeholder="First year of a 3-year deal, bundle of 5…" /></label>
-      <div class="flex"><button class="primary" type="submit">${icon('plus')}Record the sale</button>${a.remaining ? `<button type="button" class="ghost" id="sale-rest">Fill in what is still needed (${num(a.remaining)})</button>` : ''}<span class="err" id="sale-err"></span></div></form>` : ''}
+      <div class="flex"><button class="primary" type="submit">${icon('plus')}Record the sale</button>${a.remaining ? `<button type="button" class="ghost" id="sale-rest">Fill in what is still needed (${num(a.remaining)})</button>` : ''}<span class="err" id="sale-err"></span></div></form></details>` : ''}
     ${d.sales.length ? `<div class="tw mt"><table><thead><tr><th>Date</th><th class="num">Credits</th><th>Opportunity / order</th><th>Against</th><th>Note</th><th>Recorded by</th><th></th></tr></thead><tbody>${d.sales.map((x) => `<tr data-sale="${esc(x.id)}"><td>${esc(date(x.date))}</td><td class="num credits">${num(x.credits)}</td><td class="small">${x.opportunityUrl ? `<a href="${esc(x.opportunityUrl)}" target="_blank" rel="noopener noreferrer" class="mono">${esc(x.opportunityId)} ↗</a>` : ''}${x.reference ? `<span class="sub mono">${esc(x.reference)}</span>` : x.opportunityUrl ? '' : '—'}</td><td class="small">${x.reportId ? esc(reportName(x.reportId)) : '—'}</td><td class="small">${esc(x.note || '')}</td><td class="small">${esc(x.by)}<span class="sub">${esc(ago(x.at))}</span></td><td class="actions">${d.can.removeAnySale || x.byId === d.can.me ? `<button class="sm ghost icon" data-unsell title="Remove this sale">${icon('trash')}</button>` : ''}</td></tr>`).join('')}</tbody><tfoot><tr><td><b>Total</b></td><td class="num credits">${num(a.sold)}</td><td colspan="5"></td></tr></tfoot></table></div>` : '<p class="muted small mt">No sales recorded yet.</p>'}
   </div>`;
 }

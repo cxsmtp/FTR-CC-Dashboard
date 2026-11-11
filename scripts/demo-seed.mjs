@@ -13,7 +13,7 @@ import path from 'node:path';
 import { loadConfig } from '../server/config.js';
 import { Iam, hashPassword } from '../server/iam.js';
 import { Teams } from '../server/teams.js';
-import { Accounts } from '../server/accounts.js';
+import { Accounts, sfChecksum } from '../server/accounts.js';
 import { Terms } from '../server/terms.js';
 
 const config = loadConfig();
@@ -30,7 +30,11 @@ const PASSWORD = process.env.DEMO_PASSWORD || 'Demo-Command-Center-2026';
 let seed = 7;
 const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 const pick = (xs) => xs[Math.floor(rand() * xs.length)];
-const sfId = (prefix) => prefix + Array.from({ length: 15 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789'[Math.floor(rand() * 58)]).join('');
+// A made-up 15-character id, with Salesforce's own 3-letter check on the end (server/accounts.js checks it).
+const sfId = (prefix) => {
+  const id15 = prefix + Array.from({ length: 12 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789'[Math.floor(rand() * 58)]).join('');
+  return id15 + sfChecksum(id15);
+};
 
 async function person(email, name, role, teamId, title) {
   const { user } = await iam.create({ email, name, role, teamId, title });
@@ -94,7 +98,7 @@ for (const region of regions) {
           const credits = Math.round((k === parts - 1 ? left : left * (0.3 + rand() * 0.4)) / 1000) * 1000;
           left -= credits;
           const day = new Date(Date.now() - rand() * 120 * 86400e3).toISOString().slice(0, 10);
-          accounts.addSale(a.id, new Set([team.id]), { credits, date: day, reference: `${sfId('006').slice(0, 15)}`, note: pick(['Year 1', 'Initial bundle', 'Expansion', 'Q4 order']), reportId: primary.id }, se);
+          accounts.addSale(a.id, new Set([team.id]), { credits, date: day, opportunityUrl: `https://corp-demo.lightning.force.com/lightning/r/Opportunity/${sfId('006')}/view`, reference: `PO-${1000 + Math.floor(rand() * 9000)}`, note: pick(['Year 1', 'Initial bundle', 'Expansion', 'Q4 order']), reportId: primary.id }, se, ['force.com']);
         }
       }
     }

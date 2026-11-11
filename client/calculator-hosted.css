@@ -521,3 +521,12 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 .calc-impact-h4 { margin: 14px 0 6px; font-size: 13px; }
 .calc-breach-dialog { max-width: 620px; }
 .calc-breach-dialog .calc-terms { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+
+/* Report ready: shared with the customer, right as it is made */
+.hc-share { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); text-align: left; }
+.hc-share-q { margin: 0; font-weight: 700; font-size: 15px; }
+.hc-share input[type=text] { width: 100%; }
+.hc-share-primary { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.hc-share-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.hc-share-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.hc-shared-cell { white-space: nowrap; }

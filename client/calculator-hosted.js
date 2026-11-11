@@ -287,6 +287,10 @@ export async function startHosted() {
     } finally {
       if (work) busy.end(work);
     }
+    if (url.pathname === '/api/projections/reports' && method === 'GET') {
+      for (const r of answer?.reports ?? []) sharedOf.set(r.id, { sharedAt: r.sharedAt ?? null, by: r.sharedNote ?? '' });
+      setTimeout(decorateReports, 0);
+    }
     if (url.pathname === '/api/projections/read') busy.read(answer);
     if (url.pathname === '/api/projections/git/count') busy.git(answer);
     if (answer?.customer && (method === 'GET' || method === 'POST') && url.pathname.startsWith('/api/projections')) openCustomer = answer.customer;
@@ -300,13 +304,63 @@ export async function startHosted() {
     if (method === 'POST' && url.pathname === '/api/projections' && answer.customer) showAccount(answer.customer.id);
     if (url.pathname === '/api/projections/reports' && method === 'POST') {
       refreshAccountSoon();
-      busy.report(true, answer?.report?.totalCredits);
+      busy.report(true, answer?.report?.totalCredits, answer?.report);
     }
     return answer;
   };
   document.addEventListener('click', (event) => {
     if (event.target.closest?.('#calc-new')) newByClick = true;
   }, true);
+
+  // ---- Generated reports: whether each was shared with the customer, marked right there ----------------------------
+  const sharedOf = new Map();
+  function decorateReports() {
+    const body = document.getElementById('calc-reports');
+    if (!body) return;
+    const head = body.closest('table')?.querySelector('thead tr');
+    if (head && !head.querySelector('.hc-shared-h')) {
+      const th = document.createElement('th');
+      th.className = 'hc-shared-h';
+      th.textContent = 'Shared';
+      th.title = 'Shared with the customer';
+      head.insertBefore(th, head.lastElementChild);
+    }
+    for (const tr of body.querySelectorAll('tr[data-report]')) {
+      let cell = tr.querySelector('.hc-shared-cell');
+      if (!cell) {
+        cell = document.createElement('td');
+        cell.className = 'hc-shared-cell';
+        tr.insertBefore(cell, tr.lastElementChild);
+      }
+      const s = sharedOf.get(tr.dataset.report);
+      const can = perms.has('reports.share');
+      cell.innerHTML = s?.sharedAt
+        ? `<span class="hc-pill ok">✓ ${esc(new Date(s.sharedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}</span>${can ? ' <button type="button" class="link" data-unshare>Undo</button>' : ''}`
+        : can ? '<button type="button" class="secondary sm" data-mark-shared title="Mark this report shared with the customer">Mark</button>' : '<span class="hc-pill">Not yet</span>';
+    }
+  }
+  document.addEventListener('click', async (event) => {
+    const b = event.target.closest?.('#calc-reports [data-mark-shared], #calc-reports [data-unshare]');
+    if (!b) return;
+    const id = b.closest('tr[data-report]')?.dataset.report;
+    if (!id) return;
+    const sharing = b.hasAttribute('data-mark-shared');
+    const note = sharing ? window.prompt('Shared with the customer: how and to whom? (optional)', '') : '';
+    if (note === null) return;
+    try {
+      await server(`/api/cc/reports/${encodeURIComponent(id)}/shared`, { method: 'POST', body: { shared: sharing, note } });
+      sharedOf.set(id, { sharedAt: sharing ? new Date().toISOString() : null });
+      decorateReports();
+      refreshAccountSoon();
+      toast(sharing ? 'Marked shared with the customer.' : 'No longer marked shared.', 'ok');
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  {
+    const body = document.getElementById('calc-reports');
+    if (body) new MutationObserver(() => decorateReports()).observe(body, { childList: true });
+  }
 
   // ---- Calculating: what is being worked out, always shown, with its progress ------------------------------------------------
   const WORK = { 'POST /api/projections/read': 'Reading Checkmarx One', 'POST /api/projections/series': 'Calculating the projection', 'POST /api/projections/reports': 'Generating the report', 'POST /api/projections/git/count': 'Counting code from git', 'POST /api/projections/git/repositories': 'Listing repositories', 'POST /api/projections/git/organizations': 'Finding organisations', 'PUT /api/projections': 'Saving' };
@@ -346,7 +400,7 @@ export async function startHosted() {
       const steps = overlay.querySelectorAll('.hc-steps li');
       [350, 750].forEach((ms, i) => setTimeout(() => steps[i + 1]?.classList.add('on'), ms));
     };
-    const hideOverlay = (ok, text) => {
+    const hideOverlay = (ok, text, report = null) => {
       if (!overlay) return;
       const o = overlay;
       overlay = null;
@@ -354,10 +408,44 @@ export async function startHosted() {
       setTimeout(() => {
         o.querySelector('.hc-card').classList.add(ok ? 'done' : 'failed');
         o.querySelector('h2').textContent = ok ? 'Report ready' : 'Not generated';
+        const sub = o.querySelector('.hc-sub');
+        if (sub) sub.textContent = ok ? 'Saved to the account’s reports.' : '';
         o.querySelector('.hc-note').textContent = text ?? '';
         o.querySelectorAll('.hc-steps li').forEach((li) => li.classList.add('on'));
+        // Right here, as it is made: was it shared with the customer, and is it the one that stands for the account?
+        if (ok && report?.id && perms.has('reports.share')) return shareChoice(o, report);
         setTimeout(() => o.remove(), ok ? 1300 : 3500);
       }, wait);
+    };
+    const shareChoice = (o, report) => {
+      const box = document.createElement('div');
+      box.className = 'hc-share';
+      box.innerHTML = `<p class="hc-share-q">Shared with the customer?</p>
+        <input type="text" id="hc-share-note" maxlength="300" placeholder="How and to whom (optional): emailed to the CISO, shown in the QBR…" />
+        <label class="hc-share-primary"><input type="checkbox" id="hc-share-primary" checked /> Make it the account’s primary report</label>
+        <div class="hc-share-acts"><button type="button" class="primary" data-share="yes">✓ Shared with the customer</button><button type="button" class="ghost" data-share="no">Not yet</button></div>
+        <p class="hc-share-hint">Not yet? Mark it later in <b>Generated reports</b> or on the account page.</p>`;
+      o.querySelector('.hc-card').append(box);
+      o.classList.add('asking');
+      box.querySelector('#hc-share-note').focus();
+      box.addEventListener('click', async (event) => {
+        const b = event.target.closest('[data-share]');
+        if (!b) return;
+        box.querySelectorAll('button').forEach((x) => (x.disabled = true));
+        try {
+          if (box.querySelector('#hc-share-primary').checked) await server(`/api/cc/reports/${encodeURIComponent(report.id)}/primary`, { method: 'POST', body: { primary: true } });
+          if (b.dataset.share === 'yes') {
+            await server(`/api/cc/reports/${encodeURIComponent(report.id)}/shared`, { method: 'POST', body: { shared: true, note: box.querySelector('#hc-share-note').value } });
+            sharedOf.set(report.id, { sharedAt: new Date().toISOString() });
+            toast('Marked shared with the customer.', 'ok');
+          }
+          decorateReports();
+          refreshAccountSoon();
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+        o.remove();
+      });
     };
     return {
       start(label) {
@@ -381,8 +469,8 @@ export async function startHosted() {
         counting = running ? { label: 'Counting code from git', done: rows.filter((r) => r.state === 'done' || r.done).length, total: rows.length || (job.repositories?.length ?? 0) } : null;
         render();
       },
-      report(ok, total) {
-        hideOverlay(ok, ok && Number.isFinite(total) ? `${Math.round(total).toLocaleString()} credits` : '');
+      report(ok, total, report) {
+        hideOverlay(ok, ok && Number.isFinite(total) ? `${Math.round(total).toLocaleString()} credits` : '', report);
       },
     };
   })();
