@@ -317,3 +317,7 @@ html[data-cc] .shell.standalone .sa-top .title-row { flex: none; } html[data-cc]
 html[data-cc] .cc-side { font: 14px/1.5 var(--font); letter-spacing: normal; }
 html[data-cc] .cc-side b { font-weight: 600; }
 html[data-cc] .cc-me .cc-row button { font-size: 12.5px; padding: 5px 10px; min-height: 0; line-height: 1.5; }
+/* Quick guide: just above the person, as on the dashboard. */
+.cc-guide-nav { margin-top: auto; }
+.cc-work:not([hidden]) ~ .cc-guide-nav { margin-top: 0; }
+.cc-guide-nav + .cc-me { margin-top: 6px; }

@@ -374,3 +374,21 @@ test('audit log: every change is recorded, refused attempts too, and it can be f
   assert.match(String(csv.data), /refused: /);
   assert.equal((await se.get('/api/audit')).status, 403);
 });
+
+test('roles can be renamed, built-in ones and Admin too; Admin keeps every permission', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const before = (await admin.get('/api/people')).data.roles;
+  const se = before.find((r) => r.id === 'se');
+  const renamed = await admin.put('/api/roles/se', { name: 'Solutions Engineer', description: se.description, permissions: se.permissions });
+  assert.equal(renamed.status, 200);
+  assert.equal(renamed.data.role.name, 'Solutions Engineer');
+  assert.deepEqual(renamed.data.role.permissions, se.permissions);
+  const adm = await admin.put('/api/roles/admin', { name: 'Platform Admin', permissions: [] });
+  assert.equal(adm.status, 200);
+  assert.equal(adm.data.role.name, 'Platform Admin');
+  assert.equal(env.app.iam.roles().admin.permissions.length, before.find((r) => r.id === 'admin').permissions.length);
+  // Someone with the renamed role still has what it allowed.
+  const se1 = await client(env.base, 'se1@t.example');
+  assert.equal(se1.me.role.name, 'Solutions Engineer');
+  assert.equal((await se1.get('/api/dashboard')).status, 200);
+});

@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.12.00 — 2026-11-11
+
+- **Three quick guides, one per persona, six visual steps each.** **Sales Engineer** (from a customer’s name to a projection), **Leader** (your teams at a glance, and where to step in), and **Admin** (set it up once). Each step is an animated card with a picture and a **Go there** link. Your own guide is the first page after your first sign-in. Under **Quick guide** you also see the guides below you: an Admin all three, a Leader the Leader and Sales Engineer guides.
+- **Quick guide sits just above your name**, at the foot of the menu, on every page including the calculator.
+- **Rename any role**, the built-in ones and Admin too (People & roles → Roles & permissions → **Rename**). Who holds it and what it allows stay the same; Admin always holds every permission.
+
 ## CC-01.11.01 — 2026-11-11
 
 - **Fixed: the menu moved on the calculator page.** Your name, Theme and Sign out sat higher in the calculator's menu than on the dashboard, and the menu items were spaced differently, so the menu jumped when moving between pages. It is now the same, to the pixel, on every page.

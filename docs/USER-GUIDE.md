@@ -8,7 +8,7 @@ The command center is where every Sales Engineer works out the credits an accoun
 2. Open the command center's address and sign in with them.
 3. **Choose your own password.** At least 12 characters. A few words strung together are easy to remember and hard to guess.
 4. **Accept the terms of use.** Read them first: projections are supporting information only, keys and tokens are for the projection only, and the command center is for internal use under the PolyForm Internal Use License 1.0.0. You are asked again whenever the terms change.
-5. **Read the quick guide.** It shows the steps for your role. It is always under **Quick guide** in the menu.
+5. **Read your quick guide.** Six steps for your role (Sales Engineer, Leader or Admin). It is always under **Quick guide**, just above your name in the menu, with the guides for the roles below yours.
 
 **Forgot your password?** On the sign-in page, click **Forgot your password?** and enter your work email. A link to choose a new one arrives by email. It works once, for 30 minutes, and signs you out everywhere else. Nothing arrived? Check spam, or ask an Admin to reset it: they give you a new one-time password. Locked out after 5 wrong tries? Wait 15 minutes.
 

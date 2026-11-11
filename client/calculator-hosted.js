@@ -120,11 +120,11 @@ export async function startHosted() {
       ${link('/#/people', 'people', can('users.manage') ? 'People &amp; roles' : 'People')}
       <div class="cc-label">Work</div>
       ${link('/calculator', 'calc', 'Calculator', true, true)}
-      ${link('/#/guide', 'guide', 'Quick guide')}
       ${admin ? '<div class="cc-label">Administration</div>' : ''}
       ${link('/#/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
       ${link('/#/admin', 'admin', 'Settings', settings)}
       ${link('/#/audit', 'audit', 'Audit log', can('audit.view'))}`;
+    $('cc-guide-nav').innerHTML = link('/#/guide', 'guide', 'Quick guide');
     const name = cfg.user?.name ?? '';
     $('cc-avatar').textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
     $('cc-name').textContent = name;

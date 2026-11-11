@@ -110,7 +110,12 @@ export class Iam {
   saveRole(id, { name, description, permissions }, granterPermissions) {
     const roles = this.doc.value.roles;
     const key = id ?? `role-${randomUUID().slice(0, 8)}`;
-    if (roles[key]?.locked) throw fail(400, 'The Admin role always holds every permission.');
+    // The Admin role can be renamed and described, but always holds every permission.
+    if (roles[key]?.locked) {
+      roles[key] = { ...roles[key], name: clean(name, 60) || roles[key].name, description: description === undefined ? roles[key].description : clean(description, 300) };
+      this.save();
+      return { id: key, ...roles[key] };
+    }
     const wanted = cleanPermissions(permissions);
     if (wanted.some((p) => !granterPermissions.has(p))) throw fail(403, 'A role cannot be given permissions you do not hold.');
     if (wanted.some((p) => ADMIN_ONLY.includes(p))) throw fail(403, 'HTTPS, single sign-on, updates, backups and settings stay with the Admin role: no other role can hold them.');

@@ -415,3 +415,43 @@ table.audit tr.refused td { background: color-mix(in srgb, var(--red) 6%, transp
 .nowrap { white-space: nowrap; }
 .callout.ok { border-color: color-mix(in srgb, var(--green) 40%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
 .callout.bad { border-color: color-mix(in srgb, var(--red) 40%, transparent); background: color-mix(in srgb, var(--red) 8%, transparent); }
+
+/* Quick guide: just above the person, at the foot of the menu. */
+.side .guide-nav { margin-top: auto; }
+.side .bgwork:not([hidden]) ~ .guide-nav { margin-top: 0; }
+.side .guide-nav + .me { margin-top: 6px; }
+
+/* ---- Quick guides: a hero, persona tabs, six animated steps ---------------------------------------- */
+.wizard.wide { max-width: 1180px; }
+.gx-hero { display: flex; gap: 26px; align-items: center; margin-bottom: 18px; }
+.gx-intro h1 { font-size: clamp(26px, 3vw, 36px); margin: 8px 0 4px; }
+.gx-intro p { margin: 2px 0; max-width: 680px; }
+.gx-orbit { position: relative; width: 96px; height: 96px; flex: none; }
+.gx-orbit i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--cyan); animation: spin 2.4s linear infinite; }
+.gx-orbit i:nth-child(2) { inset: 10px; border-top-color: var(--violet); animation-duration: 3.4s; animation-direction: reverse; }
+.gx-orbit i:nth-child(3) { inset: 20px; border-right-color: var(--cyan); animation-duration: 1.8s; opacity: .6; }
+.gx-orbit span { position: absolute; inset: 28px; border-radius: 50%; background: var(--grad); display: grid; place-items: center; box-shadow: var(--glow); animation: gxpulse 2.6s ease-in-out infinite; }
+.gx-orbit svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes gxpulse { 50% { transform: scale(1.08); } }
+.gx-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-hi); margin: 4px 0 18px; flex-wrap: wrap; }
+.gx-tabs button { border: 0; background: transparent; }
+.gx-tabs button.on { background: var(--grad); color: #fff; }
+.gx-tabs small { opacity: .75; font-weight: 400; margin-left: 4px; }
+.gx-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: gx; position: relative; }
+.gx-step { position: relative; padding: 18px 18px 16px; border-radius: 18px; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); opacity: 0; transform: translateY(18px) scale(.98); animation: gxin .6s cubic-bezier(.2, .8, .2, 1) forwards; animation-delay: calc(var(--i) * 120ms + 150ms); transition: transform .2s, box-shadow .2s, border-color .2s; overflow: hidden; }
+.gx-step::before { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--grad); transform: scaleX(0); transform-origin: left; animation: gxline .7s ease forwards; animation-delay: calc(var(--i) * 120ms + 450ms); }
+.gx-step:hover { transform: translateY(-3px); box-shadow: var(--glow), var(--shadow); border-color: color-mix(in srgb, var(--cyan) 40%, var(--line)); }
+@keyframes gxin { to { opacity: 1; transform: none; } }
+@keyframes gxline { to { transform: scaleX(1); } }
+.gx-art { position: relative; width: 72px; height: 72px; border-radius: 20px; display: grid; place-items: center; margin-bottom: 12px; background: linear-gradient(135deg, color-mix(in srgb, var(--cyan) 16%, transparent), color-mix(in srgb, var(--violet) 18%, transparent)); border: 1px solid color-mix(in srgb, var(--violet) 22%, transparent); }
+.gx-art svg { width: 44px; height: 44px; fill: none; stroke: var(--violet); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; animation: gxfloat 4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.6s); }
+.gx-step:nth-child(even) .gx-art svg { stroke: var(--cyan); }
+@keyframes gxfloat { 50% { transform: translateY(-3px) rotate(-2deg); } }
+.gx-n { position: absolute; right: -8px; bottom: -8px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: #fff; background: var(--grad); box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--violet) 80%, transparent); }
+.gx-step h3 { font-size: 16px; margin: 0 0 6px; }
+.gx-step p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.gx-go { display: inline-block; margin-top: 10px; font-size: 13px; font-weight: 600; }
+.gx-done { align-items: center; }
+@media (max-width: 1100px) { .gx-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .gx-steps { grid-template-columns: 1fr; } .gx-hero { flex-direction: column; align-items: flex-start; } }
+@media (prefers-reduced-motion: reduce) { .gx-step, .gx-step::before { animation: none; opacity: 1; transform: none; } .gx-orbit i, .gx-orbit span, .gx-art svg { animation: none; } }
