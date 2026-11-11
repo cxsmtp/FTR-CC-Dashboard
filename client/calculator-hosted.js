@@ -152,7 +152,7 @@ export async function startHosted() {
       ${link('/#/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
       ${link('/#/admin', 'admin', 'Settings', settings)}
       ${link('/#/audit', 'audit', 'Audit log', can('audit.view'))}`;
-    $('cc-guide-nav').innerHTML = link('/#/guide', 'guide', 'Quick guide');
+    $('cc-guide-nav').innerHTML = `<a href="/calculator" id="cc-side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/#/guide', 'guide', 'Quick guide')}`;
     const name = cfg.user?.name ?? '';
     $('cc-avatar').textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
     $('cc-name').textContent = name;
@@ -809,7 +809,10 @@ export async function startHosted() {
     setTimeout(lights, 30_000);
   };
   lights();
-  $('cc-refresh').addEventListener('click', () => location.reload());
+  $('cc-side-refresh').addEventListener('click', (e) => {
+    e.preventDefault();
+    location.reload();
+  });
   $('cc-mode').addEventListener('click', async () => {
     look.mode = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     applyTheme(look.mode, look.accent);

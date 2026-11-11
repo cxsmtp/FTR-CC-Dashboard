@@ -12,5 +12,8 @@ Rules from the owner, for every change:
 - Every table can be sorted low to high and back, and filtered by each column with a multi-select (public/app.js
   `enhanceTable`, applied to every table with a header). New tables need a `<thead>`; use `data-sort` / `data-v` on
   cells whose text is not what they should sort or filter by.
-- Settings save by themselves and go back to the last known good setting when a new one does not work.
+- Every page keeps the work being done: settings save by themselves ("Changes save as you type") and go back to the
+  last known good setting when a new one does not work; anything typed into any other form is kept as it is typed
+  (public/app.js drafts) until the form is sent.
+- Terms of use, the licence and the user guide open in the app (the reading overlay), never as a bare file.
 - Run `npm test` before pushing.

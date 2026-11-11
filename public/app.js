@@ -201,15 +201,14 @@ function shell(active, content) {
         ${link('/audit', 'audit', 'Audit log', can('audit.view'))}
       </nav>
       <a class="bgwork" id="bgwork" hidden></a>
-      <nav class="nav guide-nav">${link('/guide', 'guide', 'Quick guide')}</nav>
+      <nav class="nav guide-nav"><a href="#" id="side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/guide', 'guide', 'Quick guide')}</nav>
       <button class="ver" id="ver" title="${can('system.update') ? 'Versions and updates' : 'About, version and what is new'}">${esc(me.versionLabel ?? '')}</button>
-      <div class="side-links"><a href="#/about">About</a><span>·</span><a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a><span>·</span><a href="/legal/license" target="_blank" rel="noopener">License</a></div>
+      <div class="side-links"><a href="#/about">About</a><span>·</span><a href="#/legal" data-doc="terms">Terms &amp; license</a></div>
       <div class="side-lic">PolyForm Internal Use 1.0.0 · internal use only</div>
     </aside>
     <div class="col">
       <header class="topbar">
         <button class="jump" id="jump" title="Jump to a page, an account or a person">${icon('search')}<span>Jump to…</span><kbd>Ctrl K</kbd></button>
-        <button class="tb-icon" id="tb-refresh" title="Refresh this page" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg></button>
         <span class="tb-grow"></span>
         <span class="tb-lights" id="tb-lights"></span>
         <button class="tb-icon" id="tb-mode" title="Light or dark" aria-label="Light or dark">${icon('theme')}</button>
@@ -250,7 +249,11 @@ async function lights() {
 }
 function wireTopbar() {
   lights();
-  $('#tb-refresh').onclick = () => route();
+  $('#side-refresh').onclick = (e) => {
+    e.preventDefault();
+    lights();
+    route();
+  };
   $('#tb-mode').onclick = async () => {
     const dark = document.documentElement.dataset.theme === 'dark';
     const mode = dark ? 'light' : 'dark';
@@ -426,7 +429,7 @@ function viewLogin() {
         <a href="#/forgot" class="small" id="forgot-link">Forgot your password?</a>
       </form>
       <div id="sso-box" hidden><div class="or"><span>or</span></div><a class="btn sso" id="sso-btn" href="/saml/login">${icon('people')}<span id="sso-label">Sign in with SSO</span></a></div>
-      <p class="foot">First time? Your Admin sent you a one-time password: sign in with it and you will choose your own, accept the terms of use and see a quick guide.<br/>Internal use only · <a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a> · <a href="/legal/license" target="_blank" rel="noopener">PolyForm Internal Use License</a></p>
+      <p class="foot">First time? Your Admin sent you a one-time password: sign in with it and you will choose your own, accept the terms of use and see a quick guide.<br/>Internal use only · <a href="#/legal" data-doc="terms">Terms of use &amp; license</a></p>
     </section>
   </div>`;
   fetch('/api/auth/sso').then((r) => r.json()).then((x) => {
@@ -568,7 +571,7 @@ async function viewWelcome() {
     };
     return;
   }
-  $('#app').innerHTML = `<div class="wizard wide fade">${steps}<div class="panel gx-panel">${guideHtml(personaOf(), { first: true })}<div class="flex mt gx-done"><button class="primary" id="done">Get started →</button><a class="btn ghost" href="/legal/guide" target="_blank" rel="noopener">Full user guide</a><span class="muted small">This guide is always under <b>Quick guide</b>, just above your name in the menu.</span></div></div></div>`;
+  $('#app').innerHTML = `<div class="wizard wide fade">${steps}<div class="panel gx-panel">${guideHtml(personaOf(), { first: true })}<div class="flex mt gx-done"><button class="primary" id="done">Get started →</button><button type="button" class="ghost" data-doc="guide">Full user guide</button><span class="muted small">This guide is always under <b>Quick guide</b>, just above your name in the menu.</span></div></div></div>`;
   $('#done').onclick = async () => {
     await api('/api/me/guide', { method: 'POST', body: {} }).catch(() => {});
     state.me = await api('/api/me');
@@ -661,7 +664,7 @@ function viewGuide(params) {
   const tabs = guidesFor(mine);
   const want = params?.get?.('for');
   const persona = tabs.includes(want) ? want : mine;
-  shell('guide', `<div class="head"><div></div><div class="tools"><a class="btn" href="/legal/guide" target="_blank" rel="noopener">Full user guide</a><a class="btn ghost" href="/legal/terms" target="_blank" rel="noopener">Terms of use</a><a class="btn ghost" href="/legal/license" target="_blank" rel="noopener">License</a></div></div><div class="panel gx-panel">${guideHtml(persona, { tabs })}</div>`);
+  shell('guide', `<div class="head"><div></div><div class="tools"><button type="button" data-doc="guide">Full user guide</button><button type="button" class="ghost" data-doc="terms">Terms &amp; license</button></div></div><div class="panel gx-panel">${guideHtml(persona, { tabs })}</div>`);
   for (const b of $$('[data-guide]')) b.onclick = () => go(`/guide?for=${b.dataset.guide}`);
 }
 
@@ -2388,15 +2391,66 @@ function md(text) {
   if (list) out.push('</ul>');
   return out.join('');
 }
-async function viewAbout() {
+async function viewAbout(params) {
   shell('', loading());
+  const me = state.me;
+  const b = state.branding ?? {};
   const log = await fetch('/legal/changelog').then((r) => r.text()).catch(() => '');
-  $('#main').innerHTML = `<div class="head"><div><h1 class="serif">About</h1><p>FTR Credits Command Center <b>${esc(state.me.versionLabel)}</b>, with the Cx Credits Calculator from CxMissionZero <b>${esc(state.me.mz)}</b>.</p></div>
-    <div class="tools"><a class="btn" href="/legal/guide" target="_blank" rel="noopener">User guide</a><a class="btn ghost" href="/legal/terms" target="_blank" rel="noopener">Terms of use</a><a class="btn ghost" href="/legal/license" target="_blank" rel="noopener">PolyForm Internal Use License 1.0.0</a></div></div>
-    <div class="grid g3"><div class="panel md"><h2>What is new</h2>${md(log.replace(/^# .*\n/, ''))}</div>
-    <div class="panel"><h2>Version</h2><dl class="kv"><dt>Command center</dt><dd>${esc(state.me.versionLabel)} (${esc(state.me.version)})</dd><dt>Calculator</dt><dd>CxMissionZero ${esc(state.me.mz)}</dd><dt>Licence</dt><dd>PolyForm Internal Use 1.0.0: internal business use only</dd></dl>
-    <p class="muted small mt">An independent project, not a Checkmarx product. Figures are supporting information only: Checkmarx's own records are authoritative.</p>${can('system.update') ? '<a class="btn mt" href="#/admin/updates">Updates and rollback</a>' : ''}</div></div>`;
+  const versions = log.replace(/^# .*\n/, '').split(/\n(?=## )/).filter((x) => x.startsWith('## '));
+  const accepted = me.terms?.accepted;
+  $('#main').innerHTML = `<div class="head"><div><h1 class="serif">About</h1><p>${esc(b.appName ?? 'FTR Credits')} ${esc(b.tagline ?? 'Command Center')}, with the Cx Credits Calculator from CxMissionZero.</p></div></div>
+    <div class="panel about">
+      <h2>About ${esc(b.appName ?? 'FTR Credits')} ${esc(b.tagline ?? 'Command Center')}</h2>
+      <p class="muted">Where every Sales Engineer works out the credits an account needs, keeps each projection report and what was shared with the customer, and where leaders see the whole picture across every team and region.</p>
+      <dl class="about-facts">
+        <div><dt>Version</dt><dd>${esc(me.versionLabel)} <span class="muted">(${esc(me.version)})</span>${can('system.update') ? ' · <a href="#/admin/updates">Versions and updates</a>' : ''}</dd></div>
+        <div><dt>Calculator</dt><dd>Cx Credits Calculator from CxMissionZero ${esc(me.mz)}</dd></div>
+        <div><dt>Licence</dt><dd>PolyForm Internal Use 1.0.0 · <button type="button" class="link" data-doc="license">read it</button></dd></div>
+        <div><dt>Project</dt><dd><a href="https://github.com/cxsmtp/FTR-CC-Dashboard" target="_blank" rel="noopener noreferrer">github.com/cxsmtp/FTR-CC-Dashboard</a></dd></div>
+        <div><dt>Terms accepted</dt><dd>${accepted ? `Version ${esc(me.terms.version)}${me.terms.at ? `, ${esc(dateTime(me.terms.at))}` : ''}` : 'Not yet'}</dd></div>
+        <div><dt>Organisation</dt><dd>${esc(me.organisationName ?? '')}</dd></div>
+      </dl>
+      <p class="onprem-note"><b>On premise, your data stays yours.</b> The command center runs on your own server and sends your data to no one: it connects only to what you connect it to (customers’ Checkmarx One tenants with their keys, your email server, the git hosts an SE counts code from, and GitHub for its own updates). No telemetry, no analytics.</p>
+      <div class="terms-card"><h3>Terms of use &amp; license</h3>
+        <p class="muted small">An independent project, not a Checkmarx product, for internal business use under the PolyForm Internal Use License 1.0.0. Figures are supporting information worked out from data at a moment in time: Checkmarx’s own records are authoritative, and a projection is not a quote.</p>
+        <div class="flex"><button type="button" class="primary" data-doc="terms">Read the terms of use &amp; license</button><button type="button" data-doc="guide">Read the user guide</button></div></div>
+    </div>
+    <div class="panel mt"><h2>What is new <small>every version, newest first</small></h2>
+      <div class="versions-log">${versions.map((v, i) => `<details ${i === 0 ? 'open' : ''}><summary>${esc(v.split('\n')[0].replace(/^## /, ''))}</summary><div class="md">${md(v.split('\n').slice(1).join('\n'))}</div></details>`).join('')}</div></div>`;
+  if (params?.get?.('doc')) openDoc(params.get('doc'));
 }
+/** Terms of use, the licence and the user guide: read here, in the app’s own look, never as a bare file in a new tab. */
+const DOCS = [['terms', 'Terms of use', '/legal/terms'], ['license', 'License', '/legal/license'], ['guide', 'User guide', '/legal/guide']];
+async function openDoc(which = 'terms') {
+  document.getElementById('docd')?.remove();
+  const dlg = document.createElement('dialog');
+  dlg.id = 'docd';
+  dlg.className = 'docd';
+  dlg.innerHTML = `<div class="doc-head"><div class="seg" role="tablist">${DOCS.map(([id, name]) => `<button type="button" role="tab" data-d="${id}">${esc(name)}</button>`).join('')}</div><button type="button" class="ghost sm" id="doc-close" aria-label="Close">✕</button></div><div class="doc-text md" id="doc-text"></div><div class="doc-foot muted small">PolyForm Internal Use License 1.0.0 · internal business use only · not a Checkmarx product</div>`;
+  document.body.append(dlg);
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.addEventListener('click', (e) => e.target === dlg && dlg.close());
+  $('#doc-close', dlg).onclick = () => dlg.close();
+  const show = async (id) => {
+    for (const b of dlg.querySelectorAll('[data-d]')) b.classList.toggle('primary', b.dataset.d === id);
+    const [, , url] = DOCS.find((d) => d[0] === id) ?? DOCS[0];
+    $('#doc-text', dlg).innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+    const text = await fetch(url).then((r) => r.text()).catch(() => 'It could not be loaded.');
+    // Links in the text show as their words (the overlay keeps you here).
+    $('#doc-text', dlg).innerHTML = md(text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/^<(https?:[^>]+)>$/gm, '$1'));
+    $('#doc-text', dlg).scrollTop = 0;
+  };
+  for (const b of dlg.querySelectorAll('[data-d]')) b.onclick = () => show(b.dataset.d);
+  dlg.showModal();
+  show(which);
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-doc]');
+  if (!b) return;
+  e.preventDefault();
+  openDoc(b.dataset.doc);
+});
+
 // ---- Every table: sort low to high and back, and filter each column by its values (multi-select) -------------------
 /** What a cell sorts and filters by: data-sort / data-v, else its text without the small print under it. */
 function cellText(td) {
@@ -2560,9 +2614,45 @@ function enhanceTable(table) {
   }
   apply();
 }
+// ---- Every page keeps your work: what you type in a form is kept as you type, until the form is sent -----------------
+// Settings save on the server as they change; everything else (a person being added, a sale being recorded, a team
+// being made…) is kept in this browser, so leaving the page, a reload or a dropped connection loses nothing.
+const DRAFT = 'cc-draft:';
+const draftable = (el) => el.form && el.name && !el.closest('[data-nodraft], .filters, .mpick') && !['password', 'file', 'hidden', 'submit', 'button', 'search'].includes(el.type) && !el.form.matches('#sf, #bf, #auto, #af, #actf');
+const draftKey = (el) => `${DRAFT}${location.hash.split('?')[0]}:${el.form.id || el.form.className}:${el.name}`;
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!draftable(el)) return;
+  try {
+    localStorage.setItem(draftKey(el), JSON.stringify(el.type === 'checkbox' ? el.checked : el.value));
+    el.form.dataset.drafted = '1';
+  } catch {}
+}, true);
+document.addEventListener('submit', (e) => {
+  try {
+    for (const el of e.target.elements ?? []) if (draftable(el)) localStorage.removeItem(draftKey(el));
+  } catch {}
+}, true);
+function restoreDrafts(root) {
+  for (const el of root.querySelectorAll('form input, form textarea, form select')) {
+    if (!draftable(el) || el.dataset.draftChecked) continue;
+    el.dataset.draftChecked = '1';
+    let v;
+    try {
+      v = localStorage.getItem(draftKey(el));
+    } catch {}
+    if (v === null || v === undefined) continue;
+    const value = JSON.parse(v);
+    if (el.type === 'checkbox') el.checked = Boolean(value);
+    else el.value = value;
+    el.classList.add('drafted');
+    el.title = 'Kept from what you typed before';
+  }
+}
 /** Tables appear as pages draw: each is given sorting and filters once. */
 new MutationObserver(() => {
   for (const t of document.querySelectorAll('#app table:not([data-tx])')) enhanceTable(t);
+  restoreDrafts(document.getElementById('app') ?? document.body);
 }).observe(document.getElementById('app') ?? document.body, { childList: true, subtree: true });
 window.addEventListener('hashchange', () => document.querySelector('.tx-pop')?.remove());
 
@@ -2597,7 +2687,8 @@ async function route() {
     if (path === '/audit') return await viewAudit(params);
     if (path === '/activity') return await viewActivity(params);
     if (path === '/guide') return viewGuide(params);
-    if (path === '/about') return await viewAbout();
+    if (path === '/about') return await viewAbout(params);
+    if (path === '/legal') return await viewAbout(new URLSearchParams(`doc=${params.get('doc') ?? 'terms'}`));
     go(home());
   } catch (error) {
     if (error.status === 401) return;

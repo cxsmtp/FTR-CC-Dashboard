@@ -475,7 +475,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       team: team ? { id: team.id, name: team.name, path: teamPath(ctx.teams, team.id).map((x) => x.name).join(' › ') } : null,
       leads: ctx.teams.filter((t) => t.leaderIds?.includes(ctx.user.id)).map((t) => t.id),
       scopeTeams,
-      terms: { accepted: terms.acceptedBy(ctx.user.id), version: terms.version },
+      terms: { accepted: terms.acceptedBy(ctx.user.id), version: terms.version, at: terms.doc?.value?.users?.[ctx.user.id]?.at ?? null },
       guideSeen: Boolean(ctx.user.guideSeenAt),
       organisationName: settings.value.organisationName,
       version: VERSION,

@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.21.00 — 2026-11-11
+
+- **About, laid out as in CxMissionZero.** One panel: what the command center is for, then its facts (version, calculator, licence, project, the terms you accepted and when, the organisation), the note that your data stays on your own server, and the terms card. Below it, **What is new**: every version, the newest open.
+- **Terms of use, the licence and the user guide in the app, in its look.** They open in one reading window with a tab each, from About, the foot of the menu (**About · Terms & license**, nothing more), the sign-in page, the quick guide and the calculator. No more bare files in a new tab.
+- **Refresh, above Quick guide**, in the menu of every page (and no longer twice, in the top bar too).
+- **Every page keeps your work.** What you type in a form (a person you are adding, a sale you are recording, a team you are making…) is kept as you type it, so leaving the page, a reload or a dropped connection loses nothing; it is cleared once the form is sent. A field filled in from what you typed before is marked in amber. Settings keep saving on the server as you change them.
+
 ## CC-01.20.00 — 2026-11-11
 
 - **The calculator starts with one compact panel instead of two large ones.** The customer is on one row (name as in Salesforce, the Salesforce link, the team and the accountable SE). Under it, **Data from: Checkmarx One · Git · cloc-fusion**: the Checkmarx One key, Remember and Connect sit on one line; **Git** and **cloc-fusion** open the calculator’s own Fusion · from Git and Fusion · cloc-fusion tabs and bring them into view. Impact, the kept key, the customer’s version and the reports summary share one thin line.
