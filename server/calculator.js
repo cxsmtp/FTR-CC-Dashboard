@@ -141,6 +141,8 @@ export class CalculatorService {
   onFinish = () => {};
   /** Checkmarx One activity (server/activity.js), and who a person and an account are, for it. */
   activity = null;
+  /** What each tenant taught about calls that fail (server/resilience.js). */
+  memory = null;
   describe = () => ({});
   #who(userId) {
     const l = this.#links.get(userId);
@@ -152,7 +154,7 @@ export class CalculatorService {
   /** A client whose every call is recorded for this person and the account they work on. */
   #client(userId, connection) {
     const client = this.connect(connection);
-    return this.activity && typeof client?.request === 'function' ? recorded(client, { log: this.activity, tenant: connection.tenant, who: () => this.#who(userId) }) : client;
+    return this.activity && typeof client?.request === 'function' ? recorded(client, { log: this.activity, tenant: connection.tenant, who: () => this.#who(userId), memory: this.memory }) : client;
   }
   /** The account a person works on (for the activity log): set when they connect for it or read for it. */
   workingOn(userId, account) {

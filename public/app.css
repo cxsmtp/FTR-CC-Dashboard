@@ -859,3 +859,13 @@ table.rates input { width: 100%; }
 table.rates td.num input, #team-rows input, .det-admin, .det-team { max-width: 150px; text-align: right; }
 table.rates td.c, table.rates th.c { text-align: center; }
 input.need { border-color: var(--amber) !important; }
+
+/* CxOne API audit: why a call did not succeed, what was done, what happens next time */
+.why { margin-top: 6px; padding: 6px 8px; border-radius: 8px; font-size: 12px; line-height: 1.45; white-space: normal; max-width: 520px; background: var(--panel-hi); border-left: 3px solid var(--line-hi); }
+.why.failed { border-left-color: var(--red); }
+.why.recovered { border-left-color: var(--green); }
+.why .chip { margin-right: 4px; }
+tr.recovered td { background: color-mix(in srgb, var(--green) 5%, transparent); }
+.why-table td.small { min-width: 180px; white-space: normal; }
+.learned { display: flex; flex-wrap: wrap; gap: 6px; }
+.why-panel > summary { cursor: pointer; list-style: none; } .why-panel > summary::-webkit-details-marker { display: none; } .why-panel > summary h2::before { content: "▸ "; color: var(--muted); } .why-panel[open] > summary h2::before { content: "▾ "; } .why-panel > summary h2 { margin: 0; } .why-panel[open] > summary { margin-bottom: 10px; }

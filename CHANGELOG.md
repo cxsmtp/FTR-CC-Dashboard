@@ -2,6 +2,18 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.32.00 — 2026-11-11
+
+- **CxOne API audit explains every call that did not succeed** — why, what was done, and what happens next time — on the row itself and in **Why calls did not succeed**, one line per kind of failure with how often it happened.
+  - Each gets a verdict: **Needs attention**, **Recovered by itself** or **Expected**. The card on top counts only what needs attention (the aim: 0), with what recovered and what was avoided beside it.
+  - The 404s on `/api/sast-metadata/:id` were never lost: those scans have no SAST metadata, and their lines of code were already taken from the scan itself. They now show as recovered.
+- **It learns, and does not repeat.** Each tenant’s lessons are kept (and carried across versions):
+  - a scan without SAST metadata is not asked for it again;
+  - an optional API the tenant does not offer, or refuses to the key, is not asked again for a week;
+  - a tenant that asked to slow down is read with at most 6 calls at once from then on.
+  - Calls avoided are counted, never made, and never failures.
+- **Filters apply as you change them**; **Apply** is still there for a change made midway. Outcome can now show **Needs attention**, **Recovered by itself** or **Any that did not succeed**.
+
 ## CC-01.31.00 — 2026-11-11
 
 - **Fusion engines & rates** (Administration → Fusion engines & rates, for leaders and above): the credits per 10K lines of code for each AI engine, applied by the calculator by itself.

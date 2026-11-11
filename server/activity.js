@@ -93,18 +93,36 @@ export class ActivityLog {
  * A Checkmarx One client whose every request is recorded for `who()` (the person and the account open), on `log`.
  * The client's own pagination goes through request(), so every page is recorded too.
  */
-export function recorded(client, { log, who, tenant }) {
+export function recorded(client, { log, who, tenant, memory = null, slowAtOnce = 6 }) {
   const request = client.request.bind(client);
+  // A tenant that asked to slow down is read with fewer calls at once (server/resilience.js).
+  let running = 0;
+  const waiting = [];
+  const slot = async () => {
+    if (!memory?.isSlow(tenant)) return () => {};
+    if (running >= slowAtOnce) await new Promise((r) => waiting.push(r));
+    running++;
+    return () => {
+      running--;
+      waiting.shift()?.();
+    };
+  };
   client.request = async (p, opts = {}) => {
     const t = Date.now();
     const method = String(opts.method ?? 'GET').toUpperCase();
+    // What this tenant taught (server/resilience.js): a call known to fail is not made; the caller's fallback runs.
+    if (memory && method === 'GET' && !memory.allows(tenant, p)) throw Object.assign(new Error('Not asked: this tenant is known not to answer it.'), { status: 404, avoided: true });
+    const done = await slot();
     try {
       const out = await request(p, opts);
       log.add({ kind: 'call', ...who(), tenant, method, path: shortPath(p), status: 200, ok: true, ms: Date.now() - t });
       return out;
     } catch (error) {
       log.add({ kind: 'call', ...who(), tenant, method, path: shortPath(p), status: error.status || 0, ok: false, ms: Date.now() - t, detail: String(error.message ?? '').slice(0, 160) });
+      memory?.learn(tenant, p, error.status || 0);
       throw error;
+    } finally {
+      done();
     }
   };
   return client;

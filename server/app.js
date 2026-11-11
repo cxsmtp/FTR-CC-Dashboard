@@ -18,6 +18,7 @@ import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } fro
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
+import { CallMemory, explainCall } from './resilience.js';
 import { FusionRates, engineKey, rateModels, withRates } from './fusion-rates.js';
 import { IntegrityService } from './integrity/service.js';
 import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
@@ -71,6 +72,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // Checkmarx One activity (server/activity.js): every call to a customer's tenant, per person and account.
   const activity = new ActivityLog({ dataDir: config.dataDir });
   calc.activity = activity;
+  calc.memory = new CallMemory({ dataDir: config.dataDir });
   calc.describe = (userId, accountId) => {
     const u = iam.byId(userId);
     const meta = accountId ? accounts.accounts.meta(accountId) : null;
@@ -1512,6 +1514,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const kinds = new Set(list('kind'));
     const accountIds = new Set(list('account'));
     const outcome = sp.get('outcome') ?? '';
+    const verdictOf = (e) => (e.kind === 'call' ? explainCall(e).verdict : 'failed');
     const from = sp.get('from') ? Date.parse(sp.get('from')) : null;
     const to = sp.get('to') ? Date.parse(sp.get('to')) + 86_400_000 : null;
     const before = sp.get('before') ?? '';
@@ -1529,6 +1532,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (accountIds.size && !accountIds.has(e.account?.id)) return false;
       if (outcome === 'ok' && e.ok === false) return false;
       if (outcome === 'failed' && e.ok !== false) return false;
+      if (outcome === 'attention' && (e.ok !== false || verdictOf(e) !== 'failed')) return false;
+      if (outcome === 'recovered' && (e.ok !== false || verdictOf(e) === 'failed')) return false;
       return true;
     };
     const events = activity.recent({ limit: limit + 1, filter: matches });
@@ -1538,7 +1543,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const people = new Map();
     const tenantSet = new Set();
     const accountsSeen = new Map();
-    const summary = { calls: 0, failed: 0, reads: 0, reports: 0, connects: 0, tenants: 0, ms: 0 };
+    const summary = { calls: 0, failed: 0, attention: 0, recovered: 0, reads: 0, reports: 0, connects: 0, tenants: 0, ms: 0 };
+    // Every call that did not succeed, grouped by what it was and why: the reason, what was done, the lesson.
+    const groups = new Map();
     for (const e of seen) {
       if (e.user?.id) people.set(e.user.id, { id: e.user.id, name: e.user.name ?? e.user.email ?? e.user.id, email: e.user.email ?? '' });
       if (e.tenant) tenantSet.add(e.tenant);
@@ -1546,7 +1553,19 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (e.kind === 'call') {
         summary.calls++;
         summary.ms += e.ms ?? 0;
-        if (e.ok === false) summary.failed++;
+        if (e.ok === false) {
+          summary.failed++;
+          const x = explainCall(e);
+          if (x.verdict === 'failed') summary.attention++;
+          else summary.recovered++;
+          const key = `${e.method} ${e.path} ${e.status}`;
+          const g = groups.get(key) ?? { method: e.method, path: e.path, status: e.status, ...x, count: 0, tenants: new Set(), last: e.at, first: e.at };
+          g.count++;
+          if (e.tenant) g.tenants.add(e.tenant);
+          if (e.at > g.last) g.last = e.at;
+          if (e.at < g.first) g.first = e.at;
+          groups.set(key, g);
+        }
       }
       if (e.kind === 'read' && e.detail?.startsWith('finished')) summary.reads++;
       if (e.kind === 'report') summary.reports++;
@@ -1554,7 +1573,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
     summary.tenants = tenantSet.size;
     summary.avgMs = summary.calls ? Math.round(summary.ms / summary.calls) : 0;
-    return { events: events.slice(0, limit), more: events.length > limit, me: ctx.user.id, people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name)), tenants: [...tenantSet].sort(), accounts: [...accountsSeen.values()].sort((a, b) => a.name.localeCompare(b.name)), summary };
+    const learned = calc.memory.summary(tenantSet);
+    summary.avoided = learned.reduce((n, t) => n + t.avoided, 0);
+    // Those that need someone first, then the most frequent.
+    const analysis = [...groups.values()].map((g) => ({ ...g, tenants: [...g.tenants] })).sort((a, b) => (b.verdict === 'failed') - (a.verdict === 'failed') || b.count - a.count);
+    const explained = events.slice(0, limit).map((e) => (e.kind === 'call' && e.ok === false ? { ...e, explain: explainCall(e) } : e));
+    return { events: explained, analysis, learned, more: events.length > limit, me: ctx.user.id, people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name)), tenants: [...tenantSet].sort(), accounts: [...accountsSeen.values()].sort((a, b) => a.name.localeCompare(b.name)), summary };
   });
   /** The calculator page's settings for this person (the page itself is the same for everyone). */
   r('GET', '/api/cc/calc-config', perm('calculator.use'), (req, ctx) => ({
