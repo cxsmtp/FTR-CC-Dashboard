@@ -15,7 +15,19 @@ Each person signs in, then works for two minutes, pausing 0.5–2.5 s (1.5 s on 
 
 A stress run removes the pauses: everyone clicks as fast as the server answers.
 
-## Results
+## Results, CC-01.54.00 (2026-11-11)
+
+The same organisation and load, run again after the security fixes of CC-01.54.00, over HTTPS (the load generator now checks the server's certificate).
+
+| Run | Server | Requests/s | Errors | Slowest action, p95 | Slowest, p99 | Server CPU (1 core = 100%) | Memory (RSS, max) |
+| --- | --- | ---: | ---: | ---: | ---: | --- | ---: |
+| **200 people, normal pace** | **2 vCPU** | **123** | **0** | **13 ms** | **51 ms** | **avg 25%, max 45%** | **248 MB** |
+| **200 people, normal pace** | **1 vCPU** | **123** | **0** | **24 ms** | **44 ms** | **avg 23%, max 32%** | **249 MB** |
+| 200 people, stress (no pauses) | 2 vCPU | 591 | 0 | 390 ms | 432 ms | ~100% (one core: Node.js) | 415 MB |
+
+Sign-in: 74–76 ms at p95 at normal pace. Under stress, when all 200 sign in at the same moment, sign-in waits its turn for password hashing (scrypt, p95 11 s) and the requests queued behind that first burst take up to 15 s; once signed in, every action stays under 0.45 s at p99.
+
+## Results, CC-01.05.00
 
 | Run | Server | Requests/s | Errors | Slowest action, p95 | Slowest, p99 | Server CPU (1 core = 100%) | Memory (RSS, max) |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: |

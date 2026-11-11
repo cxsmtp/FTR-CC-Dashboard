@@ -217,3 +217,24 @@ test('an Admin signs in as someone: their view, recorded as the Admin acting as 
   const refused = events.find((e) => e.action.startsWith('refused') && e.actor?.as?.email === 'se1@t.example');
   assert.ok(refused, 'what was done while signed in as them is recorded as the Admin acting as them');
 });
+
+test('roles are changed only by their own id; teams are managed only within the manager’s own teams', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  for (const id of ['__proto__', 'constructor', 'toString', 'made-up'])
+    assert.equal((await admin.put(`/api/roles/${id}`, { name: 'x', permissions: [] })).status, 404, id);
+  assert.equal(Object.prototype.permissions, undefined);
+  // A role that manages teams, given to the EMEA leader: EMEA (and below) only.
+  const made = await admin.put('/api/roles/new', { name: 'Team keeper', permissions: ['teams.manage', 'calculator.use', 'dashboard.view', 'users.manage'] });
+  assert.equal(made.status, 200);
+  const lead = env.users.emeaLead;
+  assert.equal((await admin.put(`/api/people/${lead.id}`, { role: made.data.role.id })).status, 200);
+  const keeper = await client(env.base, 'emea.lead@t.example');
+  assert.equal((await keeper.put(`/api/teams/${env.teams.emea.id}`, { region: 'Europe' })).status, 200);
+  assert.equal((await keeper.put(`/api/teams/${env.teams.apac.id}`, { leaderIds: [lead.id] })).status, 403);
+  assert.equal((await keeper.put(`/api/teams/${env.teams.emea.id}`, { leaderIds: [env.users.apacSe.id] })).status, 403);
+  assert.equal((await keeper.put(`/api/teams/${env.teams.emea.id}`, { parentId: null })).status, 403);
+  assert.equal((await keeper.post('/api/teams', { name: 'Rogue', parentId: env.teams.apac.id })).status, 403);
+  assert.equal((await keeper.del(`/api/teams/${env.teams.apac.id}`)).status, 403);
+  // Back as it was.
+  assert.equal((await admin.put(`/api/people/${lead.id}`, { role: 'leader' })).status, 200);
+});

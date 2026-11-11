@@ -9,6 +9,8 @@ cd "$(dirname "$0")/.."
 USERS=${1:-200}
 SECS=${2:-120}
 DATA=$(mktemp -d)
+# One password for every simulated person, made for this run and kept only in this shell (never written down).
+export BENCH_PASSWORD=${BENCH_PASSWORD:-$(node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))")}
 trap 'kill $SERVER 2>/dev/null; wait 2>/dev/null; rm -rf "$DATA"' EXIT
 pin() { if [ -n "${1:-}" ] && command -v taskset >/dev/null; then echo "taskset -c $1"; fi; }
 DATA_DIR=$DATA node loadtest/seed.mjs

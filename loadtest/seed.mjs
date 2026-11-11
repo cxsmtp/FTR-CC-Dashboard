@@ -4,7 +4,6 @@
  * Admin), ACCOUNTS accounts with reports and sales. Every person's password is BENCH_PASSWORD.
  *   DATA_DIR=/tmp/cc-bench REGIONS=8 SES=24 ACCOUNTS=1000 node loadtest/seed.mjs
  */
-import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -18,8 +17,9 @@ const config = loadConfig();
 const REGIONS = Number(process.env.REGIONS ?? 8);
 const SES = Number(process.env.SES ?? 24);
 const ACCOUNTS = Number(process.env.ACCOUNTS ?? 1000);
-// One password for every simulated person, made for this run (or BENCH_PASSWORD), kept beside the data for load.mjs.
-const PASSWORD = process.env.BENCH_PASSWORD || randomBytes(18).toString('base64url');
+// One password for every simulated person, made for this run by run.sh and handed over in BENCH_PASSWORD.
+const PASSWORD = process.env.BENCH_PASSWORD;
+if (!PASSWORD) throw new Error('Set BENCH_PASSWORD (loadtest/run.sh makes one for each run).');
 if (fs.existsSync(path.join(config.dataDir, 'iam.json'))) throw new Error(`${config.dataDir} is not empty`);
 const iam = new Iam(config.dataDir);
 const teams = new Teams(config.dataDir);
@@ -67,5 +67,4 @@ for (let i = 0; i < ACCOUNTS; i++) {
   if (rand() < 0.5) accounts.addSale(a.id, new Set([teamId]), { credits: 50000, date: '2026-10-01' }, owner);
 }
 fs.writeFileSync(path.join(config.dataDir, 'bench-people.json'), JSON.stringify(people));
-fs.writeFileSync(path.join(config.dataDir, 'bench-password.txt'), PASSWORD, { mode: 0o600 });
 console.log(`Seeded ${people.length} people in ${regionIds.length} regions, ${accounts.accounts.size} accounts, ${accounts.reports.size} reports into ${config.dataDir}`);

@@ -1206,18 +1206,35 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return supportChannel();
   });
 
+  // Teams are managed within the manager's own scope: the team, where it sits, and its leaders (people of teams in scope).
+  const teamInScope = (ctx, id) => {
+    if (!id) {
+      if (!ctx.permissions.has('scope.all')) throw fail(403, 'Only someone who sees every team can add a team at the top.');
+      return;
+    }
+    if (!ctx.scope.has(String(id))) throw fail(403, 'That team is outside the teams you manage.');
+  };
+  const validLeaders = (ctx, ids) => {
+    if (!Array.isArray(ids)) return [];
+    const people = ids.map(String).map((id) => iam.byId(id)).filter(Boolean);
+    if (people.some((u) => !ctx.permissions.has('scope.all') && !ctx.scope.has(u.teamId))) throw fail(403, 'A leader must be someone from the teams you manage.');
+    return people.map((u) => u.id);
+  };
   r('POST', '/api/teams', perm('teams.manage'), (req, ctx, body) => {
-    const team = teams.create({ name: body?.name, region: body?.region, parentId: body?.parentId || null, leaderIds: validLeaders(body?.leaderIds) });
+    teamInScope(ctx, body?.parentId || null);
+    const team = teams.create({ name: body?.name, region: body?.region, parentId: body?.parentId || null, leaderIds: validLeaders(ctx, body?.leaderIds) });
     record(ctx, req, 'team.create', team.name);
     return { team };
   });
-  const validLeaders = (ids) => (Array.isArray(ids) ? ids.map(String).filter((id) => iam.byId(id)) : []);
   r('PUT', '/api/teams/:id', perm('teams.manage'), (req, ctx, body, res, url, params) => {
-    const team = teams.update(params.id, { name: body?.name, region: body?.region, parentId: body?.parentId === undefined ? undefined : body.parentId || null, leaderIds: body?.leaderIds === undefined ? undefined : validLeaders(body.leaderIds) });
+    teamInScope(ctx, params.id);
+    if (body?.parentId !== undefined) teamInScope(ctx, body.parentId || null);
+    const team = teams.update(params.id, { name: body?.name, region: body?.region, parentId: body?.parentId === undefined ? undefined : body.parentId || null, leaderIds: body?.leaderIds === undefined ? undefined : validLeaders(ctx, body.leaderIds) });
     record(ctx, req, 'team.update', team.name, { changed: Object.keys(body ?? {}) });
     return { team };
   });
   r('DELETE', '/api/teams/:id', perm('teams.manage'), (req, ctx, body, res, url, params) => {
+    teamInScope(ctx, params.id);
     const team = teams.get(params.id);
     teams.remove(params.id, { hasMembers: iam.users().some((u) => u.teamId === params.id), hasAccounts: accounts.accounts.list().some((a) => a.teamId === params.id) });
     record(ctx, req, 'team.remove', team?.name ?? params.id);
@@ -2052,7 +2069,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     } catch {}
     const value = acme.challenge(token);
     // Plain text for Let's Encrypt; the same protective headers as every other answer (nothing to run, no framing).
-    res.writeHead(value ? 200 : 404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'", 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=31536000' });
+    res.writeHead(value ? 200 : 404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'", 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' });
     return res.end(value ?? 'Not found');
   }
   /** The https:// address for a request that came over plain http while the server is HTTPS only. */

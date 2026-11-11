@@ -2,6 +2,15 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.55.00 — 2026-11-11
+
+Security, second pass (after the Checkmarx One rescan):
+
+- **Teams are managed within your own teams.** "Manage teams" now reaches only the teams in the manager's scope: a team outside it cannot be changed, moved, deleted or given leaders, a team cannot be added at the top without seeing every team, and a leader must be someone from the teams managed. Admins and Executives (every team) work as before.
+- **Roles are changed by their own id only**; a made-up id is refused instead of creating a role under it.
+- **Load test**: the password for the simulated people lives only in the shell for the run, never in a file.
+- Results of the load test after the fixes are in docs/performance.md.
+
 ## CC-01.54.00 — 2026-11-11
 
 Security: a full Checkmarx One scan (SAST, SCA, IaC, containers, secrets, API security) and every real finding fixed.

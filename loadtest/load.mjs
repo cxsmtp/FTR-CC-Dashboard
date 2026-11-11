@@ -22,8 +22,9 @@ const RAMP = Number(process.env.RAMP ?? 20) * 1000;
 const THINK = Number(process.env.THINK_MS ?? 1500);
 const PID = Number(process.env.SERVER_PID ?? 0);
 const people = JSON.parse(fs.readFileSync(path.join(process.env.DATA_DIR, 'bench-people.json'), 'utf8'));
-// The password seed.mjs chose for every simulated person (BENCH_PASSWORD, or one made for the run): never in the source.
-const PASSWORD = process.env.BENCH_PASSWORD || fs.readFileSync(path.join(process.env.DATA_DIR, 'bench-password.txt'), 'utf8').trim();
+// The password every simulated person was given (run.sh makes one for each run): never in the source.
+const PASSWORD = process.env.BENCH_PASSWORD;
+if (!PASSWORD) throw new Error('Set BENCH_PASSWORD (loadtest/run.sh makes one for each run).');
 const reportData = JSON.parse(fs.readFileSync(path.join(HERE, 'fixtures', 'report-data.json'), 'utf8'));
 // A save the size a read of a large tenant makes: 300 Fusion projects.
 const fusionSave = { fusion: { periodMonths: 12, projects: Array.from({ length: 300 }, (_, i) => ({ id: `p${i}`, name: `Project ${i}`, loc: 20000 + i * 137, criticality: 1 + (i % 3), frequency: ['daily', 'weekly', 'monthly'][i % 3], scansPerWeek: (i % 7) + 1, scanCount: 40 + (i % 50), source: 'scan', applications: [`App ${i % 20}`], included: true })) } };

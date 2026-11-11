@@ -117,6 +117,8 @@ export class Iam {
   }
   saveRole(id, { name, description, permissions, home }, granterPermissions) {
     const roles = this.doc.value.roles;
+    // A role is changed by its own id, or made new (id null): no other key is ever written.
+    if (id !== null && id !== undefined && !Object.hasOwn(roles, String(id))) throw fail(404, 'That role no longer exists.');
     const key = id ?? `role-${randomUUID().slice(0, 8)}`;
     // The Admin role can be renamed and described, but always holds every permission.
     if (roles[key]?.locked) {
@@ -133,7 +135,7 @@ export class Iam {
     return { id: key, ...roles[key] };
   }
   removeRole(id) {
-    const role = this.doc.value.roles[id];
+    const role = Object.hasOwn(this.doc.value.roles, String(id)) ? this.doc.value.roles[id] : null;
     if (!role) throw fail(404, 'That role no longer exists.');
     if (role.builtin) throw fail(400, 'Built-in roles cannot be removed.');
     if (this.users().some((u) => u.role === id)) throw fail(409, 'People still have that role: give them another first.');
