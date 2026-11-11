@@ -1330,11 +1330,34 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/api/settings/smtp', perm('settings.manage'), () => smtpView());
   // The sign-in rules (People → Sign-in): who may reset a forgotten password by email, and whether email works.
   r('GET', '/api/people/signin', perm('users.manage'), (req, ctx) => ({ canChange: ctx.permissions.has('settings.manage'), passwordReset: resetPolicy(), reset: resetReady(), sso: { ready: sso.ready(), passwordSignIn: sso.config().passwordSignIn, label: sso.config().label }, idleHours: config.sessionIdleHours }));
-  r('PUT', '/api/settings/smtp', perm('settings.manage'), (req, ctx, body) => {
+  r('PUT', '/api/settings/smtp', perm('settings.manage'), async (req, ctx, body) => {
+    const before = settings.value.smtp ? { ...settings.value.smtp } : null;
     if (body?.smtp) {
       const next = mergeSmtp(smtpNow(), body.smtp);
       settings.value.smtp = { ...next, password: secrets.seal(next.password) };
     }
+    // Saved as typed, then tested at once: settings that do not work give way to the last ones that did.
+    if (body?.test === true && body?.smtp && smtpNow().host) {
+      try {
+        await mailTransport.verify(smtpNow());
+        settings.value.smtpVerified = smtpFingerprint(smtpNow());
+        settings.value.smtpVerifiedAt = new Date().toISOString();
+        settings.value.smtpGood = { ...settings.value.smtp };
+      } catch (error) {
+        const good = settings.value.smtpGood ?? null;
+        if (good && JSON.stringify(good) !== JSON.stringify(settings.value.smtp)) {
+          settings.value.smtp = { ...good };
+          settings.value.smtpVerified = smtpFingerprint(smtpNow());
+          settings.save();
+          record(ctx, req, 'settings.smtp.rollback', good.host, { error: error.message });
+          throw fail(409, `${error.message} The last email settings that worked are back.`);
+        }
+        settings.save();
+        record(ctx, req, 'settings.smtp', smtpNow().host, { tested: false, error: error.message });
+        throw fail(400, `Saved, but the test failed: ${error.message}`);
+      }
+    }
+    void before;
     if (body?.passwordReset !== undefined) {
       if (!RESET_POLICIES.includes(body.passwordReset)) throw fail(400, 'Choose who may reset a forgotten password by email.');
       settings.value.passwordReset = body.passwordReset;
@@ -1352,6 +1375,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       throw fail(400, error.message);
     }
     settings.value.smtpVerified = smtpFingerprint(smtp);
+    settings.value.smtpGood = { ...settings.value.smtp };
     settings.value.smtpVerifiedAt = new Date().toISOString();
     settings.save();
     record(ctx, req, 'settings.smtp.test', smtp.host, { ok: true });

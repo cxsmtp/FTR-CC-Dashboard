@@ -2,6 +2,15 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.24.00 — 2026-11-11
+
+- **Every setting saves as you type, and goes back to the last good one when it does not work.**
+  - **Email (SMTP)**: saved as you type, then tested with the mail server at once. If the server refuses the new settings, the last ones that worked come back, and the page says why. With nothing that worked before, the new settings stay, marked not tested. **Test connection** and **Send test email** are still there.
+  - **Single sign-on**: saved as you type; a change the server refuses (a sign-in URL that is not one, a certificate that is not one) is not saved, and the page shows the last good values again.
+  - **HTTPS**: the lowest TLS version and HSTS save as you change them. Uploading a certificate and Let’s Encrypt stay as buttons: they are actions, with files.
+  - One way for all of them, with **Changes save as you type** on top and the result at the foot.
+- **The default logo and browser icon** are the command center’s own (the tricolour jet), wherever Branding sets none.
+
 ## CC-01.23.00 — 2026-11-11
 
 - **Your profile, as in CxMissionZero** (the menu under your name → **Your profile**), saved as you type:

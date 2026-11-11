@@ -1588,6 +1588,55 @@ async function viewTeams() {
 // ---- Settings: one tab per area, each only for those whose role allows it (the special ones are Admin-only) -------------
 let adminTab = 'general';
 const cmpVer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+/**
+ * A settings form that saves as it is typed in: `save(form)` is called after a pause (text) or at once (a choice),
+ * and when it fails the form shows the last good values again. The status is in `status`.
+ */
+function autosave(form, save, { status, delay = 700, keep = [] } = {}) {
+  const snap = () => Object.fromEntries([...form.elements].filter((el) => el.name && !keep.includes(el.name) && el.type !== 'password' && el.type !== 'file').map((el) => [el.name, el.type === 'checkbox' ? el.checked : el.value]));
+  let good = snap();
+  let timer = null;
+  const say = (t, cls = '') => {
+    if (!status) return;
+    status.textContent = t;
+    status.className = `saved-foot ${cls}`;
+  };
+  const run = async () => {
+    clearTimeout(timer);
+    say('Saving…');
+    // What is sent now becomes the last good setting once saved (not what is typed meanwhile).
+    const sent = snap();
+    try {
+      const msg = await save(form);
+      good = sent;
+      say(msg || `All changes are saved ✓ ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    } catch (error) {
+      // The last good setting stays: on the server, and in the form.
+      for (const [name, v] of Object.entries(good)) {
+        const el = form.elements[name];
+        if (!el) continue;
+        if (el.type === 'checkbox') el.checked = v;
+        else el.value = v;
+      }
+      say(`${error.message}${/back\.|kept\./.test(error.message) ? '' : ' The last good setting is kept.'}`, 'bad');
+    }
+  };
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    run();
+  });
+  form.addEventListener('input', (e) => {
+    if (['checkbox', 'radio', 'select-one', 'file'].includes(e.target.type)) return;
+    clearTimeout(timer);
+    timer = setTimeout(run, e.target.tagName === 'TEXTAREA' ? 1200 : delay);
+  });
+  form.addEventListener('change', (e) => {
+    if (e.target.type === 'file') return;
+    run();
+  });
+  return { run };
+}
+const SAVES_AS_YOU_TYPE = '<div class="saved-banner">✓ Changes save as you type.</div>';
 const ADMIN_TABS = [
   ['general', 'General', 'settings.manage'],
   ['branding', 'Branding', 'settings.manage'],
@@ -1772,14 +1821,14 @@ const ADMIN_VIEWS = {
 
   async email() {
     const m = await api('/api/settings/smtp');
-    $('#tab').innerHTML = smtpPanel(m).replace('<div class="panel mt">', '<div class="panel">');
+    $('#tab').innerHTML = SAVES_AS_YOU_TYPE + smtpPanel(m).replace('<div class="panel mt">', '<div class="panel">');
     wireSmtp(m);
   },
 
   async sso() {
     const x = await api('/api/settings/sso');
     const chip = x.ready ? '<span class="chip ok"><i></i>On</span>' : x.enabled ? '<span class="chip warn"><i></i>On, but PUBLIC_URL is missing</span>' : '<span class="chip"><i></i>Off</span>';
-    $('#tab').innerHTML = `<div class="grid g2">
+    $('#tab').innerHTML = `${SAVES_AS_YOU_TYPE}<div class="grid g2">
       <div class="panel"><h2>Identity provider (SAML 2.0) ${chip}</h2>
         <form class="form" id="ssof">
           <label class="f">Sign-in URL of the identity provider (SSO URL)<input name="entryPoint" value="${esc(x.entryPoint)}" placeholder="https://login.microsoftonline.com/<tenant>/saml2" /></label>
@@ -1794,25 +1843,18 @@ const ADMIN_VIEWS = {
           <label class="f">Their team<select name="jitTeamId"><option value="">Choose…</option>${x.teams.map((t) => `<option value="${esc(t.id)}"${t.id === x.jitTeamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label></div>
           <label class="f">Who may still sign in with a password<select name="passwordSignIn"><option value="everyone"${x.passwordSignIn === 'everyone' ? ' selected' : ''}>Everyone</option><option value="admins"${x.passwordSignIn === 'admins' ? ' selected' : ''}>Admins only (a way in if the identity provider is down)</option></select></label>
           <label class="check"><input type="checkbox" name="enabled" ${x.enabled ? 'checked' : ''} /><span><b>Single sign-on is on</b></span></label>
-          <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="ssoerr"></span></div>
-        </form></div>
+        </form><div class="saved-foot" id="ssosaved">All changes are saved.</div></div>
       <div class="panel"><h2>This service, for the identity provider</h2>
         ${x.sp ? `<dl class="kv"><dt>Entity ID (audience)</dt><dd class="mono">${esc(x.sp.entityId)}</dd><dt>Reply URL (ACS)</dt><dd class="mono">${esc(x.sp.acs)}</dd><dt>Sign-on URL</dt><dd class="mono">${esc(x.sp.login)}</dd><dt>Metadata</dt><dd><a href="/saml/metadata" target="_blank" rel="noopener">${esc(x.sp.metadata)}</a></dd><dt>Name ID</dt><dd class="mono">emailAddress</dd></dl>
         <div class="callout mt">In your identity provider, add an enterprise application (SAML) with the Entity ID and Reply URL above, send the work email as the NameID or the email attribute, and assign the Sales Engineers and leaders. Then paste its SSO URL and signing certificate here.</div>` : '<div class="callout warn">Set <b>PUBLIC_URL</b> to the https address people use, and restart: the identity provider needs it.</div>'}
       </div></div>`;
-    $('#ssof').onsubmit = async (e) => {
-      e.preventDefault();
-      const f = new FormData(e.target);
+    autosave($('#ssof'), async (form) => {
+      const f = new FormData(form);
       const body = { entryPoint: f.get('entryPoint'), idpIssuer: f.get('idpIssuer'), emailAttribute: f.get('emailAttribute'), nameAttribute: f.get('nameAttribute'), wantResponseSigned: f.get('wantResponseSigned') === 'on', label: f.get('label'), jit: f.get('jit') === 'on', jitRole: f.get('jitRole'), jitTeamId: f.get('jitTeamId'), passwordSignIn: f.get('passwordSignIn'), enabled: f.get('enabled') === 'on' };
       if (String(f.get('idpCert') ?? '').trim()) body.idpCert = f.get('idpCert');
-      try {
-        await api('/api/settings/sso', { method: 'PUT', body });
-        toast('Single sign-on saved.', 'ok');
-        viewAdmin('sso');
-      } catch (error) {
-        $('#ssoerr').textContent = error.message;
-      }
-    };
+      await api('/api/settings/sso', { method: 'PUT', body });
+      if (form.elements.idpCert) form.elements.idpCert.value = '';
+    }, { status: $('#ssosaved') });
   },
 
   async https() {
@@ -1834,7 +1876,7 @@ const ADMIN_VIEWS = {
         <label class="f">HSTS for<select name="maxAge">${h.hstsAges.map((a) => `<option value="${a}"${h.hsts.maxAge === a ? ' selected' : ''}>${esc(age(a))}</option>`).join('')}</select></label></div>
         <label class="check"><input type="checkbox" name="hsts" ${h.hsts.enabled ? 'checked' : ''} /><span>HSTS: browsers refuse plain http to this name<small>Only with HTTPS only and a certificate browsers trust.</small></span></label>
         <label class="check"><input type="checkbox" name="sub" ${h.hsts.includeSubDomains ? 'checked' : ''} /><span>Include subdomains</span></label>
-        <div class="flex"><button type="submit">Save hardening</button></div></form>
+        </form><div class="saved-foot" id="hardsaved">Saved as you change it.</div>
         <div class="err" id="herr"></div></div>
       <div class="panel"><h2>Certificate in use ${h.mode === 'http' || !sum.subject ? '' : selfSigned ? '<span class="chip warn"><i></i>Self-signed: browsers warn</span>' : cert.usable === false ? '<span class="chip bad"><i></i>Not usable</span>' : '<span class="chip ok"><i></i>Trusted</span>'}</h2>
         ${sum.subject ? `<dl class="kv"><dt>For</dt><dd>${esc(sum.subject)}</dd><dt>Names</dt><dd class="mono small">${esc((sum.names ?? []).join(', '))}</dd><dt>Issuer</dt><dd>${esc(sum.issuer ?? '')}</dd><dt>Valid until</dt><dd>${esc(date(sum.validTo))}${sum.daysLeft !== undefined ? ` · ${esc(sum.daysLeft)} days` : ''}</dd><dt>Source</dt><dd>${esc(cert.source ?? (h.uploaded ? 'uploaded here' : h.environmentCertificate ? 'from the server options' : 'self-signed'))}</dd></dl>` : '<p class="muted">No certificate in use (HTTP only).</p>'}
@@ -1868,17 +1910,10 @@ const ADMIN_VIEWS = {
       toast(`Now ${MODE[mode]}.`, 'ok');
       viewAdmin('https');
     };
-    $('#hard').onsubmit = async (e) => {
-      e.preventDefault();
-      const f = new FormData(e.target);
-      try {
-        await api('/api/https/hardening', { method: 'POST', body: { minVersion: f.get('minVersion'), hsts: { enabled: f.get('hsts') === 'on', includeSubDomains: f.get('sub') === 'on', maxAge: Number(f.get('maxAge')) } } });
-        toast('Saved.', 'ok');
-        viewAdmin('https');
-      } catch (error) {
-        err(error);
-      }
-    };
+    autosave($('#hard'), async (form) => {
+      const f = new FormData(form);
+      await api('/api/https/hardening', { method: 'POST', body: { minVersion: f.get('minVersion'), hsts: { enabled: f.get('hsts') === 'on', includeSubDomains: f.get('sub') === 'on', maxAge: Number(f.get('maxAge')) } } });
+    }, { status: $('#hardsaved') });
     const files = async () => Promise.all([...$('#up input[type=file]').files].map(async (file) => ({ name: file.name, data: await fileToBase64(file) })));
     const report = (r) => {
       const s2 = r.summary ?? {};
@@ -2200,8 +2235,8 @@ function smtpPanel(m) {
   const x = m.smtp;
   const status = m.verified ? `<span class="chip ok"><i></i>Tested ${esc(dateTime(m.verifiedAt))}</span>` : x.host ? '<span class="chip warn"><i></i>Not tested: nothing is sent until it is</span>' : '<span class="chip"><i></i>Not set up</span>';
   return `<div class="panel mt"><h2>Email server (SMTP) ${status}</h2>
-    <p class="muted small">Used for "Forgot your password?" links and welcome emails. Nothing is sent until <b>Test connection</b> succeeds for exactly the settings saved. The password is kept encrypted and never shown again.</p>
-    <form class="form" id="smtp">
+    <p class="muted small">Used for "Forgot your password?" links and welcome emails. Saved as you type and tested with the mail server at once; settings that fail give way to the last ones that worked. The password is kept encrypted and never shown again.</p>
+    <form class="form" id="smtp" data-nodraft data-password-set="${x.passwordSet ? '1' : ''}">
       <div class="row"><label class="f">Mail server<input name="host" value="${esc(x.host)}" placeholder="smtp.office365.com" autocomplete="off" /></label><label class="f">Port<input name="port" type="number" min="1" max="65535" value="${esc(x.port)}" /></label></div>
       <div class="row"><label class="check"><input type="checkbox" name="secure" ${x.secure ? 'checked' : ''} /><span>Implicit TLS<small>On for port 465. Off for 587 and 25, where STARTTLS is required whenever a password is sent.</small></span></label>
       <label class="check"><input type="checkbox" name="rejectUnauthorized" ${x.rejectUnauthorized !== false ? 'checked' : ''} /><span>Check the mail server's certificate<small>Leave on. For a private CA, set NODE_EXTRA_CA_CERTS on the server instead.</small></span></label></div>
@@ -2211,9 +2246,9 @@ function smtpPanel(m) {
       <div class="row"><label class="f">Who may reset a forgotten password by email<select name="passwordReset"><option value="everyone"${m.passwordReset === 'everyone' ? ' selected' : ''}>Everyone</option><option value="not-admins"${m.passwordReset === 'not-admins' ? ' selected' : ''}>Everyone but those who manage people</option><option value="off"${m.passwordReset === 'off' ? ' selected' : ''}>Nobody: Admins reset passwords</option></select></label>
       <label class="f">Links in emails point at<input value="${esc(m.publicUrl || 'PUBLIC_URL is not set')}" disabled /></label></div>
       ${m.reset.ready ? '<div class="callout">"Forgot your password?" is working.</div>' : `<div class="callout warn">"Forgot your password?" is not available yet: ${m.reset.missing.map(esc).join(' ')}</div>`}
-      <div class="flex"><button class="primary" type="submit">Save</button><button type="button" id="smtp-test">Test connection</button><input id="smtp-to" type="email" placeholder="Send a test to (you by default)" class="grow" /><button type="button" id="smtp-send">Send test email</button></div>
+      <div class="flex"><button type="button" id="smtp-test">Test connection</button><input id="smtp-to" type="email" placeholder="Send a test to (you by default)" class="grow" /><button type="button" id="smtp-send">Send test email</button></div>
       <div class="small" id="smtp-msg" aria-live="polite"></div>
-    </form></div>`;
+    </form><div class="saved-foot" id="smtpsaved">All changes are saved.</div></div>`;
 }
 function wireSmtp() {
   const form = $('#smtp');
@@ -2234,16 +2269,16 @@ function wireSmtp() {
     if (port === 465) form.elements.secure.checked = true;
     if (port === 587 || port === 25) form.elements.secure.checked = false;
   });
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await save();
-      toast('Saved. Now Test connection: nothing is sent until it succeeds.', 'ok');
-      viewAdmin('email');
-    } catch (error) {
-      msg(error.message);
-    }
-  };
+  // Saved as typed, and tested with the mail server at once: settings that fail give way to the last ones that worked.
+  autosave(form, async () => {
+    const f = new FormData(form);
+    const smtp = { host: f.get('host'), port: Number(f.get('port')), secure: f.get('secure') === 'on', requireAuth: f.get('requireAuth') === 'on', rejectUnauthorized: f.get('rejectUnauthorized') === 'on', user: f.get('user'), fromName: f.get('fromName'), fromAddress: f.get('fromAddress') };
+    if (f.get('password')) smtp.password = f.get('password');
+    const ready = smtp.host && (!smtp.requireAuth || (smtp.user && (f.get('password') || form.dataset.passwordSet === '1')));
+    await api('/api/settings/smtp', { method: 'PUT', body: { smtp, passwordReset: f.get('passwordReset'), test: Boolean(ready) } });
+    if (f.get('password')) form.elements.password.value = '';
+    return ready ? 'All changes are saved \u2713 and the mail server answered: email can be sent.' : 'All changes are saved \u2713 (give the server and sign-in, and it is tested at once).';
+  }, { status: $('#smtpsaved'), delay: 1200 });
   $('#smtp-test').onclick = async () => {
     msg('Saving and testing…', true);
     try {

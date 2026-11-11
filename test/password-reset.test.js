@@ -133,3 +133,20 @@ test('an Admin resets a password from the address the page was opened by, even w
   assert.equal(evil.status, 403);
   assert.match(evil.data.error, /another site/);
 });
+
+test('email settings save as typed, are tested at once, and a failing change brings back the last working ones', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  transport.ok = true;
+  const good = await admin.put('/api/settings/smtp', { smtp: { host: 'smtp.good.example', port: 587, secure: false, requireAuth: true, user: 'mailer@good.example', password: 'app-password-1', fromAddress: 'mailer@good.example' }, test: true });
+  assert.equal(good.status, 200, JSON.stringify(good.data));
+  assert.equal(good.data.verified, true);
+  // A change the mail server refuses: the working settings come back.
+  transport.ok = false;
+  const bad = await admin.put('/api/settings/smtp', { smtp: { host: 'smtp.broken.example', user: 'nobody', password: 'wrong' }, test: true });
+  assert.equal(bad.status, 409);
+  assert.match(bad.data.error, /last email settings that worked are back/);
+  const now = (await admin.get('/api/settings/smtp')).data;
+  assert.equal(now.smtp.host, 'smtp.good.example');
+  assert.equal(now.verified, true);
+  transport.ok = true;
+});
