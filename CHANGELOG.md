@@ -2,6 +2,14 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.49.00 — 2026-11-11
+
+- **No sideways scrolling anywhere.** Every panel, list and table fits its width at any screen size: text wraps or ends in …, and the tables were made to fit rather than scroll (checked on every page at 1280, 1366 and 1920 wide).
+  - Accounts: T&R and Fusion now sit under the total credits of each account (two columns fewer); the row buttons read **Open** and **Mute** (their full wording on hover).
+  - People: names and addresses wrap; the role and team lists take the room there is.
+  - CxOne API audit: every column wraps.
+- **A sleeker Overview.** **Sales Engineers** and **Largest projections** are two matching lists, the top six each, with a slim bar and no inner scrolling (all of them on Accounts); the largest projections show what was sold in green. **Latest reports** is gone (each account’s page and the Accounts list have them).
+
 ## CC-01.48.00 — 2026-11-11
 
 - **Bring in a report generated before** (a quote already given), so every quote is kept. Once the account has its name and Salesforce link, **⇪ A previous report** in the calculator takes the report file: it shows whom it was made for (and says so when the name differs), when it was made and its credits; add whom it was shared with (optional) and keep it. It is kept as a **Previous quote**, with its own date and figures exactly as given: the account’s settings and today’s rates do not change it. It shows among the account’s reports, and the audit log records it.
