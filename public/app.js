@@ -92,6 +92,7 @@ const THEMES = [
   ['sunset', 'Sunset', 'Amber to rose'],
   ['royal', 'Royal', 'Indigo to magenta'],
   ['graphite', 'Graphite', 'Quiet greys with one blue'],
+  ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
 ];
 const media = matchMedia('(prefers-color-scheme: dark)');
 let themeMode = 'light';
@@ -176,11 +177,25 @@ function shell(active, content) {
       </div>
       <button class="ver" id="ver" title="${can('system.update') ? 'Versions and updates' : 'About, version and what is new'}">${esc(me.versionLabel ?? '')}</button>
     </aside>
-    <main class="main fade" id="main">${content}</main>`;
+    <main class="main fade" id="main">${content}</main>
+    <div class="ops-strip" id="ops-strip" aria-hidden="true"><span class="ops-dot"></span><b>DEFCON 5</b><span>All systems nominal</span><span class="ops-sep">│</span><span>${location.protocol === 'https:' ? 'Secure link · TLS' : 'Link open'}</span><span class="ops-sep">│</span><span>Operator: ${esc(me.user.name)} · ${esc(me.role.name)}</span><span class="ops-grow"></span><span id="ops-clock"></span><span class="ops-sep">│</span><span>${esc(me.versionLabel ?? '')}</span></div>`;
+  opsClock();
   watchWork();
   $('#theme').onclick = themePicker;
   $('#ver').onclick = () => go(can('system.update') ? '/admin/updates' : '/about');
   $('#signout').onclick = signOut;
+}
+/** The war room's clock (Command Center theme): UTC, every second. */
+let opsTimer = null;
+function opsClock() {
+  clearInterval(opsTimer);
+  const tick = () => {
+    const el = document.getElementById('ops-clock');
+    if (!el) return clearInterval(opsTimer);
+    el.textContent = `${new Date().toISOString().slice(11, 19)} UTC`;
+  };
+  tick();
+  opsTimer = setInterval(tick, 1000);
 }
 async function signOut() {
   try {

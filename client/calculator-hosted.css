@@ -326,3 +326,44 @@ html[data-cc] .cc-me .cc-row button { font-size: 12.5px; padding: 5px 10px; min-
 #calc-heart .hc-heart-toggle { margin-left: auto; }
 #calc-heart.hc-collapsed > :not(.calc-heart-head):not(.calc-source) { display: none !important; }
 #calc-heart.hc-collapsed .calc-heart-head { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+
+/* ---- Command Center: the war room, as on the dashboard (public/app.css) ---------------------------------------- */
+.cc-sw.command { background: radial-gradient(circle at 30% 50%, #39ff88 0 6%, transparent 7%), repeating-linear-gradient(90deg, rgba(57, 255, 136, .25) 0 1px, transparent 1px 8px), linear-gradient(120deg, #021208, #04301a 55%, #3a2a00); }
+html[data-cc][data-ui][data-accent="command"], html[data-cc][data-ui][data-theme="light"][data-accent="command"], html[data-cc][data-ui][data-theme="dark"][data-accent="command"] {
+  color-scheme: dark;
+  --cc-panel: rgba(4, 22, 13, .82); --cc-panel-solid: #051a0f; --cc-panel-hi: rgba(10, 40, 24, .7);
+  --line: rgba(57, 255, 136, .14); --line-hi: rgba(57, 255, 136, .3); --faint: #3f7a58;
+  --cyan: #39ff88; --violet: #ffb000; --green: #39ff88; --amber: #ffb000; --red: #ff4545;
+  --grad: linear-gradient(120deg, #39ff88 0%, #14c46a 55%, #ffb000 100%);
+  --glow: 0 0 0 1px rgba(57, 255, 136, .28), 0 0 28px -6px rgba(57, 255, 136, .35);
+  --cc-side: linear-gradient(180deg, rgba(2, 14, 8, .92), rgba(2, 10, 6, .82)); --cc-orb: 0;
+  --bg: #020805; --surface: #051a0f; --surface-2: #072414; --surface-3: #0a2e1a;
+  --border: rgba(57, 255, 136, .16); --border-strong: rgba(57, 255, 136, .32);
+  --text: #d4ffe6; --muted: #74b590; --ng-head: #74b590; --accent-ink: #021208; --primary-ink: #021208;
+  --shadow: 0 0 0 1px rgba(57, 255, 136, .06) inset, 0 20px 50px -24px rgba(0, 0, 0, .9);
+  --radius: 6px; --radius-sm: 4px;
+}
+html[data-cc][data-accent="command"] .cc-bg { background: radial-gradient(1000px 600px at 85% -10%, rgba(57, 255, 136, .10), transparent 60%), var(--bg); }
+html[data-cc][data-accent="command"] .cc-bg .grid { opacity: .55; background-size: 40px 40px; mask-image: none; }
+html[data-cc][data-accent="command"] .cc-bg::before { content: ""; position: absolute; right: -260px; top: -260px; width: 820px; height: 820px; border-radius: 50%; background: repeating-radial-gradient(circle, transparent 0 79px, rgba(57, 255, 136, .14) 80px 81px), conic-gradient(from 0deg, rgba(57, 255, 136, .28), rgba(57, 255, 136, 0) 60deg, transparent 360deg); animation: ccradar 6s linear infinite; mask-image: radial-gradient(circle, #000 0 68%, transparent 70%); }
+html[data-cc][data-accent="command"] .cc-bg::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px); opacity: .45; }
+@keyframes ccradar { to { transform: rotate(360deg); } }
+html[data-cc][data-accent="command"] h1, html[data-cc][data-accent="command"] h2, html[data-cc][data-accent="command"] .calc-heart-title { font-family: var(--mono) !important; text-transform: uppercase; letter-spacing: .06em; }
+html[data-cc][data-accent="command"] .shell.standalone .sa-top h1 { background: none; color: var(--cyan); -webkit-text-fill-color: currentColor; text-shadow: 0 0 18px rgba(57, 255, 136, .45); }
+html[data-cc][data-accent="command"] .cc-nav a, html[data-cc][data-accent="command"] .cc-brand b { font-family: var(--mono); letter-spacing: .04em; }
+html[data-cc][data-accent="command"] .cc-nav .cc-label, html[data-cc][data-accent="command"] .cc-brand small, html[data-cc][data-accent="command"] th { color: var(--amber); font-family: var(--mono); letter-spacing: .14em; }
+html[data-cc][data-accent="command"] .hc-account, html[data-cc][data-accent="command"] .sa-connect, html[data-cc][data-accent="command"] .hc-status, html[data-cc][data-accent="command"][data-ui] .panel { border-color: var(--line-hi); border-radius: 6px; }
+html[data-cc][data-ui][data-accent="command"] button.primary { color: #021208; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+/* The DEFCON strip */
+.ops-strip { display: none; }
+html[data-cc][data-accent="command"] .cc-app { padding-top: 30px; }
+html[data-cc][data-accent="command"] .cc-side { top: 30px; height: calc(100vh - 30px); }
+html[data-cc][data-accent="command"] .hc-status-wrap { top: 30px; }
+html[data-cc][data-accent="command"] .ops-strip { position: fixed; z-index: 50; top: 0; left: 0; right: 0; height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font: 600 11.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); background: linear-gradient(90deg, rgba(2, 20, 10, .96), rgba(10, 26, 6, .96)); border-bottom: 1px solid var(--line-hi); box-shadow: 0 0 24px -8px rgba(57, 255, 136, .5); }
+html[data-cc][data-accent="command"] .ops-strip b { color: #021208; background: var(--cyan); padding: 3px 8px; border-radius: 3px; letter-spacing: .2em; }
+html[data-cc][data-accent="command"] .ops-strip .ops-sep { color: var(--faint); }
+html[data-cc][data-accent="command"] .ops-strip .ops-grow { flex: 1; }
+html[data-cc][data-accent="command"] #cc-ops-clock { color: var(--amber); }
+.ops-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); animation: ccblink 1.6s steps(2, start) infinite; }
+@keyframes ccblink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { html[data-cc][data-accent="command"] .cc-bg::before, .ops-dot { animation: none; } }

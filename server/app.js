@@ -432,7 +432,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
   // Themes: each person's own look (kept with them, on every device), else the organisation's.
   const THEME_MODES = ['light', 'dark', 'system'];
-  const ACCENTS = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite'];
+  const ACCENTS = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite', 'command'];
   r('PUT', '/api/me/prefs', signedIn, (req, ctx, body) => {
     const prefs = { ...(ctx.user.prefs ?? {}) };
     if (body?.mode !== undefined) {
@@ -911,7 +911,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (body?.features !== undefined) settings.value.features = { ...(settings.value.features ?? {}), exports: body.features?.exports === true };
     if (body?.theme !== undefined) {
       const mode = ['light', 'dark', 'system'].includes(body.theme?.mode) ? body.theme.mode : 'light';
-      const accent = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite'].includes(body.theme?.accent) ? body.theme.accent : 'aurora';
+      const accent = ACCENTS.includes(body.theme?.accent) ? body.theme.accent : 'aurora';
       settings.value.theme = { mode, accent };
     }
     for (const k of ['salesforceHosts', 'cxoneHosts', 'gitHosts']) if (body?.[k] !== undefined) settings.value[k] = hostList(body[k]);

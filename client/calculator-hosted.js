@@ -15,6 +15,7 @@ const ACCENTS = [
   ['sunset', 'Sunset', 'Amber to rose'],
   ['royal', 'Royal', 'Indigo to magenta'],
   ['graphite', 'Graphite', 'Quiet greys with one blue'],
+  ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
 ];
 const ADMIN_PERMS = ['settings.manage', 'security.sso', 'security.https', 'system.update', 'backup.manage'];
 const media = matchMedia('(prefers-color-scheme: dark)');
@@ -132,6 +133,14 @@ export async function startHosted() {
     $('cc-name').textContent = name;
     $('cc-role').textContent = `${cfg.roleName ?? ''}${cfg.teamName ? ` · ${cfg.teamName}` : ''}`;
     $('cc-ver').textContent = cfg.versionLabel ?? '';
+    // The DEFCON strip of the Command Center theme (shown only in it).
+    $('cc-ops').innerHTML = `<span class="ops-dot"></span><b>DEFCON 5</b><span>All systems nominal</span><span class="ops-sep">\u2502</span><span>${location.protocol === 'https:' ? 'Secure link \u00b7 TLS' : 'Link open'}</span><span class="ops-sep">\u2502</span><span>Operator: ${esc(name)} \u00b7 ${esc(cfg.roleName ?? '')}</span><span class="ops-grow"></span><span id="cc-ops-clock"></span><span class="ops-sep">\u2502</span><span>${esc(cfg.versionLabel ?? '')}</span>`;
+    const clock = () => {
+      const el = document.getElementById('cc-ops-clock');
+      if (el) el.textContent = `${new Date().toISOString().slice(11, 19)} UTC`;
+    };
+    clock();
+    setInterval(clock, 1000);
     if (perms.has('system.update')) Object.assign($('cc-ver'), { href: '/#/admin/updates', title: 'Versions and updates' });
   }
 

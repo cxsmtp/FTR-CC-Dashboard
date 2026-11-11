@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.16.00 — 2026-11-11
+
+- **Command Center theme: the war room.** A seventh choice under **Theme** (and as the organisation’s default): phosphor green and amber on near-black, a radar sweeping over a grid with faint scan lines, HUD brackets on every panel and card, glowing monospace readouts, and a **DEFCON 5 · All systems nominal** strip across the top with the link, the operator on duty, the time in UTC to the second and the version. Alerts (such as accounts missing their Salesforce link) show in red. The calculator takes it too.
+
 ## CC-01.15.01 — 2026-11-11
 
 - **The version at the foot of the menu opens Versions and updates** (Settings → Updates) for Admins, on every page including the calculator; for everyone else it opens About.
