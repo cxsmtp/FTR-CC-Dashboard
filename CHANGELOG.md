@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.52.00 — 2026-11-11
+
+- **In a meeting with the customer: choose where the data comes from.** The **Data from** choice (Checkmarx One, **Git**, cloc-fusion) now sits under the customer's name in the meeting view, so a Fusion-only opportunity can be worked out there: choose **Git**, take the customer's read-only token and connect, or choose cloc-fusion to bring in their report. The matching Fusion tab (from Git, or from cloc-fusion) opens with it. Nothing else of the frame is shown; "Remember for the account" stays out of the meeting view.
+
 ## CC-01.51.00 — 2026-11-11
 
 - **Git: you see what happens.** After **Connect to GitHub** (GitLab, Bitbucket, Azure DevOps), everything the count says shows right under the token: finding the organisations, listing the repositories, counting (with its progress), the result, and, when it cannot go on, why (in red: the token refused, an organisation it may not read, a host the server may not reach…). The page also scrolls to the Fusion · from Git results. Before, the messages went to a folded part of the Fusion tab and the top kept saying it was counting.

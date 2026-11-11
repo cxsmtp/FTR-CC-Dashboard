@@ -1161,6 +1161,9 @@ export async function startHosted() {
     // key's state do not apply; Impact stays in view when it is already on, to turn it off.
     $('hc-account').dataset.src = src;
     $('hc-account').classList.toggle('impact-on', $('hc-impact').checked);
+    // In a meeting the account panel is hidden: the page itself says which Fusion tab belongs to the source.
+    document.documentElement.dataset.src = src;
+    if (meeting && src !== 'cxone') document.querySelector(`[data-ptabs="calculator"] [data-pt="fusion-${src}"]`)?.click();
   };
   $('hc-impact').addEventListener('change', () => $('hc-account').classList.toggle('impact-on', $('hc-impact').checked));
   for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.src));
@@ -1270,6 +1273,16 @@ export async function startHosted() {
     const head = $('hc-meet-head');
     if (!meeting || !head) return;
     head.hidden = false;
+    // Where the data comes from (Checkmarx One, Git for a Fusion-only customer, or cloc-fusion) stays to hand in the
+    // meeting: the same picker, moved under the title, so the customer's own token or report can be taken there.
+    const src = document.querySelector('.hc-account .hc-src');
+    if (src && !document.getElementById('hc-meet-src')) {
+      const strip = document.createElement('div');
+      strip.id = 'hc-meet-src';
+      strip.className = 'hc-meet-src';
+      head.after(strip);
+      strip.append(src);
+    }
     const logo = brand.logo || '/brand/logo';
     head.innerHTML = `<div class="hc-mh-brand"><img src="${esc(logo)}" alt="" /><span>${esc(cfg.organisationName || 'Checkmarx')}</span></div>
       <div class="hc-mh-title"><small>Credits projection for</small><h1>${esc(account?.name ?? '…')}</h1><span>${esc(new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }))}</span></div>

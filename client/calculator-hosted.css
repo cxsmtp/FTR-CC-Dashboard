@@ -709,3 +709,11 @@ html[data-no-account] .content > main::before { content: "A new calculation: typ
 .hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-refresh,
 .hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-forget { display: none !important; }
 .hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-meet { margin-left: auto; }
+
+/* In a meeting: the source picker sits under the title; Git and cloc-fusion show their Fusion tab when chosen. */
+.hc-meet-src { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: -8px 0 18px; padding: 12px 18px; border-radius: 16px; background: var(--cc-panel, var(--surface)); border: 1px solid var(--line-hi, var(--border)); }
+.hc-meet-src .hc-src { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; width: 100%; min-width: 0; }
+.hc-meet-src .hc-pane { flex: 1 1 320px; min-width: 0; }
+html[data-meeting][data-src="git"] [data-ptabs="calculator"] [data-pt="fusion-git"],
+html[data-meeting][data-src="cloc"] [data-ptabs="calculator"] [data-pt="fusion-cloc"] { display: revert !important; }
+html[data-meeting] .hc-meet-src .hc-remember { display: none !important; }
