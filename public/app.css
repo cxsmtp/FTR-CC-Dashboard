@@ -600,3 +600,47 @@ table.versions td:first-child { min-width: 320px; }
 .integ .kv { grid-template-columns: 150px 1fr; }
 @media (max-width: 1000px) { .ur-cards { grid-template-columns: 1fr; } }
 .ur-card b.ok-t { font-size: 16px; font-family: inherit; }
+
+/* ---- The top bar (as CxMissionZero has it) and the menu's foot -------------------------------------------------- */
+.col { min-width: 0; display: flex; flex-direction: column; }
+.topbar { position: sticky; top: 0; z-index: 25; display: flex; align-items: center; gap: 8px; padding: 10px clamp(16px, 3vw, 40px); border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(14px); }
+.jump { min-width: 240px; justify-content: flex-start; gap: 8px; color: var(--muted); border-radius: 999px; padding: 7px 12px; }
+.jump svg { width: 16px; height: 16px; }
+.jump span { flex: 1; text-align: left; }
+kbd { font: 600 11px var(--mono); padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line-hi); background: var(--panel); color: var(--muted); }
+.tb-icon { padding: 7px; border-radius: 999px; }
+.tb-icon svg { width: 17px; height: 17px; }
+.tb-grow { flex: 1; }
+.tb-lights { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.tb-light { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-hi); background: var(--panel); color: var(--text); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+.tb-light:hover { text-decoration: none; border-color: var(--cyan); }
+.tb-light i { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
+.tb-light.on i { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.tb-light.warn i { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+.tb-light.bad i { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+.tb-light.off { color: var(--muted); }
+.tb-me { position: relative; }
+.tb-who { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; text-align: left; }
+.tb-who b { display: block; font-size: 13px; line-height: 1.2; }
+.tb-who small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.2; }
+.tb-me .menu-list { right: 0; }
+.menu-list button svg { width: 16px; height: 16px; }
+.side .ver { margin-top: 10px; }
+.side-links { display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 2px 8px; font-size: 12px; color: var(--faint); }
+.side-links a { color: var(--muted); }
+.side-links a:hover { color: var(--cyan); }
+.side-lic { padding: 2px 8px; font-size: 11px; color: var(--faint); }
+.side .guide-nav { margin-top: auto; }
+/* Jump to */
+dialog.jumpd { width: min(640px, 94vw); padding: 0; margin-top: 12vh; }
+.jd-in { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.jd-in svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.jd-in input { border: 0; background: transparent; box-shadow: none; font-size: 16px; padding: 6px 0; }
+.jd-list { max-height: 50vh; overflow: auto; padding: 6px; display: grid; gap: 2px; }
+.jd-list button { display: flex; align-items: center; gap: 12px; justify-content: flex-start; border: 0; background: transparent; padding: 9px 12px; border-radius: 10px; text-align: left; white-space: normal; }
+.jd-list button svg { width: 18px; height: 18px; flex: none; }
+.jd-list button.on, .jd-list button:hover { background: var(--panel-hi); box-shadow: inset 2px 0 0 var(--cyan); }
+.jd-list b { display: block; font-weight: 600; }
+.jd-list small { display: block; color: var(--muted); font-size: 12px; }
+@media (max-width: 1100px) { .tb-lights { display: none; } .jump { min-width: 0; } .jump span, .jump kbd { display: none; } }
+:root[data-accent="command"] .topbar { top: 30px; background: rgba(2, 12, 6, .85); }

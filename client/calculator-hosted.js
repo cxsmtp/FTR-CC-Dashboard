@@ -596,6 +596,7 @@ export async function startHosted() {
 
   // ---- Theme: the same picker as the dashboard's, saved to this person ---------------------------------
   $('cc-theme').addEventListener('click', () => {
+    $('cc-menu').hidden = true;
     const dlg = $('cc-theme-dialog');
     const paint = () => {
       $('cc-modes').innerHTML = ['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${look.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('');
@@ -766,6 +767,82 @@ export async function startHosted() {
       set(heart.classList.contains('hc-collapsed'));
     });
   }
+  // ---- The top bar: as on the dashboard -----------------------------------------------------------------
+  const lights = async () => {
+    try {
+      const st = await server('/api/status');
+      const light = (on, label, title, href, warn = false) => `<a class="cc-light ${on ? (warn ? 'warn' : 'on') : 'off'}" href="${href}" title="${esc(title)}"><i></i>${esc(label)}</a>`;
+      $('cc-lights').innerHTML = [
+        light(st.cxone.on, 'Checkmarx One', st.cxone.on ? `Connected to ${st.cxone.tenant}` : 'Not connected: paste a key below', '#sa-connect', st.cxone.reading),
+        light(st.email.on, 'Email', st.email.on ? 'The email server is set up and tested' : 'No tested email server', perms.has('settings.manage') ? '/#/admin/email' : '/#/about', st.email.configured && !st.email.on),
+        light(st.git.on, 'Git', st.git.on ? `${st.git.hosts} git host${st.git.hosts === 1 ? '' : 's'} allowed` : 'No git host allowed', perms.has('settings.manage') ? '/#/admin/general' : '#calc-heart'),
+        st.update ? light(true, `${st.update.version} ready`, 'A newer version is ready', '/#/admin/updates', true) : '',
+      ].join('');
+    } catch {}
+    setTimeout(lights, 30_000);
+  };
+  lights();
+  $('cc-refresh').addEventListener('click', () => location.reload());
+  $('cc-mode').addEventListener('click', async () => {
+    look.mode = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(look.mode, look.accent);
+    try {
+      await server('/api/me/prefs', { method: 'PUT', body: { mode: look.mode } });
+    } catch {}
+  });
+  $('cc-who2').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('cc-menu').hidden = !$('cc-menu').hidden;
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.cc-me2')) $('cc-menu').hidden = true;
+  });
+  const jump = () => {
+    const dlg = $('cc-jump-dialog');
+    const can = (p) => perms.has(p);
+    const pages = [['Overview', '/#/overview', can('dashboard.view')], ['Accounts', '/#/accounts', can('dashboard.view')], ['Checkmarx One activity', '/#/activity', true], ['People & roles', '/#/people', true], ['Teams', '/#/teams', true], ['Settings', '/#/admin', ADMIN_PERMS.some(can)], ['Updates', '/#/admin/updates', can('system.update')], ['Audit log', '/#/audit', can('audit.view')], ['Quick guide', '/#/guide', true], ['About', '/#/about', true]].filter((x) => x[2]).map(([t, href]) => ({ t, sub: 'Page', href }));
+    const accts = names().map((x) => ({ t: x.name, sub: 'Account · open in the calculator', id: x.id }));
+    let sel = 0;
+    let items = [];
+    const draw = () => {
+      const q = $('cc-jq').value.trim().toLowerCase();
+      items = [...accts, ...pages].filter((x) => !q || `${x.t} ${x.sub}`.toLowerCase().includes(q)).slice(0, 40);
+      sel = Math.min(sel, Math.max(0, items.length - 1));
+      $('cc-jl').innerHTML = items.map((x, i) => `<button type="button" class="${i === sel ? 'on' : ''}" data-i="${i}"><b>${esc(x.t)}</b><small>${esc(x.sub)}</small></button>`).join('') || '<p class="hc-sub">Nothing matches.</p>';
+    };
+    const open = (x) => {
+      dlg.close();
+      if (x.href) location.href = x.href;
+      else {
+        picker.value = x.id;
+        picker.dispatchEvent(new Event('change'));
+      }
+    };
+    $('cc-jq').value = '';
+    $('cc-jq').oninput = () => ((sel = 0), draw());
+    $('cc-jq').onkeydown = (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        sel = (sel + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % Math.max(1, items.length);
+        draw();
+      } else if (e.key === 'Enter' && items[sel]) open(items[sel]);
+    };
+    $('cc-jl').onclick = (e) => {
+      const b = e.target.closest('[data-i]');
+      if (b) open(items[Number(b.dataset.i)]);
+    };
+    dlg.onclick = (e) => e.target === dlg && dlg.close();
+    draw();
+    dlg.showModal();
+    $('cc-jq').focus();
+  };
+  $('cc-jump').addEventListener('click', jump);
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      jump();
+    }
+  });
   const empty = document.getElementById('calc-empty');
   if (empty) empty.innerHTML = 'No accounts yet in this team. Type the customer’s name, as in Salesforce, at the top: each account keeps its own Checkmarx One data, plan and Fusion projects, saved as you go.';
 

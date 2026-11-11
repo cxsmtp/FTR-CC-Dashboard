@@ -171,20 +171,136 @@ function shell(active, content) {
       </nav>
       <a class="bgwork" id="bgwork" hidden></a>
       <nav class="nav guide-nav">${link('/guide', 'guide', 'Quick guide')}</nav>
-      <div class="me">
-        <div class="who"><div class="avatar">${esc(initials(me.user.name))}</div><div><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></div></div>
-        <div class="row"><button class="ghost sm" id="theme" title="Theme">${icon('theme')}Theme</button><button class="ghost sm" id="signout">${icon('out')}Sign out</button></div>
-      </div>
       <button class="ver" id="ver" title="${can('system.update') ? 'Versions and updates' : 'About, version and what is new'}">${esc(me.versionLabel ?? '')}</button>
+      <div class="side-links"><a href="#/about">About</a><span>·</span><a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a><span>·</span><a href="/legal/license" target="_blank" rel="noopener">License</a></div>
+      <div class="side-lic">PolyForm Internal Use 1.0.0 · internal use only</div>
     </aside>
-    <main class="main fade" id="main">${content}</main>
+    <div class="col">
+      <header class="topbar">
+        <button class="jump" id="jump" title="Jump to a page, an account or a person">${icon('search')}<span>Jump to…</span><kbd>Ctrl K</kbd></button>
+        <button class="tb-icon" id="tb-refresh" title="Refresh this page" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg></button>
+        <span class="tb-grow"></span>
+        <span class="tb-lights" id="tb-lights"></span>
+        <button class="tb-icon" id="tb-mode" title="Light or dark" aria-label="Light or dark">${icon('theme')}</button>
+        <div class="tb-me"><button class="tb-who" id="tb-who" aria-haspopup="true" aria-expanded="false"><span class="avatar sm">${esc(initials(me.user.name))}</span><span><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></span></button>
+          <div class="menu-list" id="tb-menu" hidden><button type="button" id="theme">${icon('theme')}Theme…</button><button type="button" data-go="/guide">${icon('guide')}Quick guide</button><button type="button" data-go="/about">About</button><button type="button" class="danger" id="signout">${icon('out')}Sign out</button></div></div>
+      </header>
+      <main class="main fade" id="main">${content}</main>
+    </div>
     <div class="ops-strip" id="ops-strip" aria-hidden="true"><span class="ops-dot"></span><b>DEFCON 5</b><span>All systems nominal</span><span class="ops-sep">│</span><span>${location.protocol === 'https:' ? 'Secure link · TLS' : 'Link open'}</span><span class="ops-sep">│</span><span>Operator: ${esc(me.user.name)} · ${esc(me.role.name)}</span><span class="ops-grow"></span><span id="ops-clock"></span><span class="ops-sep">│</span><span>${esc(me.versionLabel ?? '')}</span></div>`;
   opsClock();
   watchWork();
-  $('#theme').onclick = themePicker;
+  wireTopbar();
+  $('#theme').onclick = () => {
+    $('#tb-menu').hidden = true;
+    themePicker();
+  };
   $('#ver').onclick = () => go(can('system.update') ? '/admin/updates' : '/about');
   $('#signout').onclick = signOut;
 }
+// ---- The top bar: Jump to (Ctrl K), refresh, the lights, light or dark, and the person ----------------------------------
+let lightsTimer = null;
+async function lights() {
+  clearTimeout(lightsTimer);
+  const el = document.getElementById('tb-lights');
+  if (!el) return;
+  try {
+    const st = await api('/api/status');
+    const light = (on, label, title, href, warn = false) => `<a class="tb-light ${on ? (warn ? 'warn' : 'on') : 'off'}" href="${href}" title="${esc(title)}"><i></i>${esc(label)}</a>`;
+    el.innerHTML = [
+      can('calculator.use') ? light(st.cxone.on, 'Checkmarx One', st.cxone.on ? `Connected to ${st.cxone.tenant}${st.cxone.reading ? ': reading' : ''}` : 'Not connected: connect in the calculator', '/calculator', st.cxone.reading) : '',
+      light(st.email.on, 'Email', st.email.on ? 'The email server is set up and tested' : st.email.configured ? 'Set up but not tested: Settings → Email' : 'No email server: Settings → Email', can('settings.manage') ? '#/admin/email' : '#/about', st.email.configured && !st.email.on),
+      can('calculator.use') ? light(st.git.on, 'Git', st.git.on ? `${st.git.hosts} git host${st.git.hosts === 1 ? '' : 's'} allowed for Fusion · from Git` : 'No git host allowed', can('settings.manage') ? '#/admin/general' : '/calculator') : '',
+      st.update ? light(true, `${st.update.version} ready`, 'A newer version is ready: Update now', '#/admin/updates', true) : '',
+      st.integrity && ['tampered', 'not-genuine'].includes(st.integrity) ? `<a class="tb-light bad" href="#/admin/updates" title="Software integrity"><i></i>Integrity</a>` : '',
+    ].join('');
+  } catch {}
+  lightsTimer = setTimeout(lights, 30_000);
+}
+function wireTopbar() {
+  lights();
+  $('#tb-refresh').onclick = () => route();
+  $('#tb-mode').onclick = async () => {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    const mode = dark ? 'light' : 'dark';
+    applyTheme(mode);
+    try {
+      const r = await api('/api/me/prefs', { method: 'PUT', body: { mode } });
+      state.me.prefs = r.prefs;
+    } catch {}
+  };
+  const menu = $('#tb-menu');
+  $('#tb-who').onclick = (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    $('#tb-who').setAttribute('aria-expanded', String(!menu.hidden));
+  };
+  for (const b of menu.querySelectorAll('[data-go]')) b.onclick = () => ((menu.hidden = true), go(b.dataset.go));
+  $('#jump').onclick = () => jumpTo();
+}
+document.addEventListener('click', (e) => {
+  const m = document.getElementById('tb-menu');
+  if (m && !m.hidden && !e.target.closest('.tb-me')) m.hidden = true;
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && state.me && document.getElementById('jump')) {
+    e.preventDefault();
+    jumpTo();
+  }
+});
+/** Jump to: pages, accounts and people, as you type; arrows and Enter. */
+async function jumpTo() {
+  if (document.getElementById('jumpd')) return;
+  const dlg = document.createElement('dialog');
+  dlg.id = 'jumpd';
+  dlg.className = 'jumpd';
+  dlg.innerHTML = `<div class="jd-in">${icon('search')}<input id="jq" placeholder="Jump to a page, an account or a person…" autocomplete="off" /><kbd>Esc</kbd></div><div class="jd-list" id="jl" role="listbox"></div>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  dlg.addEventListener('close', () => dlg.remove());
+  const pages = [
+    ['Overview', '/overview', 'overview', can('dashboard.view')], ['Accounts', '/accounts', 'accounts', can('dashboard.view')], ['Checkmarx One activity', '/activity', 'pulse', true],
+    ['People & roles', '/people', 'people', true], ['Calculator', '/calculator', 'calc', can('calculator.use')], ['Teams', '/teams', 'teams', can('teams.manage') || can('dashboard.view')],
+    ['Settings', '/admin', 'admin', ADMIN_TABS.some(([, , p]) => can(p))], ['Updates', '/admin/updates', 'admin', can('system.update')], ['Audit log', '/audit', 'audit', can('audit.view')],
+    ['Quick guide', '/guide', 'guide', true], ['About', '/about', 'guide', true],
+  ].filter((x) => x[3]).map(([t, href, ic]) => ({ t, sub: 'Page', href, ic }));
+  let items = pages;
+  const extra = [];
+  Promise.all([can('dashboard.view') ? api('/api/accounts').catch(() => ({ accounts: [] })) : { accounts: [] }, can('users.manage') ? api('/api/people').catch(() => ({ people: [] })) : { people: [] }]).then(([a, p]) => {
+    for (const x of a.accounts ?? []) extra.push({ t: x.name, sub: `Account · ${x.teamPath ?? x.team ?? ''}`, href: `/accounts/${encodeURIComponent(x.id)}`, ic: 'accounts' });
+    for (const x of p.people ?? []) extra.push({ t: x.name, sub: `Person · ${x.email}`, href: '/people', ic: 'people' });
+    draw();
+  });
+  let sel = 0;
+  const draw = () => {
+    const q = $('#jq', dlg).value.trim().toLowerCase();
+    items = [...pages, ...extra].filter((x) => !q || `${x.t} ${x.sub}`.toLowerCase().includes(q)).slice(0, 40);
+    sel = Math.min(sel, Math.max(0, items.length - 1));
+    $('#jl', dlg).innerHTML = items.map((x, i) => `<button type="button" role="option" class="${i === sel ? 'on' : ''}" data-i="${i}">${icon(x.ic)}<span><b>${esc(x.t)}</b><small>${esc(x.sub)}</small></span></button>`).join('') || '<p class="muted small">Nothing matches.</p>';
+  };
+  const open = (x) => {
+    dlg.close();
+    if (x.href.startsWith('/calculator')) location.href = x.href;
+    else go(x.href);
+  };
+  $('#jq', dlg).oninput = () => ((sel = 0), draw());
+  $('#jq', dlg).onkeydown = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      sel = (sel + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % Math.max(1, items.length);
+      draw();
+      $('#jl', dlg).querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && items[sel]) open(items[sel]);
+  };
+  $('#jl', dlg).onclick = (e) => {
+    const b = e.target.closest('[data-i]');
+    if (b) open(items[Number(b.dataset.i)]);
+  };
+  dlg.addEventListener('click', (e) => e.target === dlg && dlg.close());
+  draw();
+  $('#jq', dlg).focus();
+}
+
 /** The war room's clock (Command Center theme): UTC, every second. */
 let opsTimer = null;
 function opsClock() {

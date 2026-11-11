@@ -16,7 +16,7 @@ import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
 import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } from './customer-version.js';
 import { Sso, mergeSso } from './sso.js';
-import { UpdateService, VersionStore } from './updates.js';
+import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
 import { IntegrityService } from './integrity/service.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
@@ -1304,6 +1304,20 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return view;
   });
   r('GET', '/api/cc/work', perm('calculator.use'), (req, ctx) => calc.work(ctx.user.id));
+  /** The top bar's lights: this person's Checkmarx One connection, email, git, and (for Admins) a newer version. */
+  r('GET', '/api/status', ready2, (req, ctx) => {
+    const cx = calc.status(ctx.user.id);
+    const work = calc.work(ctx.user.id).read;
+    const u = ctx.permissions.has('system.update') ? updates.status() : null;
+    const newer = u?.releases?.find((r) => !r.prerelease && r.installable && !r.tampered && compareVersions(r.version, VERSION) > 0);
+    return {
+      cxone: { on: cx.connected, tenant: cx.tenant, reading: work?.state === 'running' },
+      email: { on: mailReady(), configured: Boolean(smtpNow().host) },
+      git: { on: hosts().git.length > 0, hosts: hosts().git.length },
+      update: newer ? { version: newer.version } : null,
+      integrity: ctx.permissions.has('system.update') ? (integrity.last?.state ?? null) : null,
+    };
+  });
   /**
    * Checkmarx One activity, for everyone: their own, and that of the teams they see (an SE their team; a leader every
    * team below; Executives and Admins all). Filter by people, tenant, kind, account, outcome and dates.

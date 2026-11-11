@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.18.00 — 2026-11-11
+
+- **A top bar on every page, as in CxMissionZero.** **Jump to…** (or Ctrl K) finds a page, an account or a person as you type, and opens it with Enter. **↻** refreshes the page. Lights show at a glance whether you are connected to Checkmarx One (and to which tenant), whether email is set up and tested, whether git hosts are allowed for Fusion, and, for Admins, when a newer version is ready or the software integrity check failed; each opens where it is fixed. **◑** switches light and dark. Your name and role open a menu with Theme, Quick guide, About and Sign out. The calculator has the same bar.
+- **No duplicates.** The person card at the foot of the menu is gone: Theme and Sign out are in the top bar’s menu. The menu now ends with Quick guide, the version (Admins: Versions and updates), and **About · Terms of use · License**, with the licence in a line.
+
 ## CC-01.17.00 — 2026-11-11
 
 - **Update & recovery, laid out as in CxMissionZero.** Three cards on top: **Running**, **Latest published** (with **Update now** when a newer one is ready) and **Auto-update** (always on the newest; how often to check, saved as you type). Then **Software integrity**, the **Versions** table to update or roll back, and **Check for updates**, **Reload the server** and **Download troubleshooting report** together.
