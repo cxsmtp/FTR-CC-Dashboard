@@ -510,41 +510,78 @@ table.versions td:first-child { min-width: 320px; }
    The same in light or dark: an ops room has one look.
    ========================================================================== */
 .sw-command { background: radial-gradient(circle at 30% 50%, #39ff88 0 6%, transparent 7%), repeating-linear-gradient(90deg, rgba(57, 255, 136, .25) 0 1px, transparent 1px 8px), linear-gradient(120deg, #021208, #04301a 55%, #3a2a00); }
-:root[data-accent="command"], :root[data-theme="light"][data-accent="command"] {
+:root[data-accent="command"] {
   color-scheme: dark;
+  --ops-rgb: 57, 255, 136;
   --bg: #020805;
   --bg2: #04110a;
   --panel: rgba(4, 22, 13, .82);
   --panel-solid: #051a0f;
   --panel-hi: rgba(10, 40, 24, .7);
-  --line: rgba(57, 255, 136, .14);
-  --line-hi: rgba(57, 255, 136, .3);
+  --line: rgba(var(--ops-rgb), .14);
+  --line-hi: rgba(var(--ops-rgb), .3);
   --text: #d4ffe6;
   --muted: #74b590;
   --faint: #3f7a58;
-  --cyan: #39ff88;
+  --cyan: rgb(var(--ops-rgb));
   --violet: #ffb000;
   --green: #39ff88;
   --amber: #ffb000;
   --red: #ff4545;
-  --grad: linear-gradient(120deg, #39ff88 0%, #14c46a 55%, #ffb000 100%);
-  --glow: 0 0 0 1px rgba(57, 255, 136, .28), 0 0 28px -6px rgba(57, 255, 136, .35);
-  --shadow: 0 0 0 1px rgba(57, 255, 136, .06) inset, 0 20px 50px -24px rgba(0, 0, 0, .9);
+  --grad: linear-gradient(120deg, rgb(var(--ops-rgb)) 0%, rgba(var(--ops-rgb), .72) 55%, var(--amber) 100%);
+  --glow: 0 0 0 1px rgba(var(--ops-rgb), .28), 0 0 28px -6px rgba(var(--ops-rgb), .35);
+  --shadow: 0 0 0 1px rgba(var(--ops-rgb), .06) inset, 0 20px 50px -24px rgba(0, 0, 0, .9);
   --radius: 6px;
 }
+/* The phosphor colour (Theme → Command Center): green unless chosen; the radar, the lines and the glow follow it. */
+:root[data-accent="command"][data-ops="cyan"] { --ops-rgb: 0, 229, 255; }
+:root[data-accent="command"][data-ops="blue"] { --ops-rgb: 77, 159, 255; }
+:root[data-accent="command"][data-ops="amber"] { --ops-rgb: 255, 176, 0; --amber: #00e5ff; --violet: #00e5ff; }
+:root[data-accent="command"][data-ops="red"] { --ops-rgb: 255, 77, 77; }
+:root[data-accent="command"][data-ops="violet"] { --ops-rgb: 190, 130, 255; }
+/* Command Center, light: the operations room by day. Same radar and strip, dark ink on pale paper. */
+:root[data-theme="light"][data-accent="command"] {
+  color-scheme: light;
+  --ops-rgb: 0, 140, 72;
+  --bg: #eef5f0; --bg2: #e2ede6;
+  --panel: rgba(255, 255, 255, .88); --panel-solid: #ffffff; --panel-hi: rgba(var(--ops-rgb), .08);
+  --line: rgba(var(--ops-rgb), .18); --line-hi: rgba(var(--ops-rgb), .38);
+  --text: #08281a; --muted: #3f6a54; --faint: #7d9e8b;
+  --amber: #a86400; --violet: #a86400; --green: #0a8f4a; --red: #c62828;
+  --glow: 0 0 0 1px rgba(var(--ops-rgb), .25), 0 8px 24px -12px rgba(var(--ops-rgb), .35);
+  --shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 16px 40px -26px rgba(8, 40, 26, .35);
+}
+:root[data-theme="light"][data-accent="command"][data-ops="cyan"] { --ops-rgb: 0, 124, 156; }
+:root[data-theme="light"][data-accent="command"][data-ops="blue"] { --ops-rgb: 28, 92, 204; }
+:root[data-theme="light"][data-accent="command"][data-ops="amber"] { --ops-rgb: 176, 104, 0; --amber: #007c9c; --violet: #007c9c; }
+:root[data-theme="light"][data-accent="command"][data-ops="red"] { --ops-rgb: 196, 32, 32; }
+:root[data-theme="light"][data-accent="command"][data-ops="violet"] { --ops-rgb: 118, 64, 208; }
+:root[data-theme="light"][data-accent="command"] .bg::after { background: repeating-linear-gradient(0deg, rgba(8, 40, 26, .05) 0 1px, transparent 1px 3px); opacity: .6; }
+:root[data-theme="light"][data-accent="command"] .bg::before { opacity: .7; }
+:root[data-theme="light"][data-accent="command"] .side { background: linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(240, 248, 243, .9)); }
+:root[data-theme="light"][data-accent="command"] .topbar { background: rgba(255, 255, 255, .88); }
+:root[data-theme="light"][data-accent="command"] input, :root[data-theme="light"][data-accent="command"] select, :root[data-theme="light"][data-accent="command"] textarea { background: #fff; }
+:root[data-theme="light"][data-accent="command"] .ops-strip { background: linear-gradient(90deg, #dcefe3, #f4ecd6); box-shadow: 0 1px 0 var(--line-hi); }
+:root[data-theme="light"][data-accent="command"] .ops-strip b, :root[data-theme="light"][data-accent="command"] button.primary, :root[data-theme="light"][data-accent="command"] .btn.primary, :root[data-theme="light"][data-accent="command"] .avatar, :root[data-theme="light"][data-accent="command"] .brand .logo { color: #fff; }
+:root[data-theme="light"][data-accent="command"] .head h1, :root[data-theme="light"][data-accent="command"] .kpi .v, :root[data-theme="light"][data-accent="command"] .kpi.hero .v, :root[data-theme="light"][data-accent="command"] .kpi.warn .v { text-shadow: none; }
+:root[data-theme="light"][data-accent="command"] button.primary, :root[data-theme="light"][data-accent="command"] .btn.primary { box-shadow: 0 6px 18px -8px rgba(var(--ops-rgb), .7); }
+/* The phosphor picker (Theme) */
+.ops-pick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.ops-pick button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: 0 0 10px -2px var(--c); }
+.ops-pick button.on { border-color: var(--text); }
 :root[data-accent="command"] body { background: var(--bg); letter-spacing: .01em; }
-:root[data-accent="command"] .bg { background: radial-gradient(1000px 600px at 85% -10%, rgba(57, 255, 136, .10), transparent 60%), radial-gradient(800px 500px at -10% 110%, rgba(255, 176, 0, .06), transparent 60%), var(--bg); }
+:root[data-accent="command"] .bg { background: radial-gradient(1000px 600px at 85% -10%, rgba(var(--ops-rgb), .10), transparent 60%), radial-gradient(800px 500px at -10% 110%, rgba(255, 176, 0, .06), transparent 60%), var(--bg); }
 :root[data-accent="command"] .bg .grid { opacity: .55; background-size: 40px 40px; mask-image: none; }
 :root[data-accent="command"] .bg .orb { display: none; }
 /* The radar: a sweep turning in the corner, and its rings. */
-:root[data-accent="command"] .bg::before { content: ""; position: absolute; right: -260px; top: -260px; width: 820px; height: 820px; border-radius: 50%; background: repeating-radial-gradient(circle, transparent 0 79px, rgba(57, 255, 136, .14) 80px 81px), conic-gradient(from 0deg, rgba(57, 255, 136, .28), rgba(57, 255, 136, 0) 60deg, transparent 360deg); animation: radar 6s linear infinite; mask-image: radial-gradient(circle, #000 0 68%, transparent 70%); }
+:root[data-accent="command"] .bg::before { content: ""; position: absolute; right: -260px; top: -260px; width: 820px; height: 820px; border-radius: 50%; background: repeating-radial-gradient(circle, transparent 0 79px, rgba(var(--ops-rgb), .14) 80px 81px), conic-gradient(from 0deg, rgba(var(--ops-rgb), .28), rgba(var(--ops-rgb), 0) 60deg, transparent 360deg); animation: radar 6s linear infinite; mask-image: radial-gradient(circle, #000 0 68%, transparent 70%); }
 :root[data-accent="command"] .bg::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px); opacity: .45; }
 @keyframes radar { to { transform: rotate(360deg); } }
 /* Type: the screens of a command post. */
 :root[data-accent="command"] h1, :root[data-accent="command"] h2, :root[data-accent="command"] .serif { font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
-:root[data-accent="command"] .head h1 { color: var(--cyan); text-shadow: 0 0 18px rgba(57, 255, 136, .45); }
+:root[data-accent="command"] .head h1 { color: var(--cyan); text-shadow: 0 0 18px rgba(var(--ops-rgb), .45); }
 :root[data-accent="command"] .kpi .k, :root[data-accent="command"] th, :root[data-accent="command"] .nav .label { font-family: var(--mono); color: var(--amber); letter-spacing: .14em; }
-:root[data-accent="command"] .kpi .v { font-family: var(--mono); color: var(--cyan); text-shadow: 0 0 14px rgba(57, 255, 136, .5); }
+:root[data-accent="command"] .kpi .v { font-family: var(--mono); color: var(--cyan); text-shadow: 0 0 14px rgba(var(--ops-rgb), .5); }
 :root[data-accent="command"] .kpi.hero .v { color: var(--amber); background: none; -webkit-text-fill-color: currentColor; text-shadow: 0 0 18px rgba(255, 176, 0, .5); }
 :root[data-accent="command"] .kpi.warn .v { color: var(--red); text-shadow: 0 0 14px rgba(255, 69, 69, .5); }
 /* HUD brackets on every panel and card. */
@@ -557,8 +594,8 @@ table.versions td:first-child { min-width: 320px; }
 :root[data-accent="command"] .kpi::after { display: none; }
 :root[data-accent="command"] .side { background: linear-gradient(180deg, rgba(2, 14, 8, .92), rgba(2, 10, 6, .82)); border-right-color: var(--line-hi); }
 :root[data-accent="command"] .nav a { font-family: var(--mono); font-size: 13px; letter-spacing: .04em; }
-:root[data-accent="command"] .nav a.on { background: rgba(57, 255, 136, .1); box-shadow: inset 3px 0 0 var(--cyan), 0 0 18px -6px rgba(57, 255, 136, .6); }
-:root[data-accent="command"] button.primary, :root[data-accent="command"] .btn.primary { color: #021208; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; box-shadow: 0 0 22px -4px rgba(57, 255, 136, .6); }
+:root[data-accent="command"] .nav a.on { background: rgba(var(--ops-rgb), .1); box-shadow: inset 3px 0 0 var(--cyan), 0 0 18px -6px rgba(var(--ops-rgb), .6); }
+:root[data-accent="command"] button.primary, :root[data-accent="command"] .btn.primary { color: #021208; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; box-shadow: 0 0 22px -4px rgba(var(--ops-rgb), .6); }
 :root[data-accent="command"] input, :root[data-accent="command"] select, :root[data-accent="command"] textarea { background: rgba(0, 10, 5, .7); font-family: var(--mono); }
 :root[data-accent="command"] .chip { font-family: var(--mono); letter-spacing: .04em; }
 :root[data-accent="command"] .avatar, :root[data-accent="command"] .brand .logo { color: #021208; }
@@ -567,7 +604,7 @@ table.versions td:first-child { min-width: 320px; }
 /* The DEFCON strip: only in the Command Center theme. */
 .ops-strip { display: none; }
 :root[data-accent="command"] .app:not(.bare) { padding-top: 30px; }
-:root[data-accent="command"] .ops-strip { position: fixed; z-index: 50; top: 0; left: 0; right: 0; height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font: 600 11.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); background: linear-gradient(90deg, rgba(2, 20, 10, .96), rgba(10, 26, 6, .96)); border-bottom: 1px solid var(--line-hi); box-shadow: 0 0 24px -8px rgba(57, 255, 136, .5); }
+:root[data-accent="command"] .ops-strip { position: fixed; z-index: 50; top: 0; left: 0; right: 0; height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font: 600 11.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); background: linear-gradient(90deg, rgba(2, 20, 10, .96), rgba(10, 26, 6, .96)); border-bottom: 1px solid var(--line-hi); box-shadow: 0 0 24px -8px rgba(var(--ops-rgb), .5); }
 :root[data-accent="command"] .ops-strip b { color: #021208; background: var(--cyan); padding: 3px 8px; border-radius: 3px; letter-spacing: .2em; }
 :root[data-accent="command"] .ops-strip .ops-sep { color: var(--faint); }
 :root[data-accent="command"] .ops-strip .ops-grow { flex: 1; }

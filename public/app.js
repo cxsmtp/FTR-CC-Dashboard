@@ -99,6 +99,19 @@ const THEMES = [
   ['graphite', 'Graphite', 'Quiet greys with one blue'],
   ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
 ];
+const OPS = [['green', '#39ff88'], ['cyan', '#00e5ff'], ['blue', '#4d9fff'], ['amber', '#ffb000'], ['red', '#ff4d4d'], ['violet', '#be82ff']];
+const OPS_KEY = 'cc-ops';
+/** Command Center's phosphor colour (green unless chosen). */
+function applyOps(ops) {
+  const v = OPS.some(([id]) => id === ops) ? ops : 'green';
+  document.documentElement.dataset.ops = v;
+  try {
+    localStorage.setItem(OPS_KEY, v);
+  } catch {}
+}
+try {
+  applyOps(localStorage.getItem(OPS_KEY));
+} catch {}
 const media = matchMedia('(prefers-color-scheme: dark)');
 let themeMode = 'light';
 function applyTheme(mode = themeMode, accent) {
@@ -123,6 +136,7 @@ function applyMyTheme() {
   if (me.branding) state.branding = me.branding;
   const own = state.branding?.letChoose !== false;
   applyTheme((own && me.prefs?.mode) || me.theme?.mode || 'light', (own && me.prefs?.accent) || me.theme?.accent || 'aurora');
+  applyOps(me.prefs?.ops);
   applyBranding();
 }
 // ---- Branding (Settings → Branding): the name, the logo, the browser icon, the accent and where the menu sits --------
@@ -159,7 +173,8 @@ function themePicker() {
   const cur = { mode: me.prefs?.mode ?? me.theme?.mode ?? 'light', accent: me.prefs?.accent ?? me.theme?.accent ?? 'aurora' };
   dlg.innerHTML = `<form method="dialog"><div class="dh"><h2>Theme</h2><p class="muted small">Yours, on every device you sign in on.</p></div><div class="db">
     <div class="seg" id="modes">${['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${cur.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('')}</div>
-    <div class="swatches mt">${THEMES.map(([id, name, note]) => `<button type="button" class="swatch${cur.accent === id ? ' on' : ''}" data-a="${id}"><span class="sw sw-${id}"></span><b>${name}</b><small>${note}</small></button>`).join('')}</div></div>
+    <div class="swatches mt">${THEMES.map(([id, name, note]) => `<button type="button" class="swatch${cur.accent === id ? ' on' : ''}" data-a="${id}"><span class="sw sw-${id}"></span><b>${name}</b><small>${note}</small></button>`).join('')}</div>
+    <div class="ops-pick" id="ops-pick"${cur.accent === 'command' ? '' : ' hidden'}><span class="muted small">Command Center colour</span>${OPS.map(([id, c]) => `<button type="button" data-o="${id}" style="--c:${c}" class="${(me.prefs?.ops ?? 'green') === id ? 'on' : ''}" title="${id[0].toUpperCase()}${id.slice(1)}" aria-label="${id}"></button>`).join('')}</div></div>
     <div class="df"><button value="ok" class="primary">Done</button></div></form>`;
   document.body.append(dlg);
   const save = async () => {
@@ -177,7 +192,16 @@ function themePicker() {
   for (const b of dlg.querySelectorAll('[data-a]')) b.onclick = () => {
     cur.accent = b.dataset.a;
     dlg.querySelectorAll('[data-a]').forEach((x) => x.classList.toggle('on', x === b));
+    dlg.querySelector('#ops-pick').hidden = cur.accent !== 'command';
     save();
+  };
+  for (const b of dlg.querySelectorAll('[data-o]')) b.onclick = async () => {
+    applyOps(b.dataset.o);
+    dlg.querySelectorAll('[data-o]').forEach((x) => x.classList.toggle('on', x === b));
+    try {
+      const r = await api('/api/me/prefs', { method: 'PUT', body: { ops: b.dataset.o } });
+      state.me.prefs = r.prefs;
+    } catch {}
   };
   dlg.addEventListener('close', () => dlg.remove());
   dlg.showModal();

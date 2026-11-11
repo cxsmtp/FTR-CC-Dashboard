@@ -18,6 +18,17 @@ const ACCENTS = [
   ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
 ];
 const ADMIN_PERMS = ['settings.manage', 'security.sso', 'security.https', 'system.update', 'backup.manage'];
+const OPS = [['green', '#39ff88'], ['cyan', '#00e5ff'], ['blue', '#4d9fff'], ['amber', '#ffb000'], ['red', '#ff4d4d'], ['violet', '#be82ff']];
+function applyOps(ops) {
+  const v = OPS.some(([id]) => id === ops) ? ops : 'green';
+  document.documentElement.dataset.ops = v;
+  try {
+    localStorage.setItem('cc-ops', v);
+  } catch {}
+}
+try {
+  applyOps(localStorage.getItem('cc-ops'));
+} catch {}
 const media = matchMedia('(prefers-color-scheme: dark)');
 let themeMode = 'light';
 /** The same look as the dashboard: light, dark or the system's, in one of six palettes (public/app.js applyTheme). */
@@ -134,6 +145,8 @@ export async function startHosted() {
   const own = brand.letChoose !== false;
   const look = { mode: (own && cfg.prefs?.mode) || cfg.theme?.mode || 'light', accent: (own && cfg.prefs?.accent) || cfg.theme?.accent || 'aurora' };
   applyTheme(look.mode, look.accent);
+  applyOps(cfg.prefs?.ops);
+  look.ops = cfg.prefs?.ops ?? 'green';
   {
     const rootEl = document.documentElement;
     rootEl.dataset.menu = brand.menu === 'top' ? 'top' : 'left';
@@ -673,12 +686,22 @@ export async function startHosted() {
     const dlg = $('cc-theme-dialog');
     const paint = () => {
       $('cc-modes').innerHTML = ['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${look.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('');
-      $('cc-swatches').innerHTML = ACCENTS.map(([id, name, note]) => `<button type="button" class="cc-swatch${look.accent === id ? ' on' : ''}" data-a="${id}"><span class="cc-sw ${id}"></span><b>${name}</b><small>${note}</small></button>`).join('');
+      $('cc-swatches').innerHTML = ACCENTS.map(([id, name, note]) => `<button type="button" class="cc-swatch${look.accent === id ? ' on' : ''}" data-a="${id}"><span class="cc-sw ${id}"></span><b>${name}</b><small>${note}</small></button>`).join('') +
+        (look.accent === 'command' ? `<div class="cc-ops-pick"><small>Command Center colour</small>${OPS.map(([id, c]) => `<button type="button" data-o="${id}" style="--c:${c}" class="${look.ops === id ? 'on' : ''}" title="${id}" aria-label="${id}"></button>`).join('')}</div>` : '');
     };
     paint();
     dlg.onclick = async (event) => {
-      const b = event.target.closest?.('[data-m],[data-a]');
+      const b = event.target.closest?.('[data-m],[data-a],[data-o]');
       if (!b) return;
+      if (b.dataset.o) {
+        look.ops = b.dataset.o;
+        applyOps(look.ops);
+        paint();
+        try {
+          await server('/api/me/prefs', { method: 'PUT', body: { ops: look.ops } });
+        } catch {}
+        return;
+      }
       if (b.dataset.m) look.mode = b.dataset.m;
       if (b.dataset.a) look.accent = b.dataset.a;
       applyTheme(look.mode, look.accent);

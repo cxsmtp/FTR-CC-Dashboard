@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.27.00 — 2026-11-11
+
+- **Command Center has a light view.** With the Command Center theme, **Light** is now the operations room by day: pale paper, dark ink, the same radar sweep, DEFCON strip and corner brackets. **Dark** stays the war room; **System** follows the computer.
+- **Choose the Command Center’s colour**: green (as before), cyan, blue, amber, red or violet, under **Theme** once Command Center is picked. The radar, lines, glow and buttons follow it, by day and by night, on the dashboard and in the calculator; it is kept with you on every device.
+
 ## CC-01.26.00 — 2026-11-11
 
 - **Git: paste the token, the platform is found.** The calculator's Git choice now has the token field itself: GitHub, GitLab, Bitbucket and Azure DevOps are told from the token (ghp_/github_pat_, glpat-, ATATT/BBDC-, AZDO or the 52-letter Azure form), and the button says **Connect to GitHub →** and so on. Only a token that says nothing asks for the host. Connect adds it, finds its organisations and counts the repositories; added tokens show as chips you can remove. Self-hosted servers and the Azure DevOps organisation go under Advanced.

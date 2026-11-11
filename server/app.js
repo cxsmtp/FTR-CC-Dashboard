@@ -582,6 +582,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (!ACCENTS.includes(body.accent)) throw fail(400, 'Choose one of the themes.');
       prefs.accent = body.accent;
     }
+    // Command Center's phosphor colour.
+    if (body?.ops !== undefined) {
+      if (!['green', 'cyan', 'blue', 'amber', 'red', 'violet'].includes(body.ops)) throw fail(400, 'Choose one of the colours.');
+      prefs.ops = body.ops;
+    }
     if (body?.seenVersion !== undefined) prefs.seenVersion = String(body.seenVersion).slice(0, 20);
     // The Overview cards this person chose to see (Cards ▾).
     if (body?.cards !== undefined) {
@@ -1555,7 +1560,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     // The menu and the look, as on the dashboard.
     teamName: teams.get(ctx.user.teamId)?.name ?? '',
     versionLabel: versionLabel(),
-    prefs: { mode: ctx.user.prefs?.mode, accent: ctx.user.prefs?.accent },
+    prefs: { mode: ctx.user.prefs?.mode, accent: ctx.user.prefs?.accent, ops: ctx.user.prefs?.ops },
     theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
     branding: brandingView(),
   }));

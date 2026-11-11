@@ -329,37 +329,71 @@ html[data-cc] .cc-me .cc-row button { font-size: 12.5px; padding: 5px 10px; min-
 
 /* ---- Command Center: the war room, as on the dashboard (public/app.css) ---------------------------------------- */
 .cc-sw.command { background: radial-gradient(circle at 30% 50%, #39ff88 0 6%, transparent 7%), repeating-linear-gradient(90deg, rgba(57, 255, 136, .25) 0 1px, transparent 1px 8px), linear-gradient(120deg, #021208, #04301a 55%, #3a2a00); }
-html[data-cc][data-ui][data-accent="command"], html[data-cc][data-ui][data-theme="light"][data-accent="command"], html[data-cc][data-ui][data-theme="dark"][data-accent="command"] {
+html[data-cc][data-ui][data-accent="command"], html[data-cc][data-ui][data-theme="dark"][data-accent="command"] {
   color-scheme: dark;
+  --ops-rgb: 57, 255, 136;
   --cc-panel: rgba(4, 22, 13, .82); --cc-panel-solid: #051a0f; --cc-panel-hi: rgba(10, 40, 24, .7);
-  --line: rgba(57, 255, 136, .14); --line-hi: rgba(57, 255, 136, .3); --faint: #3f7a58;
-  --cyan: #39ff88; --violet: #ffb000; --green: #39ff88; --amber: #ffb000; --red: #ff4545;
-  --grad: linear-gradient(120deg, #39ff88 0%, #14c46a 55%, #ffb000 100%);
-  --glow: 0 0 0 1px rgba(57, 255, 136, .28), 0 0 28px -6px rgba(57, 255, 136, .35);
+  --line: rgba(var(--ops-rgb), .14); --line-hi: rgba(var(--ops-rgb), .3); --faint: #3f7a58;
+  --cyan: rgb(var(--ops-rgb)); --violet: #ffb000; --green: #39ff88; --amber: #ffb000; --red: #ff4545;
+  --grad: linear-gradient(120deg, rgb(var(--ops-rgb)) 0%, rgba(var(--ops-rgb), .72) 55%, var(--amber) 100%);
+  --glow: 0 0 0 1px rgba(var(--ops-rgb), .28), 0 0 28px -6px rgba(var(--ops-rgb), .35);
   --cc-side: linear-gradient(180deg, rgba(2, 14, 8, .92), rgba(2, 10, 6, .82)); --cc-orb: 0;
   --bg: #020805; --surface: #051a0f; --surface-2: #072414; --surface-3: #0a2e1a;
-  --border: rgba(57, 255, 136, .16); --border-strong: rgba(57, 255, 136, .32);
+  --border: rgba(var(--ops-rgb), .16); --border-strong: rgba(var(--ops-rgb), .32);
   --text: #d4ffe6; --muted: #74b590; --ng-head: #74b590; --accent-ink: #021208; --primary-ink: #021208;
-  --shadow: 0 0 0 1px rgba(57, 255, 136, .06) inset, 0 20px 50px -24px rgba(0, 0, 0, .9);
+  --shadow: 0 0 0 1px rgba(var(--ops-rgb), .06) inset, 0 20px 50px -24px rgba(0, 0, 0, .9);
   --radius: 6px; --radius-sm: 4px;
 }
-html[data-cc][data-accent="command"] .cc-bg { background: radial-gradient(1000px 600px at 85% -10%, rgba(57, 255, 136, .10), transparent 60%), var(--bg); }
+html[data-cc][data-accent="command"] .cc-bg { background: radial-gradient(1000px 600px at 85% -10%, rgba(var(--ops-rgb), .10), transparent 60%), var(--bg); }
 html[data-cc][data-accent="command"] .cc-bg .grid { opacity: .55; background-size: 40px 40px; mask-image: none; }
-html[data-cc][data-accent="command"] .cc-bg::before { content: ""; position: absolute; right: -260px; top: -260px; width: 820px; height: 820px; border-radius: 50%; background: repeating-radial-gradient(circle, transparent 0 79px, rgba(57, 255, 136, .14) 80px 81px), conic-gradient(from 0deg, rgba(57, 255, 136, .28), rgba(57, 255, 136, 0) 60deg, transparent 360deg); animation: ccradar 6s linear infinite; mask-image: radial-gradient(circle, #000 0 68%, transparent 70%); }
+html[data-cc][data-accent="command"] .cc-bg::before { content: ""; position: absolute; right: -260px; top: -260px; width: 820px; height: 820px; border-radius: 50%; background: repeating-radial-gradient(circle, transparent 0 79px, rgba(var(--ops-rgb), .14) 80px 81px), conic-gradient(from 0deg, rgba(var(--ops-rgb), .28), rgba(var(--ops-rgb), 0) 60deg, transparent 360deg); animation: ccradar 6s linear infinite; mask-image: radial-gradient(circle, #000 0 68%, transparent 70%); }
 html[data-cc][data-accent="command"] .cc-bg::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px); opacity: .45; }
 @keyframes ccradar { to { transform: rotate(360deg); } }
 html[data-cc][data-accent="command"] h1, html[data-cc][data-accent="command"] h2, html[data-cc][data-accent="command"] .calc-heart-title { font-family: var(--mono) !important; text-transform: uppercase; letter-spacing: .06em; }
-html[data-cc][data-accent="command"] .shell.standalone .sa-top h1 { background: none; color: var(--cyan); -webkit-text-fill-color: currentColor; text-shadow: 0 0 18px rgba(57, 255, 136, .45); }
+html[data-cc][data-accent="command"] .shell.standalone .sa-top h1 { background: none; color: var(--cyan); -webkit-text-fill-color: currentColor; text-shadow: 0 0 18px rgba(var(--ops-rgb), .45); }
 html[data-cc][data-accent="command"] .cc-nav a, html[data-cc][data-accent="command"] .cc-brand b { font-family: var(--mono); letter-spacing: .04em; }
 html[data-cc][data-accent="command"] .cc-nav .cc-label, html[data-cc][data-accent="command"] .cc-brand small, html[data-cc][data-accent="command"] th { color: var(--amber); font-family: var(--mono); letter-spacing: .14em; }
 html[data-cc][data-accent="command"] .hc-account, html[data-cc][data-accent="command"] .sa-connect, html[data-cc][data-accent="command"] .hc-status, html[data-cc][data-accent="command"][data-ui] .panel { border-color: var(--line-hi); border-radius: 6px; }
 html[data-cc][data-ui][data-accent="command"] button.primary { color: #021208; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+/* The phosphor colour, and Command Center by day (as on the dashboard). */
+html[data-cc][data-ui][data-theme="dark"][data-accent="command"][data-ops="cyan"] { --ops-rgb: 0, 229, 255; }
+html[data-cc][data-ui][data-theme="dark"][data-accent="command"][data-ops="blue"] { --ops-rgb: 77, 159, 255; }
+html[data-cc][data-ui][data-theme="dark"][data-accent="command"][data-ops="amber"] { --ops-rgb: 255, 176, 0; --amber: #00e5ff; --violet: #00e5ff; }
+html[data-cc][data-ui][data-theme="dark"][data-accent="command"][data-ops="red"] { --ops-rgb: 255, 77, 77; }
+html[data-cc][data-ui][data-theme="dark"][data-accent="command"][data-ops="violet"] { --ops-rgb: 190, 130, 255; }
+html[data-cc][data-ui][data-theme="light"][data-accent="command"] {
+  color-scheme: light;
+  --ops-rgb: 0, 140, 72;
+  --cc-panel: rgba(255, 255, 255, .88); --cc-panel-solid: #ffffff; --cc-panel-hi: rgba(var(--ops-rgb), .08);
+  --line: rgba(var(--ops-rgb), .18); --line-hi: rgba(var(--ops-rgb), .38); --faint: #7d9e8b;
+  --cyan: rgb(var(--ops-rgb)); --violet: #a86400; --green: #0a8f4a; --amber: #a86400; --red: #c62828;
+  --grad: linear-gradient(120deg, rgb(var(--ops-rgb)) 0%, rgba(var(--ops-rgb), .72) 55%, var(--amber) 100%);
+  --glow: 0 0 0 1px rgba(var(--ops-rgb), .25), 0 8px 24px -12px rgba(var(--ops-rgb), .35);
+  --cc-side: linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(240, 248, 243, .9)); --cc-orb: 0;
+  --bg: #eef5f0; --surface: #ffffff; --surface-2: #f3f8f5; --surface-3: #e6f0ea;
+  --border: rgba(var(--ops-rgb), .2); --border-strong: rgba(var(--ops-rgb), .4);
+  --text: #08281a; --muted: #3f6a54; --ng-head: #3f6a54; --accent-ink: #ffffff; --primary-ink: #ffffff;
+  --shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 16px 40px -26px rgba(8, 40, 26, .35);
+  --radius: 6px; --radius-sm: 4px;
+}
+html[data-cc][data-ui][data-theme="light"][data-accent="command"][data-ops="cyan"] { --ops-rgb: 0, 124, 156; }
+html[data-cc][data-ui][data-theme="light"][data-accent="command"][data-ops="blue"] { --ops-rgb: 28, 92, 204; }
+html[data-cc][data-ui][data-theme="light"][data-accent="command"][data-ops="amber"] { --ops-rgb: 176, 104, 0; --amber: #007c9c; --violet: #007c9c; }
+html[data-cc][data-ui][data-theme="light"][data-accent="command"][data-ops="red"] { --ops-rgb: 196, 32, 32; }
+html[data-cc][data-ui][data-theme="light"][data-accent="command"][data-ops="violet"] { --ops-rgb: 118, 64, 208; }
+html[data-cc][data-theme="light"][data-accent="command"] .cc-bg::after { background: repeating-linear-gradient(0deg, rgba(8, 40, 26, .05) 0 1px, transparent 1px 3px); opacity: .6; }
+html[data-cc][data-theme="light"][data-accent="command"] .ops-strip { background: linear-gradient(90deg, #dcefe3, #f4ecd6); box-shadow: 0 1px 0 var(--line-hi); }
+html[data-cc][data-theme="light"][data-accent="command"] .ops-strip b, html[data-cc][data-ui][data-theme="light"][data-accent="command"] button.primary { color: #fff; }
+html[data-cc][data-theme="light"][data-accent="command"] .shell.standalone .sa-top h1 { text-shadow: none; }
+.cc-ops-pick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.cc-ops-pick button { width: 26px !important; height: 26px !important; min-height: 0 !important; padding: 0 !important; border-radius: 50% !important; border: 2px solid transparent !important; background: var(--c) !important; box-shadow: 0 0 10px -2px var(--c) !important; }
+.cc-ops-pick button.on { border-color: var(--text) !important; }
 /* The DEFCON strip */
 .ops-strip { display: none; }
 html[data-cc][data-accent="command"] .cc-app { padding-top: 30px; }
 html[data-cc][data-accent="command"] .cc-side { top: 30px; height: calc(100vh - 30px); }
 html[data-cc][data-accent="command"] .hc-status-wrap { top: 30px; }
-html[data-cc][data-accent="command"] .ops-strip { position: fixed; z-index: 50; top: 0; left: 0; right: 0; height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font: 600 11.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); background: linear-gradient(90deg, rgba(2, 20, 10, .96), rgba(10, 26, 6, .96)); border-bottom: 1px solid var(--line-hi); box-shadow: 0 0 24px -8px rgba(57, 255, 136, .5); }
+html[data-cc][data-accent="command"] .ops-strip { position: fixed; z-index: 50; top: 0; left: 0; right: 0; height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font: 600 11.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); background: linear-gradient(90deg, rgba(2, 20, 10, .96), rgba(10, 26, 6, .96)); border-bottom: 1px solid var(--line-hi); box-shadow: 0 0 24px -8px rgba(var(--ops-rgb), .5); }
 html[data-cc][data-accent="command"] .ops-strip b { color: #021208; background: var(--cyan); padding: 3px 8px; border-radius: 3px; letter-spacing: .2em; }
 html[data-cc][data-accent="command"] .ops-strip .ops-sep { color: var(--faint); }
 html[data-cc][data-accent="command"] .ops-strip .ops-grow { flex: 1; }
