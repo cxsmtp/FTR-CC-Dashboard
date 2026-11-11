@@ -913,6 +913,21 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       const mode = ['light', 'dark', 'system'].includes(body.theme?.mode) ? body.theme.mode : 'light';
       const accent = ACCENTS.includes(body.theme?.accent) ? body.theme.accent : 'aurora';
       settings.value.theme = { mode, accent };
+      // "Apply to everyone now": everyone's own choice gives way to the organisation's.
+      if (body.theme?.applyToAll === true) {
+        let n = 0;
+        for (const u of iam.users()) {
+          if (u.prefs?.mode !== undefined || u.prefs?.accent !== undefined) {
+            const { mode: m, accent: a, ...rest } = u.prefs;
+            void m;
+            void a;
+            u.prefs = rest;
+            n++;
+          }
+        }
+        iam.save();
+        record(ctx, req, 'settings.theme.everyone', `${accent} · ${mode}`, { replaced: n });
+      }
     }
     for (const k of ['salesforceHosts', 'cxoneHosts', 'gitHosts']) if (body?.[k] !== undefined) settings.value[k] = hostList(body[k]);
     settings.save();

@@ -1420,24 +1420,69 @@ const ADMIN_VIEWS = {
     $('#tab').innerHTML = `<div class="panel"><h2>Organisation &amp; hosts</h2><form class="form" id="sf">
       <label class="f">Organisation name on the reports<input name="org" maxlength="120" value="${esc(s.organisationName)}" /></label>
       <label class="check"><input type="checkbox" name="exports" ${s.features?.exports ? 'checked' : ''} /><span>Allow the two Checkmarx One exports in the calculator <span class="chip warn">off by default</span><small>"Total" and "Fixed vulnerabilities by severity" from Checkmarx One → Analytics, dropped in by hand instead of reading the tenant with an API key. When on, the section stays collapsed until opened.</small></span></label>
-      <div class="row"><label class="f">Default theme for everyone<select name="accent">${THEMES.map(([id, name]) => `<option value="${id}"${(s.theme?.accent ?? 'aurora') === id ? ' selected' : ''}>${name}</option>`).join('')}</select></label><label class="f">Default mode<select name="mode">${['light', 'dark', 'system'].map((m) => `<option value="${m}"${(s.theme?.mode ?? 'light') === m ? ' selected' : ''}>${m[0].toUpperCase()}${m.slice(1)}</option>`).join('')}</select></label></div>
+      <div class="look-org"><div class="look-h"><b>The look for everyone</b><small>What people see until they choose their own under Theme. Changes show here at once.</small></div>
+        <div class="seg" id="org-modes">${['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${(s.theme?.mode ?? 'light') === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('')}</div>
+        <div class="swatches mt" id="org-accents">${THEMES.map(([id, name, note]) => `<button type="button" class="swatch${(s.theme?.accent ?? 'aurora') === id ? ' on' : ''}" data-a="${id}"><span class="sw sw-${id}"></span><b>${name}</b><small>${note}</small></button>`).join('')}</div>
+        <div class="flex mt"><button type="button" id="org-all">Apply to everyone now</button><span class="muted small">Replaces each person’s own choice with this one; they can still choose again.</span></div></div>
       <div class="row"><label class="f">Salesforce hosts${s.fromEnvironment.salesforce ? ' (set by SALESFORCE_HOSTS)' : ''}<textarea name="sfh" rows="3" ${s.fromEnvironment.salesforce ? 'disabled' : ''}>${esc(s.effective.salesforce.join('\n'))}</textarea></label>
       <label class="f">Checkmarx One hosts${s.fromEnvironment.cxone ? ' (set by CXONE_ALLOWED_HOSTS)' : ''}<textarea name="cxh" rows="3" ${s.fromEnvironment.cxone ? 'disabled' : ''}>${esc(s.effective.cxone.join('\n'))}</textarea></label>
       <label class="f">Git hosts${s.fromEnvironment.git ? ' (set by GIT_ALLOWED_HOSTS)' : ''}<textarea name="gh" rows="3" ${s.fromEnvironment.git ? 'disabled' : ''}>${esc(s.effective.git.join('\n'))}</textarea></label></div>
       <p class="muted small">A host here also allows every name below it (force.com allows acme.lightning.force.com). Private and link-local addresses are never called, whatever is listed.</p>
-      <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="serr"></span></div></form></div>`;
-    $('#sf').onsubmit = async (e) => {
-      e.preventDefault();
-      const f = new FormData(e.target);
-      const body = { organisationName: f.get('org'), theme: { accent: f.get('accent'), mode: f.get('mode') }, features: { exports: f.get('exports') === 'on' } };
+      <div class="flex"><span class="small muted" id="ssaved">Saved as you change it.</span><span class="err" id="serr"></span></div></form></div>`;
+    // Saved as it changes; a value the server refuses goes back to the last one saved.
+    const look = { mode: s.theme?.mode ?? 'light', accent: s.theme?.accent ?? 'aurora' };
+    let good = s;
+    const preview = () => applyTheme(look.mode, look.accent);
+    const save = async (extra = {}) => {
+      const f = new FormData($('#sf'));
+      const body = { organisationName: f.get('org'), theme: { ...look, ...extra }, features: { exports: f.get('exports') === 'on' } };
       if (!s.fromEnvironment.salesforce) body.salesforceHosts = f.get('sfh');
       if (!s.fromEnvironment.cxone) body.cxoneHosts = f.get('cxh');
       if (!s.fromEnvironment.git) body.gitHosts = f.get('gh');
       try {
-        await api('/api/settings', { method: 'PUT', body });
-        toast('Settings saved.', 'ok');
+        good = await api('/api/settings', { method: 'PUT', body });
+        $('#serr').textContent = '';
+        $('#ssaved').textContent = `Saved \u2713 ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        state.me.theme = { ...look };
+        return true;
       } catch (error) {
-        $('#serr').textContent = error.message;
+        $('#serr').textContent = `${error.message} Back to what was saved.`;
+        const form = $('#sf');
+        form.elements.org.value = good.organisationName;
+        form.elements.exports.checked = Boolean(good.features?.exports);
+        return false;
+      }
+    };
+    let timer = null;
+    $('#sf').onsubmit = (e) => e.preventDefault();
+    $('#sf').addEventListener('input', (e) => {
+      if (e.target.closest('.look-org')) return;
+      clearTimeout(timer);
+      timer = setTimeout(save, e.target.tagName === 'TEXTAREA' ? 900 : 500);
+    });
+    $('#sf').addEventListener('change', (e) => {
+      if (e.target.closest('.look-org')) return;
+      clearTimeout(timer);
+      save();
+    });
+    for (const b of $$('#org-modes [data-m]')) b.onclick = () => {
+      look.mode = b.dataset.m;
+      $$('#org-modes [data-m]').forEach((x) => x.classList.toggle('primary', x === b));
+      if (!state.me.prefs?.mode) preview();
+      save();
+    };
+    for (const b of $$('#org-accents [data-a]')) b.onclick = () => {
+      look.accent = b.dataset.a;
+      $$('#org-accents [data-a]').forEach((x) => x.classList.toggle('on', x === b));
+      if (!state.me.prefs?.accent) preview();
+      save();
+    };
+    $('#org-all').onclick = async () => {
+      if (!confirm('Apply this look to everyone now? Each person\u2019s own choice is replaced; they can still choose again under Theme.')) return;
+      if (await save({ applyToAll: true })) {
+        state.me.prefs = { ...(state.me.prefs ?? {}), mode: undefined, accent: undefined };
+        preview();
+        toast('Everyone now has this look.', 'ok');
       }
     };
   },

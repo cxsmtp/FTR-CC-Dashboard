@@ -577,3 +577,7 @@ table.versions td:first-child { min-width: 320px; }
 :root[data-accent="command"] .side { top: 30px; height: calc(100vh - 30px); }
 @media (max-width: 860px) { :root[data-accent="command"] .ops-strip > span:not(.ops-dot):not(#ops-clock) { display: none; } :root[data-accent="command"] .side { top: 0; height: auto; } }
 @media (prefers-reduced-motion: reduce) { :root[data-accent="command"] .bg::before, .ops-dot { animation: none; } }
+
+.look-org { padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-hi); }
+.look-h { display: grid; gap: 2px; margin-bottom: 10px; }
+.look-h small { color: var(--muted); }

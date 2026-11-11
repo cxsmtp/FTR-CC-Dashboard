@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.16.01 — 2026-11-11
+
+- **The look for everyone, chosen by sight.** Settings → General shows the same Light / Dark / System and palette swatches as **Theme**, Command Center included, and you see the change at once. **Apply to everyone now** replaces each person’s own choice with it; they can still choose again.
+- **Settings → General saves as you change it**, with no Save button. A value the server refuses goes back to the last one saved, and says why.
+
 ## CC-01.16.00 — 2026-11-11
 
 - **Command Center theme: the war room.** A seventh choice under **Theme** (and as the organisation’s default): phosphor green and amber on near-black, a radar sweeping over a grid with faint scan lines, HUD brackets on every panel and card, glowing monospace readouts, and a **DEFCON 5 · All systems nominal** strip across the top with the link, the operator on duty, the time in UTC to the second and the version. Alerts (such as accounts missing their Salesforce link) show in red. The calculator takes it too.
