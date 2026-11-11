@@ -2,6 +2,19 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.57.00 — 2026-11-11
+
+Less to look at, the same work done. A first pass over the whole product: what is not needed is gone, and the menu is three pages and Settings.
+
+- **The menu**: Overview, Accounts, Calculator, and **Settings**. Everything else is in Settings, with its own menu beside the page: People, Teams, Roles & permissions, Sign-in; Engines & rates; Audit log, CxOne API audit; General, Branding, Email, Single sign-on, HTTPS, Updates, Backups, Get help, About. Every page keeps its address, so links and bookmarks still work. Jump to (Ctrl K) lists them all.
+- **Accounts: one line per account.** Name (with a link to Salesforce), accountable SE, credits, sold, still needed, customer, last report. The team and the T&R / Fusion split show when you point at a cell. A **pencil** in a cell changes it right there (it shows when you point at the row), and the **⋯** menu at the end of the row has everything: open, open in the calculator, rename, change the SE, record a sale, shared with the customer, mute. Double-click is gone; one click opens the account at once.
+- **Rates are the Admin's, for everyone.** A team no longer has rates of its own, so a quote is the same whichever team makes it. Rates a team set before are no longer applied.
+- **The breach cost is gone** from Impact, the report and the PDF: a share of the customer's revenue is not a figure to put in front of them. Impact itself is unchanged.
+- **Get help is one form.** Say what is not working, or what you would like; it is emailed to the support address, which answers by replying to that email (the reply goes to you). What you sent is listed under the form. The conversation and statuses inside the app are gone; requests sent before are still listed.
+- **Two looks**: Standard and Command Center, each in light or dark. Ocean, Emerald, Sunset, Royal and Graphite are gone; whoever had one sees Standard.
+- **The top bar is quieter**: the Checkmarx One, Email and Git lights and the Refresh entry are gone. An Admin still sees when a newer version is ready.
+- Branding no longer offers an accent colour (one set before still applies).
+
 ## CC-01.56.00 — 2026-11-11
 
 - **More found by Fusion starts at 0%.** A new projection (and **Defaults**) no longer adds 5% more findings for Fusion; set it when the customer's own numbers support it. A projection saved before keeps its own %.

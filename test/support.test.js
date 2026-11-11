@@ -14,7 +14,7 @@ after(async () => {
   fs.rmSync(env.dataDir, { recursive: true, force: true });
 });
 
-test('Get help: a numbered case and enhancement, a conversation, statuses; the support team answers', async () => {
+test('Get help: a numbered case or enhancement, emailed to the support address, answered by email', async () => {
   const se = await client(env.base, 'se1@t.example');
   const se2 = await client(env.base, 'se2@t.example');
   const admin = await client(env.base, 'admin@t.example');
@@ -38,18 +38,13 @@ test('Get help: a numbered case and enhancement, a conversation, statuses; the s
   // Only theirs, and the team's: another SE does not see it; the Admin (support team) sees both.
   assert.equal((await se2.get('/api/support/SUP-0001')).status, 404);
   assert.equal((await admin.get('/api/support')).data.requests.length, 2);
-  assert.equal((await se.post('/api/support/SUP-0001/status', { status: 'completed' })).status, 403);
-  const answered = await admin.post('/api/support/SUP-0001/messages', { text: 'Fixed in 1.50.' });
-  assert.equal(answered.data.request.conversation.at(-1).team, true);
-  const done = await admin.post('/api/support/SUP-0001/status', { status: 'completed' });
-  assert.equal(done.data.request.status, 'completed');
-  // The requester answers: back to New for the team.
-  const back = await se.post('/api/support/SUP-0001/messages', { text: 'Still there.' });
-  assert.equal(back.data.request.status, 'new');
+  // Answered by email: the support address replies to the person who asked; there is no conversation here.
+  assert.ok(sent.some((m) => String(m.to).includes('bhawani.singh@checkmarx.com') && String(m.replyTo).includes('se1@t.example')));
+  assert.equal((await admin.post('/api/support/SUP-0001/messages', { text: 'Fixed.' })).status, 410);
+  assert.equal((await admin.post('/api/support/SUP-0001/status', { status: 'completed' })).status, 410);
   // Settings: the address can change; the audit log has it all.
   assert.equal((await admin.put('/api/settings/support', { mode: 'portal', email: 'not an address' })).status, 400);
   assert.equal((await se.put('/api/settings/support', { mode: 'email' })).status, 403);
   const audit = JSON.stringify((await admin.get('/api/audit?limit=100')).data);
   assert.match(audit, /support\.case/);
-  assert.match(audit, /support\.status/);
 });

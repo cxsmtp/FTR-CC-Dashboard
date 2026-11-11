@@ -9,12 +9,7 @@ import { startHelpTips } from '../help-tips.js';
 const THEME_KEY = 'cxcalc-theme';
 const ACCENT_KEY = 'cc-accent';
 const ACCENTS = [
-  ['aurora', 'Aurora', 'Cyan to violet: the command center\u2019s own'],
-  ['ocean', 'Ocean', 'Deep blue to teal'],
-  ['emerald', 'Emerald', 'Green and teal, calm'],
-  ['sunset', 'Sunset', 'Amber to rose'],
-  ['royal', 'Royal', 'Indigo to magenta'],
-  ['graphite', 'Graphite', 'Quiet greys with one blue'],
+  ['aurora', 'Standard', 'Calm and plain: the command center\u2019s own'],
   ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
 ];
 const ADMIN_PERMS = ['settings.manage', 'security.sso', 'security.https', 'system.update', 'backup.manage'];
@@ -36,7 +31,8 @@ function applyTheme(mode = themeMode, accent) {
   themeMode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light';
   const root = document.documentElement;
   root.dataset.theme = themeMode === 'system' ? (media.matches ? 'dark' : 'light') : themeMode;
-  if (accent && ACCENTS.some(([id]) => id === accent)) root.dataset.accent = accent;
+  // A look from before (Ocean, Emerald, Sunset, Royal, Graphite) is now the standard one.
+  if (accent) root.dataset.accent = ACCENTS.some(([id]) => id === accent) ? accent : 'aurora';
   try {
     localStorage.setItem(THEME_KEY, root.dataset.theme);
     localStorage.setItem(ACCENT_KEY, root.dataset.accent);
@@ -225,19 +221,12 @@ export async function startHosted() {
     const link = (href, ic, label, show = true, on = false) => (show ? `<a href="${href}"${on ? ' class="on" aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[ic]}</svg><span>${label}</span></a>` : '');
     const settings = ADMIN_PERMS.some(can);
     const admin = can('users.manage') || can('teams.manage') || settings || can('audit.view');
-    $('cc-nav').innerHTML = `<div class="cc-label">Insight</div>
-      ${link('/#/overview', 'overview', 'Overview', can('dashboard.view'))}
+    // The same menu as the dashboard: Overview, Accounts, Calculator; everything else under Settings.
+    $('cc-nav').innerHTML = `${link('/#/overview', 'overview', 'Overview', can('dashboard.view'))}
       ${link('/#/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
-      ${link('/#/people', 'people', can('users.manage') ? 'People &amp; roles' : 'People')}
-      <div class="cc-label">Work</div>
       ${link('/calculator', 'calc', 'Calculator', true, true)}
-      ${link('/#/activity', 'pulse', 'CxOne API audit')}
-      ${admin ? '<div class="cc-label">Administration</div>' : ''}
-      ${link('/#/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
-      ${link('/#/rates', 'engine', 'Fusion engines &amp; rates', can('users.manage') || settings)}
-      ${link('/#/admin', 'admin', 'Settings', settings)}
-      ${link('/#/audit', 'audit', 'Audit log', can('audit.view'))}`;
-    $('cc-guide-nav').innerHTML = `<a href="/calculator" id="cc-side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/#/guide', 'guide', 'Quick guide')}${link('/#/help', 'help', 'Get help')}`;
+      ${link('/#/people', 'admin', 'Settings')}`;
+    $('cc-guide-nav').innerHTML = `${link('/#/guide', 'guide', 'Quick guide')}${link('/#/help', 'help', 'Get help')}`;
     const name = cfg.user?.name ?? '';
     $('cc-avatar').textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
     $('cc-name').textContent = name;
@@ -1087,19 +1076,12 @@ export async function startHosted() {
       const st = await server('/api/status');
       const light = (on, label, title, href, warn = false) => `<a class="cc-light ${on ? (warn ? 'warn' : 'on') : 'off'}" href="${href}" title="${esc(title)}"><i></i>${esc(label)}</a>`;
       $('cc-lights').innerHTML = [
-        light(st.cxone.on, 'Checkmarx One', st.cxone.on ? `Connected to ${st.cxone.tenant}` : 'Not connected: paste a key below', '#sa-connect', st.cxone.reading),
-        light(st.email.on, 'Email', st.email.on ? 'The email server is set up and tested' : 'No tested email server', perms.has('settings.manage') ? '/#/admin/email' : '/#/about', st.email.configured && !st.email.on),
-        light(st.git.on, 'Git', st.git.on ? `${st.git.hosts} git host${st.git.hosts === 1 ? '' : 's'} allowed` : 'No git host allowed', perms.has('settings.manage') ? '/#/admin/general' : '#calc-heart'),
         st.update ? light(true, `${st.update.version} ready`, 'A newer version is ready', '/#/admin/updates', true) : '',
       ].join('');
     } catch {}
     setTimeout(lights, 30_000);
   };
   lights();
-  $('cc-side-refresh').addEventListener('click', (e) => {
-    e.preventDefault();
-    location.reload();
-  });
   $('cc-mode').addEventListener('click', async () => {
     look.mode = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     applyTheme(look.mode, look.accent);

@@ -66,8 +66,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const calc = calculatorService ?? new CalculatorService({ cxoneHosts: hosts().cxone, gitHosts: hosts().git, log });
   // Fusion's engines and their rates (Fusion rates page): what applies to a person is their team's, else a team above, else the Admin's.
   const fusionRates = new FusionRates(settings);
-  const ratesForTeam = (teamId) => fusionRates.effective(teamPath(teams.list(), teamId));
-  const ratesFor = (userId) => ratesForTeam(iam.byId(userId)?.teamId);
+  // One set of rates for everyone, the Admin's: a quote is the same whichever team makes it. (Rates a team set for
+  // itself before CC-01.57 are still in settings.json, and no longer applied.)
+  const ratesFor = () => fusionRates.effective([]);
   // Triage & remediation credits per finding: one figure per severity for everyone, set by the Admin only.
   const SEVS = ['Critical', 'High', 'Medium', 'Low'];
   const trRates = () => {
@@ -150,7 +151,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   };
   const sendMail = async (to, message) => {
     if (!mailReady()) throw new MailError('The email server is not set up and tested yet (Settings → Email server).', 409);
-    return mailTransport.send(smtpNow(), { to, subject: message.subject, text: message.text, html: message.html });
+    return mailTransport.send(smtpNow(), { to, subject: message.subject, text: message.text, html: message.html, ...(message.replyTo ? { replyTo: message.replyTo } : {}) });
   };
   // ---- Get help: support cases and enhancement requests (server/support.js) ----
   const supportDesk = new SupportDesk({ dataDir: config.dataDir });
@@ -577,7 +578,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
   // Themes: each person's own look (kept with them, on every device), else the organisation's.
   const THEME_MODES = ['light', 'dark', 'system'];
-  const ACCENTS = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite', 'command'];
+  const ACCENTS = ['aurora', 'command'];
   // ---- Your profile: your name, picture, time zone and Impact figures ----------------------------------------------
   r('PUT', '/api/me/profile', ownSelf, (req, ctx, body) => {
     const u = ctx.user;
@@ -1151,7 +1152,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const result = { sent: 0, error: '' };
     for (const [to, addresses] of jobs) {
       try {
-        await sendMail(addresses.join(', '), supportEmail(t, { event, to, appName, url, message }));
+        // The support address answers by replying: the reply goes to the person who asked.
+        await sendMail(addresses.join(', '), { ...supportEmail(t, { event, to, appName, url, message }), ...(to === 'team' && t.requester.email ? { replyTo: t.requester.email } : {}) });
         result.sent += addresses.length;
       } catch (error) {
         result.error = error.message;
@@ -1167,33 +1169,17 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
   r('POST', '/api/support', signedIn, async (req, ctx, body) => {
     if (!SUPPORT_KINDS[body?.kind]) throw fail(400, 'Choose a support case or an enhancement.');
-    const channel = supportChannel();
-    if (channel.mode === 'email') throw fail(409, `Requests go by email here: write to ${channel.email}.`);
     if (supportDesk.raisedSince(ctx.user.id, new Date(Date.now() - 3_600_000).toISOString()) >= 20) throw fail(429, 'You raised 20 requests in the last hour. Add to one of them instead, or try again later.');
     const t = supportDesk.create({ kind: body.kind, subject: body?.subject, text: body?.text, priority: body?.priority, page: body?.page, version: versionLabel(), requester: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email } });
     record(ctx, req, t.kind === 'case' ? 'support.case' : 'support.enhancement', `${t.id} ${t.subject}`, { id: t.id, priority: t.priority });
     const emailed = await mailSupport(ctx, t, 'created');
     return { request: requestView(ctx, t, { full: true }), emailed };
   });
-  r('POST', '/api/support/:id/messages', signedIn, async (req, ctx, body, res, url, params) => {
-    const t = supportDesk.get(params.id);
-    if (!t || !seesRequest(ctx, t)) throw fail(404, 'No such request, or it is not yours to see.');
-    // Someone who both raised it and is on the team answers as the person who raised it.
-    const fromTeam = t.requester.id !== ctx.user.id;
-    supportDesk.reply(t.id, { by: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email }, team: fromTeam, text: body?.text });
-    record(ctx, req, 'support.message', t.id, { fromTeam });
-    const emailed = await mailSupport(ctx, t, 'message', { fromTeam, message: t.messages.at(-1).text });
-    return { request: requestView(ctx, t, { full: true }), emailed };
-  });
-  r('POST', '/api/support/:id/status', perm('support.manage'), async (req, ctx, body, res, url, params) => {
-    const t = supportDesk.get(params.id);
-    if (!t) throw fail(404, 'No such request.');
-    const before = t.status;
-    supportDesk.setStatus(t.id, String(body?.status ?? ''), { by: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email } });
-    record(ctx, req, 'support.status', `${t.id} ${before} → ${t.status}`, { id: t.id });
-    const emailed = t.status === before ? { sent: 0, error: '' } : await mailSupport(ctx, t, 'status', { fromTeam: true });
-    return { request: requestView(ctx, t, { full: true }), emailed };
-  });
+  // Answers go by email (each request is sent from the person's own address as reply-to): there is no conversation here.
+  for (const p of ['/api/support/:id/messages', '/api/support/:id/status'])
+    r('POST', p, signedIn, () => {
+      throw fail(410, 'Requests are answered by email.');
+    });
   // Settings → Get help: the portal or email, and the address requests go to.
   r('PUT', '/api/settings/support', perm('settings.manage'), (req, ctx, body) => {
     const before = supportChannel();
@@ -1809,13 +1795,13 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // ---- Fusion rates: the Admin's engines and default engine, each team's own, and engines seen without a rate ----
   const ratesView = (ctx) => {
     const admin = ctx.permissions.has('settings.manage');
-    const mine = ctx.teams.filter((t) => ctx.scope.has(t.id));
     return {
       admin: fusionRates.admin,
       detected: fusionRates.detected,
       canAdmin: admin,
-      canTeams: ctx.permissions.has('users.manage') || admin,
-      teams: mine.map((t) => ({ id: t.id, name: t.name, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), own: fusionRates.teams[t.id] ?? null, effective: ratesForTeam(t.id) })),
+      canTeams: false,
+      teams: [],
+      effective: fusionRates.effective([]),
       myTeamId: ctx.user.teamId,
       trRates: trRates(),
     };
@@ -1849,13 +1835,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'tr.rates', changes.join('; ') || 'no change', next);
     return ratesView(ctx);
   });
-  r('PUT', '/api/fusion-rates/teams/:teamId', signedIn, (req, ctx, body, res, url, params) => {
-    if (!ctx.permissions.has('users.manage') && !ctx.permissions.has('settings.manage')) throw fail(403, 'Leaders and above set a team\u2019s rates.');
-    needTeam(ctx.scope, String(params.teamId));
-    const own = fusionRates.setTeam(String(params.teamId), { rates: body?.rates, defaultModel: body?.defaultModel });
-    const what = [...Object.entries(body?.rates ?? {}).map(([n, v]) => `${n} ${v === null || v === '' ? '→ the Admin\u2019s rate' : `→ ${v}`}`), ...(body?.defaultModel !== undefined ? [`default engine → ${body.defaultModel || 'the Admin\u2019s'}`] : [])];
-    record(ctx, req, 'fusion.rates.team', `${teams.get(String(params.teamId))?.name ?? params.teamId}: ${what.join('; ')}`, { teamId: params.teamId, own });
-    return ratesView(ctx);
+  r('PUT', '/api/fusion-rates/teams/:teamId', signedIn, () => {
+    throw fail(410, 'Rates are set by the Admin for everyone: a team no longer has its own.');
   });
   r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: forBrowser(withTrRates(withRates(accounts.get(params.id, ctx.teamSet), ratesFor(ctx.user.id)))) }));
   r('PUT', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {

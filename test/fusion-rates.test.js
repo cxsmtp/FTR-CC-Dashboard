@@ -48,7 +48,7 @@ test('the calculator gets the rates: engines read take theirs, none read gives t
   assert.equal(typed.fusion.models[1].creditsPer10k, 1.5);
 });
 
-test('Admin sets the rates; a leader sets the team’s own, used below it; back to the Admin’s; an SE may not', async () => {
+test('the Admin sets the rates, for everyone; no team has its own', async () => {
   const admin = await client(env.base, 'admin@t.example');
   const vp = await client(env.base, 'vp@t.example');
   const lead = await client(env.base, 'emea.lead@t.example');
@@ -59,23 +59,18 @@ test('Admin sets the rates; a leader sets the team’s own, used below it; back 
   assert.equal((await admin.put('/api/fusion-rates', { models: [{ name: 'Opus 5.5', creditsPer10k: -1 }] })).status, 400);
   assert.equal((await admin.put('/api/fusion-rates', { models: [{ name: 'Opus 5.5', creditsPer10k: 2 }], defaultModel: 'Nope' })).status, 400);
   assert.equal((await lead.put('/api/fusion-rates', { models: [] })).status, 403);
-  assert.equal((await se.put(`/api/fusion-rates/teams/${env.teams.emea.id}`, { rates: { 'Opus 5.5': 3 } })).status, 403);
-  // The VP sets Global's own rate: EMEA takes it; the EMEA leader sets EMEA's own, then goes back.
-  assert.equal((await vp.put(`/api/fusion-rates/teams/${env.teams.global.id}`, { rates: { 'Opus 5.5': 2.2 }, defaultModel: 'Haiku 4.5' })).status, 200);
+  // One set of rates for everyone: a team has none of its own (leaders included).
+  assert.equal((await vp.put(`/api/fusion-rates/teams/${env.teams.global.id}`, { rates: { 'Opus 5.5': 2.2 } })).status, 410);
+  assert.equal((await lead.put(`/api/fusion-rates/teams/${env.teams.emea.id}`, { rates: { 'Opus 5.5': 2.4 } })).status, 410);
   r = await lead.get('/api/fusion-rates');
-  const emea = () => r.data.teams.find((t) => t.id === env.teams.emea.id).effective;
-  assert.equal(emea().models.find((m) => m.name === 'Opus 5.5').creditsPer10k, 2.2);
-  assert.equal(emea().defaultModel, 'Haiku 4.5');
-  r = await lead.put(`/api/fusion-rates/teams/${env.teams.emea.id}`, { rates: { 'Opus 5.5': 2.4 } });
-  assert.equal(emea().models.find((m) => m.name === 'Opus 5.5').creditsPer10k, 2.4);
-  assert.equal((await lead.put(`/api/fusion-rates/teams/${env.teams.apac.id}`, { rates: { 'Opus 5.5': 9 } })).status, 403);
-  r = await lead.put(`/api/fusion-rates/teams/${env.teams.emea.id}`, { rates: { 'Opus 5.5': null } });
-  assert.equal(emea().models.find((m) => m.name === 'Opus 5.5').creditsPer10k, 2.2);
-  // A new account in the calculator starts with the rated engines and the team's default engine.
+  assert.deepEqual(r.data.teams, []);
+  assert.equal(r.data.canTeams, false);
+  assert.equal(r.data.effective.models.find((m) => m.name === 'Opus 5.5').creditsPer10k, 2);
+  // A new account in the calculator starts with the Admin's rated engines and default engine.
   const created = await se.post('/api/projections', { name: 'Rated Co' }, { 'X-Team': env.teams.emea.id });
   const f = created.data.customer.fusion;
-  assert.equal(engineKey(f.models.find((m) => m.id === f.defaultModel).name), engineKey('Haiku 4.5'));
-  assert.equal(f.models.find((m) => engineKey(m.name) === engineKey('Opus 5.5')).creditsPer10k, 2.2);
+  assert.equal(engineKey(f.models.find((m) => m.id === f.defaultModel).name), engineKey('Opus 5.5'));
+  assert.equal(f.models.find((m) => engineKey(m.name) === engineKey('Opus 5.5')).creditsPer10k, 2);
   // Engines seen without a rate are listed until one is set; everything is in the audit log.
   env.app.calc.rates.detected(env.users.se1.id, ['Gemini 9 Ultra'], 'acme');
   r = await admin.get('/api/fusion-rates');
@@ -84,7 +79,6 @@ test('Admin sets the rates; a leader sets the team’s own, used below it; back 
   assert.ok(!(await admin.get('/api/fusion-rates')).data.detected.some((d) => d.name === 'Gemini 9 Ultra'));
   const audit = (await admin.get('/api/audit?limit=200')).data;
   const actions = JSON.stringify(audit);
-  assert.match(actions, /fusion\.rates\.team/);
   assert.match(actions, /fusion\.rates/);
 });
 

@@ -1055,3 +1055,73 @@ html, body, .main { overflow-x: hidden; }
 .imp-bar span:nth-child(2) { flex: 1 1 260px; min-width: 0; }
 .imp-bar button { background: #fff !important; color: #92400e !important; border: 0 !important; font-weight: 700; }
 .imp-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; flex: none; }
+
+/* ---- Settings: its own menu beside the page (People, Pricing, Records, System) ---------------------------------- */
+.set-wrap { display: grid; grid-template-columns: 208px minmax(0, 1fr); align-items: start; min-width: 0; }
+.set-wrap > .main { min-width: 0; }
+.set-nav { position: sticky; top: 64px; display: grid; gap: 18px; padding: 22px 0 22px 22px; }
+.set-group { display: grid; gap: 2px; }
+.set-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 10px 4px; }
+.set-nav a { display: block; padding: 6px 10px; border-radius: 8px; color: var(--ink, inherit); text-decoration: none; font-size: 13.5px; line-height: 1.35; }
+.set-nav a:hover { background: color-mix(in srgb, var(--brand, #4f46e5) 8%, transparent); }
+.set-nav a.on { background: color-mix(in srgb, var(--brand, #4f46e5) 14%, transparent); font-weight: 600; }
+@media (max-width: 900px) {
+  .set-wrap { grid-template-columns: minmax(0, 1fr); }
+  .set-nav { position: static; display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 14px 16px 0; }
+  .set-group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .set-label { padding: 0 4px 0 0; }
+}
+
+/* ---- Accounts: one line per account; the pencil in a cell and the row menu change it --------------------------- */
+#main[data-page="accounts"] td { white-space: nowrap; vertical-align: middle; }
+.cell-line { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; }
+.cell-line.end { justify-content: flex-end; }
+.acc-name b { display: inline-block; max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.acc-team, .acc-last { color: var(--muted); }
+.acc-team { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; }
+.acc-owner .clip { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
+.sf-link { display: inline-flex; color: var(--muted); }
+.sf-link:hover { color: var(--brand, #4f46e5); }
+.sf-link svg { width: 14px; height: 14px; }
+.cell-pen { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; cursor: pointer; color: var(--muted); opacity: 0; flex: none; }
+.cell-pen svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+tr:hover .cell-pen, .cell-pen:focus-visible { opacity: 1; }
+.cell-pen:hover, .cell-pen:focus-visible { background: color-mix(in srgb, var(--brand, #4f46e5) 12%, transparent); color: var(--brand, #4f46e5); }
+@media (hover: none) { .cell-pen { opacity: .7; } }
+td.actions { white-space: nowrap; text-align: right; }
+.icon-btn { padding: 0 !important; width: 30px; height: 30px; display: inline-flex !important; align-items: center; justify-content: center; }
+.icon-btn svg { margin: 0; }
+.row-menu { display: inline-block; position: relative; vertical-align: middle; margin-left: 4px; }
+.row-menu > summary { list-style: none; cursor: pointer; font-size: 16px; line-height: 1; }
+.row-menu > summary::-webkit-details-marker { display: none; }
+.row-menu > .menu-list { right: 0; left: auto; min-width: 230px; text-align: left; }
+
+/* ---- Get help: one form ----------------------------------------------------------------------------------------- */
+.help-form { max-width: 760px; }
+.help-form .seg { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.help-form textarea { width: 100%; resize: vertical; }
+.help-detail td { background: color-mix(in srgb, var(--brand, #4f46e5) 5%, transparent); white-space: normal !important; }
+.help-text { white-space: pre-wrap; margin-bottom: 6px; max-width: 80ch; }
+.sf-link svg, .icon-btn svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#main[data-page="accounts"] th, #main[data-page="accounts"] td { padding-left: 10px; padding-right: 10px; }
+#main[data-page="accounts"] th { white-space: nowrap; }
+.acc-name b { max-width: 22ch; }
+.acc-team { max-width: 15ch; }
+.acc-owner .clip { max-width: 14ch; }
+.set-wrap { grid-template-columns: 188px minmax(0, 1fr); }
+.set-nav { padding-left: 14px; }
+#main[data-page="people"] .inline-sel { min-width: 132px; max-width: 190px; }
+#main[data-page="accounts"] th, #main[data-page="accounts"] td { padding-left: 8px; padding-right: 8px; }
+#main[data-page="people"] .inline-sel { min-width: 0; width: 124px; max-width: 124px; }
+#main[data-page="people"] th, #main[data-page="people"] td { padding-left: 8px; padding-right: 8px; }
+@media (max-width: 1360px) { .acc-name b { max-width: 17ch; } .acc-owner .clip { max-width: 11ch; } #main[data-page="accounts"] th, #main[data-page="accounts"] td { padding-left: 6px; padding-right: 6px; } }
+#main[data-page="people"] td .sub { white-space: normal; }
+#main[data-page="people"] td:nth-last-child(2), #main[data-page="people"] th:nth-last-child(2) { white-space: nowrap; }
+@media (max-width: 1360px) {
+  .set-wrap { grid-template-columns: 164px minmax(0, 1fr); }
+  .set-nav { padding-left: 8px; }
+  #main[data-page="people"] .inline-sel { width: 108px; max-width: 108px; }
+  #main[data-page="people"] th, #main[data-page="people"] td { padding-left: 5px; padding-right: 5px; }
+  .acc-name b { max-width: 16ch; }
+}
+@media (max-width: 1360px) { #main[data-page="accounts"] th, #main[data-page="accounts"] td { padding-left: 5px; padding-right: 5px; } .row-menu { margin-left: 0; } }

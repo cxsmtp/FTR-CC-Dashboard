@@ -28,6 +28,7 @@ const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
 const ICONS = {
   help: '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 9h6"/><path d="M9 12h4"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   overview: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
   accounts: '<path d="M3 7h18M3 12h18M3 17h12"/>',
   engine: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
@@ -93,14 +94,11 @@ const go = (path) => {
 const THEME_KEY = 'cxcalc-theme';
 const ACCENT_KEY = 'cc-accent';
 const THEMES = [
-  ['aurora', 'Aurora', 'Cyan to violet: the command center\u2019s own'],
-  ['ocean', 'Ocean', 'Deep blue to teal'],
-  ['emerald', 'Emerald', 'Green and teal, calm'],
-  ['sunset', 'Sunset', 'Amber to rose'],
-  ['royal', 'Royal', 'Indigo to magenta'],
-  ['graphite', 'Graphite', 'Quiet greys with one blue'],
+  ['aurora', 'Standard', 'Calm and plain: the command center\u2019s own'],
   ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
 ];
+/** A look from before (Ocean, Emerald, Sunset, Royal, Graphite) is now the standard one. */
+const lookOf = (accent) => (THEMES.some(([id]) => id === accent) ? accent : 'aurora');
 const OPS = [['green', '#39ff88'], ['cyan', '#00e5ff'], ['blue', '#4d9fff'], ['amber', '#ffb000'], ['red', '#ff4d4d'], ['violet', '#be82ff']];
 const OPS_KEY = 'cc-ops';
 /** Command Center's phosphor colour (green unless chosen). */
@@ -119,6 +117,7 @@ let themeMode = 'light';
 function applyTheme(mode = themeMode, accent) {
   themeMode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light';
   document.documentElement.dataset.theme = themeMode === 'system' ? (media.matches ? 'dark' : 'light') : themeMode;
+  if (accent) accent = lookOf(accent);
   if (accent) document.documentElement.dataset.accent = accent;
   try {
     localStorage.setItem(THEME_KEY, document.documentElement.dataset.theme);
@@ -175,7 +174,7 @@ fetch('/api/branding', { credentials: 'same-origin' }).then((r) => r.json()).the
 function themePicker() {
   const me = state.me;
   const dlg = document.createElement('dialog');
-  const cur = { mode: me.prefs?.mode ?? me.theme?.mode ?? 'light', accent: me.prefs?.accent ?? me.theme?.accent ?? 'aurora' };
+  const cur = { mode: me.prefs?.mode ?? me.theme?.mode ?? 'light', accent: lookOf(me.prefs?.accent ?? me.theme?.accent ?? 'aurora') };
   dlg.innerHTML = `<form method="dialog"><div class="dh"><h2>Theme</h2><p class="muted small">Yours, on every device you sign in on.</p></div><div class="db">
     <div class="seg" id="modes">${['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${cur.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('')}</div>
     <div class="swatches mt">${THEMES.map(([id, name, note]) => `<button type="button" class="swatch${cur.accent === id ? ' on' : ''}" data-a="${id}"><span class="sw sw-${id}"></span><b>${name}</b><small>${note}</small></button>`).join('')}</div>
@@ -212,31 +211,39 @@ function themePicker() {
   dlg.showModal();
 }
 
+// ---- Settings: everything that is not Overview, Accounts or the Calculator, in one place ----
+const SETTINGS_PAGES = ['people', 'teams', 'rates', 'audit', 'activity', 'admin'];
+function settingsNav() {
+  const system = ADMIN_TABS.some(([, , p]) => p && can(p)) ? ADMIN_TABS.filter(([, , p]) => !p || can(p)).map(([id, label]) => [label, `/admin/${id}`]) : [];
+  return [
+    ['People', [['People', '/people/people'], ...(can('teams.manage') || can('dashboard.view') ? [['Teams', '/teams']] : []), ...(can('users.manage') || can('roles.manage') ? [['Roles &amp; permissions', '/people/roles']] : []), ...(can('users.manage') ? [['Sign-in', '/people/signin']] : [])]],
+    ['Pricing', [['Engines &amp; rates', '/rates']]],
+    ['Records', [...(can('audit.view') ? [['Audit log', '/audit']] : []), ['CxOne API audit', '/activity']]],
+    ...(system.length ? [['System', system]] : []),
+  ];
+}
+
 // ---- Shell ----------------------------------------------------------------------------------------------
 function shell(active, content) {
   const me = state.me;
   const link = (path, name, label, show = true) => (show ? `<a href="#${path}" class="${active === name ? 'on' : ''}">${icon(name)}<span>${label}</span></a>` : '');
-  const admin = can('users.manage') || can('teams.manage') || ADMIN_TABS.some(([, , p]) => p && can(p)) || can('audit.view');
+  const inSettings = SETTINGS_PAGES.includes(active);
+  const here = location.hash.slice(1).split('?')[0];
+  const setNav = inSettings
+    ? `<nav class="set-nav" aria-label="Settings">${settingsNav().map(([group, items]) => `<div class="set-group"><span class="set-label">${group}</span>${items.map(([label, href]) => `<a href="#${href}" class="${here === href || here.startsWith(`${href}/`) ? 'on' : ''}">${label}</a>`).join('')}</div>`).join('')}</nav>`
+    : '';
   $('#app').className = 'app';
   $('#app').innerHTML = `
     <aside class="side">
       ${brandHtml()}
       <nav class="nav">
-        <div class="label">Insight</div>
         ${link('/overview', 'overview', 'Overview', can('dashboard.view'))}
         ${link('/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
-        ${link('/people', 'people', can('users.manage') ? 'People & roles' : 'People')}
-        <div class="label">Work</div>
         ${can('calculator.use') ? `<a href="/calculator">${icon('calc')}<span>Calculator</span></a>` : ''}
-        ${link('/activity', 'pulse', 'CxOne API audit')}
-        ${admin ? '<div class="label">Administration</div>' : ''}
-        ${link('/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
-        ${link('/rates', 'engine', 'Fusion engines & rates', can('users.manage') || can('settings.manage'))}
-        ${link('/admin', 'admin', 'Settings', ADMIN_TABS.some(([, , p]) => p && can(p)))}
-        ${link('/audit', 'audit', 'Audit log', can('audit.view'))}
+        <a href="#/people" class="${inSettings ? 'on' : ''}">${icon('admin')}<span>Settings</span></a>
       </nav>
       <a class="bgwork" id="bgwork" hidden></a>
-      <nav class="nav guide-nav"><a href="#" id="side-refresh" title="Refresh this page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></a>${link('/guide', 'guide', 'Quick guide')}${link('/help', 'help', 'Get help')}</nav>
+      <nav class="nav guide-nav">${link('/guide', 'guide', 'Quick guide')}${link('/help', 'help', 'Get help')}</nav>
       <button class="ver" id="ver" title="${can('system.update') ? 'Versions and updates' : 'About, version and what is new'}">${esc(me.versionLabel ?? '')}</button>
       <div class="side-links"><a href="#/about">About</a><span>·</span><a href="#/legal" data-doc="terms">Terms &amp; license</a></div>
       <div class="side-lic">PolyForm Internal Use 1.0.0 · internal use only</div>
@@ -251,7 +258,7 @@ function shell(active, content) {
         <div class="tb-me"><button class="tb-who" id="tb-who" aria-haspopup="true" aria-expanded="false">${avatar(me.user.name, me.picture)}<span><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></span></button>
           <div class="menu-list" id="tb-menu" hidden><button type="button" data-go="/profile">${icon('people')}Your profile</button><button type="button" id="theme">${icon('theme')}Theme…</button><button type="button" data-go="/guide">${icon('guide')}Quick guide</button><button type="button" data-go="/about">About</button><button type="button" class="danger" id="signout">${icon('out')}Sign out</button></div></div>
       </header>
-      <main class="main fade" id="main" data-page="${esc(active)}">${content}</main>
+      ${inSettings ? `<div class="set-wrap">${setNav}<main class="main fade" id="main" data-page="${esc(active)}">${content}</main></div>` : `<main class="main fade" id="main" data-page="${esc(active)}">${content}</main>`}
     </div>
     <div class="ops-strip" id="ops-strip" aria-hidden="true"><span class="ops-dot"></span><b>DEFCON 5</b><span>All systems nominal</span><span class="ops-sep">│</span><span>${location.protocol === 'https:' ? 'Secure link · TLS' : 'Link open'}</span><span class="ops-sep">│</span><span>Operator: ${esc(me.user.name)} · ${esc(me.role.name)}</span><span class="ops-grow"></span><span id="ops-clock"></span><span class="ops-sep">│</span><span>${esc(me.versionLabel ?? '')}</span></div>`;
   opsClock();
@@ -275,9 +282,6 @@ async function lights() {
     const st = await api('/api/status');
     const light = (on, label, title, href, warn = false) => `<a class="tb-light ${on ? (warn ? 'warn' : 'on') : 'off'}" href="${href}" title="${esc(title)}"><i></i>${esc(label)}</a>`;
     el.innerHTML = [
-      can('calculator.use') ? light(st.cxone.on, 'Checkmarx One', st.cxone.on ? `Connected to ${st.cxone.tenant}${st.cxone.reading ? ': reading' : ''}` : 'Not connected: connect in the calculator', '/calculator', st.cxone.reading) : '',
-      light(st.email.on, 'Email', st.email.on ? 'The email server is set up and tested' : st.email.configured ? 'Set up but not tested: Settings → Email' : 'No email server: Settings → Email', can('settings.manage') ? '#/admin/email' : '#/about', st.email.configured && !st.email.on),
-      can('calculator.use') ? light(st.git.on, 'Git', st.git.on ? `${st.git.hosts} git host${st.git.hosts === 1 ? '' : 's'} allowed for Fusion · from Git` : 'No git host allowed', can('settings.manage') ? '#/admin/general' : '/calculator') : '',
       st.update ? light(true, `${st.update.version} ready`, 'A newer version is ready: Update now', '#/admin/updates', true) : '',
       st.integrity && ['tampered', 'not-genuine'].includes(st.integrity) ? `<a class="tb-light bad" href="#/admin/updates" title="Software integrity"><i></i>Integrity</a>` : '',
     ].join('');
@@ -286,11 +290,6 @@ async function lights() {
 }
 function wireTopbar() {
   lights();
-  $('#side-refresh').onclick = (e) => {
-    e.preventDefault();
-    lights();
-    route();
-  };
   $('#tb-mode').onclick = async () => {
     const dark = document.documentElement.dataset.theme === 'dark';
     const mode = dark ? 'light' : 'dark';
@@ -330,10 +329,9 @@ async function jumpTo() {
   dlg.showModal();
   dlg.addEventListener('close', () => dlg.remove());
   const pages = [
-    ['Overview', '/overview', 'overview', can('dashboard.view')], ['Accounts', '/accounts', 'accounts', can('dashboard.view')], ['CxOne API audit', '/activity', 'pulse', true], ['Fusion engines & rates', '/rates', 'engine', can('users.manage') || can('settings.manage')],
-    ['People & roles', '/people', 'people', true], ['Calculator', '/calculator', 'calc', can('calculator.use')], ['Teams', '/teams', 'teams', can('teams.manage') || can('dashboard.view')],
-    ['Settings', '/admin', 'admin', ADMIN_TABS.some(([, , p]) => p && can(p))], ['Updates', '/admin/updates', 'admin', can('system.update')], ['Audit log', '/audit', 'audit', can('audit.view')],
-    ['Quick guide', '/guide', 'guide', true], ['Get help', '/help', 'help', true], ['Submit a support case', '/help/case', 'help', true], ['Request an enhancement', '/help/enhancement', 'help', true], ['About', '/about', 'guide', true],
+    ['Overview', '/overview', 'overview', can('dashboard.view')], ['Accounts', '/accounts', 'accounts', can('dashboard.view')], ['Calculator', '/calculator', 'calc', can('calculator.use')],
+    ...settingsNav().flatMap(([group, items]) => items.map(([label, href]) => [`${group === 'System' ? 'Settings' : group} · ${label.replace(/&amp;/g, '&')}`, href, 'admin', true])),
+    ['Quick guide', '/guide', 'guide', true], ['Get help', '/help', 'help', true], ['About', '/about', 'guide', true],
   ].filter((x) => x[3]).map(([t, href, ic]) => ({ t, sub: 'Page', href, ic }));
   let items = pages;
   const extra = [];
@@ -1035,7 +1033,7 @@ async function viewAccounts(params) {
   void people;
   let sort = { key: 'credits', dir: -1 };
   $('#main').innerHTML = `
-    <div class="head"><div><h1 class="serif">Accounts</h1><p>Every account in your teams with its primary report. Click an account to open it; <b>double-click</b> its name, accountable SE, sold or customer cell to change it right here.</p></div>
+    <div class="head"><div><h1 class="serif">Accounts</h1><p>Every account in your teams with its primary report. Click an account to open it; the pencil in a cell, or the row’s menu, changes it right here.</p></div>
       <div class="tools">${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('plus')}New in calculator</a>` : ''}</div></div>
     <div class="panel">
       <div class="flex">
@@ -1046,10 +1044,10 @@ async function viewAccounts(params) {
         <span class="spacer"></span><span class="muted small" id="count"></span>
       </div>
       <div class="tw mt"><table><thead><tr>
-        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th>Salesforce</th><th class="sort num" data-k="credits">Total credits</th><th class="sort num" data-k="sold">Sold</th><th class="sort num" data-k="remaining">Still needed</th><th class="sort num" data-k="reports">Reports</th><th>Customer</th><th class="sort" data-k="last">Last report</th>${can('calculator.use') || can('forecast.mute') ? '<th></th>' : ''}
+        <th class="sort" data-k="name">Account</th><th class="sort" data-k="owner">Accountable SE</th><th class="sort num" data-k="credits">Credits</th><th class="sort num" data-k="sold">Sold</th><th class="sort num" data-k="remaining">Still needed</th><th>Customer</th><th class="sort" data-k="last">Last</th><th></th>
       </tr></thead><tbody id="rows"></tbody></table></div>
     </div>`;
-  const val = (a, k) => ({ name: a.name.toLowerCase(), owner: String(a.owner).toLowerCase(), tr: a.primary?.trCredits ?? -1, fusion: a.primary?.fusionCredits ?? -1, credits: a.primary?.totalCredits ?? -1, reports: a.reportCount, sold: a.sold ?? 0, remaining: a.remaining ?? -1, last: a.lastReportAt ?? '' })[k];
+  const val = (a, k) => ({ team: String(a.team ?? '').toLowerCase(), name: a.name.toLowerCase(), owner: String(a.owner).toLowerCase(), tr: a.primary?.trCredits ?? -1, fusion: a.primary?.fusionCredits ?? -1, credits: a.primary?.totalCredits ?? -1, reports: a.reportCount, sold: a.sold ?? 0, remaining: a.remaining ?? -1, last: a.lastReportAt ?? '' })[k];
   const render = () => {
     const q = $('#q').value.trim().toLowerCase();
     const owner = $('#owner').value;
@@ -1063,44 +1061,65 @@ async function viewAccounts(params) {
       .sort((a, b) => (val(a, sort.key) > val(b, sort.key) ? 1 : val(a, sort.key) < val(b, sort.key) ? -1 : 0) * sort.dir);
     $('#count').textContent = `${num(list.length)} of ${num(accounts.length)} accounts`;
     $('#rows').innerHTML = list.length
-      ? list.map((a) => `<tr class="click${a.muted ? ' muted-row' : ''}" data-account="${esc(a.id)}">
-        <td data-edit="name" title="Double-click to rename"><b>${esc(a.name)}</b>${a.muted ? ` <span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}<span class="sub">${esc(a.teamPath)}</span></td>
-        <td data-edit="owner" title="Double-click to change the accountable SE"><div class="flex"><span class="avatar sm">${esc(initials(a.owner))}</span>${esc(a.owner)}</div></td>
-        <td>${sfChip(a)}</td>
-        <td class="num">${a.primary ? `<span class="credits big">${num(Math.round(a.primary.totalCredits))}</span><span class="sub">T&amp;R ${num(Math.round(a.primary.trCredits ?? 0))} · Fusion ${num(Math.round(a.primary.fusionCredits ?? 0))}${a.primary.how === 'latest' ? ' · latest' : ''}</span>` : '<span class="muted">No report</span>'}</td>
-        <td class="num" data-edit="sold" title="Double-click to record a sale">${soldCell(a)}</td>
+      ? list.map((a) => {
+        const pen = (kind, label) => `<button type="button" class="cell-pen" data-pen="${kind}" title="${label}" aria-label="${label}">${icon('edit')}</button>`;
+        const split = a.primary ? `T&R ${num(Math.round(a.primary.trCredits ?? 0))} · Fusion ${num(Math.round(a.primary.fusionCredits ?? 0))}${a.primary.how === 'latest' ? ' · the latest report (none marked primary)' : ''}` : '';
+        const total = Number(a.primary?.totalCredits) || 0;
+        const soldNote = a.sold ? `${total ? `${Math.min(100, Math.round((a.sold / total) * 100))}% of the projection` : ''}${a.salesCount > 1 ? ` · ${num(a.salesCount)} sales` : ''}` : 'Nothing sold yet';
+        const shared = a.sharedCount ? `<span class="chip ok" title="${esc(a.primary?.sharedWith?.length ? `Shared with ${a.primary.sharedWith.join(', ')}` : 'Shared with the customer')}"><i></i>${num(a.sharedCount)} shared</span>` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="muted">—</span>';
+        const menu = [
+          ['open', 'Open the account', true],
+          ['calc', 'Open in the calculator', can('calculator.use')],
+          ['name', 'Rename', can('calculator.use')],
+          ['owner', 'Change the accountable SE', can('calculator.use') || can('users.manage')],
+          ['sold', 'Record a sale', can('sales.record') && Boolean(a.primary)],
+          ['shared', a.primary?.sharedAt ? 'No longer shared with the customer' : 'Shared with the customer…', can('reports.share') && Boolean(a.primary)],
+          ['mute', a.muted ? 'Bring back into the forecast' : 'Mute from the forecast', can('forecast.mute')],
+        ].filter((x) => x[2]);
+        return `<tr class="click${a.muted ? ' muted-row' : ''}" data-account="${esc(a.id)}">
+        <td data-edit="name" class="acc-name"><span class="cell-line"><b title="${esc(a.name)}">${esc(a.name)}</b>${a.salesforceUrl ? `<a class="sf-link" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open the ${a.salesforceKind === 'opportunity' ? 'opportunity' : 'account'} in Salesforce (new tab)" aria-label="Open in Salesforce">${icon('ext')}</a>` : '<span class="chip bad" title="No Salesforce link yet: nothing is generated until one is saved">No link</span>'}${a.muted ? `<span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}${pen('name', 'Rename')}</span></td>
+        <td data-edit="owner" class="acc-owner"><span class="cell-line"><span class="avatar sm">${esc(initials(a.owner))}</span><span class="clip" title="${esc(`${a.owner} · ${a.teamPath}`)}">${esc(a.owner)}</span>${pen('owner', 'Change the accountable SE')}</span></td>
+        <td class="num" title="${esc(`${split}${a.reportCount ? ` · ${a.reportCount} report${a.reportCount === 1 ? '' : 's'}` : ''}`)}">${a.primary ? `<span class="credits">${num(Math.round(a.primary.totalCredits))}</span>` : '<span class="muted">No report</span>'}</td>
+        <td class="num" data-edit="sold" title="${esc(soldNote)}"><span class="cell-line end">${a.sold ? num(Math.round(a.sold)) : '<span class="muted">—</span>'}${can('sales.record') && a.primary ? pen('sold', 'Record a sale') : ''}</span></td>
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
-        <td class="num">${num(a.reportCount)}</td>
-        <td data-edit="shared" title="Double-click: the primary report shared with the customer (to whom), or not">${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>${a.primary?.sharedWith?.length ? `<span class="sub">${esc(a.primary.sharedWith.join(', '))}</span>` : ''}` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
-        <td>${esc(ago(a.lastReportAt))}</td>
-        ${can('calculator.use') || can('forecast.mute') ? `<td class="actions">${can('forecast.mute') ? `<button type="button" class="sm ${a.muted ? '' : 'ghost'} mute-btn" data-mute="${a.muted ? 'off' : 'on'}" title="${a.muted ? 'Bring it back into the dashboards' : 'Leave it out of the dashboards (it stays here, marked muted)'}">${a.muted ? 'Unmute' : 'Mute'}</button>` : ''}${can('calculator.use') ? `<a class="btn sm primary calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator">${icon('calc')}Open</a>` : ''}</td>` : ''}</tr>`).join('')
-      : `<tr><td colspan="${can('calculator.use') || can('forecast.mute') ? 10 : 9}"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>`;
-    for (const b of $$('#rows [data-mute]')) {
-      b.onclick = async (e) => {
-        e.stopPropagation();
-        const a = accounts.find((x) => x.id === b.closest('tr').dataset.account);
-        const on = b.dataset.mute === 'on';
-        try {
-          await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/mute`, { method: 'POST', body: { muted: on } });
-          toast(on ? `${a.name} is muted from the forecast: the dashboards leave it out.` : `${a.name} is back in the forecast.`, 'ok');
-          await reload();
-        } catch (error) {
-          toast(error.message, 'bad');
-        }
-      };
-    }
-    // One click opens the account; a double-click edits the cell (the click waits a moment to tell them apart).
+        <td data-edit="shared"><span class="cell-line">${shared}${can('reports.share') && a.primary ? pen('shared', 'Shared with the customer, or not') : ''}</span></td>
+        <td class="acc-last" data-sort="${esc(a.lastReportAt ?? '')}">${esc(ago(a.lastReportAt))}</td>
+        <td class="actions">${can('calculator.use') ? `<a class="btn sm icon-btn calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator" aria-label="Open in the calculator">${icon('calc')}</a>` : ''}<details class="menu row-menu"><summary class="btn sm icon-btn" aria-label="More for ${esc(a.name)}">⋯</summary><div class="menu-list">${menu.map(([id, label]) => `<button type="button" data-row="${id}">${label}</button>`).join('')}</div></details></td></tr>`;
+      }).join('')
+      : `<tr><td colspan="8"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>`;
+    const mute = async (a) => {
+      const on = !a.muted;
+      try {
+        await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/mute`, { method: 'POST', body: { muted: on } });
+        toast(on ? `${a.name} is muted from the forecast: the dashboards leave it out.` : `${a.name} is back in the forecast.`, 'ok');
+        await reload();
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    };
+    // A click on the row opens the account; the pencil in a cell, or the row's menu, changes it.
     for (const el of $$('[data-account]')) {
-      let timer = null;
+      const a = accounts.find((x) => x.id === el.dataset.account);
       el.onclick = (e) => {
-        if (e.target.closest('a, input, select, button, .cell-edit')) return;
-        clearTimeout(timer);
-        timer = setTimeout(() => go(`/accounts/${encodeURIComponent(el.dataset.account)}`), 260);
-      };
-      el.ondblclick = (e) => {
-        clearTimeout(timer);
-        const cell = e.target.closest('[data-edit]');
-        if (cell && !cell.querySelector('.cell-edit')) editCell(accounts.find((a) => a.id === el.dataset.account), cell);
+        const penBtn = e.target.closest('[data-pen]');
+        const rowBtn = e.target.closest('[data-row]');
+        if (penBtn) {
+          const cell = penBtn.closest('[data-edit]');
+          if (!cell.querySelector('.cell-edit')) editCell(a, cell);
+          return;
+        }
+        if (rowBtn) {
+          rowBtn.closest('details').open = false;
+          const act = rowBtn.dataset.row;
+          if (act === 'open') return go(`/accounts/${encodeURIComponent(a.id)}`);
+          if (act === 'calc') return void (location.href = `/calculator?team=${encodeURIComponent(a.teamId ?? '')}&account=${encodeURIComponent(a.id)}`);
+          if (act === 'mute') return mute(a);
+          const cell = el.querySelector(`[data-edit="${act}"]`);
+          if (cell && !cell.querySelector('.cell-edit')) editCell(a, cell);
+          return;
+        }
+        if (e.target.closest('a, input, select, button, summary, .cell-edit, .menu-list')) return;
+        go(`/accounts/${encodeURIComponent(a.id)}`);
       };
     }
   };
@@ -1436,7 +1455,7 @@ async function viewPeople(tab = peopleTab) {
   const d = await peopleList();
   const tabs = [['people', `People <em>${num(d.people.length)}</em>`], ...(manage || can('roles.manage') ? [['roles', `Roles &amp; permissions <em>${num(d.roles.length)}</em>`]] : []), ...(manage ? [['signin', 'Sign-in']] : [])];
   $('#main').innerHTML = `<div class="head"><div><h1 class="serif">People</h1><p>${manage ? (can('scope.all') ? 'Everyone who can sign in, and what they may do. You manage people in every team.' : 'The people in the teams you lead. You can invite them, change their role and team, reset passwords, unlock, sign out and turn access off, never beyond your own permissions.') : 'The people in your teams and the teams you lead.'}</p></div></div>
-    <nav class="tabs" role="tablist">${tabs.map(([id, label]) => `<a role="tab" href="#/people/${id}" class="${id === peopleTab ? 'on' : ''}">${label}</a>`).join('')}</nav><div id="ptab"></div>`;
+    <div id="ptab"></div>`;
   if (peopleTab === 'roles') return rolesMatrix(d);
   if (peopleTab === 'signin') return signInTab();
   return peopleTable(d);
@@ -1468,7 +1487,7 @@ function peopleTable(d) {
       ${d.mail ? '<button type="button" class="sm" data-bulk="welcome">Send welcome</button>' : ''}
       <button type="button" class="sm" data-bulk="reset">Reset passwords</button><button type="button" class="sm" data-bulk="signout">Sign out everywhere</button><button type="button" class="sm" data-bulk="unlock">Unlock</button>
       <button type="button" class="sm danger" data-bulk="remove">Remove</button><button type="button" class="sm ghost" id="bulk-clear">Clear</button><span class="muted small" id="bulk-out"></span></div>` : ''}
-    <div class="tw mt"><table class="people"><thead><tr>${manage ? '<th class="sel"><input type="checkbox" id="sel-all" title="Select everyone shown by the filters" aria-label="Select everyone shown by the filters" /></th>' : ''}<th>Person</th><th>Role</th><th>Team</th><th>Sign-in</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="tw mt"><table class="people"><thead><tr>${manage ? '<th class="sel"><input type="checkbox" id="sel-all" title="Select everyone shown by the filters" aria-label="Select everyone shown by the filters" /></th>' : ''}<th>Person</th><th>Role</th><th>Team</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
     <div class="flex pager" id="pager"><span class="muted small" id="pinfo"></span><span class="spacer"></span><button class="sm" id="prev">Previous</button><button class="sm" id="next">Next</button></div></div>`;
   const list = () => {
     const q = $('#q').value.trim().toLowerCase();
@@ -1502,7 +1521,7 @@ function peopleTable(d) {
       const teamCell = u.manageable ? `<select class="inline-sel" data-inline="team" title="Move ${esc(u.name)} to another team">${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select>` : esc(u.team || '—');
       return `<tr data-id="${esc(u.id)}" class="${selected.has(u.id) ? 'picked' : ''}">${manage ? `<td class="sel">${u.manageable && !self ? `<input type="checkbox" data-sel ${selected.has(u.id) ? 'checked' : ''} aria-label="Select ${esc(u.name)}" />` : ''}</td>` : ''}<td><div class="flex nowrap">${avatar(u.name, u.picture)}<div><b>${esc(u.name)}</b>${u.id === state.me.user.id ? ' <span class="chip">You</span>' : ''}<span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td>
         <td data-v="${esc(u.roleName)}">${roleCell}${u.leads.length ? `<span class="sub">Leads ${esc(u.leads.join(', '))}</span>` : ''}</td><td title="${esc(u.teamPath)}" data-v="${esc(u.team || '—')}">${teamCell}</td>
-        <td class="small">${u.signIn === 'sso' ? 'Single sign-on' : 'Password'}</td><td><span class="chip ${kind}"><i></i>${label}</span>${u.lockedUntil ? `<span class="sub">until ${esc(new Date(u.lockedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>` : ''}</td>
+        <td title="Signs in with ${u.signIn === 'sso' ? 'single sign-on' : 'a password'}"><span class="chip ${kind}"><i></i>${label}</span>${u.lockedUntil ? `<span class="sub">until ${esc(new Date(u.lockedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>` : ''}</td>
         <td class="small">${esc(ago(u.lastSignInAt))}</td><td class="actions">${acts}</td></tr>`;
     }).join('') || `<tr><td colspan="${manage ? 8 : 7}"><div class="empty"><b>Nobody matches</b></div></td></tr>`;
     for (const b of $$('[data-act]')) b.onclick = () => personAction(d, d.people.find((u) => u.id === b.closest('tr').dataset.id), b.dataset.act);
@@ -2089,8 +2108,8 @@ async function viewAdmin(tab = adminTab) {
   if (!tabs.length) return go(home());
   adminTab = tabs.some(([id]) => id === tab) ? tab : tabs[0][0];
   if (location.hash !== `#/admin/${adminTab}`) history.replaceState(null, '', `#/admin/${adminTab}`);
-  shell('admin', `<div class="head compact"><div class="ht"><h1 class="serif">Settings</h1><span class="crumbs">for the whole command center \u00b7 Admins only</span></div></div>
-    <nav class="tabs" role="tablist">${tabs.map(([id, label]) => `<a role="tab" href="#/admin/${id}" class="${id === adminTab ? 'on' : ''}" aria-selected="${id === adminTab}">${esc(label)}</a>`).join('')}</nav><div id="tab">${loading()}</div>`);
+  shell('admin', `<div class="head compact"><div class="ht"><h1 class="serif">${esc(tabs.find(([id]) => id === adminTab)?.[1] ?? 'Settings')}</h1><span class="crumbs">for the whole command center \u00b7 Admins only</span></div></div>
+    <div id="tab">${loading()}</div>`);
   try {
     await ADMIN_VIEWS[adminTab]();
   } catch (error) {
@@ -2099,20 +2118,18 @@ async function viewAdmin(tab = adminTab) {
 }
 
 const ADMIN_VIEWS = {
-  // Get help: where support cases and enhancement requests go (saved as they change; a refused one goes back).
+  // Get help: the address support cases and enhancement requests are emailed to (saved as it changes).
   async help() {
     const me = await api('/api/me');
-    const sup = me.support ?? { mode: 'portal', email: 'bhawani.singh@checkmarx.com' };
+    const sup = me.support ?? { email: '' };
     $('#tab').innerHTML = `<div class="saved-banner">✓ Changes save as you type.</div>
-      <div class="panel"><h2>Get help <small>where support cases and enhancement requests go when people use Get help in the menu</small></h2>
+      <div class="panel"><h2>Get help <small>where the support cases and enhancement requests people send from Get help are emailed</small></h2>
       <form class="form" id="supf" autocomplete="off">
-        <label class="check"><input type="radio" name="mode" value="portal" ${sup.mode !== 'email' ? 'checked' : ''} /><span><b>Support portal in the command center</b><small>A form, a numbered queue (SUP-0001, ENH-0001) and email updates. Every new request and answer is emailed to the address below; people with “Answer support cases &amp; enhancements” answer them here.</small></span></label>
-        <label class="check"><input type="radio" name="mode" value="email" ${sup.mode === 'email' ? 'checked' : ''} /><span><b>Email</b><small>Get help opens each person’s own email app, addressed to the address below, with the details filled in. For a server that cannot send email.</small></span></label>
         <label class="f">Send requests to<input type="email" name="email" value="${esc(sup.email)}" placeholder="support@company.com" /></label>
-        <p class="muted small">In the portal, the emails go out through the email server (Settings → Email (SMTP)); until it is set up and tested, requests are kept here and the page says the email could not be sent.</p>
+        <p class="muted small">Each request is emailed here through the email server (Settings → Email (SMTP)); replying to it answers the person who asked. Until the email server is set up and tested, requests are kept and the page says the email did not go.</p>
       </form><div class="saved-foot" id="supsaved">All changes are saved.</div></div>`;
     autosave($('#supf'), async (form) => {
-      const r = await api('/api/settings/support', { method: 'PUT', body: { mode: form.querySelector('input[name=mode]:checked')?.value ?? 'portal', email: form.elements.email.value } });
+      const r = await api('/api/settings/support', { method: 'PUT', body: { mode: 'portal', email: form.elements.email.value } });
       state.me.support = r;
     }, { status: $('#supsaved') });
   },
@@ -2121,7 +2138,7 @@ const ADMIN_VIEWS = {
   },
   async branding() {
     const [s, b] = await Promise.all([api('/api/settings'), api('/api/branding')]);
-    const look = { accent: b.look ?? 'aurora', mode: b.mode ?? 'light' };
+    const look = { accent: lookOf(b.look ?? 'aurora'), mode: b.mode ?? 'light' };
     $('#tab').innerHTML = `<div class="saved-banner">✓ Changes save as you type.</div>
       <div class="panel brand-page"><h2>Branding</h2>
       <form class="form" id="bf" autocomplete="off">
@@ -2129,7 +2146,7 @@ const ADMIN_VIEWS = {
           <label class="f">App name<input name="appName" maxlength="40" value="${esc(b.appName)}" /></label>
           <label class="f">Under the name<input name="tagline" maxlength="40" value="${esc(b.tagline ?? '')}" placeholder="Command Center" /></label>
           <label class="f">Company name <small>on every report</small><input name="organisationName" maxlength="120" value="${esc(s.organisationName)}" /></label>
-          <label class="f">Accent colour <small>${b.accent ? `<button type="button" class="link" id="accent-reset">the look’s own</button>` : 'the look’s own'}</small><span class="colour"><input type="color" name="accent" value="${esc(b.accent || '#22d3ee')}" /><span id="accent-v">${esc(b.accent || 'From the look')}</span></span></label>
+          <label class="f" hidden>Accent colour <small>${b.accent ? `<button type="button" class="link" id="accent-reset">the look’s own</button>` : 'the look’s own'}</small><span class="colour"><input type="color" name="accent" value="${esc(b.accent || '#22d3ee')}" /><span id="accent-v">${esc(b.accent || 'From the look')}</span></span></label>
         </div>
         <div class="brand-grid two">
           <div class="f">Company logo <small>https address, or upload one (PNG, JPEG, SVG or WebP, up to 200 KB)</small>
@@ -3016,11 +3033,11 @@ async function viewRates(params) {
     <div class="head compact"><div class="ht"><h1 class="serif">Fusion engines &amp; rates</h1><span class="crumbs">credits per 10K lines of code for each AI engine · the calculator applies them by itself, and they can still be changed there for one customer</span></div>
       <div class="tools"><a class="btn primary" href="/calculator">${icon('calc')}Open calculator</a></div></div>
     <div class="saved-banner">✓ Changes save as you type; a change that does not work goes back to the last good one.</div>
-    ${d.canAdmin ? `<div class="panel"><h2>For everyone <small>the Admin’s rates and the default engine for Fusion; leaders may set their team’s own below</small></h2>
+    ${d.canAdmin ? `<div class="panel"><h2>For everyone <small>the Admin’s rates and the default engine for Fusion: the same for every team</small></h2>
       <form id="rates-admin" class="form" autocomplete="off" data-nodraft><div class="tw"><table class="rates"><thead><tr><th>Engine</th><th class="num">Credits per 10K LOC</th><th class="c">Default engine</th><th></th></tr></thead><tbody>${adminRows}</tbody></table></div>
       <div class="flex mt"><button type="button" class="sm" id="add-engine">${icon('plus')}Add an engine</button><span class="muted small">Name it as Checkmarx One does (“Opus 5.5”, “claude-opus-5-5” and “Claude Opus 5.5” are the same engine).</span></div></form>
       <div class="saved-foot" id="rates-saved">All changes are saved.</div></div>`
-    : `<div class="panel"><h2>The Admin’s rates <small>for everyone, unless a team sets its own</small></h2><div class="tw"><table><thead><tr><th>Engine</th><th class="num">Credits per 10K LOC</th></tr></thead><tbody>${d.admin.models.map((m) => `<tr><td><b>${esc(m.name)}</b>${m.name === d.admin.defaultModel ? ' <span class="chip star">Default</span>' : ''}</td><td class="num">${m.creditsPer10k ? num(m.creditsPer10k, 3) : '<span class="chip warn"><i></i>needs a rate</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
+    : `<div class="panel"><h2>The Admin’s rates <small>the same for everyone</small></h2><div class="tw"><table><thead><tr><th>Engine</th><th class="num">Credits per 10K LOC</th></tr></thead><tbody>${d.admin.models.map((m) => `<tr><td><b>${esc(m.name)}</b>${m.name === d.admin.defaultModel ? ' <span class="chip star">Default</span>' : ''}</td><td class="num">${m.creditsPer10k ? num(m.creditsPer10k, 3) : '<span class="chip warn"><i></i>needs a rate</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
     <div class="panel mt"><h2>Triage &amp; remediation credits <small>per finding, for everyone: ${d.canAdmin ? 'only you (the Admin) can change them; the calculator and the reports show them as they are' : 'set by the Admin; the calculator and the reports use them as they are'}</small></h2>
       <form id="tr-rates" class="form" autocomplete="off" data-nodraft><div class="tw"><table class="rates"><thead><tr><th>Severity</th><th class="num">Credits to triage one</th><th class="num">Credits to remediate one</th></tr></thead><tbody>${['Critical', 'High', 'Medium', 'Low'].map((sv) => `<tr><td><b>${sv}</b></td><td class="num">${d.canAdmin ? `<input type="number" min="0" max="1000" step="0.5" name="t-${sv}" value="${esc(d.trRates.triageCost[sv])}" aria-label="${sv}: credits to triage one finding" />` : num(d.trRates.triageCost[sv], 3)}</td><td class="num">${d.canAdmin ? `<input type="number" min="0" max="1000" step="0.5" name="r-${sv}" value="${esc(d.trRates.remediationCost[sv])}" aria-label="${sv}: credits to remediate one finding" />` : num(d.trRates.remediationCost[sv], 3)}</td></tr>`).join('')}</tbody></table></div></form>
       ${d.canAdmin ? '<div class="saved-foot" id="tr-saved">All changes are saved.</div>' : ''}</div>
@@ -3069,7 +3086,7 @@ async function viewRates(params) {
       const del = e.target.closest('[data-del]');
       if (!del) return;
       const row = del.closest('tr');
-      if (!confirm(`Remove ${row.querySelector('[name=name]').value || 'this engine'} from the list? Teams’ own rates for it are kept.`)) return;
+      if (!confirm(`Remove ${row.querySelector('[name=name]').value || 'this engine'} from the list?`)) return;
       row.remove();
       save();
     });
@@ -3141,23 +3158,11 @@ async function viewRates(params) {
   }
 }
 
-// ---- Get help: support cases and enhancement requests ---------------------------------------------------------------
-// Everyone raises their own and follows them; the support team ("Answer support cases & enhancements") sees them all,
-// answers, and moves each one on. Every new request and answer is emailed to the support address (Settings → Get help).
-const HELP_STATUS = { new: ['New', ''], 'in-progress': ['In progress', 'ok'], waiting: ['Waiting for reply', 'warn'], completed: ['Completed', 'ok'], declined: ['Declined', ''] };
+// ---- Get help: one form. What is sent goes by email to the support address (Settings → Get help), which answers by
+// email; what each person sent is listed below the form.
 const HELP_KIND = { case: 'Support case', enhancement: 'Enhancement' };
-const HELP_PRIORITY = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
-const helpChip = (st) => `<span class="chip ${HELP_STATUS[st]?.[1] ?? ''}"><i></i>${esc(HELP_STATUS[st]?.[0] ?? st)}</span>`;
-const helpState = { filter: { kind: '', status: 'open', whose: 'mine' }, justRaised: '', emailed: null };
-function supportMailto(kind) {
-  const isCase = kind === 'case';
-  const me = state.me.user;
-  const body = [isCase ? 'What happened:' : 'What I would like:', '', '', isCase ? 'What I expected:' : 'Who it helps, and how I would use it:', '', '', ...(isCase ? ['Steps to see it:', '', '', 'Priority (low, normal, high, urgent): normal', ''] : []), '---', `From: ${me.name} <${me.email}>`, `Version: ${state.me.versionLabel}`, `Server: ${location.origin}`].join('\n');
-  return `mailto:${state.me.support.email}?subject=${encodeURIComponent(isCase ? 'Support case: ' : 'Enhancement request: ')}&body=${encodeURIComponent(body)}`;
-}
 async function viewHelp(view) {
   shell('help', loading());
-  const byEmail = state.me.support?.mode === 'email';
   let d;
   try {
     d = await api('/api/support');
@@ -3165,116 +3170,66 @@ async function viewHelp(view) {
     $('#main').innerHTML = `<div class="panel"><div class="empty"><b>${esc(error.message)}</b></div></div>`;
     return;
   }
-  if (d.team && !helpState.teamSeen) {
-    helpState.filter.whose = 'all';
-    helpState.teamSeen = true;
-  }
-  const caseHref = byEmail ? supportMailto('case') : '#/help/case';
-  const enhHref = byEmail ? supportMailto('enhancement') : '#/help/enhancement';
+  const kind = view === 'enhancement' ? 'enhancement' : 'case';
+  const open = /^(SUP|ENH)-\d+$/i.test(view) ? view.toUpperCase() : '';
   $('#main').innerHTML = `
-    <div class="head compact"><div class="ht"><h1 class="serif">Get help</h1><span class="crumbs">support cases and enhancement requests${byEmail ? ` · by email to ${esc(state.me.support.email)}` : ' · each gets a number, and you follow it here'}</span></div>
-      <div class="tools"><a class="btn primary" href="${esc(caseHref)}">${icon('help')}Submit a support case</a><a class="btn" href="${esc(enhHref)}">Request an enhancement</a></div></div>
-    <div class="help-grid">
-      <section class="panel help-queue"><div class="flex help-filters">
-        <select id="hf-kind"><option value="">Cases and enhancements</option><option value="case">Support cases</option><option value="enhancement">Enhancements</option></select>
-        <select id="hf-status"><option value="open">Open</option><option value="">Any status</option>${Object.entries(HELP_STATUS).map(([k, [l]]) => `<option value="${k}">${l}</option>`).join('')}</select>
-        ${d.team ? '<select id="hf-whose"><option value="all">Everyone’s</option><option value="mine">Mine</option></select>' : ''}
-      </div><h2 id="hq-title" class="mt"></h2><div id="hq-list"></div></section>
-      <section class="panel help-detail" id="help-detail"></section>
+    <div class="head compact"><div class="ht"><h1 class="serif">Get help</h1><span class="crumbs">emailed to ${esc(state.me.support?.email ?? 'the support address')} · answered by email</span></div></div>
+    <div class="panel help-form"><form id="hf" class="form" autocomplete="off">
+      <div class="seg" id="hkind" role="radiogroup" aria-label="What is it?"><button type="button" role="radio" data-k="case" class="${kind === 'case' ? 'primary' : ''}">Something is not working</button><button type="button" role="radio" data-k="enhancement" class="${kind === 'enhancement' ? 'primary' : ''}">I would like something added or changed</button></div>
+      <label class="f">In a few words<input name="subject" maxlength="200" required placeholder="${kind === 'case' ? 'The report stops at 40%' : 'A column for the renewal date'}" /></label>
+      <label class="f">The details<textarea name="text" rows="6" maxlength="10000" required placeholder="What happened, what you expected, and the steps to see it"></textarea></label>
+      <div class="flex"><label class="f" id="hprio-l">How urgent<select name="priority"><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option><option value="urgent">Urgent: I cannot work</option></select></label>
+        <span class="spacer"></span><span class="muted small" id="hsay" aria-live="polite"></span><button class="primary" type="submit">Send</button></div>
+    </form></div>
+    <div class="panel mt"><h2>${d.team ? 'Sent by everyone' : 'What you sent'} <small>${d.requests.length ? 'the latest first; click one to read it' : 'nothing yet'}</small></h2>
+      ${d.requests.length ? `<div class="tw"><table><thead><tr><th>Number</th><th>Type</th><th>In a few words</th>${d.team ? '<th>From</th>' : ''}<th>Sent</th></tr></thead><tbody id="hrows">${d.requests.map((r) => `<tr class="click" data-id="${esc(r.id)}"><td class="mono">${esc(r.id)}</td><td>${esc(HELP_KIND[r.kind] ?? r.kind)}</td><td><b>${esc(r.subject)}</b></td>${d.team ? `<td>${esc(r.requester.name || r.requester.email)}</td>` : ''}<td data-sort="${esc(r.createdAt)}">${esc(ago(r.createdAt))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Requests you send are listed here.</div>'}
     </div>`;
-  const f = helpState.filter;
-  $('#hf-kind').value = f.kind;
-  $('#hf-status').value = f.status;
-  if ($('#hf-whose')) $('#hf-whose').value = f.whose;
-  const renderList = () => {
-    const everyone = d.team && f.whose === 'all';
-    const rows = d.requests.filter((r) => (!f.kind || r.kind === f.kind) && (!f.status || (f.status === 'open' ? !['completed', 'declined'].includes(r.status) : r.status === f.status)) && (everyone || r.mine));
-    $('#hq-title').innerHTML = `${everyone ? 'Support queue' : 'My requests'} <small>${num(rows.length)} shown</small>`;
-    $('#hq-list').innerHTML = rows.length
-      ? `<ul class="help-rows">${rows.map((r) => `<li><a class="help-row${r.id === view.toUpperCase() ? ' on' : ''}" href="#/help/${esc(r.id)}"><span class="help-row-top"><b class="mono">${esc(r.id)}</b>${helpChip(r.status)}${r.priority === 'urgent' || r.priority === 'high' ? `<span class="chip bad"><i></i>${HELP_PRIORITY[r.priority]}</span>` : ''}</span><span class="help-row-title">${esc(r.subject)}</span><span class="sub">${r.mine ? '' : `${esc(r.requester.name || r.requester.email)} · `}${esc(dateTime(r.updatedAt))}</span></a></li>`).join('')}</ul>`
-      : `<p class="muted small">${d.requests.length ? 'Nothing matches these filters.' : byEmail ? 'Requests go by email here, so none are listed.' : 'No requests yet. Raise one with the buttons above.'}</p>`;
+  let chosen = kind;
+  const form = $('#hf');
+  const setKind = (k) => {
+    chosen = k;
+    for (const b of $$('#hkind [data-k]')) {
+      b.classList.toggle('primary', b.dataset.k === k);
+      b.setAttribute('aria-checked', String(b.dataset.k === k));
+    }
+    $('#hprio-l').hidden = k !== 'case';
   };
-  for (const [id, key] of [['#hf-kind', 'kind'], ['#hf-status', 'status'], ['#hf-whose', 'whose']]) if ($(id)) $(id).onchange = (e) => ((f[key] = e.target.value), renderList());
-  renderList();
-  const box = $('#help-detail');
-  const v = String(view ?? '');
-  if (byEmail && !/^(SUP|ENH)-\d+$/i.test(v)) {
-    box.innerHTML = `<div class="empty"><b>Get help by email</b>Support here is by email. Your email app opens, addressed to <b>${esc(state.me.support.email)}</b>, with a short template to fill in; the answers come back by email.<div class="flex mt"><a class="btn primary" href="${esc(caseHref)}">Email a support case</a><a class="btn" href="${esc(enhHref)}">Email an enhancement request</a></div></div>`;
-    return;
-  }
-  if (v === 'case' || v === 'enhancement') {
-    const isCase = v === 'case';
-    box.innerHTML = `<form class="form" id="help-form" autocomplete="off"><h2>${isCase ? 'Submit a support case' : 'Request an enhancement'}</h2>
-      <p class="muted small">${isCase ? 'Tell the support team what is not working, or where you are stuck. You get an email with the case number, and every answer.' : 'Describe the feature or improvement you would like, and why it helps. You get an email with its number, and can follow it until it is done.'}</p>
-      <label class="f">Title<input name="subject" maxlength="200" required placeholder="In a few words" /></label>
-      <label class="f">Description<textarea name="text" rows="8" maxlength="10000" required placeholder="${isCase ? 'What happened, what you expected, and the steps to see it' : 'What you would like, who it helps, and how you would use it'}"></textarea></label>
-      ${isCase ? '<label class="f">Priority<select name="priority"><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option><option value="urgent">Urgent: work is blocked</option></select></label>' : ''}
-      <div class="flex"><button class="primary" type="submit">Submit</button><a class="btn ghost" href="#/help">Cancel</a><span class="err" id="help-err"></span></div></form>`;
-    $('#help-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      e.target.querySelector('button[type=submit]').disabled = true;
-      try {
-        const r = await api('/api/support', { method: 'POST', body: { kind: v, subject: fd.get('subject'), text: fd.get('text'), priority: fd.get('priority') || 'normal', page: document.referrer ? '' : location.hash } });
-        helpState.justRaised = r.request.id;
-        helpState.emailed = r.emailed;
-        go(`/help/${r.request.id}`);
-      } catch (error) {
-        $('#help-err').textContent = error.message;
-        e.target.querySelector('button[type=submit]').disabled = false;
-      }
-    };
-    return;
-  }
-  if (/^(SUP|ENH)-\d+$/i.test(v)) return helpRequest(v.toUpperCase());
-  box.innerHTML = '<div class="empty"><b>Get help</b>Raise a support case when something does not work, or request an enhancement for something new. Each gets a number, sent to you by email, and you can follow it here until it is done.</div>';
-}
-const helpNote = (emailed) => (emailed?.error ? `Saved, but an email could not be sent: ${esc(emailed.error)}` : emailed?.sent ? 'Saved, and emailed.' : 'Saved.');
-async function helpRequest(id) {
-  const box = $('#help-detail');
-  box.innerHTML = loading();
-  let res;
-  try {
-    res = await api(`/api/support/${encodeURIComponent(id)}`);
-  } catch (error) {
-    box.innerHTML = `<div class="empty"><b>${esc(error.message)}</b></div>`;
-    return;
-  }
-  const { request: r, team } = res;
-  const raised = helpState.justRaised === r.id;
-  const emailed = helpState.emailed;
-  helpState.justRaised = '';
-  box.innerHTML = `${raised ? `<div class="callout ok"><b>Thank you. Your number is ${esc(r.id)}.</b> ${r.kind === 'case' ? 'The support team has been told. You get an email with every answer.' : 'It is now in the list of enhancements. You get an email whenever its status changes.'}${emailed?.error ? `<br /><span class="bad-t">The email with your number could not be sent: ${esc(emailed.error)}</span>` : ''}</div>` : ''}
-    <div class="flex help-head"><b class="mono">${esc(r.id)}</b><span class="chip">${HELP_KIND[r.kind]}</span>${helpChip(r.status)}${r.priority ? `<span class="muted small">Priority: ${HELP_PRIORITY[r.priority] ?? esc(r.priority)}</span>` : ''}</div>
-    <h2 class="help-subject">${esc(r.subject)}</h2>
-    <p class="muted small">Raised by ${esc(r.requester.name || r.requester.email)} · ${esc(dateTime(r.createdAt))}${r.version ? ` · ${esc(r.version)}` : ''}</p>
-    <ol class="help-thread">${r.conversation.map((m) => `<li class="help-msg${m.team ? ' team' : ''}${m.mine ? ' mine' : ''}"><div class="help-msg-head"><b>${esc(m.name)}</b>${m.team ? '<span class="chip ok">Support team</span>' : ''}<span class="muted small">${esc(dateTime(m.at))}</span></div><div class="help-msg-text">${esc(m.text)}</div></li>`).join('')}</ol>
-    <form class="form help-reply" id="help-reply"><label class="f">${r.mine ? 'Add to your request' : 'Answer'}<textarea name="text" rows="4" maxlength="10000" required placeholder="${r.mine ? 'More detail, or an answer to the support team' : 'Your answer: it is emailed to the person who raised it'}"></textarea></label><div class="flex"><button class="primary" type="submit">Send</button></div></form>
-    ${team ? `<div class="flex help-set"><label class="f">Status<select id="help-status-set">${Object.entries(HELP_STATUS).map(([k, [l]]) => `<option value="${k}"${k === r.status ? ' selected' : ''}>${l}</option>`).join('')}</select></label><button type="button" id="help-status-go">Update status</button><span class="muted small">The person who raised it gets an email with the new status.</span></div>` : ''}
-    <p class="small" id="help-view-status"></p>
-    <details class="help-history"><summary>Status history</summary><ul>${r.history.map((h) => `<li>${helpChip(h.status)} ${esc(h.name)} · ${esc(dateTime(h.at))}</li>`).join('')}</ul></details>`;
-  $('#help-reply').onsubmit = async (e) => {
+  setKind(kind);
+  for (const b of $$('#hkind [data-k]')) b.onclick = () => setKind(b.dataset.k);
+  form.onsubmit = async (e) => {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
-    btn.disabled = true;
+    const send = form.querySelector('button[type=submit]');
+    send.disabled = true;
+    $('#hsay').textContent = 'Sending…';
     try {
-      const out = await api(`/api/support/${encodeURIComponent(r.id)}/messages`, { method: 'POST', body: { text: new FormData(e.target).get('text') } });
-      await helpRequest(r.id);
-      $('#help-view-status').innerHTML = helpNote(out.emailed);
+      const r = await api('/api/support', { method: 'POST', body: { kind: chosen, subject: form.elements.subject.value, text: form.elements.text.value, priority: form.elements.priority.value, page: document.referrer ? '' : location.hash } });
+      toast(r.emailed?.error ? `${r.request.id} is kept, but the email did not go: ${r.emailed.error}` : `${r.request.id} sent. The answer comes by email.`, r.emailed?.error ? 'bad' : 'ok');
+      await viewHelp(r.request.id);
     } catch (error) {
-      $('#help-view-status').textContent = error.message;
-      btn.disabled = false;
+      $('#hsay').textContent = error.message;
+      send.disabled = false;
     }
   };
-  if ($('#help-status-go')) $('#help-status-go').onclick = async () => {
+  // One sent before, opened in place: its own words.
+  const show = async (row) => {
+    const next = row.nextElementSibling;
+    if (next?.classList.contains('help-detail')) return next.remove();
+    for (const x of $$('#hrows .help-detail')) x.remove();
     try {
-      const out = await api(`/api/support/${encodeURIComponent(r.id)}/status`, { method: 'POST', body: { status: $('#help-status-set').value } });
-      await viewHelp(r.id);
-      $('#help-view-status').innerHTML = helpNote(out.emailed);
+      const { request } = await api(`/api/support/${encodeURIComponent(row.dataset.id)}`);
+      const tr = document.createElement('tr');
+      tr.className = 'help-detail';
+      tr.innerHTML = `<td colspan="${d.team ? 5 : 4}"><div class="help-text">${esc(request.conversation?.[0]?.text ?? '')}</div><span class="muted small">${esc(new Date(request.createdAt).toLocaleString())}${request.priority ? ` · ${esc(request.priority)}` : ''}${request.version ? ` · ${esc(request.version)}` : ''}${d.team ? ` · ${esc(request.requester.email)}` : ''}</span></td>`;
+      row.after(tr);
     } catch (error) {
-      $('#help-view-status').textContent = error.message;
+      toast(error.message, 'bad');
     }
   };
+  for (const row of $$('#hrows tr[data-id]')) row.onclick = () => show(row);
+  if (open) {
+    const row = $(`#hrows tr[data-id="${CSS.escape(open)}"]`);
+    if (row) show(row);
+  }
 }
 
 // ---- Your profile, as CxMissionZero has it: who you are here, and how the command center appears to you ---------------

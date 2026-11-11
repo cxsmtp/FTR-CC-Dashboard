@@ -141,7 +141,7 @@ export function supportEmail(ticket, { event, to, appName = 'FTR Credits Command
   const lines = {
     created: forTeam
       ? [`${ticket.requester.name || ticket.requester.email} raised ${kind.toLowerCase()} ${ticket.id}.`]
-      : [`Thank you: your ${kind.toLowerCase()} is ${ticket.id}. Keep this number to follow it.`, 'The support team has been told and will answer here.'],
+      : [`Thank you: your ${kind.toLowerCase()} is ${ticket.id}.`, 'The support team has it and will answer you by email.'],
     message: forTeam ? [`${ticket.requester.name || ticket.requester.email} wrote on ${ticket.id}.`] : [`The support team answered on ${ticket.id}.`],
     status: [`${ticket.id} is now: ${status}.`],
   }[event];
@@ -156,7 +156,7 @@ export function supportEmail(ticket, { event, to, appName = 'FTR Credits Command
     ...(forTeam && ticket.version ? [['Version', ticket.version]] : []),
     ...(forTeam && ticket.page ? [['Page', ticket.page]] : []),
   ];
-  const text = [...lines, '', ...facts.map(([k, v]) => `${k}: ${v}`), `Title: ${ticket.subject}`, ...(quoted ? ['', quoted] : []), ...(link ? ['', `Follow it, and answer, at ${link}`] : [])].join('\n');
+  const text = [...lines, '', ...facts.map(([k, v]) => `${k}: ${v}`), `Title: ${ticket.subject}`, ...(quoted ? ['', quoted] : []), ...(forTeam ? ['', `Reply to this email to answer ${ticket.requester.name || ticket.requester.email}.`] : link ? ['', `What you sent is kept at ${link}`] : [])].join('\n');
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const html = `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;font-size:14px;line-height:1.5">
 <div style="max-width:640px;margin:0 auto;padding:16px">
@@ -165,7 +165,7 @@ export function supportEmail(ticket, { event, to, appName = 'FTR Credits Command
 ${lines.map((l) => `<p style="margin:0 0 8px">${esc(l)}</p>`).join('')}
 <table role="presentation" style="border-collapse:collapse;margin:8px 0 12px;font-size:13px">${facts.map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#64748b">${esc(k)}</td><td style="padding:2px 0">${esc(v)}</td></tr>`).join('')}</table>
 ${quoted ? `<blockquote style="margin:0 0 12px;padding:8px 12px;border-left:3px solid #c7d2fe;background:#f8fafc;white-space:pre-wrap">${esc(quoted)}</blockquote>` : ''}
-${link ? `<p style="margin:0"><a href="${esc(link)}">Follow it, and answer, in ${esc(appName)}</a></p>` : ''}
+${forTeam ? `<p style="margin:0;color:#64748b">Reply to this email to answer ${esc(ticket.requester.name || ticket.requester.email)}.</p>` : link ? `<p style="margin:0"><a href="${esc(link)}">What you sent is kept in ${esc(appName)}</a></p>` : ''}
 </div></body></html>`;
   return { subject, text, html };
 }

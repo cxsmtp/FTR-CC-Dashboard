@@ -3269,7 +3269,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   const impact = () => impactSettings(c.open?.impact ?? {}, impactSettings(c.impactDefaults ?? {}));
   const IMPACT_FIELDS = {
     'calc-imp-triage': 'triageMinutes', 'calc-imp-fix': 'fixMinutes', 'calc-imp-review': 'reviewMinutes', 'calc-imp-rate': 'hourlyRate', 'calc-imp-price': 'creditPrice', 'calc-imp-currency': 'currency',
-    'calc-imp-lph': 'linesPerHour', 'calc-imp-reviewers': 'reviewers', 'calc-imp-later': 'laterFixMultiplier', 'calc-imp-arr': 'arr', 'calc-imp-arrpct': 'breachArrPercent', 'calc-imp-breaches': 'breachesAvoided',
+    'calc-imp-lph': 'linesPerHour', 'calc-imp-reviewers': 'reviewers', 'calc-imp-later': 'laterFixMultiplier',
   };
 
   function fillImpact() {
@@ -3279,7 +3279,6 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       if (key === 'currency' && ![...$(id).options].some((o) => o.value === v)) $(id).add(new Option(v, v));
       $(id).value = key === 'currency' ? v : key === 'hourlyRate' || key === 'creditPrice' ? (v || '') : v;
     }
-    $('calc-imp-count').checked = s.countBreach;
     $('calc-imp-fusion-on').checked = s.countFusion;
   }
 
@@ -3377,12 +3376,6 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     if (!c.open) return;
     c.open.impact = impactSettings({ ...impact(), countFusion: event.target.checked }, impact());
     if (event.target.checked) $('calc-imp-fusion-box').open = true;
-    renderImpact();
-    save({ impact: c.open.impact });
-  });
-  $('calc-imp-count').addEventListener('change', (event) => {
-    if (!c.open) return;
-    c.open.impact = impactSettings({ ...impact(), countBreach: event.target.checked }, impact());
     renderImpact();
     save({ impact: c.open.impact });
   });
@@ -3516,51 +3509,6 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
    * One click: read Checkmarx One first when nothing is read yet (or follow the read running), then
    * make the report with every default in place. Returns the report and its file, or null.
    */
-  /**
-   * With Impact on, before each report: add the breach cost (beta)? Off unless chosen; asks the customer's ARR, the
-   * share of it a breach costs (10%) and the breaches avoided. Resolves false only when the person cancels.
-   */
-  function askBreach() {
-    return new Promise((resolve) => {
-      const s = impact();
-      const d = document.createElement('dialog');
-      d.className = 'notice-dialog calc-breach-dialog';
-      d.innerHTML = `<form method="dialog">
-        <h2>Add the breach cost to the report? <i class="hc-beta">beta</i></h2>
-        <p class="hint">For projection only, and being refined on feedback: the breaches Fusion helps avoid, each costing a share of the customer’s annual revenue. It is marked <b>beta</b> in the report and its PDF, and left out unless you add it.</p>
-        <div class="calc-terms">
-          <label class="field"><span>Customer’s annual revenue (ARR, ${esc(s.currency)})</span><input type="number" name="arr" min="0" step="1000000" value="${s.arr || ''}" placeholder="e.g. 250000000" /></label>
-          <label class="field"><span>A breach costs (% of ARR)</span><input type="number" name="pct" min="0" max="100" step="0.5" value="${s.breachArrPercent}" /></label>
-          <label class="field"><span>Breaches avoided</span><input type="number" name="n" min="0" step="1" value="${s.breachesAvoided}" /></label>
-        </div>
-        <p class="status" data-breach-status aria-live="polite"></p>
-        <div class="hc-dialog-actions"><button value="cancel" class="ghost" formnovalidate>Cancel</button><button value="no" class="secondary" formnovalidate>Leave it out</button><button value="yes" class="primary">Add it, marked beta</button></div>
-      </form>`;
-      document.body.append(d);
-      const form = d.querySelector('form');
-      form.addEventListener('submit', (event) => {
-        if (event.submitter?.value !== 'yes') return;
-        if (!(Number(form.arr.value) > 0)) {
-          event.preventDefault();
-          d.querySelector('[data-breach-status]').textContent = 'Give the customer’s annual revenue, or leave the breach cost out.';
-          form.arr.focus();
-        }
-      });
-      d.addEventListener('close', () => {
-        const answer = d.returnValue;
-        d.remove();
-        if (answer !== 'yes' && answer !== 'no') return resolve(false);
-        const on = answer === 'yes';
-        const next = on ? { countBreach: true, countFusion: true, arr: form.arr.value, breachArrPercent: form.pct.value, breachesAvoided: form.n.value } : { countBreach: false };
-        c.open.impact = impactSettings({ ...impact(), ...next }, impact());
-        fillImpact();
-        renderImpact();
-        save({ impact: c.open.impact });
-        resolve(true);
-      });
-      d.showModal();
-    });
-  }
 
   async function generate({ download: save = true } = {}) {
     if (!c.open) return null;
@@ -3572,7 +3520,6 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       await done;
       await flush();
     }
-    if (impactOn() && !(await askBreach())) return null;
     const data = reportData();
     if (!data.tr && !data.fusion) {
       toast(offline() ? 'Nothing to report yet: drop the two Checkmarx One exports below (or load the sample data), or add Fusion projects first.' : 'Nothing to report yet: read Checkmarx One (or use the two exports), or add Fusion projects first.', 'warn');

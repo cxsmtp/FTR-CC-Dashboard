@@ -1108,7 +1108,6 @@ export function impactSettings(value = {}, base = IMPACT_DEFAULTS) {
     return v === null ? clamp(Number(base?.[key] ?? IMPACT_DEFAULTS[key]) || 0, 0, max) : clamp(v, 0, max);
   };
   const currency = String(value?.currency || base?.currency || IMPACT_DEFAULTS.currency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'USD';
-  const count = value?.countBreach ?? base?.countBreach ?? IMPACT_DEFAULTS.countBreach;
   const fusionOn = value?.countFusion ?? base?.countFusion ?? IMPACT_DEFAULTS.countFusion;
   return {
     triageMinutes: pick('triageMinutes', 600),
@@ -1122,7 +1121,9 @@ export function impactSettings(value = {}, base = IMPACT_DEFAULTS) {
     laterFixMultiplier: Math.max(1, pick('laterFixMultiplier', 1000)),
     breachChancePercent: pick('breachChancePercent', 100),
     breachCost: pick('breachCost', 1e11),
-    countBreach: count === true || count === 'true',
+    // The breach cost is no longer part of Impact (a share of revenue is not a figure to put in front of a customer):
+    // never counted, whatever an account saved before asked for.
+    countBreach: false,
     countFusion: fusionOn === true || fusionOn === 'true',
     arr: pick('arr', 1e13),
     breachArrPercent: pick('breachArrPercent', 100),

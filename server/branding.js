@@ -15,7 +15,9 @@ import { privateAddress } from './calculator.js';
 import { fail } from './store.js';
 
 export const MAX_IMAGE = 200 * 1024;
-export const LOOKS = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite', 'command'];
+// Two looks: the standard one and the Command Center. (Five others were offered before CC-01.57; one kept from then
+// shows as the standard look.)
+export const LOOKS = ['aurora', 'command'];
 const TYPES = { png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', webp: 'image/webp' };
 export const DEFAULT_BRANDING = { appName: 'FTR Credits', tagline: 'Command Center', accent: '', letChoose: true, menu: 'left', logo: null, icon: null };
 
