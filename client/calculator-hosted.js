@@ -53,6 +53,12 @@ const fail = (status, message) => Object.assign(new Error(message), { status });
  * A Salesforce link, read as the server reads it (server/accounts.js checkSalesforceUrl): https, an opportunity (006)
  * or an account (001) whose object in a Lightning link agrees, and an 18-character id whose last three letters check.
  */
+/** Email addresses typed for "shared with": one or more; null when one is not an address. */
+function emailList(value) {
+  const list = String(value ?? '').split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  return list.length && list.every((e) => /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[a-z]{2,}$/i.test(e)) ? list : null;
+}
+
 function sfRead(value) {
   const text = String(value ?? '').trim();
   if (!text) return { error: 'Paste the opportunity or account link from Salesforce.' };
@@ -290,7 +296,7 @@ export async function startHosted() {
       if (work) busy.end(work);
     }
     if (url.pathname === '/api/projections/reports' && method === 'GET') {
-      for (const r of answer?.reports ?? []) sharedOf.set(r.id, { sharedAt: r.sharedAt ?? null, by: r.sharedNote ?? '' });
+      for (const r of answer?.reports ?? []) sharedOf.set(r.id, { sharedAt: r.sharedAt ?? null, with: r.sharedWith ?? [] });
       setTimeout(decorateReports, 0);
     }
     if (url.pathname === '/api/projections/read') busy.read(answer);
@@ -337,7 +343,7 @@ export async function startHosted() {
       const s = sharedOf.get(tr.dataset.report);
       const can = perms.has('reports.share');
       cell.innerHTML = s?.sharedAt
-        ? `<span class="hc-pill ok">✓ ${esc(new Date(s.sharedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}</span>${can ? ' <button type="button" class="link" data-unshare>Undo</button>' : ''}`
+        ? `<span class="hc-pill ok" title="${esc((s.with ?? []).join(', '))}">✓ ${esc(new Date(s.sharedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}${s.with?.length ? ` · ${esc(s.with[0])}${s.with.length > 1 ? ` +${s.with.length - 1}` : ''}` : ''}</span>${can ? ' <button type="button" class="link" data-unshare>Undo</button>' : ''}`
         : can ? '<button type="button" class="secondary sm" data-mark-shared title="Mark this report shared with the customer">Mark</button>' : '<span class="hc-pill">Not yet</span>';
     }
   }
@@ -347,14 +353,30 @@ export async function startHosted() {
     const id = b.closest('tr[data-report]')?.dataset.report;
     if (!id) return;
     const sharing = b.hasAttribute('data-mark-shared');
-    const note = sharing ? window.prompt('Shared with the customer: how and to whom? (optional)', '') : '';
-    if (note === null) return;
+    if (sharing && !b.closest('.hc-share-in')) {
+      // With whom, typed in the cell itself.
+      const cell = b.closest('td');
+      cell.innerHTML = '<span class="hc-share-in"><input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="name@customer.com" aria-label="Email address of whom it was shared with" /><button type="button" class="secondary sm" data-mark-shared>✓</button><button type="button" class="link" data-share-cancel>✕</button></span>';
+      const input = cell.querySelector('input');
+      input.focus();
+      input.onkeydown = (e) => (e.key === 'Enter' ? (e.preventDefault(), cell.querySelector('[data-mark-shared]').click()) : e.key === 'Escape' && decorateReports());
+      cell.querySelector('[data-share-cancel]').onclick = () => decorateReports();
+      return;
+    }
+    const who = sharing ? emailList(b.closest('td').querySelector('input')?.value) : [];
+    if (sharing && !who) {
+      const input = b.closest('td').querySelector('input');
+      input.setCustomValidity('Type the email address of whom it was shared with.');
+      input.reportValidity();
+      input.oninput = () => input.setCustomValidity('');
+      return;
+    }
     try {
-      await server(`/api/cc/reports/${encodeURIComponent(id)}/shared`, { method: 'POST', body: { shared: sharing, note } });
-      sharedOf.set(id, { sharedAt: sharing ? new Date().toISOString() : null });
+      await server(`/api/cc/reports/${encodeURIComponent(id)}/shared`, { method: 'POST', body: sharing ? { shared: true, sharedWith: who.join(', ') } : { shared: false } });
+      sharedOf.set(id, { sharedAt: sharing ? new Date().toISOString() : null, with: who });
       decorateReports();
       refreshAccountSoon();
-      toast(sharing ? 'Marked shared with the customer.' : 'No longer marked shared.', 'ok');
+      toast(sharing ? `Marked shared with ${who.join(', ')}.` : 'No longer marked shared.', 'ok');
     } catch (error) {
       toast(error.message, 'bad');
     }
@@ -423,7 +445,7 @@ export async function startHosted() {
       const box = document.createElement('div');
       box.className = 'hc-share';
       box.innerHTML = `<p class="hc-share-q">Shared with the customer?</p>
-        <input type="text" id="hc-share-note" maxlength="300" placeholder="How and to whom (optional): emailed to the CISO, shown in the QBR…" />
+        <input type="text" id="hc-share-note" inputmode="email" autocomplete="off" spellcheck="false" placeholder="Shared with: name@customer.com (more with a comma)" aria-label="Email address of whom it was shared with" />
         <label class="hc-share-primary"><input type="checkbox" id="hc-share-primary" checked /> Make it the account’s primary report</label>
         <div class="hc-share-acts"><button type="button" class="primary" data-share="yes">✓ Shared with the customer</button><button type="button" class="ghost" data-share="no">Not yet</button></div>
         <p class="hc-share-hint">Not yet? Mark it later in <b>Generated reports</b> or on the account page.</p>`;
@@ -433,13 +455,21 @@ export async function startHosted() {
       box.addEventListener('click', async (event) => {
         const b = event.target.closest('[data-share]');
         if (!b) return;
+        const who = emailList(box.querySelector('#hc-share-note').value);
+        if (b.dataset.share === 'yes' && !who) {
+          const input = box.querySelector('#hc-share-note');
+          input.setCustomValidity('Type the email address of whom it was shared with.');
+          input.reportValidity();
+          input.oninput = () => input.setCustomValidity('');
+          return;
+        }
         box.querySelectorAll('button').forEach((x) => (x.disabled = true));
         try {
           if (box.querySelector('#hc-share-primary').checked) await server(`/api/cc/reports/${encodeURIComponent(report.id)}/primary`, { method: 'POST', body: { primary: true } });
           if (b.dataset.share === 'yes') {
-            await server(`/api/cc/reports/${encodeURIComponent(report.id)}/shared`, { method: 'POST', body: { shared: true, note: box.querySelector('#hc-share-note').value } });
-            sharedOf.set(report.id, { sharedAt: new Date().toISOString() });
-            toast('Marked shared with the customer.', 'ok');
+            await server(`/api/cc/reports/${encodeURIComponent(report.id)}/shared`, { method: 'POST', body: { shared: true, sharedWith: who.join(', ') } });
+            sharedOf.set(report.id, { sharedAt: new Date().toISOString(), with: who });
+            toast(`Marked shared with ${who.join(', ')}.`, 'ok');
           }
           decorateReports();
           refreshAccountSoon();

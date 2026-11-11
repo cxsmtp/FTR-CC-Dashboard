@@ -78,9 +78,11 @@ test('a report needs the Salesforce link; the latest is primary until one is mar
   acct = (await se1.get(`/api/cc/accounts/${id}`)).data.account;
   assert.equal(acct.primary.id, r1.data.report.id);
   assert.equal(acct.primary.how, 'marked');
-  // Shared with the customer, with a note.
-  const shared = await se1.post(`/api/cc/reports/${r1.data.report.id}/shared`, { shared: true, note: 'Emailed to the CISO' });
-  assert.equal(shared.data.reports.find((r) => r.id === r1.data.report.id).sharedNote, 'Emailed to the CISO');
+  // Shared with the customer: with whom, as email addresses (required, each checked).
+  assert.equal((await se1.post(`/api/cc/reports/${r1.data.report.id}/shared`, { shared: true })).status, 400);
+  assert.equal((await se1.post(`/api/cc/reports/${r1.data.report.id}/shared`, { shared: true, sharedWith: 'the ciso' })).status, 400);
+  const shared = await se1.post(`/api/cc/reports/${r1.data.report.id}/shared`, { shared: true, sharedWith: 'CISO@Customer.example, cto@customer.example' });
+  assert.deepEqual(shared.data.reports.find((r) => r.id === r1.data.report.id).sharedWith, ['ciso@customer.example', 'cto@customer.example']);
 });
 
 test('deleting reports: your own unshared ones, or with the permission', async () => {
@@ -93,7 +95,7 @@ test('deleting reports: your own unshared ones, or with the permission', async (
   const mine = (await se1.post('/api/projections/reports', { customerId: data.customer.id, data: reportData() }, h)).data.report.id;
   const other = (await se1.post('/api/projections/reports', { customerId: data.customer.id, data: reportData() }, h)).data.report.id;
   assert.equal((await se2.del(`/api/cc/reports/${mine}`)).status, 403);
-  await se1.post(`/api/cc/reports/${other}/shared`, { shared: true });
+  await se1.post(`/api/cc/reports/${other}/shared`, { shared: true, sharedWith: 'buyer@customer.example' });
   assert.equal((await se1.del(`/api/cc/reports/${other}`)).status, 403);
   assert.equal((await se1.del(`/api/cc/reports/${mine}`)).status, 200);
   assert.equal((await lead.del(`/api/cc/reports/${other}`)).status, 200);

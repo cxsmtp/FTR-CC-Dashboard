@@ -950,6 +950,50 @@ const soldCell = (a) => {
 };
 
 // ---- Accounts --------------------------------------------------------------------------------------------
+/** Email addresses typed for "shared with": one or more, comma or space between; null when one is not an address. */
+function emailList(value) {
+  const list = String(value ?? '').split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  return list.length && list.every((e) => /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[a-z]{2,}$/i.test(e)) ? list : null;
+}
+/** Who it went to, for a table cell. */
+const sharedTo = (r) => (r?.sharedWith?.length ? r.sharedWith.join(', ') : r?.sharedNote || '');
+/**
+ * Shared with the customer, typed where the click was: the email address(es) of whom it was shared with, then ✓.
+ * Enter saves, Esc puts the place back. `onDone` runs once it is saved.
+ */
+function shareInline(host, reportId, { onDone, onCancel } = {}) {
+  const before = host.innerHTML;
+  host.innerHTML = `<span class="cell-edit share-inline"><input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="Shared with: name@customer.com" aria-label="Email address of whom it was shared with" /><button type="button" class="sm primary" data-ok>✓ Shared</button><button type="button" class="sm ghost" data-x title="Cancel">✕</button></span>`;
+  const input = host.querySelector('input');
+  input.focus();
+  input.oninput = () => input.setCustomValidity(input.value.trim() && !emailList(input.value) ? 'Type the email address(es) of whom it was shared with.' : '');
+  const cancel = () => {
+    host.innerHTML = before;
+    onCancel?.();
+  };
+  const save = async () => {
+    const emails = emailList(input.value);
+    if (!emails) {
+      input.setCustomValidity('Type the email address(es) of whom it was shared with.');
+      input.reportValidity();
+      return;
+    }
+    host.querySelectorAll('button').forEach((b) => (b.disabled = true));
+    try {
+      await api(`/api/cc/reports/${encodeURIComponent(reportId)}/shared`, { method: 'POST', body: { shared: true, sharedWith: emails.join(', ') } });
+      toast(`Marked shared with ${emails.join(', ')}.`, 'ok');
+      onDone?.();
+    } catch (error) {
+      toast(error.message, 'bad');
+      host.querySelectorAll('button').forEach((b) => (b.disabled = false));
+    }
+  };
+  host.querySelector('[data-ok]').onclick = (e) => (e.stopPropagation(), save());
+  host.querySelector('[data-x]').onclick = (e) => (e.stopPropagation(), cancel());
+  input.onkeydown = (e) => (e.key === 'Enter' ? (e.preventDefault(), save()) : e.key === 'Escape' && cancel());
+  host.onclick = (e) => e.stopPropagation();
+}
+
 async function viewAccounts(params) {
   const focus = params.get('team') ?? '';
   shell('accounts', loading());
@@ -996,7 +1040,7 @@ async function viewAccounts(params) {
         <td class="num" data-edit="sold" title="Double-click to record a sale">${soldCell(a)}</td>
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td class="num">${num(a.reportCount)}</td>
-        <td data-edit="shared" title="Double-click: the primary report shared with the customer, or not">${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
+        <td data-edit="shared" title="Double-click: the primary report shared with the customer (to whom), or not">${a.sharedCount ? `<span class="chip ok"><i></i>${num(a.sharedCount)} shared</span>${a.primary?.sharedWith?.length ? `<span class="sub">${esc(a.primary.sharedWith.join(', '))}</span>` : ''}` : a.reportCount ? '<span class="chip warn"><i></i>Not shared</span>' : '<span class="chip"><i></i>—</span>'}</td>
         <td>${esc(ago(a.lastReportAt))}</td></tr>`).join('')
       : '<tr><td colspan="11"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>';
     // One click opens the account; a double-click edits the cell (the click waits a moment to tell them apart).
@@ -1081,12 +1125,10 @@ async function viewAccounts(params) {
       // In the cell itself, as the name is: how and to whom, then ✓; or, when shared, undo it.
       const shared = Boolean(a.primary.sharedAt);
       const url = `/api/cc/reports/${encodeURIComponent(a.primary.id)}/shared`;
-      cell.innerHTML = shared
-        ? `<div class="cell-edit share-inline"><span class="muted small">Shared ${esc(date(a.primary.sharedAt))}</span><button type="button" class="sm" data-ok>Not shared</button><button type="button" class="sm ghost" data-x>✕</button></div>`
-        : `<div class="cell-edit share-inline"><input maxlength="300" placeholder="How and to whom (optional)" aria-label="How and to whom was the primary report shared" /><button type="button" class="sm primary" data-ok>✓ Shared</button><button type="button" class="sm ghost" data-x>✕</button></div>`;
-      const note = cell.querySelector('input');
-      (note ?? cell.querySelector('[data-ok]')).focus();
-      const save = () => done(() => api(url, { method: 'POST', body: shared ? { shared: false } : { shared: true, note: note.value } }), shared ? 'No longer marked shared.' : 'Marked shared with the customer.');
+      if (!shared) return shareInline(cell, a.primary.id, { onDone: reload });
+      cell.innerHTML = `<div class="cell-edit share-inline"><span class="muted small">Shared ${esc(date(a.primary.sharedAt))}${a.primary.sharedWith?.length ? ` with ${esc(a.primary.sharedWith.join(', '))}` : ''}</span><button type="button" class="sm" data-ok>Not shared</button><button type="button" class="sm ghost" data-x>✕</button></div>`;
+      cell.querySelector('[data-ok]').focus();
+      const save = () => done(() => api(url, { method: 'POST', body: { shared: false } }), 'No longer marked shared.');
       cell.querySelector('[data-ok]').onclick = save;
       cell.querySelector('[data-x]').onclick = restore;
       cell.onkeydown = (e) => (e.key === 'Enter' ? save() : e.key === 'Escape' && restore());
@@ -1122,7 +1164,7 @@ async function viewAccount(id) {
     ${a.salesforceUrl ? '' : `<div class="callout warn">This account has no Salesforce opportunity or account link: no report can be generated until it is given.${d.can.edit ? ' Add it under Account details.' : ''}</div>`}
     <div class="acct-strip mt">
       <div class="as-main"><small>Primary report · ${p ? (p.how === 'marked' ? 'marked' : 'the latest (none marked)') : 'none yet'}</small>${p ? `<span class="credits big serif" id="bigc"></span><span class="sub">T&amp;R ${num(Math.round(p.trCredits ?? 0))} · Fusion ${num(Math.round(p.fusionCredits ?? 0))}${p.extraPercent ? ` · +${num(p.extraPercent, 1)}%` : ''}${p.bundles ? ` · ${num(p.bundles)} bundle${p.bundles === 1 ? '' : 's'}` : ''} · ${esc(date(p.createdAt))} by ${esc(p.createdBy)}</span>` : `<b>—</b><span class="sub">Open the account in the calculator and generate one.</span>`}</div>
-      <div><small>Shared with the customer</small>${p ? (p.sharedAt ? `<b class="ok-t">✓ ${esc(date(p.sharedAt))}</b>` : `<b class="warn-t">Not yet</b>${d.can.share ? `<button class="sm" id="share-primary">${icon('send')}Mark shared</button>` : ''}`) : '<b>—</b>'}</div>
+      <div><small>Shared with the customer</small>${p ? (p.sharedAt ? `<b class="ok-t">✓ ${esc(date(p.sharedAt))}</b>${p.sharedWith?.length ? `<span class="sub">with ${esc(p.sharedWith.join(', '))}</span>` : ''}` : `<b class="warn-t">Not yet</b>${d.can.share ? `<button class="sm" id="share-primary">${icon('send')}Mark shared</button>` : ''}`) : '<b>—</b>'}</div>
       <div><small>Sold</small><b class="sold-t">${num(a.sold)}</b><span class="sub">${p ? `${Math.min(100, Math.round((a.sold / Math.max(1, p.totalCredits)) * 100))}% of the projection` : ''}</span></div>
       <div><small>Still needed</small><b>${a.remaining === null ? '—' : num(a.remaining)}</b></div>
       <div><small>Reports</small><b>${num(a.reportCount)}</b><span class="sub">${num(a.sharedCount)} shared</span></div>
@@ -1143,22 +1185,12 @@ async function viewAccount(id) {
     <div class="panel mt"><h2>Reports <small>download them from the calculator's Saved reports list</small>${d.can.edit ? `<label class="btn sm file-btn">⇪ Upload the customer's version<input type="file" id="cv-file" accept=".html,.htm,text/html" hidden /></label>` : ''}</h2>
       ${d.reports.length ? `<div class="tw"><table><thead><tr><th></th><th>Made</th><th>By</th><th class="num">T&amp;R</th><th class="num">Fusion</th><th class="num">Total</th><th>Shared with customer</th><th></th></tr></thead><tbody>${d.reports.map((r) => {
         const primary = a.primary?.id === r.id;
-        return `<tr data-id="${esc(r.id)}"><td>${primary ? `<span class="chip star">${icon('star')}${a.primary.how === 'marked' ? 'Primary' : 'Latest'}</span>` : ''}${r.source === 'customer' ? `<span class="chip sf" title="${esc(r.changes.join('\n') || 'No changes')}">Customer's version</span><span class="sub">${r.sentTotal ? `${r.totalCredits - r.sentTotal > 0 ? '+' : ''}${num(Math.round(r.totalCredits - r.sentTotal))} vs sent` : ''}${r.changes.length ? ` · ${num(r.changes.length)} change${r.changes.length === 1 ? '' : 's'}` : ''}</span>` : ''}</td><td>${esc(dateTime(r.createdAt))}</td><td>${esc(r.createdBy)}</td><td class="num">${num(Math.round(r.trCredits ?? 0))}</td><td class="num">${num(Math.round(r.fusionCredits ?? 0))}</td><td class="num credits">${num(Math.round(r.totalCredits))}</td><td>${r.sharedAt ? `<span class="chip ok"><i></i>${esc(date(r.sharedAt))}</span><span class="sub">${esc(r.sharedByName)}${r.sharedNote ? ` · ${esc(r.sharedNote)}` : ''}</span>` : '<span class="muted">—</span>'}</td>
+        return `<tr data-id="${esc(r.id)}"><td>${primary ? `<span class="chip star">${icon('star')}${a.primary.how === 'marked' ? 'Primary' : 'Latest'}</span>` : ''}${r.source === 'customer' ? `<span class="chip sf" title="${esc(r.changes.join('\n') || 'No changes')}">Customer's version</span><span class="sub">${r.sentTotal ? `${r.totalCredits - r.sentTotal > 0 ? '+' : ''}${num(Math.round(r.totalCredits - r.sentTotal))} vs sent` : ''}${r.changes.length ? ` · ${num(r.changes.length)} change${r.changes.length === 1 ? '' : 's'}` : ''}</span>` : ''}</td><td>${esc(dateTime(r.createdAt))}</td><td>${esc(r.createdBy)}</td><td class="num">${num(Math.round(r.trCredits ?? 0))}</td><td class="num">${num(Math.round(r.fusionCredits ?? 0))}</td><td class="num credits">${num(Math.round(r.totalCredits))}</td><td class="shared-cell">${r.sharedAt ? `<span class="chip ok"><i></i>${esc(date(r.sharedAt))}</span><span class="sub">${sharedTo(r) ? `with ${esc(sharedTo(r))} · ` : ''}by ${esc(r.sharedByName)}</span>` : '<span class="muted">—</span>'}</td>
         <td class="actions">${d.can.share ? `${a.primaryReportId === r.id ? '<button class="sm ghost" data-act="unprimary">Unmark primary</button>' : `<button class="sm" data-act="primary">${icon('star')}Make primary</button>`}${r.sharedAt ? '<button class="sm ghost" data-act="unshare">Unmark shared</button>' : `<button class="sm" data-act="share">${icon('send')}Mark shared</button>`}` : ''}${d.can.sell ? `<button class="sm ghost" data-sell="${esc(r.id)}" title="Record credits sold against this report">Sold…</button>` : ''}<button class="sm ghost icon" data-act="delete" title="Delete report">${icon('trash')}</button></td></tr>`;
       }).join('')}</tbody></table></div>` : '<div class="empty"><b>No reports yet</b></div>'}
     </div>`;
   if (p) countUp($('#bigc'), Math.round(p.totalCredits), ' credits');
-  if ($('#share-primary')) $('#share-primary').onclick = async () => {
-    const note = await ask('Mark shared with the customer', 'How and to whom was it shared? (optional) For example: emailed to the CISO, 12 Nov.');
-    if (note === null) return;
-    try {
-      await api(`/api/cc/reports/${encodeURIComponent(p.id)}/shared`, { method: 'POST', body: { shared: true, note } });
-      toast('Marked shared with the customer.', 'ok');
-      viewAccount(a.id);
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  };
+  if ($('#share-primary')) $('#share-primary').onclick = () => shareInline($('#share-primary').parentElement, p.id, { onDone: () => viewAccount(a.id) });
   wireSales(a, d);
   if ($('#forget-key')) $('#forget-key').onclick = async (e) => {
     e.preventDefault();
@@ -1196,11 +1228,7 @@ async function viewAccount(id) {
     const act = b.dataset.act;
     try {
       if (act === 'primary' || act === 'unprimary') await api(`/api/cc/reports/${encodeURIComponent(rid)}/primary`, { method: 'POST', body: { primary: act === 'primary' } });
-      if (act === 'share') {
-        const note = await ask('Mark shared with the customer', 'How and to whom was it shared? (optional) For example: emailed to the CISO, 12 Nov.');
-        if (note === null) return;
-        await api(`/api/cc/reports/${encodeURIComponent(rid)}/shared`, { method: 'POST', body: { shared: true, note } });
-      }
+      if (act === 'share') return shareInline(b.closest('tr').querySelector('.shared-cell'), rid, { onDone: () => viewAccount(a.id) });
       if (act === 'unshare') await api(`/api/cc/reports/${encodeURIComponent(rid)}/shared`, { method: 'POST', body: { shared: false } });
       if (act === 'delete') {
         if (!confirm('Delete this report? This cannot be undone.')) return;

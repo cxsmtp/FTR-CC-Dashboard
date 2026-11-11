@@ -650,7 +650,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         salesCount: a.salesCount ?? 0,
         lastSaleAt: a.lastSaleAt ?? null,
         remaining: p ? Math.max(0, Math.round((Number(p.totalCredits) || 0) - (a.soldCredits ?? 0))) : null,
-        primary: p ? { id: p.id, how, createdAt: p.createdAt, createdBy: p.createdBy, createdById: p.createdById, trCredits: p.trCredits, fusionCredits: p.fusionCredits, totalCredits: p.totalCredits, bundles: p.bundles, sharedAt: p.sharedAt } : null,
+        primary: p ? { id: p.id, how, createdAt: p.createdAt, createdBy: p.createdBy, createdById: p.createdById, trCredits: p.trCredits, fusionCredits: p.fusionCredits, totalCredits: p.totalCredits, bundles: p.bundles, sharedAt: p.sharedAt, sharedWith: p.sharedWith ?? [] } : null,
       };
     });
     return { teamIds, accounts: out, reports };
@@ -777,8 +777,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return accountDetail(ctx, rep.customerId);
   });
   r('POST', '/api/cc/reports/:id/shared', perm('reports.share'), (req, ctx, body, res, url, params) => {
-    const rep = accounts.markShared(params.id, ctx.scope, { shared: body?.shared !== false, note: body?.note }, ctx.user);
-    record(ctx, req, rep.sharedAt ? 'report.shared' : 'report.unshared', rep.customer, { id: rep.id, note: rep.sharedNote });
+    const rep = accounts.markShared(params.id, ctx.scope, { shared: body?.shared !== false, note: body?.note, sharedWith: body?.sharedWith }, ctx.user);
+    record(ctx, req, rep.sharedAt ? 'report.shared' : 'report.unshared', rep.customer, { id: rep.id, sharedWith: rep.sharedWith, note: rep.sharedNote });
     return accountDetail(ctx, rep.customerId);
   });
   const deleteReport = (req, ctx, id, teamIds) => {
@@ -1722,6 +1722,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (body?.dryRun !== false) return { dryRun: true, ...preview };
     if (!sameName && body?.confirm !== true) throw fail(409, `This report was made for "${figures.customer}", not ${account.name}. Confirm to record it here anyway.`);
     const rep = accounts.addCustomerReport({ customerId: account.id, data: figures.data, user: ctx.user, note: body?.note, sentTotal: figures.sentTotal, changes }, ctx.scope);
+    // The customer's own version came from them: shared by nature, and so was the report they had been sent.
+    accounts.markShared(rep.id, ctx.scope, { shared: true, fromCustomer: true, note: 'The customer’s own version, sent back by them' }, ctx.user);
+    const sent = accounts.reportsOf(ctx.scope, account.id).find((r) => r.source !== 'customer' && r.id !== rep.id && Number.isFinite(figures.sentTotal) && Math.round(r.totalCredits) === Math.round(figures.sentTotal));
+    if (sent && !sent.sharedAt) accounts.markShared(sent.id, ctx.scope, { shared: true, fromCustomer: true, note: 'The customer sent back their version of it' }, ctx.user);
     if (body?.makePrimary !== false) accounts.setPrimary(account.id, rep.id, ctx.scope);
     if (body?.applyPreferences !== false) accounts.update(account.id, ctx.scope, preferencesPatch(account, live.inputs), ctx.user);
     record(ctx, req, 'report.customerVersion', account.name, { id: rep.id, total: rep.totalCredits, sentTotal: figures.sentTotal, changes: changes.length, primary: body?.makePrimary !== false, preferences: body?.applyPreferences !== false });

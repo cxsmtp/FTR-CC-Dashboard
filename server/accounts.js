@@ -27,6 +27,13 @@ export const DEFAULT_SALESFORCE_HOSTS = ['salesforce.com', 'force.com'];
  * the record's id in it (001… account, 006… opportunity). Returns { url, kind, recordId } or throws.
  */
 /** The three letters Salesforce adds to a 15-character id (its case, in code): an 18-character id must end in them. */
+/** The addresses a report was shared with: one or more emails (comma, semicolon or space between); a wrong one is refused. */
+export function sharedEmails(value) {
+  const list = (Array.isArray(value) ? value : String(value ?? '').split(/[\s,;]+/)).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+  for (const e of list) if (e.length > 254 || !/^[^\s@<>()",;]+@[^\s@<>()",;]+\.[a-z]{2,}$/i.test(e)) throw fail(400, `${e} is not an email address.`);
+  return [...new Set(list)].slice(0, 10);
+}
+
 export function sfChecksum(id15) {
   const map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
   let out = '';
@@ -91,6 +98,7 @@ const reportIndex = (r) => ({
   sharedAt: r.sharedAt ?? null,
   sharedById: r.sharedById ?? null,
   sharedNote: r.sharedNote ?? '',
+  sharedWith: Array.isArray(r.sharedWith) ? r.sharedWith : [],
   source: r.source ?? 'calculator',
   sentTotal: r.sentTotal ?? null,
   changes: r.changes ?? [],
@@ -244,10 +252,17 @@ export class Accounts {
     Object.assign(report, { teamId: account.teamId, createdById: user.id, ownerId: account.ownerId, salesforceUrl: account.salesforceUrl, salesforceKind: account.salesforceKind, sharedAt: null, sharedById: null, sharedNote: '' });
     return this.reports.put(report);
   }
-  markShared(id, teamIds, { shared, note = '' }, user) {
+  /**
+   * Shared with the customer: with whom (their email addresses, required), or not any more. `fromCustomer`: the
+   * customer sent it back themselves (their own version), so no address is asked.
+   */
+  markShared(id, teamIds, { shared, note = '', sharedWith = '', fromCustomer = false }, user) {
     const report = this.report(id, teamIds);
-    if (shared) Object.assign(report, { sharedAt: new Date().toISOString(), sharedById: user.id, sharedNote: String(note ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300) });
-    else Object.assign(report, { sharedAt: null, sharedById: null, sharedNote: '' });
+    if (shared) {
+      const emails = sharedEmails(sharedWith);
+      if (!emails.length && !fromCustomer) throw fail(400, 'Give the email address of whom it was shared with.');
+      Object.assign(report, { sharedAt: new Date().toISOString(), sharedById: user.id, sharedWith: emails, sharedNote: String(note ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300) });
+    } else Object.assign(report, { sharedAt: null, sharedById: null, sharedWith: [], sharedNote: '' });
     return this.reports.put(report);
   }
   setPrimary(customerId, reportId, teamIds) {

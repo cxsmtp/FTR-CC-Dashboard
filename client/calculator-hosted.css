@@ -553,3 +553,6 @@ html[data-cc][data-ui] button.hc-3d {
 /* Customer Success: the SE to choose before anything is generated */
 .hc-owner.need-se select { border-color: var(--amber) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent) !important; }
 .hc-owner.need-se > span::after { content: " · choose one"; color: var(--amber); font-weight: 700; }
+
+.hc-share-in { display: inline-flex; gap: 4px; align-items: center; }
+.hc-share-in input { width: 170px; padding: 4px 8px; font-size: 12.5px; }

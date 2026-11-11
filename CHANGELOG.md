@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.36.00 — 2026-11-11
+
+- **Shared means: with whom.** Marking a report shared asks for the **email address(es) of whom it was shared with**, typed right where you clicked: the Accounts list (double-click Customer), the account page (its strip and each report’s row), the calculator’s **Generated reports** (Mark) and **Report ready**. Enter saves, Esc puts it back; an address that is not one is refused. Who it went to shows beside the date everywhere. No pop-ups.
+- **A customer’s version is shared by itself.** Uploading the version the customer sent back records it as shared (it came from them), and the report they had been sent too, if it was not marked yet.
+
 ## CC-01.35.00 — 2026-11-11
 
 - **Accounts: Customer shared is marked in the cell itself**, as the name is: double-click, type how and to whom (optional), **✓ Shared** or Enter; on a shared one, **Not shared** undoes it. No pop-up.
