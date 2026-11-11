@@ -54,7 +54,7 @@ function start() {
   say(`Starting CC ${target.version} (${target.source}${trial ? ', on trial' : ''}).`);
   const started = Date.now();
   let ready = false;
-  child = fork(path.join(target.dir, 'server', 'index.js'), [], { cwd: target.dir, env: { ...process.env, CC_SUPERVISOR: '1', CC_BUILTIN_VERSION: builtInVersion, ...(proxied && !process.env.NODE_USE_ENV_PROXY ? { NODE_USE_ENV_PROXY: '1' } : {}) }, stdio: 'inherit' });
+  child = fork(path.join(target.dir, 'server', 'index.js'), [], { execArgv: ['--disable-warning=UNDICI-EHPA'], cwd: target.dir, env: { ...process.env, CC_SUPERVISOR: '1', CC_BUILTIN_VERSION: builtInVersion, ...(proxied && !process.env.NODE_USE_ENV_PROXY ? { NODE_USE_ENV_PROXY: '1' } : {}) }, stdio: 'inherit' });
   const timer = setTimeout(() => {
     if (ready || stopping) return;
     if (trial) {

@@ -25,11 +25,11 @@ export function loadConfig(env = process.env) {
   if (env.TLS_KEY && !env.TLS_KEY_FILE) env.TLS_KEY_FILE = env.TLS_KEY;
   if (env.HTTPS === undefined || env.HTTPS === '') env.HTTPS = 'on';
   if (env.PUBLIC_URL && !env.REPORT_SERVER_URL) env.REPORT_SERVER_URL = env.PUBLIC_URL;
-  const port = Number(env.PORT ?? 8080);
+  const port = Number(env.PORT ?? 7443);
   return {
     root: ROOT,
     host: env.HOST ?? '0.0.0.0',
-    port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 8080,
+    port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 7443,
     dataDir: path.resolve(ROOT, env.DATA_DIR ?? 'data'),
     publicUrl: env.PUBLIC_URL ?? '',
     env,

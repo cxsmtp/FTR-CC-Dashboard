@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 import { CxClient } from '../vendor/mz/src/cxone/client.js';
@@ -110,27 +111,23 @@ export function calculatorPage({ productCode = '' } = {}) {
   const gate = `\n${scriptText(licenceGateScript())}\n`;
   // An activation code given to the server (MZ_PRODUCT_CODE) is offered to the gate, so nobody has to type it.
   const seed = productCode ? `\n${scriptText(`try { if (!localStorage.getItem('mz-product-code')) localStorage.setItem('mz-product-code', ${JSON.stringify(productCode)}); } catch {}`)}\n` : '';
-  const config = "window.CX_HOSTED = JSON.parse(document.getElementById('cx-hosted').textContent);";
   const vendorScripts = ['calculator/vendor/xlsx-lite.js', 'calculator/vendor/parse.js'].map((file) => `\n${scriptText(read(file))}\n`);
   const main = `\n${scriptText(`const __m = [];\n${bundle}\nlet __started = false;\nwindow.__mzStart = () => {\n  if (__started) return;\n  __started = true;\n  __m[${index.get('calculator/hosted.js')}].startHosted();\n};\nif (!window.__mzBlocked) window.__mzStart();`)}\n`;
   const css = `\n${`${inlined(read('styles.css'), MZ_PUBLIC)}\n${inlined(read('nextgen.css'), MZ_PUBLIC)}\n${fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.css'), 'utf8')}`.replace(/\r\n?/g, '\n')}\n`;
-  const scripts = [...(seed ? [seed] : []), gate, config, ...vendorScripts, main];
+  const scripts = [...(seed ? [seed] : []), gate, ...vendorScripts, main];
   const csp = `default-src 'none'; script-src ${scripts.map(contentHash).join(' ')}; script-src-attr 'none'; style-src 'unsafe-inline'; style-src-elem ${contentHash(css)}; style-src-attr 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'self'; worker-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
   const markup = standaloneMarkup(calculatorMarkup(read('index.html')), { launcher: true });
   const head = fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.html'), 'utf8');
   const html = head
     .replace('<!--CSS-->', `<style>${css}</style>`)
     .replace('<!--CALCULATOR-->', markup)
-    .replace('<!--SCRIPTS-->', `${seed ? `<script>${seed}</script>\n` : ''}<script>${gate}</script>\n<script type="application/json" id="cx-hosted">"__HOSTED__"</script>\n<script>${config}</script>\n<script type="application/json" id="cx-report-runtime">${JSON.stringify(reportRuntime({ root: MZ_PUBLIC })).replace(/</g, '\\u003c')}</script>\n${vendorScripts.map((t) => `<script>${t}</script>`).join('\n')}\n<script type="module">${main}</script>`)
+    .replace('<!--SCRIPTS-->', `${seed ? `<script>${seed}</script>\n` : ''}<script>${gate}</script>\n<script type="application/json" id="cx-report-runtime">${JSON.stringify(reportRuntime({ root: MZ_PUBLIC })).replace(/</g, '\\u003c')}</script>\n${vendorScripts.map((t) => `<script>${t}</script>`).join('\n')}\n<script type="module">${main}</script>`)
     .replaceAll('{{MZ}}', MZ_SOURCE.label);
-  built = { productCode, html, csp };
+  // The same page for everyone (each person's settings come from /api/cc/calc-config): compressed once, cached by ETag.
+  const gz = zlib.gzipSync(html, { level: 9 });
+  const etag = `"cc-${createHash('sha256').update(html).digest('hex').slice(0, 20)}"`;
+  built = { productCode, html, csp, gz, etag };
   return built;
-}
-
-/** The page for one person: their settings in the JSON element (escaped so nothing in it can end the element). */
-export function pageFor(settings, options) {
-  const { html, csp } = calculatorPage(options);
-  return { html: html.replace('"__HOSTED__"', JSON.stringify(settings).replace(/</g, '\\u003c')), csp };
 }
 
 // ---- Each person's Checkmarx One connection and git counts ------------------------------------------

@@ -12,8 +12,17 @@ const TEAM_KEY = 'cc-calc-team';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
-export function startHosted() {
-  const cfg = window.CX_HOSTED && typeof window.CX_HOSTED === 'object' ? window.CX_HOSTED : {};
+export async function startHosted() {
+  // This person's settings (the page itself is the same for everyone, so it is cached).
+  let cfg = {};
+  try {
+    const res = await fetch('/api/cc/calc-config', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (res.status === 401) {
+      location.href = `/#/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+      return;
+    }
+    cfg = await res.json();
+  } catch {}
   const $ = (id) => document.getElementById(id);
   const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const perms = new Set(cfg.permissions ?? []);

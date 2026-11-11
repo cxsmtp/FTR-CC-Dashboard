@@ -1,16 +1,14 @@
+# podman compose up -d   (or docker compose). Change the host port on the left of "7443".
 services:
   command-center:
     build: .
     image: ftr-cc-dashboard:latest
     restart: unless-stopped
     ports:
-      - "443:8443"
-      - "80:8443"
+      - "7443:7443"
     env_file: .env
-    environment:
-      DATA_DIR: /data
     volumes:
-      - cc-data:/data
+      - ftr-cc-data:/data
     read_only: true
     tmpfs:
       - /tmp
@@ -18,4 +16,4 @@ services:
       - no-new-privileges:true
     cap_drop: [ALL]
 volumes:
-  cc-data:
+  ftr-cc-data:

@@ -32,23 +32,82 @@ The **Cx Credits Calculator**, hosted for every Sales Engineer, with team-based 
 
 Screens: sign-in · first sign-in (password → terms → quick guide) · Overview · Accounts · Account (primary, shared, Salesforce) · Calculator · People · Teams · Settings & roles · Audit log.
 
-## Run it
+## Run it with Podman (two commands)
+
+As with CxMissionZero: one command to get the image, one to run it.
+
+**1. Get the image.**
+
+From this repository:
+
+```
+podman build --format docker -t ftr-cc-dashboard https://github.com/cxsmtp/FTR-CC-Dashboard.git
+```
+
+Or, once a release is published to ghcr.io (see `.github/workflows/container.yml`):
+
+```
+podman pull ghcr.io/cxsmtp/ftr-cc-dashboard:latest
+```
+
+**2. Run it.** HTTPS on port 7443, data in the `ftr-cc-data` volume.
+
+Windows cmd, one line:
+
+```
+podman run -d --name ftr-cc --restart unless-stopped -p 7443:7443 -v ftr-cc-data:/data -e ADMIN_EMAIL=you@yourcompany.com -e PUBLIC_URL=https://cc.yourcompany.com:7443 --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true ftr-cc-dashboard
+```
+
+bash:
+
+```bash
+podman run -d --name ftr-cc --restart unless-stopped -p 7443:7443 -v ftr-cc-data:/data \
+  -e ADMIN_EMAIL=you@yourcompany.com -e PUBLIC_URL=https://cc.yourcompany.com:7443 \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true ftr-cc-dashboard
+```
+
+(With the ghcr.io image, put `ghcr.io/cxsmtp/ftr-cc-dashboard:latest` in place of `ftr-cc-dashboard` at the end.)
+
+Open `https://<server>:7443`. The Admin's one-time password:
+
+```
+podman exec ftr-cc cat /data/initial-admin-password.txt
+```
+
+**Another port.**
+- Change the left side of `-p`: `-p 9443:7443` serves `https://<server>:9443`.
+- Or move the port inside the container too: `-e PORT=9443 -p 9443:9443`.
+
+Keep `PUBLIC_URL` on the same port. Plain `http://` on that port is redirected to `https://`.
+
+**Your certificate.** The server starts with a self-signed certificate. Upload yours under **Settings → HTTPS**, or get a free one from Let's Encrypt there. Or give your files at start: `-v C:\certs:/certs:ro -e TLS_CERT_FILE=/certs/server.crt -e TLS_KEY_FILE=/certs/server.key`.
+
+**Updates.** Settings → Updates installs new releases, checked against their checksums, and rolls back by itself if one does not start. The versions are kept in the data volume.
+
+To replace the image itself:
+
+```
+podman pull ghcr.io/cxsmtp/ftr-cc-dashboard:latest
+```
+
+```
+podman rm -f ftr-cc
+```
+
+Then run step 2 again. The data stays in the volume.
+
+**Size.** 1 vCPU and 1 GB is enough for 200 people working at once. See [Performance and sizing](docs/performance.md).
+
+## Run it without a container
 
 Node.js 22 or later, and git (for Fusion · from Git). **No npm dependencies.**
 
 ```bash
 cp .env.example .env    # set ADMIN_EMAIL and PUBLIC_URL at least
-npm start      # the launcher: HTTPS on PORT (8443 in the container), updates and rollback
+npm start      # the launcher: HTTPS on PORT (7443 by default), updates and rollback
 ```
 
 On the first start the server creates the Admin and writes their one-time password to `DATA_DIR/initial-admin-password.txt`. The file is deleted once they choose their own password. Sign in, then add the teams (**Teams**) and people (**People → Invite someone**).
-
-With Docker or Podman:
-
-```bash
-docker compose up -d --build
-docker compose exec command-center cat /data/initial-admin-password.txt
-```
 
 To try it with a fictional organisation (3 regions, 27 people, about 40 accounts):
 

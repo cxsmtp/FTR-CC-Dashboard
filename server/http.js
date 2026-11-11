@@ -5,6 +5,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 
 export const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -21,8 +23,15 @@ export const APP_CSP = "default-src 'none'; script-src 'self'; style-src 'self';
 export function send(res, status, body, headers = {}) {
   if (res.headersSent) return;
   const isText = typeof body === 'string' || Buffer.isBuffer(body);
-  res.writeHead(status, { ...SECURITY_HEADERS, 'Cache-Control': 'no-store', ...(isText ? {} : { 'Content-Type': 'application/json; charset=utf-8' }), ...headers });
-  res.end(isText ? body : JSON.stringify(body));
+  let out = isText ? body : JSON.stringify(body);
+  const extra = {};
+  // Large JSON answers (dashboards of a whole organisation) go compressed when the browser takes it.
+  if (!isText && out.length > 16 * 1024 && /\bgzip\b/.test(String(res.req?.headers?.['accept-encoding'] ?? ''))) {
+    out = zlib.gzipSync(out, { level: 5 });
+    Object.assign(extra, { 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
+  }
+  res.writeHead(status, { ...SECURITY_HEADERS, 'Cache-Control': 'no-store', ...(isText ? {} : { 'Content-Type': 'application/json; charset=utf-8' }), ...extra, ...headers });
+  res.end(out);
 }
 
 export async function readBody(req, limit) {
@@ -116,8 +125,20 @@ export function serveStatic(root, req, res, pathname) {
   if (!stat.isFile()) return false;
   const type = TYPES[path.extname(file).toLowerCase()];
   if (!type) return false;
-  res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': type, 'Content-Length': stat.size, 'Cache-Control': 'no-cache', 'Content-Security-Policy': APP_CSP });
-  if (req.method === 'HEAD') return res.end(), true;
-  fs.createReadStream(file).pipe(res);
+  // Kept in memory compressed, with an ETag: a browser coming back is answered 304, with nothing sent again.
+  let cached = STATIC.get(file);
+  if (!cached || cached.mtime !== stat.mtimeMs) {
+    const raw = fs.readFileSync(file);
+    const compressible = /text|javascript|json|svg|markdown/.test(type) && raw.length > 1024;
+    cached = { mtime: stat.mtimeMs, raw, gz: compressible ? zlib.gzipSync(raw, { level: 9 }) : null, etag: `"${createHash('sha256').update(raw).digest('hex').slice(0, 20)}"` };
+    STATIC.set(file, cached);
+  }
+  const headers = { ...SECURITY_HEADERS, 'Content-Type': type, 'Cache-Control': 'no-cache', ETag: cached.etag, Vary: 'Accept-Encoding', 'Content-Security-Policy': APP_CSP };
+  if (req.headers['if-none-match'] === cached.etag) return res.writeHead(304, headers).end(), true;
+  const gz = cached.gz && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
+  const body = gz ? cached.gz : cached.raw;
+  res.writeHead(200, { ...headers, ...(gz ? { 'Content-Encoding': 'gzip' } : {}), 'Content-Length': body.length });
+  res.end(req.method === 'HEAD' ? undefined : body);
   return true;
 }
+const STATIC = new Map();

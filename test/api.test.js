@@ -166,16 +166,23 @@ test('CSV exports cannot carry spreadsheet formulas', async () => {
   assert.match(csv, /'=HYPERLINK/);
 });
 
-test('the hosted calculator page: its own scripts only, and the person’s settings escaped', async () => {
+test('the hosted calculator page: its own scripts only, the same for everyone (cached), settings from the API', async () => {
   const se1 = await client(env.base, 'se1@t.example');
-  const res = await fetch(`${env.base}/calculator`, { headers: { cookie: se1.cookie } });
+  const res = await fetch(`${env.base}/calculator`, { headers: { cookie: se1.cookie, 'Accept-Encoding': 'gzip' } });
   assert.equal(res.status, 200);
   const csp = res.headers.get('content-security-policy');
   assert.match(csp, /script-src 'sha256-/);
   assert.doesNotMatch(csp, /unsafe-eval|script-src[^;]*unsafe-inline/);
+  const etag = res.headers.get('etag');
+  assert.ok(etag);
   const html = await res.text();
-  assert.ok(html.includes('id="cx-hosted"'));
-  assert.ok(!html.includes('"__HOSTED__"'));
+  assert.ok(!html.includes(se1.me.csrf), 'no one\u2019s settings in the shared page');
+  assert.equal((await fetch(`${env.base}/calculator`, { headers: { cookie: se1.cookie, 'If-None-Match': etag } })).status, 304);
+  const cfg = (await se1.get('/api/cc/calc-config')).data;
+  assert.equal(cfg.csrf, se1.me.csrf);
+  assert.equal(cfg.teams[0].id, env.teams.emea.id);
+  const viewer = await client(env.base, 'viewer@t.example');
+  assert.equal((await viewer.get('/api/cc/calc-config')).status, 403);
 });
 
 test('the audit log records reports and sign-ins, and nothing in data holds a session token', async () => {
@@ -248,7 +255,7 @@ test('people management, as MZ: leaders manage their teams, executives everyone;
 
 test('the two Checkmarx One exports are off until an Admin turns them on', async () => {
   const se1 = await client(env.base, 'se1@t.example');
-  const page = async () => (await (await fetch(`${env.base}/calculator`, { headers: { cookie: se1.cookie } })).text()).match(/"exportsEnabled":(true|false)/)?.[1];
+  const page = async () => String((await se1.get('/api/cc/calc-config')).data.exportsEnabled);
   assert.equal(await page(), 'false');
   const admin = await client(env.base, 'admin@t.example');
   await admin.put('/api/settings', { features: { exports: true } });

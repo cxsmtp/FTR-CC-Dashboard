@@ -1,6 +1,10 @@
 .git
+.github
+node_modules
 data
 demo-data
-.env
+dist
 test
-node_modules
+loadtest
+.env
+*.log

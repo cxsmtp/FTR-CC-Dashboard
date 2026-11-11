@@ -22,7 +22,7 @@ import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed }
 import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
 import { HSTS_AGES, HttpsManager } from '../vendor/mz/src/https-manager.js';
 import { AcmeService, CHALLENGE_PREFIX, RENEW_DAYS, cleanNames, validName } from '../vendor/mz/src/acme.js';
-import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, MZ_SOURCE, impactSettings, pageFor, summary } from './calculator.js';
+import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, MZ_SOURCE, calculatorPage, impactSettings, summary } from './calculator.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 /** The version as people see it, MZ's way: CC-01.01.00. */
@@ -415,7 +415,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
     const out = accounts.list(teamIds).map((a) => {
       const own = byAccount.get(a.id) ?? [];
-      const { report: p, how } = accounts.primaryOf(a);
+      // Its reports are newest first already: the one marked primary, else the latest.
+      const marked = a.primaryReportId ? own.find((r) => r.id === a.primaryReportId) : null;
+      const p = marked ?? own[0] ?? null;
+      const how = marked ? 'marked' : p ? 'latest' : 'none';
       return {
         id: a.id,
         name: a.name,
@@ -1154,6 +1157,17 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return calc.startRead(ctx.user.id, body, meta && ctx.teamSet.has(meta.teamId) ? { id: meta.id, name: meta.name, teamId: meta.teamId } : null);
   });
   r('GET', '/api/cc/work', perm('calculator.use'), (req, ctx) => calc.work(ctx.user.id));
+  /** The calculator page's settings for this person (the page itself is the same for everyone). */
+  r('GET', '/api/cc/calc-config', perm('calculator.use'), (req, ctx) => ({
+    csrf: ctx.session.csrf,
+    user: { id: ctx.user.id, name: ctx.user.name },
+    roleName: iam.roles()[ctx.user.role]?.name ?? '',
+    permissions: [...ctx.permissions],
+    teams: ctx.teams.filter((t) => ctx.scope.has(t.id)).map((t) => ({ id: t.id, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › ') })).sort((a, b) => a.path.localeCompare(b.path)),
+    ownTeamId: ctx.user.teamId,
+    organisationName: settings.value.organisationName,
+    exportsEnabled: settings.value.features?.exports === true,
+  }));
   r('GET', '/api/projections/read', calcTeam, (req, ctx, body, res, url) => calc.readView(ctx.user.id, url.searchParams.get('since')));
   r('POST', '/api/projections/series', calcTeam, (req, ctx, body) => calc.series(ctx.user.id, body));
   r('GET', '/api/projections/git/connections', calcTeam, () => calc.gitConnections());
@@ -1274,9 +1288,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (!ctx) return send(res, 302, '', { Location: '/#/login?next=%2Fcalculator' });
       if (ctx.user.mustChangePassword || !terms.acceptedBy(ctx.user.id)) return send(res, 302, '', { Location: '/#/welcome' });
       if (!ctx.permissions.has('calculator.use')) return send(res, 302, '', { Location: '/#/overview' });
-      const scopeTeams = ctx.teams.filter((t) => ctx.scope.has(t.id)).map((t) => ({ id: t.id, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › ') })).sort((a, b) => a.path.localeCompare(b.path));
-      const { html, csp } = pageFor({ csrf: ctx.session.csrf, user: { id: ctx.user.id, name: ctx.user.name }, roleName: iam.roles()[ctx.user.role]?.name ?? '', permissions: [...ctx.permissions], teams: scopeTeams, ownTeamId: ctx.user.teamId, organisationName: settings.value.organisationName, exportsEnabled: settings.value.features?.exports === true }, { productCode: config.productCode });
-      return send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp });
+      const page = calculatorPage({ productCode: config.productCode });
+      const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': page.csp, 'Cache-Control': 'private, no-cache', ETag: page.etag, Vary: 'Accept-Encoding' };
+      if (req.headers['if-none-match'] === page.etag) return send(res, 304, '', headers);
+      if (/\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) return send(res, 200, page.gz, { ...headers, 'Content-Encoding': 'gzip' });
+      return send(res, 200, page.html, headers);
     }
 
     const match = router.match(method, pathname);
