@@ -87,3 +87,26 @@ test('Admin sets the rates; a leader sets the team’s own, used below it; back 
   assert.match(actions, /fusion\.rates\.team/);
   assert.match(actions, /fusion\.rates/);
 });
+
+test('Customer Success works out projections for an SE they choose: no report until one is accountable', async () => {
+  const { reportData, SF } = await import('./helpers.js');
+  const csUser = (await env.app.iam.create({ email: 'cs@t.example', name: 'Casey Success', role: 'cs', teamId: env.teams.emea.id })).user;
+  const { hashPassword } = await import('../server/iam.js');
+  Object.assign(csUser, { passwordHash: await hashPassword('Test-Password-For-Tests-1'), mustChangePassword: false, guideSeenAt: new Date().toISOString() });
+  env.app.iam.save();
+  env.app.terms.accept(csUser.id);
+  const cs = await client(env.base, 'cs@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const made = await cs.post('/api/projections', { name: 'CS Account' }, h);
+  assert.equal(made.status, 200);
+  const id = made.data.customer.id;
+  assert.equal((await cs.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF })).status, 200);
+  const refused = await cs.post('/api/projections/reports', { customerId: id, data: reportData() }, h);
+  assert.equal(refused.status, 409);
+  assert.match(refused.data.error, /accountable Sales Engineer/);
+  // The SE list never offers Customer Success; with an SE chosen, the report is made.
+  const detail = await cs.get(`/api/cc/accounts/${id}`);
+  assert.ok(!detail.data.members.some((m) => m.id === csUser.id));
+  assert.equal((await cs.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se1.id })).status, 200);
+  assert.equal((await cs.post('/api/projections/reports', { customerId: id, data: reportData() }, h)).status, 200);
+});

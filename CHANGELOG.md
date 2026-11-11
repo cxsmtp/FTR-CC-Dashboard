@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.33.00 — 2026-11-11
+
+- **People: many at once, and no Manage menu needed for the everyday changes.**
+  - Tick people (the box on top ticks everyone the filters show, across pages) and a bar offers: **Role**, **Team**, **Access on**, **Access off**, **Send welcome**, **Reset passwords** (the new temporary passwords download once, as a sheet), **Sign out everywhere**, **Unlock**, **Remove**. Each change is made and audited person by person; what could not be done is said, with why.
+  - **Role and team change right in the row**, from their own lists. Manage is still there for the rest.
+- **Customer Success** (a new built-in role): works out projections and reports for their team’s accounts, always for the **Sales Engineer they choose as accountable**. Until one is chosen, the calculator marks the SE list and no report is generated; Customer Success is never offered as the accountable SE. Their home page is the calculator.
+
 ## CC-01.32.00 — 2026-11-11
 
 - **CxOne API audit explains every call that did not succeed** — why, what was done, and what happens next time — on the row itself and in **Why calls did not succeed**, one line per kind of failure with how often it happened.

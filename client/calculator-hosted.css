@@ -549,3 +549,7 @@ html[data-cc][data-ui] button.hc-3d {
   --btn-drop: 0 4px 0 color-mix(in srgb, var(--cyan) 55%, #000); --btn-glow: 0 8px 16px -6px color-mix(in srgb, var(--cyan) 70%, transparent);
   background-color: var(--cyan) !important; color: #fff !important; height: auto; min-height: 0;
 }
+
+/* Customer Success: the SE to choose before anything is generated */
+.hc-owner.need-se select { border-color: var(--amber) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent) !important; }
+.hc-owner.need-se > span::after { content: " · choose one"; color: var(--amber); font-weight: 700; }

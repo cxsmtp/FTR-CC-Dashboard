@@ -716,8 +716,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const meta = accounts.accounts.meta(id);
     const reps = accounts.reportsOf(ctx.scope, id).map((x) => ({ ...x, createdByName: userName(x.createdById), sharedByName: x.sharedById ? userName(x.sharedById) : '' }));
     const { report: p, how } = accounts.primaryOf(meta);
-    const members = iam.users().filter((u) => u.active !== false && u.teamId === a.teamId).map((u) => ({ id: u.id, name: u.name }));
-    if (a.ownerId && !members.some((m) => m.id === a.ownerId)) members.push({ id: a.ownerId, name: userName(a.ownerId) });
+    // Who can be accountable: the team's people who work out projections themselves (Customer Success never is).
+    const members = iam.users().filter((u) => u.active !== false && u.teamId === a.teamId && u.role !== 'cs').map((u) => ({ id: u.id, name: u.name, role: u.role }));
+    if (a.ownerId && !members.some((m) => m.id === a.ownerId) && iam.byId(a.ownerId)?.role !== 'cs') members.push({ id: a.ownerId, name: userName(a.ownerId) });
     return {
       account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, cxone: a.cxone ? { tenant: a.cxone.tenant, savedBy: a.cxone.savedBy, savedAt: a.cxone.savedAt, lastReadAt: a.cxone.lastReadAt ?? null } : null, sold: (a.sales ?? []).reduce((n, x) => n + x.credits, 0), remaining: p ? Math.max(0, Math.round(p.totalCredits - (a.sales ?? []).reduce((n, x) => n + x.credits, 0))) : null, impactEnabled: Boolean(a.impactEnabled), impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed), impactCurrency: a.impact?.currency ?? 'USD', reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
       reports: reps,
@@ -1459,6 +1460,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../vendor/mz/src/standalone-calculator.js')).reportRuntime());
   r('GET', '/api/projections/reports', calcTeam, (req, ctx, body, res, url) => ({ reports: accounts.reportsOf(ctx.teamSet, String(url.searchParams.get('customer') ?? '')) }));
   r('POST', '/api/projections/reports', calcTeam, (req, ctx, body) => {
+    {
+      const meta = accounts.accounts.meta(String(body?.customerId ?? ''));
+      const owner = meta ? iam.byId(meta.ownerId) : null;
+      if (meta && (!owner || owner.role === 'cs' || owner.active === false)) throw fail(409, 'Choose the accountable Sales Engineer for this account first (at the top of the calculator): a projection is always for an SE.');
+    }
     const rep = accounts.addReport({ customerId: String(body?.customerId ?? ''), data: body?.data, user: ctx.user }, ctx.teamSet);
     record(ctx, req, 'report.create', rep.customer, { id: rep.id, totalCredits: rep.totalCredits, team: teams.get(rep.teamId)?.name });
     const repMeta = accounts.accounts.meta(String(body?.customerId ?? ''));
@@ -1585,6 +1591,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     csrf: ctx.session.csrf,
     user: { id: ctx.user.id, name: ctx.user.name },
     roleName: iam.roles()[ctx.user.role]?.name ?? '',
+    role: ctx.user.role,
     permissions: [...ctx.permissions],
     teams: ctx.teams.filter((t) => ctx.scope.has(t.id)).map((t) => ({ id: t.id, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › ') })).sort((a, b) => a.path.localeCompare(b.path)),
     ownTeamId: ctx.user.teamId,

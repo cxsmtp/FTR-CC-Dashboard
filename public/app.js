@@ -1285,7 +1285,14 @@ function peopleTable(d) {
       <select id="f-team"><option value="">All teams</option>${teams.map((t) => `<option value="${esc(t.id)}">${esc(t.path)}</option>`).join('')}</select>
       <select id="f-status"><option value="">Any status</option>${Object.entries(STATUS).map(([k, [, l]]) => `<option value="${k}">${l}</option>`).join('')}</select>
       <span class="spacer"></span><span class="muted small" id="count"></span></div>
-    <div class="tw mt"><table class="people"><thead><tr><th>Person</th><th>Role</th><th>Team</th><th>Sign-in</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+    ${manage ? `<div class="bulk" id="bulk" hidden><b id="bulk-n"></b>
+      <label class="bulk-f">Role<select id="bulk-role"><option value="">—</option>${roles.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select></label>
+      <label class="bulk-f">Team<select id="bulk-team"><option value="">—</option>${teams.map((t) => `<option value="${esc(t.id)}">${esc(t.path)}</option>`).join('')}</select></label>
+      <button type="button" class="sm" data-bulk="on">Access on</button><button type="button" class="sm" data-bulk="off">Access off</button>
+      ${d.mail ? '<button type="button" class="sm" data-bulk="welcome">Send welcome</button>' : ''}
+      <button type="button" class="sm" data-bulk="reset">Reset passwords</button><button type="button" class="sm" data-bulk="signout">Sign out everywhere</button><button type="button" class="sm" data-bulk="unlock">Unlock</button>
+      <button type="button" class="sm danger" data-bulk="remove">Remove</button><button type="button" class="sm ghost" id="bulk-clear">Clear</button><span class="muted small" id="bulk-out"></span></div>` : ''}
+    <div class="tw mt"><table class="people"><thead><tr>${manage ? '<th class="sel"><input type="checkbox" id="sel-all" title="Select everyone shown by the filters" aria-label="Select everyone shown by the filters" /></th>' : ''}<th>Person</th><th>Role</th><th>Team</th><th>Sign-in</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
     <div class="flex pager" id="pager"><span class="muted small" id="pinfo"></span><span class="spacer"></span><button class="sm" id="prev">Previous</button><button class="sm" id="next">Next</button></div></div>`;
   const list = () => {
     const q = $('#q').value.trim().toLowerCase();
@@ -1313,13 +1320,119 @@ function peopleTable(d) {
         ${u.sessions ? `<button type="button" data-act="signout">Sign out everywhere (${num(u.sessions)})</button>` : ''}
         <button type="button" data-act="toggle">${u.active ? 'Turn access off' : 'Turn access on'}</button>
         <button type="button" data-act="remove" class="danger">Remove</button></div></details>` : '';
-      return `<tr data-id="${esc(u.id)}"><td><div class="flex nowrap">${avatar(u.name, u.picture)}<div><b>${esc(u.name)}</b>${u.id === state.me.user.id ? ' <span class="chip">You</span>' : ''}<span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td>
-        <td><span class="chip role">${esc(u.roleName)}</span>${u.leads.length ? `<span class="sub">Leads ${esc(u.leads.join(', '))}</span>` : ''}</td><td title="${esc(u.teamPath)}">${esc(u.team || '—')}</td>
+      const self = u.id === state.me.user.id;
+      const roleCell = u.manageable && !self ? `<select class="inline-sel" data-inline="role" title="Change ${esc(u.name)}’s role">${roles.some((r) => r.id === u.role) ? '' : `<option value="${esc(u.role)}" selected>${esc(u.roleName)}</option>`}${roles.map((r) => `<option value="${esc(r.id)}"${r.id === u.role ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>` : `<span class="chip role">${esc(u.roleName)}</span>`;
+      const teamCell = u.manageable ? `<select class="inline-sel" data-inline="team" title="Move ${esc(u.name)} to another team">${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select>` : esc(u.team || '—');
+      return `<tr data-id="${esc(u.id)}" class="${selected.has(u.id) ? 'picked' : ''}">${manage ? `<td class="sel">${u.manageable && !self ? `<input type="checkbox" data-sel ${selected.has(u.id) ? 'checked' : ''} aria-label="Select ${esc(u.name)}" />` : ''}</td>` : ''}<td><div class="flex nowrap">${avatar(u.name, u.picture)}<div><b>${esc(u.name)}</b>${u.id === state.me.user.id ? ' <span class="chip">You</span>' : ''}<span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td>
+        <td data-v="${esc(u.roleName)}">${roleCell}${u.leads.length ? `<span class="sub">Leads ${esc(u.leads.join(', '))}</span>` : ''}</td><td title="${esc(u.teamPath)}" data-v="${esc(u.team || '—')}">${teamCell}</td>
         <td class="small">${u.signIn === 'sso' ? 'Single sign-on' : 'Password'}</td><td><span class="chip ${kind}"><i></i>${label}</span>${u.lockedUntil ? `<span class="sub">until ${esc(new Date(u.lockedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>` : ''}</td>
         <td class="small">${esc(ago(u.lastSignInAt))}</td><td class="actions">${acts}</td></tr>`;
-    }).join('') || '<tr><td colspan="7"><div class="empty"><b>Nobody matches</b></div></td></tr>';
+    }).join('') || `<tr><td colspan="${manage ? 8 : 7}"><div class="empty"><b>Nobody matches</b></div></td></tr>`;
     for (const b of $$('[data-act]')) b.onclick = () => personAction(d, d.people.find((u) => u.id === b.closest('tr').dataset.id), b.dataset.act);
+    // Role and team, changed right in the row.
+    for (const sel of $$('#rows [data-inline]')) {
+      sel.onchange = async () => {
+        const u = d.people.find((x) => x.id === sel.closest('tr').dataset.id);
+        const body = sel.dataset.inline === 'role' ? { role: sel.value } : { teamId: sel.value };
+        try {
+          await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body });
+          toast(`${u.name}: ${sel.dataset.inline === 'role' ? 'role' : 'team'} changed to ${sel.selectedOptions[0].textContent}.`, 'ok');
+          d.people = (await peopleList()).people;
+          render();
+        } catch (error) {
+          toast(error.message, 'bad');
+          sel.value = sel.dataset.inline === 'role' ? u.role : u.teamId;
+        }
+      };
+    }
+    for (const box of $$('#rows [data-sel]')) {
+      box.onchange = () => {
+        const id = box.closest('tr').dataset.id;
+        if (box.checked) selected.add(id);
+        else selected.delete(id);
+        box.closest('tr').classList.toggle('picked', box.checked);
+        bulkBar();
+      };
+    }
+    if ($('#sel-all')) {
+      const pickable = all.filter((u) => u.manageable && u.id !== state.me.user.id);
+      $('#sel-all').checked = pickable.length > 0 && pickable.every((u) => selected.has(u.id));
+      $('#sel-all').indeterminate = !$('#sel-all').checked && pickable.some((u) => selected.has(u.id));
+      $('#sel-all').onchange = (e) => {
+        for (const u of pickable) e.target.checked ? selected.add(u.id) : selected.delete(u.id);
+        render();
+      };
+    }
+    bulkBar();
   };
+  // ---- Many at once: the people ticked (across pages and filters), each change made and audited one by one ----
+  const selected = new Set();
+  const bulkBar = () => {
+    if (!$('#bulk')) return;
+    $('#bulk').hidden = selected.size === 0;
+    $('#bulk-n').textContent = `${num(selected.size)} selected`;
+  };
+  const runBulk = async (label, fn, { reload = true } = {}) => {
+    const people = d.people.filter((u) => selected.has(u.id));
+    const failed = [];
+    const out = [];
+    let n = 0;
+    for (const u of people) {
+      $('#bulk-out').textContent = `${label}: ${++n} of ${people.length}…`;
+      try {
+        out.push({ u, r: await fn(u) });
+      } catch (error) {
+        failed.push(`${u.name}: ${error.message}`);
+      }
+    }
+    $('#bulk-out').textContent = '';
+    toast(failed.length ? `${label}: ${num(out.length)} done, ${num(failed.length)} not: ${failed.slice(0, 3).join(' · ')}${failed.length > 3 ? '…' : ''}` : `${label}: done for ${num(out.length)} ${out.length === 1 ? 'person' : 'people'}.`, failed.length ? 'bad' : 'ok', failed.length ? 12000 : 5000);
+    if (reload) {
+      d.people = (await peopleList()).people;
+      for (const id of [...selected]) if (!d.people.some((u) => u.id === id)) selected.delete(id);
+      render();
+    }
+    return out;
+  };
+  if ($('#bulk')) {
+    const P = (u) => `/api/people/${encodeURIComponent(u.id)}`;
+    $('#bulk-role').onchange = async (e) => {
+      if (!e.target.value) return;
+      const name = e.target.selectedOptions[0].textContent;
+      if (confirm(`Give ${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'} the role ${name}?`)) await runBulk(`Role → ${name}`, (u) => api(P(u), { method: 'PUT', body: { role: e.target.value } }));
+      e.target.value = '';
+    };
+    $('#bulk-team').onchange = async (e) => {
+      if (!e.target.value) return;
+      const name = e.target.selectedOptions[0].textContent;
+      if (confirm(`Move ${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'} to ${name}?`)) await runBulk(`Team → ${name}`, (u) => api(P(u), { method: 'PUT', body: { teamId: e.target.value } }));
+      e.target.value = '';
+    };
+    $('#bulk-clear').onclick = () => (selected.clear(), render());
+    $('#bulk').addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-bulk]')?.dataset.bulk;
+      if (!act) return;
+      const n = `${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'}`;
+      if (act === 'on') return runBulk('Access on', (u) => api(P(u), { method: 'PUT', body: { active: true } }));
+      if (act === 'off' && confirm(`Turn off access for ${n}? They are signed out at once; their accounts and reports stay with their teams.`)) return runBulk('Access off', (u) => api(P(u), { method: 'PUT', body: { active: false } }));
+      if (act === 'welcome' && confirm(`Email a welcome to ${n}?`)) return runBulk('Welcome sent', (u) => api(`${P(u)}/welcome`, { method: 'POST', body: {} }), { reload: false });
+      if (act === 'signout' && confirm(`Sign ${n} out on every device?`)) return runBulk('Signed out', (u) => api(`${P(u)}/signout`, { method: 'POST', body: {} }));
+      if (act === 'unlock') return runBulk('Unlocked', (u) => api(`${P(u)}/unlock`, { method: 'POST', body: {} }));
+      if (act === 'remove' && confirm(`Remove ${n}? Their accounts and reports stay with their teams. This cannot be undone.`)) {
+        await runBulk('Removed', (u) => api(P(u), { method: 'DELETE' }));
+        return;
+      }
+      if (act === 'reset' && confirm(`Give ${n} a new temporary password? Their current ones stop working and they are signed out everywhere. The new ones download once, as a sheet.`)) {
+        const done = await runBulk('Passwords reset', (u) => api(`${P(u)}/reset`, { method: 'POST', body: {} }));
+        if (done.length) {
+          const csv = ['Name,Email,Temporary password', ...done.map(({ u, r }) => [u.name, u.email, r.temporary].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\r\n');
+          const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `temporary-passwords-${new Date().toISOString().slice(0, 10)}.csv` });
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        }
+      }
+    });
+  }
   for (const id of ['#q', '#f-role', '#f-team', '#f-status']) $(id)[id === '#q' ? 'oninput' : 'onchange'] = () => ((page = 0), render());
   $('#prev').onclick = () => (page--, render());
   $('#next').onclick = () => (page++, render());

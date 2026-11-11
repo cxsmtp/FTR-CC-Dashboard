@@ -543,7 +543,7 @@ export async function startHosted() {
       $('hc-sf').disabled = $('hc-sf-save').disabled = false;
       $('hc-sf-open').hidden = !a.salesforceUrl;
       if (a.salesforceUrl) $('hc-sf-open').href = a.salesforceUrl;
-      $('hc-owner').innerHTML = members.map((u) => `<option value="${esc(u.id)}"${u.id === a.ownerId ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+      $('hc-owner').innerHTML = (members.some((u) => u.id === a.ownerId) ? '' : '<option value="" selected disabled>Choose the Sales Engineer…</option>') + members.map((u) => `<option value="${esc(u.id)}"${u.id === a.ownerId ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
       $('hc-owner').disabled = false;
       const p = a.primary;
       const parts = [];
@@ -751,6 +751,9 @@ export async function startHosted() {
     if (!account) return;
     try {
       await server(`/api/cc/accounts/${encodeURIComponent(account.id)}`, { method: 'PUT', body: { ownerId: $('hc-owner').value } });
+      account.ownerId = $('hc-owner').value;
+      $('hc-owner').querySelector('option[value=""]')?.remove();
+      gate();
       toast('Accountable SE changed.', 'ok');
     } catch (error) {
       toast(error.message, 'bad');
@@ -1118,6 +1121,14 @@ export async function startHosted() {
 
   /** Without the account's Salesforce link nothing is read or generated: the ways in are locked, and say why. */
   function gate() {
+    // Customer Success works for an SE: until one is chosen as accountable, nothing is generated.
+    const needSe = Boolean(account) && cfg.role === 'cs' && !$('hc-owner').querySelector(`option[value="${CSS.escape(account.ownerId ?? '')}"]`);
+    $('hc-owner').closest('.hc-owner')?.classList.toggle('need-se', needSe);
+    const gen = document.getElementById('calc-generate');
+    if (gen && needSe) {
+      gen.disabled = true;
+      gen.title = 'Choose the accountable Sales Engineer first';
+    }
     const ok = Boolean(account?.salesforceUrl);
     $('hc-account').classList.toggle('no-sf', Boolean(account) && !ok);
     for (const el of [$('sa-connect-go'), $('sa-key'), $('hc-git-go'), $('hc-git-token'), ...document.querySelectorAll('[data-open-tab]'), document.getElementById('calc-generate'), document.getElementById('hc-refresh')]) {
