@@ -109,6 +109,9 @@ export async function startHosted() {
   const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const perms = new Set(cfg.permissions ?? []);
   const params = new URLSearchParams(location.search);
+  // In a meeting with the customer: only the calculator, its projections and the report, nothing of ours around it.
+  const meeting = params.get('meeting') === '1';
+  if (meeting) document.documentElement.dataset.meeting = 'on';
   let toastTimer = null;
   const toast = (message, kind = '', ms = 6000) => {
     const el = $('toast');
@@ -437,7 +440,7 @@ export async function startHosted() {
         o.querySelector('.hc-note').textContent = text ?? '';
         o.querySelectorAll('.hc-steps li').forEach((li) => li.classList.add('on'));
         // Right here, as it is made: was it shared with the customer, and is it the one that stands for the account?
-        if (ok && report?.id && perms.has('reports.share')) return shareChoice(o, report);
+        if (ok && report?.id && perms.has('reports.share') && !meeting) return shareChoice(o, report);
         setTimeout(() => o.remove(), ok ? 1300 : 3500);
       }, wait);
     };
@@ -1149,8 +1152,30 @@ export async function startHosted() {
   });
   gitShow();
 
+  // ---- In a meeting with the customer: this account's calculator alone, in a new tab ----------------------------
+  $('hc-meet').addEventListener('click', () => {
+    if (!account) return;
+    const url = `/calculator?team=${encodeURIComponent(account.teamId ?? team)}&account=${encodeURIComponent(account.id)}&meeting=1`;
+    window.open(url, '_blank', 'noopener');
+  });
+  function meetingHead() {
+    const head = $('hc-meet-head');
+    if (!meeting || !head) return;
+    head.hidden = false;
+    const logo = brand.logo || '/brand/logo';
+    head.innerHTML = `<div class="hc-mh-brand"><img src="${esc(logo)}" alt="" /><span>${esc(cfg.organisationName || 'Checkmarx')}</span></div>
+      <div class="hc-mh-title"><small>Credits projection for</small><h1>${esc(account?.name ?? '…')}</h1><span>${esc(new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }))}</span></div>
+      <button type="button" class="ghost sm hc-mh-leave" id="hc-mh-leave" title="Back to the full calculator">Leave meeting view</button>`;
+    document.title = `${account?.name ?? 'Customer'} · credits projection`;
+    $('hc-mh-leave').onclick = () => {
+      window.close();
+      setTimeout(() => (location.href = location.pathname + location.search.replace(/([?&])meeting=1&?/, '$1').replace(/[?&]$/, '')), 200);
+    };
+  }
   /** Without the account's Salesforce link nothing is read or generated: the ways in are locked, and say why. */
   function gate() {
+    $('hc-meet').disabled = !account;
+    meetingHead();
     // Customer Success works for an SE: until one is chosen as accountable, nothing is generated.
     const needSe = Boolean(account) && cfg.role === 'cs' && !$('hc-owner').querySelector(`option[value="${CSS.escape(account.ownerId ?? '')}"]`);
     $('hc-owner').closest('.hc-owner')?.classList.toggle('need-se', needSe);
@@ -1182,8 +1207,10 @@ export async function startHosted() {
     const owner = $('hc-owner').selectedOptions[0]?.textContent ?? '';
     const team = $('hc-team').selectedOptions[0]?.textContent ?? '';
     const sfLabel = account?.salesforceUrl ? `${account.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account'} ${account.salesforceId ?? ''}` : 'No Salesforce link';
-    el.innerHTML = `<b>${esc(account?.name ?? 'No account open')}</b>${account ? `<span class="hc-pill ${account.salesforceUrl ? 'ok' : 'bad'}">${esc(sfLabel)}</span><span>${esc(team)}</span><span>${esc(owner)}</span>` : ''}<span class="hc-pill ${cxState.connected ? 'ok' : ''}">${cxState.connected ? `Checkmarx One · ${esc(cxState.tenant)}` : 'Not connected'}</span>${account && !$('hc-upload-l').hidden ? '<button type="button" class="hc-3d" id="hc-fold-cv" title="Bring in the report the customer changed and sent back">⇪ The customer’s version</button>' : ''}<button type="button" class="ghost sm" id="hc-unfold">Edit ▾</button>`;
+    el.innerHTML = `<b>${esc(account?.name ?? 'No account open')}</b>${account ? `<span class="hc-pill ${account.salesforceUrl ? 'ok' : 'bad'}">${esc(sfLabel)}</span><span>${esc(team)}</span><span>${esc(owner)}</span>` : ''}<span class="hc-pill ${cxState.connected ? 'ok' : ''}">${cxState.connected ? `Checkmarx One · ${esc(cxState.tenant)}` : 'Not connected'}</span>${account && !$('hc-upload-l').hidden ? '<button type="button" class="hc-3d" id="hc-fold-cv" title="Bring in the report the customer changed and sent back">⇪ The customer’s version</button>' : ''}${account ? '<button type="button" class="hc-meet-btn sm" id="hc-fold-meet" title="Open only the calculator for this customer, in a new tab"><span class="hc-meet-dot"></span>In meeting</button>' : ''}<button type="button" class="ghost sm" id="hc-unfold">Edit ▾</button>`;
     document.getElementById('hc-unfold').onclick = () => fold(false);
+    const fm = document.getElementById('hc-fold-meet');
+    if (fm) fm.onclick = () => $('hc-meet').click();
     const cv = document.getElementById('hc-fold-cv');
     if (cv) cv.onclick = () => $('hc-upload').click();
   }

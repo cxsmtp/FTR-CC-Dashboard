@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.37.00 — 2026-11-11
+
+- **In meeting with the customer.** A strong red button in the calculator (and on the folded bar) opens this customer’s calculator alone, in a new tab, to share on screen: your logo and organisation, the customer’s name and today’s date on top, then the projection, its settings, Triage & remediation, Fusion, Impact and **Generate projection report**, in your theme.
+  - Nothing of ours is shown: no menu or top bar, no status lights, no Salesforce link, API key, git token, team or SE, no other customers or reports, no internal questions after a report is made.
+  - **Leave meeting view** (faint, top right) closes the tab.
+
 ## CC-01.36.00 — 2026-11-11
 
 - **Shared means: with whom.** Marking a report shared asks for the **email address(es) of whom it was shared with**, typed right where you clicked: the Accounts list (double-click Customer), the account page (its strip and each report’s row), the calculator’s **Generated reports** (Mark) and **Report ready**. Enter saves, Esc puts it back; an address that is not one is refused. Who it went to shows beside the date everywhere. No pop-ups.
