@@ -493,6 +493,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       prefs: ctx.user.prefs ?? {},
       theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
       branding: brandingView(),
+      picture: ctx.user.picture ? `/api/people/${ctx.user.id}/picture?v=${encodeURIComponent(ctx.user.picture.at)}` : null,
+      sessions: iam.sessionsOf(ctx.user.id),
       mz: MZ_SOURCE.label,
     };
   });
@@ -515,6 +517,61 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // Themes: each person's own look (kept with them, on every device), else the organisation's.
   const THEME_MODES = ['light', 'dark', 'system'];
   const ACCENTS = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite', 'command'];
+  // ---- Your profile: your name, picture, time zone and Impact figures ----------------------------------------------
+  r('PUT', '/api/me/profile', signedIn, (req, ctx, body) => {
+    const u = ctx.user;
+    const changed = [];
+    if (body?.name !== undefined) {
+      const name = clean(body.name, 120);
+      if (!name) throw fail(400, 'Give your name.');
+      u.name = name;
+      changed.push('name');
+    }
+    if (body?.timeZone !== undefined) {
+      const tz = String(body.timeZone ?? '');
+      if (tz) {
+        try {
+          new Intl.DateTimeFormat('en', { timeZone: tz });
+        } catch {
+          throw fail(400, 'That is not a time zone.');
+        }
+      }
+      u.prefs = { ...(u.prefs ?? {}), timeZone: tz.slice(0, 64) };
+      changed.push('time zone');
+    }
+    if (body?.impact !== undefined) {
+      const i = body.impact ?? {};
+      const num = (v, max) => (v === '' || v === null || v === undefined ? undefined : Math.max(0, Math.min(max, Number(v) || 0)));
+      const currency = i.currency ? String(i.currency).toUpperCase() : '';
+      if (currency && !/^[A-Z]{3}$/.test(currency)) throw fail(400, 'Choose a currency.');
+      u.prefs = { ...(u.prefs ?? {}), impact: { currency: currency || undefined, hourlyRate: num(i.hourlyRate, 100000), triageMinutes: num(i.triageMinutes, 600), fixMinutes: num(i.fixMinutes, 6000) } };
+      changed.push('impact figures');
+    }
+    if (body?.picture !== undefined) {
+      if (body.picture === null) delete u.picture;
+      else {
+        const img = imageFromUpload(body.picture, 'Your picture');
+        if (img.type === 'image/svg+xml') throw fail(415, 'Your picture: a PNG, JPEG or WebP image.');
+        u.picture = img;
+      }
+      changed.push('picture');
+    }
+    iam.save();
+    record(ctx, req, 'me.profile', u.email, { changed });
+    return { user: publicUser(u), prefs: u.prefs ?? {}, picture: u.picture ? `/api/people/${u.id}/picture?v=${encodeURIComponent(u.picture.at)}` : null };
+  });
+  /** A person's picture, for whoever is signed in. */
+  r('GET', '/api/people/:id/picture', signedIn, (req, ctx, body, res, url, params) => {
+    const u = iam.byId(params.id);
+    if (!u?.picture?.data) return send(res, 404, { error: 'No picture.' });
+    return send(res, 200, Buffer.from(u.picture.data, 'base64'), { ...imageHeaders(u.picture), 'Cache-Control': 'private, max-age=86400' });
+  });
+  /** Sign out everywhere else (this browser stays signed in). */
+  r('POST', '/api/me/signout-others', signedIn, (req, ctx) => {
+    iam.endSessionsOf(ctx.user.id, { except: ctx.session.id });
+    record(ctx, req, 'me.signout.others', ctx.user.email);
+    return { ok: true };
+  });
   r('PUT', '/api/me/prefs', signedIn, (req, ctx, body) => {
     const prefs = { ...(ctx.user.prefs ?? {}) };
     if (body?.mode !== undefined) {
@@ -675,7 +732,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
     if (body?.impactCurrency !== undefined) patch.impactCurrency = body.impactCurrency;
     if (body?.impactEnabled !== undefined) patch.impactEnabled = body.impactEnabled === true;
-    const after = accounts.setDetails(params.id, ctx.scope, patch, hosts().salesforce);
+    const after = accounts.setDetails(params.id, ctx.scope, patch, hosts().salesforce, { impactBase: ctx.user.prefs?.impact ?? null });
     record(ctx, req, 'account.update', after.name, { id: after.id, changed: Object.keys(patch), ...(patch.teamId && patch.teamId !== before.teamId ? { fromTeam: before.teamId, toTeam: patch.teamId } : {}) });
     return accountDetail(ctx, params.id);
   });
@@ -742,7 +799,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // ---- People, teams, roles, settings, audit ---------------------------------------------------------------
   const visiblePeople = (ctx) => (ctx.permissions.has('scope.all') ? iam.users() : peopleInScope(ctx.user, ctx.scope, iam.users()));
   r('GET', '/api/people', ready2, (req, ctx) => ({
-    people: visiblePeople(ctx).map((u) => ({ ...publicUser(u), roleName: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, u.teamId).map((t) => t.name).join(' › '), leads: ctx.teams.filter((t) => t.leaderIds?.includes(u.id)).map((t) => t.name), manageable: canManage(ctx, u) && u.id !== ctx.user.id, sessions: canManage(ctx, u) ? iam.sessionsOf(u.id) : undefined })),
+    people: visiblePeople(ctx).map((u) => ({ ...publicUser(u), picture: u.picture ? `/api/people/${u.id}/picture?v=${encodeURIComponent(u.picture.at)}` : null, roleName: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, u.teamId).map((t) => t.name).join(' › '), leads: ctx.teams.filter((t) => t.leaderIds?.includes(u.id)).map((t) => t.name), manageable: canManage(ctx, u) && u.id !== ctx.user.id, sessions: canManage(ctx, u) ? iam.sessionsOf(u.id) : undefined })),
     roles: Object.entries(iam.roles()).map(([id, role]) => ({ id, ...role, home: homeOf(id, role), grantable: iam.canGrant(id, ctx.permissions), holders: iam.users().filter((u) => u.role === id).length })),
     teams: ctx.teams.filter((t) => ctx.scope.has(t.id) || ctx.permissions.has('teams.manage')).map((t) => ({ ...t, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaders: (t.leaderIds ?? []).map((id) => ({ id, name: userName(id) })), members: iam.users().filter((u) => u.teamId === t.id).length })),
     permissions: PERMISSIONS,
@@ -1642,7 +1699,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         const origin = req.headers.origin;
         // The page's own address (whatever name or IP it was opened by), or PUBLIC_URL (behind a proxy that changes Host).
         if (origin && !sameSite(origin, req)) throw fail(403, 'That request came from another site.');
-        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') ? CALC_LIMIT : pathname === '/api/settings/branding' ? 512 * 1024 : BODY_LIMIT);
+        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') ? CALC_LIMIT : pathname === '/api/settings/branding' || pathname === '/api/me/profile' ? 512 * 1024 : BODY_LIMIT);
       }
       let result;
       for (const h of match.handlers) result = await h(req, ctx, body, res, url, match.params);

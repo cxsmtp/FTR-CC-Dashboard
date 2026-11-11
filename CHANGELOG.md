@@ -2,6 +2,16 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.23.00 — 2026-11-11
+
+- **Your profile, as in CxMissionZero** (the menu under your name → **Your profile**), saved as you type:
+  - your **picture** (PNG, JPEG or WebP, up to 200 KB), shown in the top bar and on People; or your initials;
+  - who you are here: email, role, team, how you sign in, your last sign-in, and how many browsers you are signed in on, with **sign out everywhere else**;
+  - your **name**;
+  - your **time zone**: this computer’s, or one you choose; every date and time is then shown in it;
+  - **your Impact figures** (currency, developers’ hourly rate, minutes to triage and to fix a finding by hand): where you turn Impact on for an account, it starts from these;
+  - **your look** (when people may choose their own) and **your password** (for email and password sign-in).
+
 ## CC-01.22.00 — 2026-11-11
 
 - **A compact Overview.** The heading and its controls share one line, and the seven numbers are small tiles with a picture each (a ring for what is sold, still needed, accounts with a report and shared; a split for T&R and Fusion; an icon for the rest), so they take a fifth of the screen instead of nearly half. **Cards ▾** chooses which tiles you see; your choice is kept for you, on every device. The top bar is slimmer too.

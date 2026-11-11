@@ -108,13 +108,16 @@ export class Accounts {
     const next = patchProfile(current, patch, user.name);
     return this.accounts.put(next);
   }
-  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency }, hosts) {
+  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency }, hosts, { impactBase = null } = {}) {
     const account = this.get(id, teamIds);
     // Impact (beta): the soft savings in the report, off until the SE turns it on and confirms the currency.
     if (impactCurrency !== undefined) {
       const cur = String(impactCurrency).toUpperCase();
       if (!/^[A-Z]{3}$/.test(cur)) throw fail(400, 'Choose a currency.');
-      account.impact = impactSettings({ ...account.impact, currency: cur });
+      // The first time: what the account does not say yet comes from the SE's own figures (Your profile).
+      // Before it was ever confirmed the account holds only defaults: the SE's own figures (Your profile) replace them.
+      const own = !account.impactCurrencyConfirmed && impactBase ? Object.fromEntries(Object.entries(impactBase).filter(([k, v]) => v !== undefined && v !== null && v !== '' && k !== 'currency')) : {};
+      account.impact = impactSettings({ ...account.impact, ...own, currency: cur });
       account.impactCurrencyConfirmed = true;
     }
     if (impactEnabled !== undefined) {

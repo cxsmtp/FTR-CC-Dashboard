@@ -428,3 +428,33 @@ test('branding: name, look and logo for everyone; an SVG runs nothing; bad image
   // Back to the defaults for the other tests.
   await admin.put('/api/settings/branding', { appName: 'FTR Credits', tagline: 'Command Center', look: 'aurora', letChoose: true, menu: 'left', accent: '', logo: null, icon: null });
 });
+
+test('your profile: name, time zone, picture, Impact figures that start an account’s Impact, sign out elsewhere', async () => {
+  const se = await client(env.base, 'se2@t.example');
+  const r = await se.put('/api/me/profile', { name: 'SE Two-Renamed', timeZone: 'Asia/Dubai', impact: { currency: 'AED', hourlyRate: 250, triageMinutes: 20, fixMinutes: 90 } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.user.name, 'SE Two-Renamed');
+  assert.equal(r.data.prefs.timeZone, 'Asia/Dubai');
+  assert.equal((await se.put('/api/me/profile', { timeZone: 'Mars/Olympus' })).status, 400);
+  // A picture: kept, served to people signed in; an SVG is refused.
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 2)]);
+  const pic = await se.put('/api/me/profile', { picture: png.toString('base64') });
+  assert.match(pic.data.picture, /^\/api\/people\/.+\/picture/);
+  assert.equal((await se.get(pic.data.picture)).status, 200);
+  assert.equal((await fetch(`${env.base}${pic.data.picture}`)).status, 401);
+  assert.equal((await se.put('/api/me/profile', { picture: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64') })).status, 415);
+  // Turning Impact on for an account starts from the SE's own figures.
+  const h = { 'X-Team': env.teams.emea.id };
+  const { data } = await se.post('/api/projections', { name: 'Profile Impact Corp' }, h);
+  const set = await se.put(`/api/cc/accounts/${data.customer.id}`, { impactCurrency: 'AED' }, h);
+  assert.equal(set.status, 200, JSON.stringify(set.data));
+  const acc = env.app.accounts.accounts.get(data.customer.id);
+  assert.equal(acc.impact.hourlyRate, 250);
+  assert.equal(acc.impact.triageMinutes, 20);
+  assert.equal(acc.impact.currency, 'AED');
+  // Sign out everywhere else: another browser's session ends, this one stays.
+  const other = await client(env.base, 'se2@t.example');
+  assert.equal((await se.post('/api/me/signout-others', {})).status, 200);
+  assert.equal((await other.get('/api/me')).status, 401);
+  assert.equal((await se.get('/api/me')).status, 200);
+});

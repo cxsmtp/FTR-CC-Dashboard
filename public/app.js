@@ -8,8 +8,10 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const num = (n, d = 0) => (n === null || n === undefined || !Number.isFinite(Number(n)) ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: d }));
 const compact = (n) => (!Number.isFinite(Number(n)) ? '—' : Math.abs(n) >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : Math.abs(n) >= 1e4 ? `${Math.round(n / 1e3)}K` : num(Math.round(n)));
-const date = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
-const dateTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
+/** The time zone dates are shown in: the person's own (Your profile), else this computer's. */
+const tz = () => (typeof state !== 'undefined' && state.me?.prefs?.timeZone) || undefined;
+const date = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric', timeZone: tz() }) : '—');
+const dateTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: tz() }) : '—');
 const ago = (iso) => {
   if (!iso) return '—';
   const s = (Date.now() - Date.parse(iso)) / 1000;
@@ -20,6 +22,8 @@ const ago = (iso) => {
   return date(iso);
 };
 const initials = (name) => String(name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+/** A person's avatar: their picture (Your profile), else their initials. */
+const avatar = (name, picture, cls = 'sm') => (picture ? `<span class="avatar ${cls} pic"><img src="${esc(picture)}" alt="" /></span>` : `<span class="avatar ${cls}">${esc(initials(name))}</span>`);
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
 const ICONS = {
@@ -213,8 +217,8 @@ function shell(active, content) {
         <span class="tb-grow"></span>
         <span class="tb-lights" id="tb-lights"></span>
         <button class="tb-icon" id="tb-mode" title="Light or dark" aria-label="Light or dark">${icon('theme')}</button>
-        <div class="tb-me"><button class="tb-who" id="tb-who" aria-haspopup="true" aria-expanded="false"><span class="avatar sm">${esc(initials(me.user.name))}</span><span><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></span></button>
-          <div class="menu-list" id="tb-menu" hidden><button type="button" id="theme">${icon('theme')}Theme…</button><button type="button" data-go="/guide">${icon('guide')}Quick guide</button><button type="button" data-go="/about">About</button><button type="button" class="danger" id="signout">${icon('out')}Sign out</button></div></div>
+        <div class="tb-me"><button class="tb-who" id="tb-who" aria-haspopup="true" aria-expanded="false">${avatar(me.user.name, me.picture)}<span><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></span></button>
+          <div class="menu-list" id="tb-menu" hidden><button type="button" data-go="/profile">${icon('people')}Your profile</button><button type="button" id="theme">${icon('theme')}Theme…</button><button type="button" data-go="/guide">${icon('guide')}Quick guide</button><button type="button" data-go="/about">About</button><button type="button" class="danger" id="signout">${icon('out')}Sign out</button></div></div>
       </header>
       <main class="main fade" id="main">${content}</main>
     </div>
@@ -1189,7 +1193,7 @@ function peopleTable(d) {
         ${u.sessions ? `<button type="button" data-act="signout">Sign out everywhere (${num(u.sessions)})</button>` : ''}
         <button type="button" data-act="toggle">${u.active ? 'Turn access off' : 'Turn access on'}</button>
         <button type="button" data-act="remove" class="danger">Remove</button></div></details>` : '';
-      return `<tr data-id="${esc(u.id)}"><td><div class="flex nowrap"><span class="avatar sm">${esc(initials(u.name))}</span><div><b>${esc(u.name)}</b>${u.id === state.me.user.id ? ' <span class="chip">You</span>' : ''}<span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td>
+      return `<tr data-id="${esc(u.id)}"><td><div class="flex nowrap">${avatar(u.name, u.picture)}<div><b>${esc(u.name)}</b>${u.id === state.me.user.id ? ' <span class="chip">You</span>' : ''}<span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td>
         <td><span class="chip role">${esc(u.roleName)}</span>${u.leads.length ? `<span class="sub">Leads ${esc(u.leads.join(', '))}</span>` : ''}</td><td title="${esc(u.teamPath)}">${esc(u.team || '—')}</td>
         <td class="small">${u.signIn === 'sso' ? 'Single sign-on' : 'Password'}</td><td><span class="chip ${kind}"><i></i>${label}</span>${u.lockedUntil ? `<span class="sub">until ${esc(new Date(u.lockedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>` : ''}</td>
         <td class="small">${esc(ago(u.lastSignInAt))}</td><td class="actions">${acts}</td></tr>`;
@@ -2495,6 +2499,118 @@ async function viewAbout(params) {
   $('#main').innerHTML = `<div class="head compact"><div class="ht"><h1 class="serif">About</h1></div></div>${await aboutHtml()}`;
   if (params?.get?.('doc')) openDoc(params.get('doc'));
 }
+// ---- Your profile, as CxMissionZero has it: who you are here, and how the command center appears to you ---------------
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'AED', 'SAR', 'QAR', 'KWD', 'BHD', 'OMR', 'ILS', 'TRY', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'ZAR', 'NGN', 'KES', 'EGP', 'JPY', 'CNY', 'HKD', 'SGD', 'AUD', 'NZD', 'KRW', 'TWD', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'CAD', 'MXN', 'BRL', 'ARS', 'CLP', 'COP'];
+async function viewProfile() {
+  state.me = await api('/api/me');
+  const me = state.me;
+  const pr = me.prefs ?? {};
+  const imp = pr.impact ?? {};
+  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Every zone this browser knows, with this computer's and the one chosen, and today's names of renamed ones.
+  const zones = [...new Set([...(typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []), here, pr.timeZone, 'Asia/Kolkata', 'Asia/Kathmandu', 'Europe/Kyiv', 'Asia/Ho_Chi_Minh'].filter(Boolean))].sort();
+  const offset = (z) => {
+    try {
+      return new Intl.DateTimeFormat('en', { timeZone: z, timeZoneName: 'shortOffset' }).formatToParts(new Date()).find((x) => x.type === 'timeZoneName')?.value ?? '';
+    } catch {
+      return '';
+    }
+  };
+  const own = state.branding?.letChoose !== false;
+  shell('profile', `<div class="head compact"><div class="ht"><h1 class="serif">Your profile</h1><span class="crumbs">how the command center appears to you · only you can change it, in every browser you sign in from</span></div></div>
+    <div class="saved-banner">✓ Changes save as you type.</div>
+    <div class="panel profile">
+      <div class="prof-top">
+        <div class="prof-pic">${avatar(me.user.name, me.picture, 'xl')}<div class="flex"><label class="btn sm">${me.picture ? 'Change picture' : 'Add a picture'}<input type="file" id="pf-pic" accept="image/png,image/jpeg,image/webp" hidden /></label>${me.picture ? '<button type="button" class="sm ghost" id="pf-pic-rm">Remove</button>' : ''}</div></div>
+        <dl class="kv prof-facts"><dt>Email</dt><dd>${esc(me.user.email)}</dd><dt>Role</dt><dd>${esc(me.role.name)}</dd><dt>Team</dt><dd>${esc(me.team?.path ?? '—')}</dd><dt>Signed in with</dt><dd>${me.user.signIn === 'sso' ? 'Single sign-on' : 'Email and password'}</dd><dt>Last sign-in</dt><dd>${esc(dateTime(me.user.lastSignInAt))}</dd><dt>Signed in on</dt><dd>${num(me.sessions)} browser${me.sessions === 1 ? '' : 's'} <button type="button" class="link" id="pf-others" ${me.sessions > 1 ? '' : 'hidden'}>sign out everywhere else</button></dd></dl>
+      </div>
+      <form class="form" id="pf" autocomplete="off" data-nodraft>
+        <label class="f">Name<input name="name" maxlength="120" value="${esc(me.user.name)}" /></label>
+        <div class="sep-line"></div>
+        <h3>Time zone</h3>
+        <label class="check"><input type="checkbox" name="tzAuto" ${pr.timeZone ? '' : 'checked'} /><span>Use this computer’s time zone</span></label>
+        <p class="muted small">Detected on this computer: <b>${esc(here)} (${esc(offset(here))})</b></p>
+        <label class="f">Time zone<select name="timeZone" ${pr.timeZone ? '' : 'disabled'}>${zones.map((z) => `<option value="${esc(z)}"${(pr.timeZone || here) === z ? ' selected' : ''}>${esc(z)}</option>`).join('')}</select></label>
+        <p class="muted small">Dates and times on these pages are shown in this time zone.</p>
+        <div class="sep-line"></div>
+        <h3>Your Impact figures</h3>
+        <p class="muted small">Where you turn Impact on for an account, it starts from these (the account can then have its own).</p>
+        <div class="row4">
+          <label class="f">Currency<select name="currency"><option value="">The account’s, suggested when you turn Impact on</option>${CURRENCIES.map((c) => `<option${imp.currency === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
+          <label class="f">Developers’ hourly rate<input name="hourlyRate" type="number" min="0" step="1" value="${esc(imp.hourlyRate ?? '')}" placeholder="50" /></label>
+          <label class="f">Minutes to triage a finding by hand<input name="triageMinutes" type="number" min="0" step="1" value="${esc(imp.triageMinutes ?? '')}" placeholder="30" /></label>
+          <label class="f">Minutes to fix a finding by hand<input name="fixMinutes" type="number" min="0" step="1" value="${esc(imp.fixMinutes ?? '')}" placeholder="120" /></label>
+        </div>
+      </form>
+      ${own ? `<div class="sep-line"></div><h3>Your look</h3><div class="flex"><button type="button" id="pf-theme">${icon('theme')}Choose your theme…</button><span class="muted small">Light, dark or your computer’s, in one of the looks; the Admin’s look when you choose none.</span></div>` : ''}
+      ${me.user.signIn === 'sso' ? '' : `<div class="sep-line"></div><h3>Password</h3>
+      <form class="form row4" id="pw2" autocomplete="off" data-nodraft><label class="f">Current password<input type="password" name="current" autocomplete="current-password" required /></label><label class="f">New password<input type="password" name="next" autocomplete="new-password" minlength="12" required /></label><label class="f">New password again<input type="password" name="again" autocomplete="new-password" minlength="12" required /></label><div class="f"><span>&nbsp;</span><button class="primary" type="submit">Change password</button></div></form><p class="err" id="pw2-err"></p>`}
+    </div>
+    <div class="saved-foot" id="pfsaved">All changes are saved.</div>`);
+  const say = (t, bad) => {
+    $('#pfsaved').textContent = t;
+    $('#pfsaved').classList.toggle('bad', Boolean(bad));
+  };
+  const save = async (patch) => {
+    say('Saving…');
+    try {
+      const r = await api('/api/me/profile', { method: 'PUT', body: patch });
+      state.me.user = { ...state.me.user, ...r.user };
+      state.me.prefs = r.prefs;
+      state.me.picture = r.picture;
+      say(`All changes are saved ✓ ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      return r;
+    } catch (error) {
+      say(`${error.message} What was saved before is kept.`, true);
+      return null;
+    }
+  };
+  const f = $('#pf');
+  let timer = null;
+  f.elements.name.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => save({ name: f.elements.name.value }), 600);
+  });
+  f.elements.tzAuto.addEventListener('change', () => {
+    f.elements.timeZone.disabled = f.elements.tzAuto.checked;
+    save({ timeZone: f.elements.tzAuto.checked ? '' : f.elements.timeZone.value });
+  });
+  f.elements.timeZone.addEventListener('change', () => save({ timeZone: f.elements.timeZone.value }));
+  const impact = () => ({ currency: f.elements.currency.value, hourlyRate: f.elements.hourlyRate.value, triageMinutes: f.elements.triageMinutes.value, fixMinutes: f.elements.fixMinutes.value });
+  for (const n of ['currency', 'hourlyRate', 'triageMinutes', 'fixMinutes']) f.elements[n].addEventListener('change', () => save({ impact: impact() }));
+  f.onsubmit = (e) => e.preventDefault();
+  $('#pf-pic').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) return say(`${file.name} is ${Math.round(file.size / 1024)} KB: at most 200 KB.`, true);
+    if (await save({ picture: await fileToBase64(file) })) viewProfile();
+  };
+  if ($('#pf-pic-rm')) $('#pf-pic-rm').onclick = async () => (await save({ picture: null })) && viewProfile();
+  if ($('#pf-theme')) $('#pf-theme').onclick = themePicker;
+  $('#pf-others').onclick = async () => {
+    try {
+      await api('/api/me/signout-others', { method: 'POST', body: {} });
+      toast('Signed out everywhere else; this browser stays signed in.', 'ok');
+      viewProfile();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+  if ($('#pw2')) $('#pw2').onsubmit = async (e) => {
+    e.preventDefault();
+    const g = new FormData(e.target);
+    if (g.get('next') !== g.get('again')) return ($('#pw2-err').textContent = 'The two new passwords are not the same.');
+    try {
+      await api('/api/me/password', { method: 'POST', body: { current: g.get('current'), next: g.get('next') } });
+      e.target.reset();
+      $('#pw2-err').textContent = '';
+      toast('Password changed. Other browsers are signed out.', 'ok');
+    } catch (error) {
+      $('#pw2-err').textContent = error.message;
+    }
+  };
+}
+
 /** Terms of use, the licence and the user guide: read here, in the app’s own look, never as a bare file in a new tab. */
 const DOCS = [['terms', 'Terms of use', '/legal/terms'], ['license', 'License', '/legal/license'], ['guide', 'User guide', '/legal/guide']];
 async function openDoc(which = 'terms') {
@@ -2763,6 +2879,7 @@ async function route() {
     if (path === '/audit') return await viewAudit(params);
     if (path === '/activity') return await viewActivity(params);
     if (path === '/guide') return viewGuide(params);
+    if (path === '/profile') return viewProfile();
     if (path === '/about') return await viewAbout(params);
     if (path === '/legal') return await viewAbout(new URLSearchParams(`doc=${params.get('doc') ?? 'terms'}`));
     go(home());
