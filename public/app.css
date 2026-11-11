@@ -455,3 +455,23 @@ table.audit tr.refused td { background: color-mix(in srgb, var(--red) 6%, transp
 @media (max-width: 1100px) { .gx-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) { .gx-steps { grid-template-columns: 1fr; } .gx-hero { flex-direction: column; align-items: flex-start; } }
 @media (prefers-reduced-motion: reduce) { .gx-step, .gx-step::before { animation: none; opacity: 1; transform: none; } .gx-orbit i, .gx-orbit span, .gx-art svg { animation: none; } }
+
+/* Multi-select filter: a dropdown of checkboxes */
+.mpick { position: relative; }
+.mpick > summary { list-style: none; cursor: pointer; display: grid; gap: 4px; font-size: 12px; color: var(--muted); min-width: 150px; }
+.mpick > summary::-webkit-details-marker { display: none; }
+.mpick .mp-v { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-radius: 11px; border: 1px solid var(--line-hi); background: var(--panel-hi); color: var(--text); font-weight: 500; font-size: 14px; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mpick .mp-v::after { content: "\25BE"; color: var(--muted); }
+.mpick.active .mp-v { border-color: var(--cyan); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 15%, transparent); }
+.mp-menu { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 240px; max-width: 340px; padding: 8px; border-radius: 14px; border: 1px solid var(--line-hi); background: var(--panel-solid); box-shadow: var(--glow), 0 20px 40px -20px rgba(0, 0, 0, .5); }
+.mp-q { margin-bottom: 6px; }
+.mp-acts { display: flex; gap: 12px; padding: 2px 4px 6px; font-size: 12px; }
+.mp-list { max-height: 260px; overflow: auto; display: grid; gap: 2px; }
+.mp-list label { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.mp-list label:hover { background: var(--panel-hi); }
+.mp-list input { width: auto; }
+button.link { border: 0; background: none; padding: 0; color: var(--cyan); font-size: inherit; }
+.switch { display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line-hi); background: var(--panel-hi); cursor: pointer; }
+.switch input { width: auto; }
+.kpis.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .kpis.five { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

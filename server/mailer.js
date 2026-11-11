@@ -75,6 +75,7 @@ export function mergeSmtp(current, input = {}) {
   if (typeof input.password === 'string' && input.password !== '') smtp.password = input.password.slice(0, 512);
   else if (input.password === null || hostChanged) smtp.password = '';
   if (smtp.host && !/^[a-z0-9.-]+$/.test(smtp.host)) throw new MailError('The mail server is a host name, like smtp.office365.com.');
+  if (smtp.secure && (smtp.port === 587 || smtp.port === 25)) throw new MailError(`Port ${smtp.port} uses STARTTLS: untick Implicit TLS (it is for port 465).`);
   if (smtp.fromAddress && !EMAIL.test(smtp.fromAddress)) throw new MailError('The "from" address is not an email address.');
   return smtp;
 }

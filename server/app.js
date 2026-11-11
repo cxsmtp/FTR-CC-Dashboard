@@ -17,6 +17,7 @@ import { suggestCurrency } from './currency.js';
 import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } from './customer-version.js';
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore } from './updates.js';
+import { ActivityLog } from './activity.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
 import { recoverDataDir } from './recover.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
@@ -56,6 +57,14 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     git: config.gitHosts ?? (settings.value.gitHosts?.length ? settings.value.gitHosts : DEFAULT_GIT_HOSTS),
   });
   const calc = calculatorService ?? new CalculatorService({ cxoneHosts: hosts().cxone, gitHosts: hosts().git, log });
+  // Checkmarx One activity (server/activity.js): every call to a customer's tenant, per person and account.
+  const activity = new ActivityLog({ dataDir: config.dataDir });
+  calc.activity = activity;
+  calc.describe = (userId, accountId) => {
+    const u = iam.byId(userId);
+    const meta = accountId ? accounts.accounts.meta(accountId) : null;
+    return { user: u ? { id: u.id, name: u.name, email: u.email, teamId: u.teamId } : { id: userId }, account: meta ? { id: meta.id, name: meta.name, teamId: meta.teamId } : null };
+  };
   const syncHosts = () => Object.assign(calc, { cxoneHosts: hosts().cxone, gitHosts: hosts().git });
   const idleMs = config.sessionIdleHours * 3600 * 1000;
   const startJobs = [];
@@ -1235,6 +1244,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/projections/reports', calcTeam, (req, ctx, body) => {
     const rep = accounts.addReport({ customerId: String(body?.customerId ?? ''), data: body?.data, user: ctx.user }, ctx.teamSet);
     record(ctx, req, 'report.create', rep.customer, { id: rep.id, totalCredits: rep.totalCredits, team: teams.get(rep.teamId)?.name });
+    const repMeta = accounts.accounts.meta(String(body?.customerId ?? ''));
+    activity.add({ kind: 'report', user: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, teamId: ctx.user.teamId }, account: repMeta ? { id: repMeta.id, name: repMeta.name, teamId: repMeta.teamId } : null, tenant: calc.status(ctx.user.id).tenant || '', ok: true, detail: `${Math.round(rep.totalCredits ?? 0).toLocaleString('en')} credits` });
     const { data, ...meta } = rep;
     void data;
     return { report: meta };
@@ -1259,6 +1270,62 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return view;
   });
   r('GET', '/api/cc/work', perm('calculator.use'), (req, ctx) => calc.work(ctx.user.id));
+  /**
+   * Checkmarx One activity, for everyone: their own, and that of the teams they see (an SE their team; a leader every
+   * team below; Executives and Admins all). Filter by people, tenant, kind, account, outcome and dates.
+   */
+  r('GET', '/api/activity', ready2, (req, ctx, body, res, url) => {
+    const sp = url.searchParams;
+    const list = (k) => sp.getAll(k).flatMap((v) => v.split(',')).map((v) => v.trim()).filter(Boolean);
+    const who = new Set(list('who').map((x) => (x === 'me' ? ctx.user.id : x)));
+    const tenants = new Set(list('tenant'));
+    const kinds = new Set(list('kind'));
+    const accountIds = new Set(list('account'));
+    const outcome = sp.get('outcome') ?? '';
+    const from = sp.get('from') ? Date.parse(sp.get('from')) : null;
+    const to = sp.get('to') ? Date.parse(sp.get('to')) + 86_400_000 : null;
+    const before = sp.get('before') ?? '';
+    const limit = Math.min(500, Math.max(1, Number(sp.get('limit')) || 200));
+    const visible = (e) => e.user?.id === ctx.user.id || ctx.scope.has(e.user?.teamId) || (e.account && ctx.scope.has(e.account.teamId));
+    const matches = (e) => {
+      if (!visible(e)) return false;
+      if (before && e.at >= before) return false;
+      const t = Date.parse(e.at);
+      if (from && t < from) return false;
+      if (to && t >= to) return false;
+      if (who.size && !who.has(e.user?.id)) return false;
+      if (tenants.size && !tenants.has(e.tenant)) return false;
+      if (kinds.size && !kinds.has(e.kind)) return false;
+      if (accountIds.size && !accountIds.has(e.account?.id)) return false;
+      if (outcome === 'ok' && e.ok === false) return false;
+      if (outcome === 'failed' && e.ok !== false) return false;
+      return true;
+    };
+    const events = activity.recent({ limit: limit + 1, filter: matches });
+    // The filters, and a summary of the last 30 days, from what this person may see.
+    const since = Date.now() - 30 * 86_400_000;
+    const seen = activity.recent({ limit: 20000, filter: (e) => visible(e) && Date.parse(e.at) >= since });
+    const people = new Map();
+    const tenantSet = new Set();
+    const accountsSeen = new Map();
+    const summary = { calls: 0, failed: 0, reads: 0, reports: 0, connects: 0, tenants: 0, ms: 0 };
+    for (const e of seen) {
+      if (e.user?.id) people.set(e.user.id, { id: e.user.id, name: e.user.name ?? e.user.email ?? e.user.id, email: e.user.email ?? '' });
+      if (e.tenant) tenantSet.add(e.tenant);
+      if (e.account?.id) accountsSeen.set(e.account.id, { id: e.account.id, name: e.account.name });
+      if (e.kind === 'call') {
+        summary.calls++;
+        summary.ms += e.ms ?? 0;
+        if (e.ok === false) summary.failed++;
+      }
+      if (e.kind === 'read' && e.detail?.startsWith('finished')) summary.reads++;
+      if (e.kind === 'report') summary.reports++;
+      if (e.kind === 'connect' && e.ok) summary.connects++;
+    }
+    summary.tenants = tenantSet.size;
+    summary.avgMs = summary.calls ? Math.round(summary.ms / summary.calls) : 0;
+    return { events: events.slice(0, limit), more: events.length > limit, me: ctx.user.id, people: [...people.values()].sort((a, b) => a.name.localeCompare(b.name)), tenants: [...tenantSet].sort(), accounts: [...accountsSeen.values()].sort((a, b) => a.name.localeCompare(b.name)), summary };
+  });
   /** The calculator page's settings for this person (the page itself is the same for everyone). */
   r('GET', '/api/cc/calc-config', perm('calculator.use'), (req, ctx) => ({
     csrf: ctx.session.csrf,
@@ -1309,6 +1376,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
 
   r('POST', '/api/cc/cxone/connect', perm('calculator.use'), async (req, ctx, body) => {
+    const forAccount = body?.accountId ? accounts.accounts.meta(String(body.accountId)) : null;
+    if (forAccount && ctx.scope.has(forAccount.teamId)) calc.workingOn(ctx.user.id, { id: forAccount.id, name: forAccount.name, teamId: forAccount.teamId });
     const state = await calc.connectKey(ctx.user.id, body);
     record(ctx, req, 'cxone.connect', state.tenant, { baseUrl: state.baseUrl });
     // "Remember this key for the account": sealed on this server, used again by the team for one-click refreshes.
@@ -1326,8 +1395,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const key = JSON.parse(secrets.open(kept.sealedKey) || 'null');
     if (!key?.apiKey) throw fail(409, 'The key kept for this account could not be opened (was the data folder moved without secret.key?). Paste it again.');
     let state;
+    const meta = accounts.accounts.meta(params.id);
+    if (meta) calc.workingOn(ctx.user.id, { id: meta.id, name: meta.name, teamId: meta.teamId });
     try {
-      state = await calc.connectKey(ctx.user.id, key);
+      state = await calc.connectKey(ctx.user.id, { ...key, kept: true });
     } catch (error) {
       record(ctx, req, 'cxone.key.failed', accounts.accounts.meta(params.id)?.name ?? '', { error: error.message });
       throw fail(error.status ?? 400, `${error.message} The kept key may have expired: paste a new one and tick "Remember".`);
@@ -1549,7 +1620,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     for (const job of startJobs) job();
     await resumeReads().catch((error) => log(`! [recover] ${error.message}`));
   }
-  stopJobs.push(() => acme.stop(), () => httpsManager.stop());
+  stopJobs.push(() => acme.stop(), () => httpsManager.stop(), () => activity.flush());
   const stop = () => stopJobs.forEach((j) => j());
   /** An update without a restart: this process stops writing and gives what it holds in memory to the next. */
   const handoff = () => {
@@ -1566,5 +1637,5 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   };
   const adopt = (state) => state?.calc && calc.adopt(state.calc);
 
-  return { handle, httpsOnly, started, stop, handoff, resume, adopt, release: () => calc.release(), https: httpsManager, acme, version: VERSION, versionLabel: versionLabel(), ready, iam, teams, accounts, audit, terms, settings, calc, SECURITY_HEADERS, APP_CSP };
+  return { handle, httpsOnly, started, stop, activity, handoff, resume, adopt, release: () => calc.release(), https: httpsManager, acme, version: VERSION, versionLabel: versionLabel(), ready, iam, teams, accounts, audit, terms, settings, calc, SECURITY_HEADERS, APP_CSP };
 }

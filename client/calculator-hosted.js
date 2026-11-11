@@ -108,6 +108,7 @@ export async function startHosted() {
       teams: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v4M12 11.5 5 16.5M12 11.5l7 5"/>',
       admin: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
       audit: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>',
+      pulse: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
       guide: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5h0"/>',
     };
     const can = (p) => perms.has(p);
@@ -117,6 +118,7 @@ export async function startHosted() {
     $('cc-nav').innerHTML = `<div class="cc-label">Insight</div>
       ${link('/#/overview', 'overview', 'Overview', can('dashboard.view'))}
       ${link('/#/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
+      ${link('/#/activity', 'pulse', 'Checkmarx One activity')}
       ${link('/#/people', 'people', can('users.manage') ? 'People &amp; roles' : 'People')}
       <div class="cc-label">Work</div>
       ${link('/calculator', 'calc', 'Calculator', true, true)}
@@ -727,6 +729,33 @@ export async function startHosted() {
     }
   });
   $('hc-name').addEventListener('blur', () => setTimeout(() => !naming && syncName(), 200));
+  // ---- Projection settings: collapsed until opened (the Read button stays in view) ------------------------------
+  const heart = document.getElementById('calc-heart');
+  const heartHead = heart?.querySelector('.calc-heart-head');
+  if (heart && heartHead) {
+    const HEART_KEY = 'cc-heart-open';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'ghost sm hc-heart-toggle';
+    heartHead.append(toggle);
+    const set = (open) => {
+      heart.classList.toggle('hc-collapsed', !open);
+      toggle.textContent = open ? 'Hide settings ▴' : 'Show settings ▾';
+      toggle.setAttribute('aria-expanded', String(open));
+      try {
+        localStorage.setItem(HEART_KEY, open ? '1' : '0');
+      } catch {}
+    };
+    let open = false;
+    try {
+      open = localStorage.getItem(HEART_KEY) === '1';
+    } catch {}
+    set(open);
+    heartHead.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      set(heart.classList.contains('hc-collapsed'));
+    });
+  }
   const empty = document.getElementById('calc-empty');
   if (empty) empty.innerHTML = 'No accounts yet in this team. Type the customer’s name, as in Salesforce, at the top: each account keeps its own Checkmarx One data, plan and Fusion projects, saved as you go.';
 

@@ -30,6 +30,7 @@ const ICONS = {
   teams: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v4M12 11.5 5 16.5M12 11.5l7 5"/>',
   admin: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
   audit: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>',
+  pulse: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
   guide: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5h0"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
@@ -158,6 +159,7 @@ function shell(active, content) {
         <div class="label">Insight</div>
         ${link('/overview', 'overview', 'Overview', can('dashboard.view'))}
         ${link('/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
+        ${link('/activity', 'pulse', 'Checkmarx One activity')}
         ${link('/people', 'people', can('users.manage') ? 'People & roles' : 'People')}
         ${can('calculator.use') ? '<div class="label">Work</div>' : ''}
         ${can('calculator.use') ? `<a href="/calculator">${icon('calc')}<span>Calculator</span></a>` : ''}
@@ -1783,13 +1785,23 @@ function wireSmtp() {
     $('#smtp-msg').textContent = text;
     $('#smtp-msg').className = `small ${ok ? 'ok-t' : 'err'}`;
   };
-  form.onsubmit = async (e) => {
-    e.preventDefault();
+  /** What the form says, saved: Test connection and Send test email always try exactly that. */
+  const save = async () => {
     const f = new FormData(form);
     const smtp = { host: f.get('host'), port: Number(f.get('port')), secure: f.get('secure') === 'on', requireAuth: f.get('requireAuth') === 'on', rejectUnauthorized: f.get('rejectUnauthorized') === 'on', user: f.get('user'), fromName: f.get('fromName'), fromAddress: f.get('fromAddress') };
     if (f.get('password')) smtp.password = f.get('password');
+    await api('/api/settings/smtp', { method: 'PUT', body: { smtp, passwordReset: f.get('passwordReset') } });
+  };
+  // Implicit TLS goes with port 465; 587 and 25 use STARTTLS.
+  form.elements.port.addEventListener('change', () => {
+    const port = Number(form.elements.port.value);
+    if (port === 465) form.elements.secure.checked = true;
+    if (port === 587 || port === 25) form.elements.secure.checked = false;
+  });
+  form.onsubmit = async (e) => {
+    e.preventDefault();
     try {
-      await api('/api/settings/smtp', { method: 'PUT', body: { smtp, passwordReset: f.get('passwordReset') } });
+      await save();
       toast('Saved. Now Test connection: nothing is sent until it succeeds.', 'ok');
       viewAdmin('email');
     } catch (error) {
@@ -1797,8 +1809,9 @@ function wireSmtp() {
     }
   };
   $('#smtp-test').onclick = async () => {
-    msg('Testing…', true);
+    msg('Saving and testing…', true);
     try {
+      await save();
       const r = await api('/api/settings/smtp/test', { method: 'POST', body: {} });
       toast(r.message, 'ok');
       viewAdmin('email');
@@ -1892,6 +1905,114 @@ async function viewAudit(params) {
   };
 }
 
+// ---- Multi-select: a dropdown of checkboxes with a search, for filters everywhere --------------------------------------
+/** options: [[value, label]]; selected: a Set of values. The chosen values are read with pickValues(root). */
+function multiPick(name, label, options, selected = new Set()) {
+  const n = selected.size;
+  return `<details class="mpick" data-name="${esc(name)}"><summary><span class="mp-l">${esc(label)}</span><b class="mp-v">${n ? (n === 1 ? esc(options.find(([v]) => selected.has(v))?.[1] ?? '1 chosen') : `${n} chosen`) : 'All'}</b></summary>
+    <div class="mp-menu">${options.length > 8 ? '<input class="mp-q" placeholder="Find…" />' : ''}<div class="mp-acts"><button type="button" class="link" data-mp="all">All</button><button type="button" class="link" data-mp="none">None</button></div>
+    <div class="mp-list">${options.map(([v, l]) => `<label><input type="checkbox" value="${esc(v)}" ${selected.has(v) ? 'checked' : ''} /><span>${esc(l)}</span></label>`).join('') || '<span class="muted small">Nothing to choose yet</span>'}</div></div></details>`;
+}
+function wirePicks(root = document, onChange = () => {}) {
+  for (const d of root.querySelectorAll('.mpick')) {
+    if (d.dataset.wired) continue;
+    d.dataset.wired = '1';
+    const update = () => {
+      const on = [...d.querySelectorAll('.mp-list input:checked')];
+      d.querySelector('.mp-v').textContent = on.length === 0 ? 'All' : on.length === 1 ? on[0].nextElementSibling.textContent : `${on.length} chosen`;
+      d.classList.toggle('active', on.length > 0);
+      onChange(d);
+    };
+    d.classList.toggle('active', d.querySelectorAll('.mp-list input:checked').length > 0);
+    d.addEventListener('change', (e) => e.target.matches('.mp-list input') && update());
+    d.querySelector('.mp-q')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      for (const l of d.querySelectorAll('.mp-list label')) l.hidden = !l.textContent.toLowerCase().includes(q);
+    });
+    d.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-mp]')?.dataset.mp;
+      if (!act) return;
+      for (const i of d.querySelectorAll('.mp-list label:not([hidden]) input')) i.checked = act === 'all';
+      update();
+    });
+  }
+  // One open at a time; a click elsewhere closes them.
+  if (!document.body.dataset.mpWired) {
+    document.body.dataset.mpWired = '1';
+    document.addEventListener('click', (e) => {
+      for (const d of document.querySelectorAll('.mpick[open]')) if (!d.contains(e.target)) d.open = false;
+    });
+  }
+}
+const pickValues = (root, name) => [...(root.querySelector(`.mpick[data-name="${name}"]`)?.querySelectorAll('.mp-list input:checked') ?? [])].map((i) => i.value);
+
+// ---- Checkmarx One activity: every call to a customer's tenant, reads, connections, reports generated --------------
+const ACT_KINDS = [['call', 'API call'], ['connect', 'Connected'], ['disconnect', 'Disconnected'], ['read', 'Tenant read'], ['report', 'Report generated']];
+async function viewActivity(params) {
+  shell('activity', loading());
+  const get = (k) => new Set((params.get(k) ?? '').split(',').filter(Boolean));
+  const f = { who: get('who'), tenant: get('tenant'), kind: get('kind'), account: get('account'), outcome: params.get('outcome') ?? '', from: params.get('from') ?? '', to: params.get('to') ?? '' };
+  const qs = () => new URLSearchParams(Object.entries(f).map(([k, v]) => [k, v instanceof Set ? [...v].join(',') : v]).filter(([, v]) => v)).toString();
+  const d = await api(`/api/activity${qs() ? `?${qs()}` : ''}`);
+  const onlyMe = f.who.size === 1 && (f.who.has('me') || f.who.has(d.me));
+  const sm = d.summary;
+  const row = (e) => `<tr class="${e.ok === false ? 'refused' : ''}"><td class="small nowrap">${esc(dateTime(e.at))}</td><td>${esc(e.user?.name ?? '—')}<span class="sub">${esc(e.user?.email ?? '')}</span></td><td><span class="chip ${e.ok === false ? 'bad' : e.kind === 'report' ? 'ok' : ''}"><i></i>${esc(ACT_KINDS.find(([k]) => k === e.kind)?.[1] ?? e.kind)}</span></td><td class="mono small">${esc(e.tenant ?? '')}</td><td>${e.account ? `<a href="#/accounts/${encodeURIComponent(e.account.id)}">${esc(e.account.name)}</a>` : '<span class="muted">—</span>'}</td><td class="mono small">${e.method ? `${esc(e.method)} ${esc(e.path ?? '')}` : esc(e.detail ?? '')}</td><td class="small nowrap">${e.status ? `<b>${esc(e.status)}</b> · ` : ''}${e.ms !== undefined ? `${num(e.ms)} ms` : ''}${e.method && e.detail ? `<span class="sub">${esc(e.detail)}</span>` : ''}</td></tr>`;
+  $('#main').innerHTML = `<div class="head"><div><div class="crumbs">Insight</div><h1 class="serif">Checkmarx One activity</h1><p>Every call made to a customer’s Checkmarx One tenant, on whose behalf and for which account, with its result and time; and every connection, tenant read and report generated. You see your own and that of the teams you see.</p></div>
+      <div class="tools"><label class="switch"><input type="checkbox" id="onlyme" ${onlyMe ? 'checked' : ''} /><span>Only me</span></label></div></div>
+    <div class="kpis five">
+      <div class="kpi"><div class="k">API calls · 30 days</div><div class="v">${num(sm.calls)}</div><div class="s">${num(sm.avgMs)} ms on average</div></div>
+      <div class="kpi ${sm.failed ? 'warn' : ''}"><div class="k">Calls that failed</div><div class="v">${num(sm.failed)}</div><div class="s">${sm.calls ? `${pct(sm.failed, sm.calls)}% of calls` : 'none yet'}</div></div>
+      <div class="kpi"><div class="k">Tenants</div><div class="v">${num(sm.tenants)}</div><div class="s">${num(sm.connects)} connection${sm.connects === 1 ? '' : 's'}</div></div>
+      <div class="kpi"><div class="k">Tenant reads</div><div class="v">${num(sm.reads)}</div><div class="s">finished</div></div>
+      <div class="kpi"><div class="k">Reports generated</div><div class="v">${num(sm.reports)}</div><div class="s">in the calculator</div></div>
+    </div>
+    <div class="panel"><form class="filters" id="actf">
+      ${multiPick('who', 'People', d.people.map((p) => [p.id, p.id === d.me ? `${p.name} (me)` : p.name]), new Set([...f.who].map((x) => (x === 'me' ? d.me : x))))}
+      ${multiPick('tenant', 'Tenant', d.tenants.map((t) => [t, t]), f.tenant)}
+      ${multiPick('kind', 'What', ACT_KINDS, f.kind)}
+      ${multiPick('account', 'Account', d.accounts.map((a) => [a.id, a.name]), f.account)}
+      <label class="f">Outcome<select name="outcome"><option value="">All</option><option value="ok"${f.outcome === 'ok' ? ' selected' : ''}>Succeeded</option><option value="failed"${f.outcome === 'failed' ? ' selected' : ''}>Failed</option></select></label>
+      <label class="f">From<input type="date" name="from" value="${esc(f.from)}" /></label>
+      <label class="f">To<input type="date" name="to" value="${esc(f.to)}" /></label>
+      <div class="flex"><button class="primary">Apply</button>${qs() ? '<a class="btn ghost" href="#/activity">Clear</a>' : ''}</div>
+    </form>
+    <div class="tw mt"><table class="audit"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Tenant</th><th>Account</th><th>Request</th><th>Result</th></tr></thead><tbody id="actrows">${d.events.map(row).join('') || '<tr><td colspan="7"><div class="empty"><b>No activity yet</b>Connections to Checkmarx One, reads and reports generated in the calculator show here.</div></td></tr>'}</tbody></table></div>
+    <div class="flex mt"><button id="actmore" ${d.more ? '' : 'hidden'}>Older entries</button><span class="muted small" id="actcount">${d.events.length} shown</span></div></div>`;
+  wirePicks($('#main'));
+  const apply = () => {
+    const form = $('#actf');
+    const out = new URLSearchParams();
+    for (const k of ['who', 'tenant', 'kind', 'account']) {
+      const v = pickValues(form, k);
+      if (v.length) out.set(k, v.join(','));
+    }
+    for (const k of ['outcome', 'from', 'to']) if (form.elements[k].value) out.set(k, form.elements[k].value);
+    go(`/activity${out.toString() ? `?${out}` : ''}`);
+  };
+  $('#actf').onsubmit = (e) => {
+    e.preventDefault();
+    apply();
+  };
+  $('#onlyme').onchange = (e) => {
+    const out = new URLSearchParams(qs());
+    if (e.target.checked) out.set('who', 'me');
+    else out.delete('who');
+    go(`/activity${out.toString() ? `?${out}` : ''}`);
+  };
+  let last = d.events.at(-1)?.at ?? '';
+  let shown = d.events.length;
+  $('#actmore').onclick = async (e) => {
+    e.target.disabled = true;
+    const next = await api(`/api/activity?${new URLSearchParams([...new URLSearchParams(qs()), ['before', last]])}`);
+    $('#actrows').insertAdjacentHTML('beforeend', next.events.map(row).join(''));
+    last = next.events.at(-1)?.at ?? last;
+    shown += next.events.length;
+    $('#actcount').textContent = `${shown} shown`;
+    e.target.disabled = false;
+    e.target.hidden = !next.more;
+  };
+}
+
 // ---- About: the version, what is new, the licence ------------------------------------------------------------------
 /** Markdown from this repository's own files (CHANGELOG.md), as safe HTML: headings, lists, bold and code only. */
 function md(text) {
@@ -1947,6 +2068,7 @@ async function route() {
     if (path === '/admin') return await viewAdmin();
     if (path.startsWith('/admin/')) return await viewAdmin(path.slice('/admin/'.length));
     if (path === '/audit') return await viewAudit(params);
+    if (path === '/activity') return await viewActivity(params);
     if (path === '/guide') return viewGuide(params);
     if (path === '/about') return await viewAbout();
     go(home());

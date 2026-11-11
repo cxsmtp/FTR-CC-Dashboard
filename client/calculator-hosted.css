@@ -321,3 +321,8 @@ html[data-cc] .cc-me .cc-row button { font-size: 12.5px; padding: 5px 10px; min-
 .cc-guide-nav { margin-top: auto; }
 .cc-work:not([hidden]) ~ .cc-guide-nav { margin-top: 0; }
 .cc-guide-nav + .cc-me { margin-top: 6px; }
+/* Projection settings: collapsed by default; the heading opens it, the Read button stays in view. */
+#calc-heart .calc-heart-head { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+#calc-heart .hc-heart-toggle { margin-left: auto; }
+#calc-heart.hc-collapsed > :not(.calc-heart-head):not(.calc-source) { display: none !important; }
+#calc-heart.hc-collapsed .calc-heart-head { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }

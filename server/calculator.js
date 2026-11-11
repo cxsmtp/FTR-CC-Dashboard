@@ -20,6 +20,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 import { CxClient } from '../vendor/mz/src/cxone/client.js';
+import { recorded } from './activity.js';
 import { deriveConnection } from '../vendor/mz/src/cxone/endpoints.js';
 import { branchScopeOf } from '../vendor/mz/src/cxone/branches.js';
 import { DEFAULT_ENGINES, cleanEngines } from '../vendor/mz/src/engines.js';
@@ -138,6 +139,25 @@ export class CalculatorService {
   interrupted = new Map();
   /** Told when a read ends (done or failed), to forget what was saved for resuming it. */
   onFinish = () => {};
+  /** Checkmarx One activity (server/activity.js), and who a person and an account are, for it. */
+  activity = null;
+  describe = () => ({});
+  #who(userId) {
+    const l = this.#links.get(userId);
+    return this.describe(userId, l?.account?.id ?? null) ?? {};
+  }
+  #note(userId, event) {
+    this.activity?.add({ ...this.#who(userId), ...event });
+  }
+  /** A client whose every call is recorded for this person and the account they work on. */
+  #client(userId, connection) {
+    const client = this.connect(connection);
+    return this.activity && typeof client?.request === 'function' ? recorded(client, { log: this.activity, tenant: connection.tenant, who: () => this.#who(userId) }) : client;
+  }
+  /** The account a person works on (for the activity log): set when they connect for it or read for it. */
+  workingOn(userId, account) {
+    if (account) this.#link(userId).account = account;
+  }
   constructor({ cxoneHosts, gitHosts, log = console.log, connect = (c) => new CxClient(c) }) {
     this.cxoneHosts = cxoneHosts;
     this.gitHosts = gitHosts;
@@ -163,7 +183,7 @@ export class CalculatorService {
     for (const [userId, l] of this.#links) {
       if (!l.connection) continue;
       const job = l.job ? { ...l.job, live: null } : null;
-      people.push({ userId, connection: l.connection, job: job?.state === 'running' ? null : job, rerun: job?.state === 'running' ? { input: job.input, account: job.account } : null, read: l.read.get() });
+      people.push({ userId, connection: l.connection, account: l.account ?? null, job: job?.state === 'running' ? null : job, rerun: job?.state === 'running' ? { input: job.input, account: job.account } : null, read: l.read.get() });
     }
     return { people, interrupted: [...this.interrupted] };
   }
@@ -178,7 +198,7 @@ export class CalculatorService {
     for (const p of state?.people ?? []) {
       try {
         const link = this.#link(p.userId);
-        Object.assign(link, { client: this.connect(p.connection), connection: p.connection, job: p.job ?? null });
+        Object.assign(link, { client: this.#client(p.userId, p.connection), connection: p.connection, job: p.job ?? null, account: p.account ?? null });
         if (p.read?.weeks) link.read.save({ readAt: p.read.readAt, weeks: p.read.weeks, byProject: Object.entries(p.read.series ?? {}) });
         if (p.rerun) this.startRead(p.userId, p.rerun.input, p.rerun.account);
       } catch (error) {
@@ -206,17 +226,22 @@ export class CalculatorService {
       throw fail(400, error.message);
     }
     for (const u of [connection.iamUrl, connection.baseUrl]) await checkHost(new URL(u).hostname, this.cxoneHosts, 'Checkmarx One');
-    const client = this.connect(connection);
+    const client = this.#client(userId, connection);
+    const started = Date.now();
     try {
       await client.request('/api/projects', { query: { limit: 1, offset: 0 }, retries: 1 });
     } catch (error) {
+      this.#note(userId, { kind: 'connect', tenant: connection.tenant, ok: false, status: error.status || 0, ms: Date.now() - started, detail: error.status === 401 || error.status === 403 ? 'API key refused' : String(error.message ?? '').slice(0, 160) });
       throw fail(400, error.status === 401 || error.status === 403 ? 'Checkmarx One refused that API key: check it has not expired and may read projects and scans.' : `Checkmarx One could not be reached: ${error.message}`);
     }
     Object.assign(this.#link(userId), { client, connection, job: null, read: new TenantReadStore({ file: null }) });
+    this.#note(userId, { kind: 'connect', tenant: connection.tenant, ok: true, ms: Date.now() - started, detail: input?.kept ? 'with the account\u2019s kept key' : '' });
     return this.status(userId);
   }
 
   disconnect(userId) {
+    const tenant = this.#links.get(userId)?.connection?.tenant;
+    if (tenant) this.#note(userId, { kind: 'disconnect', tenant, ok: true });
     Object.assign(this.#link(userId), { client: null, connection: null, job: null, read: new TenantReadStore({ file: null }) });
     return this.status(userId);
   }
@@ -228,7 +253,10 @@ export class CalculatorService {
     // The read runs here, on the server: the person can leave the calculator; it is followed again when they come back.
     const job = { id: randomUUID(), state: 'running', step: 'projects', done: 0, total: 0, read: 0, found: 0, startedAt: new Date().toISOString(), live: {}, account, applied: false, input: { branches: input?.branches, maxProjects: input?.maxProjects } };
     state.job = job;
+    if (account) state.account = account;
     const client = state.client;
+    const readStarted = Date.now();
+    this.#note(userId, { kind: 'read', tenant: state.connection?.tenant, ok: true, detail: 'started' });
     Promise.all([
       readTenant(client, { branches: branchScopeOf(input?.branches), maxProjects: readLimit(input?.maxProjects), onProgress: readProgressOf(job), live: job.live }),
       readFusionOffer(client).catch(() => ({ models: [], remainingCredits: null })).then((offer) => Object.assign(job.live ?? {}, { offer }) && offer),
@@ -236,10 +264,12 @@ export class CalculatorService {
       .then(([{ perProject, ...tenant }, offer]) => {
         state.read.save(perProject);
         Object.assign(job, { state: 'done', result: { ...tenant, ...offer }, finishedAt: new Date().toISOString(), live: null });
+        this.#note(userId, { kind: 'read', tenant: state.connection?.tenant, ok: true, ms: Date.now() - readStarted, detail: `finished: ${tenant.projects?.length ?? 0} projects` });
         this.onFinish(userId, job);
       })
       .catch((error) => {
         Object.assign(job, { state: 'failed', error: error.status === 401 || error.status === 403 ? 'Checkmarx One refused the read: check the API key may read projects and scans.' : `Checkmarx One could not be read: ${error.message}`, finishedAt: new Date().toISOString(), live: null });
+        this.#note(userId, { kind: 'read', tenant: state.connection?.tenant, ok: false, status: error.status || 0, ms: Date.now() - readStarted, detail: job.error.slice(0, 160) });
         this.onFinish(userId, job);
       });
     this.interrupted.delete(userId);

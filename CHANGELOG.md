@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.13.00 — 2026-11-11
+
+- **Checkmarx One activity, under Insight, for everyone.** Every call the command center makes to a customer’s Checkmarx One tenant is recorded: who it was for, the tenant and the account, the request (method and API path; never a key, query or response), the result and how long it took. So are connections (and refused keys), tenant reads (started, finished with the number of projects, or failed) and every report generated in the calculator. Everyone sees their own activity and that of the teams they see (an SE their team, a leader every team below, Executives and Admins all), with **Only me**, and filters by people, tenant, what, account (each a multi-select), outcome and dates. The last 30 days are summed up on top: calls, failures, average time, tenants, reads and reports. The log is kept apart from the audit log and rotated at 20 MB (`ACTIVITY_MAX_MB`).
+- **Projection settings start collapsed** in the calculator: **Show settings** opens them, and the calculator remembers your choice. The **Read from Checkmarx One** button stays in view.
+- **Email server: Test connection saves first**, so it always tests what the form says. Choosing port 465 ticks Implicit TLS, and 587 or 25 untick it; a port that needs STARTTLS with Implicit TLS ticked is refused, with what to change.
+
 ## CC-01.12.00 — 2026-11-11
 
 - **Three quick guides, one per persona, six visual steps each.** **Sales Engineer** (from a customer’s name to a projection), **Leader** (your teams at a glance, and where to step in), and **Admin** (set it up once). Each step is an animated card with a picture and a **Go there** link. Your own guide is the first page after your first sign-in. Under **Quick guide** you also see the guides below you: an Admin all three, a Leader the Leader and Sales Engineer guides.
