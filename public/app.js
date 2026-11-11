@@ -520,6 +520,55 @@ async function viewReset(params) {
 }
 
 const firstStepsDone = () => state.me && !state.me.user.mustChangePassword && state.me.terms.accepted && state.me.guideSeen;
+/**
+ * A Salesforce link, read as the server reads it (server/accounts.js checkSalesforceUrl): https, an opportunity (006)
+ * or an account (001) whose object in a Lightning link agrees, and an 18-character id whose last three letters check.
+ */
+function sfRead(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return { error: 'Paste the opportunity or account link from Salesforce.' };
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return { error: 'That is not a link: copy it from the address bar of the opportunity or account.' };
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return { error: 'Give the https link from the address bar.' };
+  if (!/(^|\.)(force\.com|salesforce\.com|lightning\.force\.com)$/i.test(url.hostname)) return { error: `${url.hostname} is not Salesforce.` };
+  const parts = url.pathname.split('/').filter(Boolean);
+  const id = parts.find((p) => /^(001|006)[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?$/.test(p)) ?? '';
+  const kind = id.startsWith('006') ? 'opportunity' : id.startsWith('001') ? 'account' : '';
+  const object = parts.includes('r') ? (parts[parts.indexOf('r') + 1] ?? '').toLowerCase() : '';
+  if (!kind || (object && object !== kind)) return { error: `That link is to ${object && object !== 'r' ? `a ${object}` : 'something else'}: open the opportunity (006…) or the account (001…).` };
+  if (id.length === 18) {
+    const map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+    let sum = '';
+    for (let b = 0; b < 3; b++) {
+      let n = 0;
+      for (let i = 0; i < 5; i++) if (/[A-Z]/.test(id[b * 5 + i])) n |= 1 << i;
+      sum += map[n];
+    }
+    if (sum !== id.slice(15)) return { error: `The id ${id} is not a whole Salesforce id: copy the link again.` };
+  }
+  return { kind, id, label: `${kind === 'opportunity' ? 'Opportunity' : 'Account'} ${id}` };
+}
+
+// Salesforce links are read as they are typed, wherever one is asked for (the account's link; a sale's opportunity).
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!el.matches?.('input[name="sf"], input[name="opportunityUrl"]')) return;
+  let hint = el.parentElement.querySelector('.sf-hint');
+  if (!hint) {
+    hint = document.createElement('small');
+    hint.className = 'sf-hint';
+    el.after(hint);
+  }
+  const r = sfRead(el.value);
+  const wrong = !r.error && el.name === 'opportunityUrl' && r.kind !== 'opportunity' ? 'That is the account: a sale needs the opportunity (006…) it was won on.' : '';
+  hint.textContent = r.error || wrong || `✓ ${r.label}`;
+  hint.className = `sf-hint ${r.error || wrong ? 'bad' : 'ok'}`;
+  el.setCustomValidity(r.error || wrong || '');
+});
 const HOME_PAGES = [['overview', 'Overview'], ['calculator', 'Calculator'], ['accounts', 'Accounts'], ['activity', 'Checkmarx One activity'], ['guide', 'Quick guide']];
 /** Where this person lands: their role's home page (set in Roles & permissions), if they may open it. */
 const home = () => {
@@ -1017,11 +1066,12 @@ function salesPanel(a, d) {
     ${d.can.sell ? `<form class="form sale-form mt" id="sale"><div class="row">
       <label class="f">Credits sold<input name="credits" type="number" min="1" step="1" required placeholder="e.g. 50000" /></label>
       <label class="f">Date of the sale<input name="date" type="date" value="${today}" max="${today}" required /></label>
-      <label class="f">Salesforce opportunity or order <span class="muted">optional</span><input name="reference" maxlength="120" placeholder="006… or order number" /></label>
+      <label class="f">Salesforce opportunity link <b>required</b><input name="opportunityUrl" type="url" required value="${a.salesforceKind === 'opportunity' ? esc(a.salesforceUrl) : ''}" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><small class="sf-hint" id="sale-sf-hint">${a.salesforceKind === 'opportunity' ? `✓ Opportunity ${esc(a.salesforceId)} (the account’s own link)` : 'The opportunity this sale was won on'}</small></label>
+      <label class="f">Order number <span class="muted">optional</span><input name="reference" maxlength="120" placeholder="Order or PO number" /></label>
       <label class="f">Against the report <span class="muted">optional</span><select name="reportId"><option value="">None in particular</option>${d.reports.map((r) => `<option value="${esc(r.id)}"${r.id === a.primary?.id ? ' selected' : ''}>${esc(date(r.createdAt))} · ${esc(num(Math.round(r.totalCredits)))} credits${r.id === a.primary?.id ? ' (primary)' : ''}</option>`).join('')}</select></label></div>
       <label class="f">Note <span class="muted">optional</span><input name="note" maxlength="300" placeholder="First year of a 3-year deal, bundle of 5…" /></label>
       <div class="flex"><button class="primary" type="submit">${icon('plus')}Record the sale</button>${a.remaining ? `<button type="button" class="ghost" id="sale-rest">Fill in what is still needed (${num(a.remaining)})</button>` : ''}<span class="err" id="sale-err"></span></div></form>` : ''}
-    ${d.sales.length ? `<div class="tw mt"><table><thead><tr><th>Date</th><th class="num">Credits</th><th>Salesforce / order</th><th>Against</th><th>Note</th><th>Recorded by</th><th></th></tr></thead><tbody>${d.sales.map((x) => `<tr data-sale="${esc(x.id)}"><td>${esc(date(x.date))}</td><td class="num credits">${num(x.credits)}</td><td class="mono small">${esc(x.reference || '—')}</td><td class="small">${x.reportId ? esc(reportName(x.reportId)) : '—'}</td><td class="small">${esc(x.note || '')}</td><td class="small">${esc(x.by)}<span class="sub">${esc(ago(x.at))}</span></td><td class="actions">${d.can.removeAnySale || x.byId === d.can.me ? `<button class="sm ghost icon" data-unsell title="Remove this sale">${icon('trash')}</button>` : ''}</td></tr>`).join('')}</tbody><tfoot><tr><td><b>Total</b></td><td class="num credits">${num(a.sold)}</td><td colspan="5"></td></tr></tfoot></table></div>` : '<p class="muted small mt">No sales recorded yet.</p>'}
+    ${d.sales.length ? `<div class="tw mt"><table><thead><tr><th>Date</th><th class="num">Credits</th><th>Opportunity / order</th><th>Against</th><th>Note</th><th>Recorded by</th><th></th></tr></thead><tbody>${d.sales.map((x) => `<tr data-sale="${esc(x.id)}"><td>${esc(date(x.date))}</td><td class="num credits">${num(x.credits)}</td><td class="small">${x.opportunityUrl ? `<a href="${esc(x.opportunityUrl)}" target="_blank" rel="noopener noreferrer" class="mono">${esc(x.opportunityId)} ↗</a>` : ''}${x.reference ? `<span class="sub mono">${esc(x.reference)}</span>` : x.opportunityUrl ? '' : '—'}</td><td class="small">${x.reportId ? esc(reportName(x.reportId)) : '—'}</td><td class="small">${esc(x.note || '')}</td><td class="small">${esc(x.by)}<span class="sub">${esc(ago(x.at))}</span></td><td class="actions">${d.can.removeAnySale || x.byId === d.can.me ? `<button class="sm ghost icon" data-unsell title="Remove this sale">${icon('trash')}</button>` : ''}</td></tr>`).join('')}</tbody><tfoot><tr><td><b>Total</b></td><td class="num credits">${num(a.sold)}</td><td colspan="5"></td></tr></tfoot></table></div>` : '<p class="muted small mt">No sales recorded yet.</p>'}
   </div>`;
 }
 function wireSales(a, d) {
@@ -1031,7 +1081,7 @@ function wireSales(a, d) {
       e.preventDefault();
       const f = new FormData(form);
       try {
-        await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/sales`, { method: 'POST', body: { credits: Number(f.get('credits')), date: f.get('date'), reference: f.get('reference'), note: f.get('note'), reportId: f.get('reportId') || null } });
+        await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/sales`, { method: 'POST', body: { credits: Number(f.get('credits')), date: f.get('date'), opportunityUrl: f.get('opportunityUrl'), reference: f.get('reference'), note: f.get('note'), reportId: f.get('reportId') || null } });
         toast(`${num(Number(f.get('credits')))} credits recorded as sold.`, 'ok');
         viewAccount(a.id);
       } catch (error) {

@@ -65,7 +65,7 @@ test('a report needs the Salesforce link; the latest is primary until one is mar
   const id = data.customer.id;
   const refused = await se1.post('/api/projections/reports', { customerId: id, data: reportData() }, h);
   assert.equal(refused.status, 409);
-  assert.equal((await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: 'https://evil.example/006AB000001xYzQAAQ' })).status, 400);
+  assert.equal((await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: 'https://evil.example/006AB000001xYzQYAU' })).status, 400);
   assert.equal((await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF })).status, 200);
   const r1 = await se1.post('/api/projections/reports', { customerId: id, data: reportData(1000, 500) }, h);
   assert.equal(r1.status, 200);
@@ -457,4 +457,24 @@ test('your profile: name, time zone, picture, Impact figures that start an accou
   assert.equal((await se.post('/api/me/signout-others', {})).status, 200);
   assert.equal((await other.get('/api/me')).status, 401);
   assert.equal((await se.get('/api/me')).status, 200);
+});
+
+test('nothing is read without the Salesforce link; a sale needs an opportunity link', async () => {
+  const se = await client(env.base, 'se1@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const { data } = await se.post('/api/projections', { name: 'No Link Yet Ltd' }, h);
+  const id = data.customer.id;
+  const refused = await se.post('/api/cc/cxone/connect', { apiKey: 'x', accountId: id });
+  assert.equal(refused.status, 409);
+  assert.match(refused.data.error, /Salesforce/);
+  // An account link: a sale must say its opportunity.
+  await se.put(`/api/cc/accounts/${id}`, { salesforceUrl: 'https://checkmarx.lightning.force.com/lightning/r/Account/0013z00002NbBI1AAN/view' }, h);
+  const noOpp = await se.post(`/api/cc/accounts/${id}/sales`, { credits: 1000, date: '2026-11-01' }, h);
+  assert.equal(noOpp.status, 400);
+  assert.match(noOpp.data.error, /opportunity/);
+  const accLink = await se.post(`/api/cc/accounts/${id}/sales`, { credits: 1000, date: '2026-11-01', opportunityUrl: 'https://checkmarx.lightning.force.com/lightning/r/Account/0013z00002NbBI1AAN/view' }, h);
+  assert.equal(accLink.status, 400);
+  const ok = await se.post(`/api/cc/accounts/${id}/sales`, { credits: 1000, date: '2026-11-01', opportunityUrl: 'https://checkmarx.lightning.force.com/lightning/r/Opportunity/006Tl00000aAXPOIA4/view' }, h);
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(ok.data.sales.at(-1).opportunityId, '006Tl00000aAXPOIA4');
 });

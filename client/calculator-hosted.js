@@ -38,6 +38,39 @@ const TEAM_KEY = 'cc-calc-team';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
+/**
+ * A Salesforce link, read as the server reads it (server/accounts.js checkSalesforceUrl): https, an opportunity (006)
+ * or an account (001) whose object in a Lightning link agrees, and an 18-character id whose last three letters check.
+ */
+function sfRead(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return { error: 'Paste the opportunity or account link from Salesforce.' };
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return { error: 'That is not a link: copy it from the address bar of the opportunity or account.' };
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return { error: 'Give the https link from the address bar.' };
+  if (!/(^|\.)(force\.com|salesforce\.com|lightning\.force\.com)$/i.test(url.hostname)) return { error: `${url.hostname} is not Salesforce.` };
+  const parts = url.pathname.split('/').filter(Boolean);
+  const id = parts.find((p) => /^(001|006)[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?$/.test(p)) ?? '';
+  const kind = id.startsWith('006') ? 'opportunity' : id.startsWith('001') ? 'account' : '';
+  const object = parts.includes('r') ? (parts[parts.indexOf('r') + 1] ?? '').toLowerCase() : '';
+  if (!kind || (object && object !== kind)) return { error: `That link is to ${object && object !== 'r' ? `a ${object}` : 'something else'}: open the opportunity (006…) or the account (001…).` };
+  if (id.length === 18) {
+    const map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+    let sum = '';
+    for (let b = 0; b < 3; b++) {
+      let n = 0;
+      for (let i = 0; i < 5; i++) if (/[A-Z]/.test(id[b * 5 + i])) n |= 1 << i;
+      sum += map[n];
+    }
+    if (sum !== id.slice(15)) return { error: `The id ${id} is not a whole Salesforce id: copy the link again.` };
+  }
+  return { kind, id, label: `${kind === 'opportunity' ? 'Opportunity' : 'Account'} ${id}` };
+}
+
 export async function startHosted() {
   // The look the dashboard last had on this device, at once; then this person's own, from the server.
   try {
@@ -514,6 +547,7 @@ export async function startHosted() {
     } else parts.push(chip('off', 'No account open'));
     $('hc-status').innerHTML = parts.join('');
     foldSummary();
+    gate();
   }
   // Generating a report: the status above it, in view, so what the report is built from is plain.
   document.addEventListener('click', (event) => {
@@ -597,6 +631,18 @@ export async function startHosted() {
       event.preventDefault();
       $('hc-sf-save').click();
     }
+  });
+  // The link, read as it is pasted: what it is, or what is wrong; a good one is saved at once.
+  const sfHint = document.createElement('small');
+  sfHint.className = 'hc-sf-hint';
+  $('hc-sf').closest('.hc-sf').append(sfHint);
+  let sfTimer = null;
+  $('hc-sf').addEventListener('input', () => {
+    const r = sfRead($('hc-sf').value);
+    sfHint.textContent = r.error ?? `✓ ${r.label}`;
+    sfHint.className = `hc-sf-hint ${r.error ? 'bad' : 'ok'}`;
+    clearTimeout(sfTimer);
+    if (!r.error && account && $('hc-sf').value.trim() !== (account.salesforceUrl ?? '')) sfTimer = setTimeout(() => $('hc-sf-save').click(), 500);
   });
   $('hc-owner').addEventListener('change', async () => {
     if (!account) return;
@@ -894,6 +940,25 @@ export async function startHosted() {
       document.querySelector(`[data-ptpanel="calculator:${b.dataset.openTab}"] input:not([type=hidden]), [data-ptpanel="calculator:${b.dataset.openTab}"] button`)?.focus({ preventScroll: true });
     }, 60);
   });
+  /** Without the account's Salesforce link nothing is read or generated: the ways in are locked, and say why. */
+  function gate() {
+    const ok = Boolean(account?.salesforceUrl);
+    $('hc-account').classList.toggle('no-sf', Boolean(account) && !ok);
+    for (const el of [$('sa-connect-go'), $('sa-key'), ...document.querySelectorAll('[data-open-tab]'), document.getElementById('calc-generate'), document.getElementById('hc-refresh')]) {
+      if (!el) continue;
+      el.disabled = !ok;
+      el.title = ok ? '' : 'Save the account’s Salesforce link first';
+    }
+    let note = document.getElementById('hc-sf-gate');
+    if (!note) {
+      note = document.createElement('p');
+      note.id = 'hc-sf-gate';
+      note.className = 'hc-sf-gate';
+      document.querySelector('.hc-src')?.prepend(note);
+    }
+    note.hidden = ok || !account;
+    note.textContent = 'Save the account’s Salesforce opportunity or account link first: nothing is read or generated without it.';
+  }
   function foldSummary() {
     const el = document.getElementById('hc-fold-sum');
     if (!el) return;

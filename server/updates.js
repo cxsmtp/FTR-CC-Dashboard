@@ -164,7 +164,14 @@ export class UpdateService {
         target = new URL(res.headers.get('location'), target);
         continue;
       }
-      if (!res.ok) throw fail(502, `GitHub answered ${res.status} for ${target.pathname}.`);
+      if (!res.ok) {
+        // GitHub's limit for servers that do not sign in (60 calls an hour): say so, and when it lifts.
+        if ((res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0') {
+          const at = Number(res.headers.get('x-ratelimit-reset')) * 1000;
+          throw fail(503, `GitHub\u2019s hourly limit for servers that do not sign in is used up${Number.isFinite(at) && at ? `; it lifts at ${new Date(at).toISOString().slice(11, 16)} UTC, and the next check after that goes ahead by itself` : ''}. Set UPDATE_GITHUB_TOKEN to a GitHub token (read-only) to lift it.`);
+        }
+        throw fail(502, `GitHub answered ${res.status} for ${target.pathname}.`);
+      }
       const length = Number(res.headers.get('content-length') ?? 0);
       if (length > limit) throw fail(413, 'That download is larger than a release can be.');
       const buf = Buffer.from(await res.arrayBuffer());
@@ -183,7 +190,8 @@ export class UpdateService {
         const version = r.tag_name.replace(/^v/, '');
         const archive = r.assets?.find((a) => a.name === ASSET(version));
         const sums = r.assets?.find((a) => a.name === 'SHA256SUMS');
-        return { version, name: r.name || r.tag_name, publishedAt: r.published_at, prerelease: Boolean(r.prerelease), notes: String(r.body ?? '').slice(0, 4000), url: r.html_url, archiveUrl: archive?.url ?? '', sumsUrl: sums?.url ?? '', size: archive?.size ?? 0, installable: Boolean(archive && sums) };
+        return { version, name: r.name || r.tag_name, publishedAt: r.published_at, prerelease: Boolean(r.prerelease), notes: String(r.body ?? '').slice(0, 4000), url: r.html_url, // The files themselves from github.com's download links (not the API: those do not count against its hourly limit).
+        archiveUrl: archive?.browser_download_url || archive?.url || '', sumsUrl: sums?.browser_download_url || sums?.url || '', size: archive?.size ?? 0, installable: Boolean(archive && sums) };
       })
       .sort((a, b) => compareVersions(b.version, a.version));
     // The checksums of the newest releases, kept the first time they are seen and compared every time after.

@@ -462,3 +462,10 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 .hc-status .hc-st.cust i { background: var(--cyan); }
 @media (max-width: 1100px) { .hc-row1 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 700px) { .hc-row1 { grid-template-columns: 1fr; } }
+
+/* The Salesforce link, read as pasted; and what waits for it */
+.hc-sf-hint { display: block; margin-top: 4px; font-size: 12px; }
+.hc-sf-hint.ok { color: var(--green); }
+.hc-sf-hint.bad { color: var(--red); }
+.hc-sf-gate { flex: 1 1 100%; margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13px; color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); background: color-mix(in srgb, var(--amber) 8%, transparent); }
+.hc-account.no-sf .hc-sf input { border-color: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 15%, transparent); }

@@ -743,9 +743,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { ok: true };
   });
   r('POST', '/api/cc/accounts/:id/sales', perm('sales.record'), (req, ctx, body, res, url, params) => {
-    const sale = accounts.addSale(params.id, ctx.scope, { credits: body?.credits, date: body?.date, reference: body?.reference, note: body?.note, reportId: body?.reportId }, ctx.user);
+    const sale = accounts.addSale(params.id, ctx.scope, { credits: body?.credits, date: body?.date, reference: body?.reference, note: body?.note, reportId: body?.reportId, opportunityUrl: body?.opportunityUrl }, ctx.user, hosts().salesforce);
     const a = accounts.accounts.meta(params.id);
-    record(ctx, req, 'sale.record', a.name, { id: sale.id, credits: sale.credits, date: sale.date, reference: sale.reference, reportId: sale.reportId });
+    record(ctx, req, 'sale.record', a.name, { id: sale.id, credits: sale.credits, date: sale.date, opportunity: sale.opportunityId, reference: sale.reference, reportId: sale.reportId });
     return accountDetail(ctx, params.id);
   });
   r('DELETE', '/api/cc/accounts/:id/sales/:sale', perm('sales.record'), (req, ctx, body, res, url, params) => {
@@ -1464,6 +1464,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const id = String(req.headers['x-account'] ?? '');
     const meta = id && accounts.accounts.meta(id);
     const account = meta && ctx.teamSet.has(meta.teamId) ? { id: meta.id, name: meta.name, teamId: meta.teamId } : null;
+    if (meta && !meta.salesforceUrl) throw fail(409, 'Save the account\u2019s Salesforce opportunity or account link first: nothing is read or generated without it.');
     const view = calc.startRead(ctx.user.id, body, account);
     // Kept on disk until its result is in its account: a restart meanwhile starts it again.
     pendingReads.value.reads[ctx.user.id] = { account, input: { branches: body?.branches, maxProjects: body?.maxProjects }, startedAt: new Date().toISOString() };
@@ -1593,7 +1594,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
 
   r('POST', '/api/cc/cxone/connect', perm('calculator.use'), async (req, ctx, body) => {
     const forAccount = body?.accountId ? accounts.accounts.meta(String(body.accountId)) : null;
-    if (forAccount && ctx.scope.has(forAccount.teamId)) calc.workingOn(ctx.user.id, { id: forAccount.id, name: forAccount.name, teamId: forAccount.teamId });
+    // Nothing is read for an account until it is tied to Salesforce.
+    if (!forAccount || !ctx.scope.has(forAccount.teamId)) throw fail(409, 'Open the account first: Checkmarx One is read for an account.');
+    if (!forAccount.salesforceUrl) throw fail(409, 'Save the account\u2019s Salesforce opportunity or account link first: nothing is read or generated without it.');
+    calc.workingOn(ctx.user.id, { id: forAccount.id, name: forAccount.name, teamId: forAccount.teamId });
     const state = await calc.connectKey(ctx.user.id, body);
     record(ctx, req, 'cxone.connect', state.tenant, { baseUrl: state.baseUrl });
     // "Remember this key for the account": sealed on this server, used again by the team for one-click refreshes.

@@ -26,6 +26,17 @@ export const DEFAULT_SALESFORCE_HOSTS = ['salesforce.com', 'force.com'];
  * A Salesforce link to an opportunity or an account: https on a Salesforce host (or one the Admin allows), with
  * the record's id in it (001… account, 006… opportunity). Returns { url, kind, recordId } or throws.
  */
+/** The three letters Salesforce adds to a 15-character id (its case, in code): an 18-character id must end in them. */
+export function sfChecksum(id15) {
+  const map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+  let out = '';
+  for (let block = 0; block < 3; block++) {
+    let n = 0;
+    for (let i = 0; i < 5; i++) if (/[A-Z]/.test(id15[block * 5 + i])) n |= 1 << i;
+    out += map[n];
+  }
+  return out;
+}
 export function checkSalesforceUrl(value, hosts = DEFAULT_SALESFORCE_HOSTS) {
   const textValue = String(value ?? '').trim();
   if (!textValue) throw fail(400, 'Give the Salesforce opportunity or account link: it is required for every account.');
@@ -39,10 +50,16 @@ export function checkSalesforceUrl(value, hosts = DEFAULT_SALESFORCE_HOSTS) {
   if (url.protocol !== 'https:' || url.username || url.password || !hosts.some((h) => host === h || host.endsWith(`.${h}`))) {
     throw fail(400, `Give a https link to Salesforce (${hosts.join(', ')}).`);
   }
+  // What the link is to: the object in a Lightning link (/lightning/r/Opportunity/006…/view) and the record's prefix
+  // (006 an opportunity, 001 an account) must agree; a contact, lead or anything else is not taken.
   const parts = url.pathname.split('/').filter(Boolean);
   const recordId = parts.find((p) => SF_ID.test(p)) ?? '';
-  if (!recordId) throw fail(400, 'That link is not to an opportunity or an account: open the opportunity (006…) or account (001…) in Salesforce and copy its link.');
-  const kind = recordId.startsWith('006') ? 'opportunity' : 'account';
+  const object = (parts[parts.indexOf('r') + 1] ?? '').toLowerCase();
+  const byPrefix = recordId.startsWith('006') ? 'opportunity' : recordId.startsWith('001') ? 'account' : '';
+  const byObject = parts.includes('r') ? ({ opportunity: 'opportunity', account: 'account' })[object] ?? 'other' : '';
+  if (recordId.length === 18 && sfChecksum(recordId.slice(0, 15)) !== recordId.slice(15)) throw fail(400, `The record id in that link (${recordId}) is not a whole Salesforce id: copy the link again from the address bar.`);
+  if (!recordId || !byPrefix || (byObject && byObject !== byPrefix)) throw fail(400, 'That link is not to an opportunity or an account: open the opportunity (006\u2026) or the account (001\u2026) in Salesforce and copy its link from the address bar.');
+  const kind = byPrefix;
   url.hash = '';
   return { url: url.toString().slice(0, 600), kind, recordId };
 }
@@ -174,8 +191,13 @@ export class Accounts {
   }
 
   // ---- Credits sold: one or many sales per account, against its projection --------------------------------------
-  addSale(id, teamIds, { credits, date, reference = '', note = '', reportId = null }, user) {
+  addSale(id, teamIds, { credits, date, reference = '', note = '', reportId = null, opportunityUrl = '' }, user, hosts) {
     const account = this.get(id, teamIds);
+    // A sale is against an opportunity: the one given, else the account's own link when it is an opportunity.
+    const given = String(opportunityUrl ?? '').trim();
+    if (!given && account.salesforceKind !== 'opportunity') throw fail(400, 'Give the Salesforce opportunity link of this sale: the account\u2019s own link is to the account, not an opportunity.');
+    const opp = checkSalesforceUrl(given || account.salesforceUrl, hosts);
+    if (opp.kind !== 'opportunity') throw fail(400, 'That is a link to an account: a sale needs the opportunity (006\u2026) it was won on.');
     const n = Number(credits);
     if (!Number.isFinite(n) || n <= 0 || n > 1e10) throw fail(400, 'Give the credits sold: a number above zero.');
     const day = String(date ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10);
@@ -186,7 +208,7 @@ export class Accounts {
       if (!r || r.customerId !== id) throw fail(400, 'That report is not one of this account\u2019s.');
     }
     const plain = (v, max) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
-    const sale = { id: randomUUID(), credits: Math.round(n), date: day, reference: plain(reference, 120), note: plain(note, 300), reportId: reportId || null, byId: user.id, by: user.name, at: new Date().toISOString() };
+    const sale = { id: randomUUID(), credits: Math.round(n), date: day, opportunityUrl: opp.url, opportunityId: opp.recordId, reference: plain(reference, 120), note: plain(note, 300), reportId: reportId || null, byId: user.id, by: user.name, at: new Date().toISOString() };
     account.sales = [...(account.sales ?? []), sale].slice(-500);
     this.accounts.put(account);
     return sale;

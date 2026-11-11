@@ -9,7 +9,7 @@ import { hashPassword } from '../server/iam.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PASSWORD = 'Test-Password-For-Tests-1';
-export const SF = 'https://acme.lightning.force.com/lightning/r/Opportunity/006AB000001xYzQAAQ/view';
+export const SF = 'https://acme.lightning.force.com/lightning/r/Opportunity/006AB000001xYzQYAU/view';
 
 /** A server on a free port with: Global → EMEA, APAC; an Admin, a VP leading Global, an EMEA leader, two EMEA SEs, one APAC SE. */
 export async function start({ mailTransport, publicUrl = '', calculatorService } = {}) {

@@ -28,9 +28,9 @@ test('scope: own team, teams led and below, or everything', () => {
 });
 
 test('Salesforce links: https on a Salesforce host, to an opportunity or an account', () => {
-  assert.equal(checkSalesforceUrl('https://acme.lightning.force.com/lightning/r/Opportunity/006AB000001xYzQAAQ/view').kind, 'opportunity');
+  assert.equal(checkSalesforceUrl('https://acme.lightning.force.com/lightning/r/Opportunity/006AB000001xYzQYAU/view').kind, 'opportunity');
   assert.equal(checkSalesforceUrl('https://acme.my.salesforce.com/001AB000001xYzQ').kind, 'account');
-  for (const bad of ['', 'not a url', 'http://acme.my.salesforce.com/001AB000001xYzQ', 'https://evil.example/006AB000001xYzQAAQ', 'https://salesforce.com.evil.example/006AB000001xYzQAAQ', 'https://acme.my.salesforce.com/home', 'https://user:pw@acme.my.salesforce.com/001AB000001xYzQ', 'javascript:alert(1)//006AB000001xYzQAAQ']) {
+  for (const bad of ['', 'not a url', 'http://acme.my.salesforce.com/001AB000001xYzQ', 'https://evil.example/006AB000001xYzQYAU', 'https://salesforce.com.evil.example/006AB000001xYzQYAU', 'https://acme.my.salesforce.com/home', 'https://user:pw@acme.my.salesforce.com/001AB000001xYzQ', 'javascript:alert(1)//006AB000001xYzQYAU']) {
     assert.throws(() => checkSalesforceUrl(bad), /Salesforce|link/, bad);
   }
 });
@@ -47,4 +47,15 @@ test('passwords: long and varied', () => {
   assert.match(passwordProblem('short'), /12/);
   assert.match(passwordProblem('aaaaaaaaaaaaaa'), /repetitive/);
   assert.equal(passwordProblem('correct-horse-battery'), '');
+});
+
+test('Salesforce links are analysed: opportunity or account by the object and the id, and an 18-character id checked', () => {
+  const opp = checkSalesforceUrl('https://checkmarx.lightning.force.com/lightning/r/Opportunity/006Tl00000aAXPOIA4/view');
+  assert.deepEqual([opp.kind, opp.recordId], ['opportunity', '006Tl00000aAXPOIA4']);
+  const acc = checkSalesforceUrl('https://checkmarx.lightning.force.com/lightning/r/Account/0013z00002NbBI1AAN/view');
+  assert.deepEqual([acc.kind, acc.recordId], ['account', '0013z00002NbBI1AAN']);
+  // A mistyped id (its last three letters do not match), a contact, or an object that disagrees with the id: refused.
+  for (const bad of ['https://checkmarx.lightning.force.com/lightning/r/Opportunity/006Tl00000aAXPOIA5/view', 'https://checkmarx.lightning.force.com/lightning/r/Contact/0033z00002NbBI1AAN/view', 'https://checkmarx.lightning.force.com/lightning/r/Account/006Tl00000aAXPOIA4/view']) {
+    assert.throws(() => checkSalesforceUrl(bad), /not|whole/, bad);
+  }
 });

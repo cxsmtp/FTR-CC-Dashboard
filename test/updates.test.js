@@ -28,9 +28,12 @@ before(() => {
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 /** GitHub, as far as the updater sees it. */
+const downloadsThroughApi = [];
 const fakeGithub = (assets) => async (url) => {
   const u = String(url);
-  const body = u.includes('/releases?') ? JSON.stringify([{ tag_name: 'v9.9.9', name: 'CC v9.9.9', published_at: '2026-11-10T00:00:00Z', body: 'Notes', assets: [{ name: 'ftr-cc-dashboard-9.9.9.tar.gz', url: 'https://api.github.com/a/1', size: assets.archive.length }, { name: 'SHA256SUMS', url: 'https://api.github.com/a/2' }] }]) : u.endsWith('/a/1') ? assets.archive : u.endsWith('/a/2') ? assets.sums : null;
+  const body = u.includes('/releases?') ? JSON.stringify([{ tag_name: 'v9.9.9', name: 'CC v9.9.9', published_at: '2026-11-10T00:00:00Z', body: 'Notes', assets: [{ name: 'ftr-cc-dashboard-9.9.9.tar.gz', url: 'https://api.github.com/a/1', browser_download_url: 'https://github.com/x/y/releases/download/v9.9.9/ftr-cc-dashboard-9.9.9.tar.gz', size: assets.archive.length }, { name: 'SHA256SUMS', url: 'https://api.github.com/a/2', browser_download_url: 'https://github.com/x/y/releases/download/v9.9.9/SHA256SUMS' }] }]) : u.endsWith('/a/1') || u.endsWith('.tar.gz') ? assets.archive : u.endsWith('/a/2') || u.endsWith('/SHA256SUMS') ? assets.sums : null;
+  // The files come from github.com's download links, never the API (its hourly limit).
+  if (/api\.github\.com\/a\//.test(u)) downloadsThroughApi.push(u);
   return body === null ? new Response('no', { status: 404 }) : new Response(body, { status: 200 });
 };
 const service = (assets, extra = {}) => {
@@ -175,4 +178,11 @@ test('always on the newest version; a rollback by hand holds back what it left u
   // Moving forward by hand lifts the hold.
   await back.switchTo('9.9.9', { reason: 'by hand' });
   assert.equal(store.state.heldUpTo, null);
+});
+
+test('release files are downloaded from github.com, not through the API and its hourly limit', async () => {
+  downloadsThroughApi.length = 0;
+  const { svc } = service(release);
+  await svc.install('9.9.9');
+  assert.deepEqual(downloadsThroughApi, []);
 });

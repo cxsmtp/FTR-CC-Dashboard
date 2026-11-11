@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.25.00 — 2026-11-11
+
+- **Updates download again.** Release files now come from github.com's download links instead of GitHub's API, whose hourly limit for servers that do not sign in refused 1.24.0 with 403. If that limit is ever hit, the page says when it lifts (and that `UPDATE_GITHUB_TOKEN` raises it).
+- **Nothing happens without the Salesforce link.** Connecting to Checkmarx One, reading projects and generating a report all wait until the account has its Salesforce opportunity or account link; the calculator locks those buttons and says why.
+- **The link is checked as you paste it**: https on a Salesforce host, an opportunity (006…) or an account (001…), the Lightning object agreeing with the id, and the 18-character id's own checksum (a mistyped letter is caught). A good link saves by itself.
+- **A sale needs its opportunity link**, prefilled when the account's own link is an opportunity; the sales table links to it, with the order number beneath.
+
 ## CC-01.24.00 — 2026-11-11
 
 - **Every setting saves as you type, and goes back to the last good one when it does not work.**

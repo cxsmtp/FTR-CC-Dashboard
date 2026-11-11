@@ -779,3 +779,7 @@ table.versions:not(.show-all) tr.v-older { display: none; }
 .sep-line { height: 1px; background: var(--line); margin: 18px 0; }
 .row4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
 @media (max-width: 1000px) { .row4 { grid-template-columns: 1fr 1fr; } }
+
+.sf-hint { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); font-weight: 400; }
+.sf-hint.ok { color: var(--green); }
+.sf-hint.bad { color: var(--red); }

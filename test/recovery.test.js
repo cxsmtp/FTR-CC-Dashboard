@@ -73,6 +73,8 @@ test('a read cut off by a restart starts again with the account’s kept key', a
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
   const { data } = await se1.post('/api/projections', { name: 'Resume Co' }, h);
+  // Nothing is read for an account until it is tied to Salesforce.
+  await se1.put(`/api/cc/accounts/${data.customer.id}`, { salesforceUrl: SF }, h);
   await se1.post('/api/cc/cxone/connect', { apiKey: 'eu-key-x', remember: true, accountId: data.customer.id });
   await se1.post('/api/projections/read', {}, { ...h, 'X-Account': data.customer.id });
   const pending = JSON.parse(fs.readFileSync(path.join(env.dataDir, 'reads.json'), 'utf8')).reads;
