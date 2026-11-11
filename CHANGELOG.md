@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.20.00 — 2026-11-11
+
+- **The calculator starts with one compact panel instead of two large ones.** The customer is on one row (name as in Salesforce, the Salesforce link, the team and the accountable SE). Under it, **Data from: Checkmarx One · Git · cloc-fusion**: the Checkmarx One key, Remember and Connect sit on one line; **Git** and **cloc-fusion** open the calculator’s own Fusion · from Git and Fusion · cloc-fusion tabs and bring them into view. Impact, the kept key, the customer’s version and the reports summary share one thin line.
+- **Once you Connect, the panel folds to one line**: the customer, its Salesforce link, team, accountable SE and the tenant, with **Edit** to open it again (and **Fold** to put it away by hand). Disconnecting opens it.
+- **The customer’s name leads the status strip.**
+
 ## CC-01.19.00 — 2026-11-11
 
 - **Branding (Settings → Branding), as in CxMissionZero**, saved as you type:

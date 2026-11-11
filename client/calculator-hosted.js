@@ -502,6 +502,7 @@ export async function startHosted() {
     const fusionNew = cu?.fusionNew?.projects?.length ?? 0;
     const parts = [
       '<span class="hc-label">Status</span>',
+      account ? `<span class="hc-st cust"><i></i><b>${esc(account.name)}</b></span>` : '',
       cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
     ];
     if (account) {
@@ -512,6 +513,7 @@ export async function startHosted() {
       parts.push(`<span class="hc-ready">${account.salesforceUrl ? (trSource || fusionCx || fusionNew ? 'Ready to generate' : 'Bring in data to generate') : 'Add the Salesforce link to generate'}</span>`);
     } else parts.push(chip('off', 'No account open'));
     $('hc-status').innerHTML = parts.join('');
+    foldSummary();
   }
   // Generating a report: the status above it, in view, so what the report is built from is plain.
   document.addEventListener('click', (event) => {
@@ -868,6 +870,43 @@ export async function startHosted() {
       jump();
     }
   });
+  // ---- One compact panel: where the data comes from, folded to a line once connected ------------------------------
+  const panes = [...document.querySelectorAll('.hc-pane')];
+  const pick = (src) => {
+    for (const b of document.querySelectorAll('.hc-seg [data-src]')) {
+      b.classList.toggle('on', b.dataset.src === src);
+      b.setAttribute('aria-selected', String(b.dataset.src === src));
+    }
+    for (const p of panes) p.hidden = p.dataset.pane !== src;
+  };
+  for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.src));
+  // Git and cloc-fusion are the calculator's own Fusion tabs: open the one asked for, and bring it into view.
+  for (const b of document.querySelectorAll('[data-open-tab]')) b.addEventListener('click', () => {
+    const tab = document.querySelector(`[data-ptabs="calculator"] [data-pt="${b.dataset.openTab}"]`);
+    if (!tab) return;
+    tab.click();
+    fold(true);
+    setTimeout(() => {
+      tab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector(`[data-ptpanel="calculator:${b.dataset.openTab}"] input:not([type=hidden]), [data-ptpanel="calculator:${b.dataset.openTab}"] button`)?.focus({ preventScroll: true });
+    }, 60);
+  });
+  function foldSummary() {
+    const el = document.getElementById('hc-fold-sum');
+    if (!el) return;
+    const owner = $('hc-owner').selectedOptions[0]?.textContent ?? '';
+    const team = $('hc-team').selectedOptions[0]?.textContent ?? '';
+    const sfLabel = account?.salesforceUrl ? `${account.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account'} ${account.salesforceId ?? ''}` : 'No Salesforce link';
+    el.innerHTML = `<b>${esc(account?.name ?? 'No account open')}</b>${account ? `<span class="hc-pill ${account.salesforceUrl ? 'ok' : 'bad'}">${esc(sfLabel)}</span><span>${esc(team)}</span><span>${esc(owner)}</span>` : ''}<span class="hc-pill ${cxState.connected ? 'ok' : ''}">${cxState.connected ? `Checkmarx One · ${esc(cxState.tenant)}` : 'Not connected'}</span><button type="button" class="ghost sm" id="hc-unfold">Edit ▾</button>`;
+    document.getElementById('hc-unfold').onclick = () => fold(false);
+  }
+  function fold(on) {
+    $('hc-account').classList.toggle('folded', on);
+    foldSummary();
+  }
+  $('hc-fold').addEventListener('click', () => fold(true));
+  $('sa-disconnect').addEventListener('click', () => fold(false));
+  foldSummary();
   const empty = document.getElementById('calc-empty');
   if (empty) empty.innerHTML = 'No accounts yet in this team. Type the customer’s name, as in Salesforce, at the top: each account keeps its own Checkmarx One data, plan and Fusion projects, saved as you go.';
 
@@ -898,6 +937,7 @@ export async function startHosted() {
       }
       $('sa-key').value = '';
       showState(state);
+      fold(true);
       toast(`Connected to ${state.tenant}: Read from Checkmarx One fills the account open.`, 'ok');
       calculator.autoRead();
     } catch (error) {

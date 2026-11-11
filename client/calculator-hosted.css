@@ -423,3 +423,42 @@ html[data-cc][data-menu="top"] .cc-guide-nav { margin: 0 0 0 auto; }
 html[data-cc][data-menu="top"] .cc-ver, html[data-cc][data-menu="top"] .cc-work { margin: 0; }
 html[data-cc][data-menu="top"] .cc-topbar { top: 57px; }
 html[data-cc][data-menu="top"] .hc-status-wrap { top: 115px; }
+
+/* ---- One compact panel: customer on one row, the data source on the next, the rest in a thin line -------------- */
+.shell.standalone .sa-top { padding: 10px 0 6px; gap: 6px 24px; align-items: baseline; }
+.shell.standalone .sa-sub { font-size: 12.5px; }
+.hc-account { display: grid !important; grid-template-columns: none !important; grid-template-areas: none !important; gap: 10px !important; padding: 12px 16px !important; }
+.hc-row1 { display: grid; grid-template-columns: minmax(200px, 1.1fr) minmax(260px, 2fr) minmax(150px, .8fr) minmax(150px, .8fr); gap: 10px 14px; align-items: end; }
+.hc-row1 .field { margin: 0; }
+.hc-row1 .hc-name, .hc-row1 .hc-sf, .hc-row1 .hc-team, .hc-row1 .hc-owner { grid-area: auto !important; }
+.hc-src { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.hc-src-l { font-size: 12px; font-weight: 600; color: var(--muted); }
+.hc-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid var(--line); background: var(--cc-panel-hi); }
+html[data-cc][data-ui] .hc-seg button { --btn-sheen: none; --btn-drop: 0 0 transparent; --btn-hi: transparent; --btn-lo: transparent; min-height: 30px; padding: 0 12px; border: 0; background: transparent; font-size: 13px; }
+html[data-cc][data-ui] .hc-seg button.on { background: var(--grad); color: #fff; }
+.hc-pane { flex: 1 1 420px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--muted); }
+.hc-pane[hidden] { display: none; }
+.shell.standalone .hc-pane .sa-connect { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; }
+html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !important; box-shadow: none !important; }
+.hc-pane #sa-key { flex: 1 1 280px; min-width: 200px; max-width: 520px; }
+.hc-pane .hc-remember { font-size: 12.5px; }
+.hc-pane .sa-advanced { flex: none; font-size: 12.5px; }
+.hc-pane .sa-advanced[open] { flex: 1 1 100%; }
+.hc-pane .status { flex: 1 1 100%; font-size: 12.5px; }
+.hc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12.5px; }
+.hc-meta .hc-impact, .hc-meta .hc-tools { grid-column: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.hc-meta .hc-switch input { width: 16px; height: 16px; }
+.hc-fold-btn { margin-left: auto; }
+.hc-reports { font-size: 12.5px !important; }
+/* Folded: one line, the essentials, and Edit */
+.hc-fold-sum { display: none; }
+.hc-account.folded > :not(.hc-fold-sum) { display: none !important; }
+.hc-account.folded { padding: 8px 14px !important; }
+.hc-account.folded .hc-fold-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; color: var(--muted); }
+.hc-fold-sum b { color: var(--text); font-size: 15px; }
+.hc-fold-sum button { margin-left: auto; }
+/* The customer, first in the status strip */
+.hc-status .hc-st.cust { color: var(--text); border-color: var(--line-hi); background: var(--cc-panel-hi); }
+.hc-status .hc-st.cust i { background: var(--cyan); }
+@media (max-width: 1100px) { .hc-row1 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) { .hc-row1 { grid-template-columns: 1fr; } }

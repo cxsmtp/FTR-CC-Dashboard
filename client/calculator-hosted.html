@@ -37,35 +37,49 @@
     <header class="topbar sa-top">
       <div class="topbar-title">
         <div class="title-row"><h1>Cx Credits Calculator</h1></div>
-        <p class="sa-sub">Work out the credits an account needs: read their Checkmarx One tenant with an API key, or, for a prospect not on Checkmarx One, count their code from git or import their cloc-fusion report. Every account and report is kept here for your team.</p>
+        <p class="sa-sub">The credits an account needs, from their Checkmarx One tenant, their git repositories or a cloc-fusion report. Every account and report is kept for your team.</p>
       </div>
       <div class="hc-account" id="hc-account">
-        <label class="field hc-team"><span>Team (region)</span><select id="hc-team"></select></label>
-        <div class="field hc-name"><span><label for="hc-name">Customer name</label> <small>as in Salesforce</small></span>
-          <span class="hc-sf-row"><input id="hc-name" list="hc-names" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Type the account's name, or pick one" /><button type="button" class="ghost sm" id="hc-new" title="Start another account">+ New</button></span>
-          <datalist id="hc-names"></datalist></div>
-        <label class="field hc-sf"><span>Salesforce opportunity or account link <b class="hc-req">required</b></span>
-          <span class="hc-sf-row"><input id="hc-sf" type="url" inputmode="url" spellcheck="false" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><button type="button" class="primary sm" id="hc-sf-save">Save</button><a id="hc-sf-open" class="ghost sm hc-btn" target="_blank" rel="noopener noreferrer" hidden>Open in Salesforce ↗</a></span>
-        </label>
-        <label class="field hc-owner"><span>Accountable SE</span><select id="hc-owner"></select></label>
-        <div class="hc-impact"><label class="hc-switch"><input type="checkbox" id="hc-impact" /><span><b>Impact</b> <i class="hc-beta">beta</i><small>Soft savings in the report, from triage and remediation of the existing vulnerabilities</small></span></label><button type="button" class="ghost sm" id="hc-currency" hidden></button></div>
-        <div class="hc-tools" id="hc-tools"><span id="hc-kept"></span><button type="button" class="primary sm" id="hc-refresh" hidden>↻ Refresh from Checkmarx One</button><button type="button" class="ghost sm" id="hc-forget" hidden>Forget the key</button><label class="ghost sm hc-btn hc-file" id="hc-upload-l">⇪ Upload the customer's version<input type="file" id="hc-upload" accept=".html,.htm,text/html" hidden /></label></div>
+        <div class="hc-fold-sum" id="hc-fold-sum"></div>
+        <div class="hc-row1">
+          <div class="field hc-name"><span><label for="hc-name">Customer name</label> <small>as in Salesforce</small></span>
+            <span class="hc-sf-row"><input id="hc-name" list="hc-names" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Type the account's name, or pick one" /><button type="button" class="ghost sm" id="hc-new" title="Start another account">+ New</button></span>
+            <datalist id="hc-names"></datalist></div>
+          <label class="field hc-sf"><span>Salesforce opportunity or account link <b class="hc-req">required</b></span>
+            <span class="hc-sf-row"><input id="hc-sf" type="url" inputmode="url" spellcheck="false" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><button type="button" class="primary sm" id="hc-sf-save">Save</button><a id="hc-sf-open" class="ghost sm hc-btn" target="_blank" rel="noopener noreferrer" hidden title="Open in Salesforce">↗</a></span>
+          </label>
+          <label class="field hc-team"><span>Team (region)</span><select id="hc-team"></select></label>
+          <label class="field hc-owner"><span>Accountable SE</span><select id="hc-owner"></select></label>
+        </div>
+        <div class="hc-src">
+          <span class="hc-src-l">Data from</span>
+          <div class="hc-seg" role="tablist" aria-label="Where the data comes from"><button type="button" role="tab" data-src="cxone" class="on">Checkmarx One</button><button type="button" role="tab" data-src="git">Git</button><button type="button" role="tab" data-src="cloc">cloc-fusion</button></div>
+          <div class="hc-pane" data-pane="cxone">
+            <form class="sa-connect" id="sa-connect" autocomplete="off">
+              <input type="password" id="sa-key" spellcheck="false" placeholder="The customer's API key (in memory for your session only)" autocomplete="off" aria-label="The customer's Checkmarx One API key" />
+              <label class="hc-remember" title="Sealed on the server; the team refreshes in one click"><input type="checkbox" id="sa-remember" /> Remember for the account</label>
+              <button type="submit" class="primary sm" id="sa-connect-go">Connect</button>
+              <button type="button" class="ghost sm" id="sa-disconnect" hidden>Disconnect</button>
+              <details class="sa-advanced"><summary>Advanced</summary>
+                <div class="sa-advanced-grid">
+                  <label class="field"><span>API URL</span><input id="sa-base" spellcheck="false" placeholder="From the key" /></label>
+                  <label class="field"><span>IAM URL</span><input id="sa-iam" spellcheck="false" placeholder="From the key" /></label>
+                  <label class="field"><span>Tenant</span><input id="sa-tenant" spellcheck="false" placeholder="From the key" /></label>
+                </div>
+              </details>
+              <span class="status" id="sa-connect-status" aria-live="polite"></span>
+            </form>
+          </div>
+          <div class="hc-pane" data-pane="git" hidden><span>A prospect’s repositories on GitHub, GitLab, Bitbucket or Azure DevOps, counted with a read-only token.</span><button type="button" class="primary sm" data-open-tab="fusion-git">Connect to git →</button></div>
+          <div class="hc-pane" data-pane="cloc" hidden><span>The customer runs cloc-fusion where their code is and sends you its report; their code never leaves them.</span><button type="button" class="primary sm" data-open-tab="fusion-cloc">Import a cloc-fusion report →</button></div>
+        </div>
+        <div class="hc-meta">
+          <div class="hc-impact"><label class="hc-switch" title="Soft savings in the report, from triage and remediation of the existing vulnerabilities"><input type="checkbox" id="hc-impact" /><span><b>Impact</b> <i class="hc-beta">beta</i></span></label><button type="button" class="ghost sm" id="hc-currency" hidden></button></div>
+          <div class="hc-tools" id="hc-tools"><span id="hc-kept"></span><button type="button" class="primary sm" id="hc-refresh" hidden>↻ Refresh from Checkmarx One</button><button type="button" class="ghost sm" id="hc-forget" hidden>Forget the key</button><label class="ghost sm hc-btn hc-file" id="hc-upload-l">⇪ The customer's version<input type="file" id="hc-upload" accept=".html,.htm,text/html" hidden /></label></div>
+          <button type="button" class="ghost sm hc-fold-btn" id="hc-fold" title="Fold this away">Fold ▴</button>
+        </div>
         <div class="hc-reports" id="hc-reports" aria-live="polite"></div>
       </div>
-      <form class="sa-connect" id="sa-connect" autocomplete="off">
-        <label class="field sa-key"><span>Customer's Checkmarx One API key</span><input type="password" id="sa-key" spellcheck="false" placeholder="Paste the API key (not kept: in memory for your session only)" autocomplete="off" /></label>
-        <label class="hc-remember"><input type="checkbox" id="sa-remember" /> Remember this key for the account <small>sealed on the server; the team refreshes in one click</small></label>
-        <button type="submit" class="primary sm" id="sa-connect-go">Connect</button>
-        <button type="button" class="ghost sm" id="sa-disconnect" hidden>Disconnect</button>
-        <span class="status" id="sa-connect-status" aria-live="polite"></span>
-        <details class="sa-advanced"><summary>Advanced</summary>
-          <div class="sa-advanced-grid">
-            <label class="field"><span>API URL</span><input id="sa-base" spellcheck="false" placeholder="From the key" /></label>
-            <label class="field"><span>IAM URL</span><input id="sa-iam" spellcheck="false" placeholder="From the key" /></label>
-            <label class="field"><span>Tenant</span><input id="sa-tenant" spellcheck="false" placeholder="From the key" /></label>
-          </div>
-        </details>
-      </form>
     </header>
     <main>
 <!--CALCULATOR-->
