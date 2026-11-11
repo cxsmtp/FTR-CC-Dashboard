@@ -1,5 +1,5 @@
-// The Cx Credits Calculator hosted in the command center: CxMissionZero's calculator page (public/calculator/page.js)
-// with its requests answered by this server, per team, instead of by the browser (MZ's standalone.js). The account
+// The Cx Credits Calculator hosted in the command center: the calculator’s calculator page (public/calculator/page.js)
+// with its requests answered by this server, per team, instead of by the browser (the calculator’s standalone.js). The account
 // bar above it ties each account to its Salesforce opportunity or account (required before a report can be made),
 // its accountable SE and its team, and shows its primary report and what was shared with the customer.
 
@@ -300,7 +300,7 @@ export async function startHosted() {
   const api = async (path, options = {}) => {
     const { method = 'GET' } = options;
     const url = new URL(path, location.origin);
-    // A customer made on the first visit in MZ's own name is not an account here: only "New" makes one.
+    // A customer made on the first visit in the calculator’s own name is not an account here: only "New" makes one.
     if (method === 'POST' && url.pathname === '/api/projections') {
       // Nothing to say: the page already asks for the customer's name.
       if (!newByClick) throw fail(409, '');
@@ -899,7 +899,7 @@ export async function startHosted() {
     dlg.showModal();
   });
 
-  // ---- The calculator's tabs (in MZ, app.js switches them) -------------------------------------------
+  // ---- The calculator's tabs (in the calculator, app.js switches them) -------------------------------------------
   const showTab = (tab) => {
     const group = tab.closest('[data-ptabs]').dataset.ptabs;
     for (const t of document.querySelectorAll(`[data-ptabs="${group}"] [data-pt]`)) {
@@ -951,7 +951,7 @@ export async function startHosted() {
   });
   showAccount(null);
 
-  // ---- The customer's name, as in Salesforce: names, opens and starts accounts (MZ's Customer ▾ menu is hidden) -------
+  // ---- The customer's name, as in Salesforce: names, opens and starts accounts (the calculator’s Customer ▾ menu is hidden) -------
   const picker = $('calc-customer');
   const names = () => [...picker.options].map((o) => ({ id: o.value, name: o.textContent.trim() }));
   const openName = () => picker.selectedOptions[0]?.textContent.trim() ?? '';
@@ -964,7 +964,7 @@ export async function startHosted() {
   picker.addEventListener('change', syncName);
   let starting = false;
   let naming = false; // + New: the next name typed starts an account
-  /** A new account, named: MZ's own New customer, then its name field. */
+  /** A new account, named: the calculator’s own New customer, then its name field. */
   async function startAccount(name) {
     starting = true;
     const before = picker.value;

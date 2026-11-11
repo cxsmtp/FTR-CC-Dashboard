@@ -100,7 +100,7 @@ export class Collection {
 
 /**
  * The audit trail: one JSON line per event, appended, never rewritten, each chained to the one before by SHA-256
- * (as CxMissionZero's audit log is), so an edited, removed or reordered line shows when the log is verified.
+ * (as the calculator’s audit log is), so an edited, removed or reordered line shows when the log is verified.
  */
 export class AuditLog {
   #last = '';

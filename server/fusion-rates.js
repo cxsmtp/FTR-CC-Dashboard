@@ -17,7 +17,7 @@ export const DEFAULT_FUSION_RATES = {
     { name: 'Opus 5.5', creditsPer10k: 2 },
     { name: 'Opus 4.7', creditsPer10k: 2.5 },
     { name: 'Haiku 4.5', creditsPer10k: 1.5 },
-    // In the calculator's own list too (MZ's CHECKMARX_MODELS): shown as needing a rate until one is set.
+    // In the calculator's own list too (the calculator’s CHECKMARX_MODELS): shown as needing a rate until one is set.
     { name: 'Opus 5.0', creditsPer10k: null },
     { name: 'Mythos 5.1', creditsPer10k: null },
   ],
@@ -169,7 +169,7 @@ export function withRates(projection, eff) {
   const added = [...rates.values()].filter((m) => !have.has(engineKey(m.name))).map(catalogModel);
   const list = [...filled, ...added].slice(0, 20);
   let defaultModel = f.defaultModel ?? null;
-  // MZ names a default by itself (its newest engine): until the account's Fusion is used, the one that applies here wins.
+  // the calculator names a default by itself (its newest engine): until the account's Fusion is used, the one that applies here wins.
   const untouched = !(f.projects?.length) && !f.readAt;
   if (untouched || !defaultModel || !list.some((m) => m.id === defaultModel)) defaultModel = list.find((m) => engineKey(m.name) === engineKey(eff.defaultModel))?.id ?? defaultModel ?? null;
   const same = added.length === 0 && filled.every((m, i) => m === models[i]) && defaultModel === (f.defaultModel ?? null);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Start the command center. HTTP and HTTPS are answered on the same port (MZ's HttpsManager: each connection's first
+ * Start the command center. HTTP and HTTPS are answered on the same port (the calculator’s HttpsManager: each connection's first
  * byte tells a TLS handshake from plain http), so moving from http to HTTPS only is done in Settings → HTTPS without
  * changing the port. Under the launcher (server/launch.js) it tells the launcher when it is up, for rollbacks.
  *
@@ -10,7 +10,7 @@
  */
 import { loadConfig } from './config.js';
 import { createApp } from './app.js';
-import { describeCertificate } from '../vendor/mz/src/tls.js';
+import { describeCertificate } from '../core/src/tls.js';
 
 const [major] = process.versions.node.split('.').map(Number);
 if (major < 22) {

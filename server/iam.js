@@ -1,5 +1,5 @@
 /**
- * People, roles, passwords and sessions. Passwords are hashed with scrypt as CxMissionZero does (src/iam.js);
+ * People, roles, passwords and sessions. Passwords are hashed with scrypt as the calculator does (src/iam.js);
  * sign-in is locked for 15 minutes after 5 wrong passwords; a new person, or one whose password an Admin reset,
  * signs in with a temporary password and must choose their own straight away. Sessions are random tokens in
  * an httpOnly cookie; only their SHA-256 is kept on disk, so a copy of the data folder cannot sign anyone in.
@@ -78,7 +78,7 @@ export class Iam {
     }
     raw.roles = roles;
     raw.users = Array.isArray(raw.users) ? raw.users.filter((u) => u?.id && u?.email) : [];
-    // Changes to the built-in roles a newer version makes, once each (as CxMissionZero migrates its roles).
+    // Changes to the built-in roles a newer version makes, once each (as the calculator migrates its roles).
     raw.migrations = Array.isArray(raw.migrations) ? raw.migrations : [];
     if (!raw.migrations.includes('cc-1.2-people')) {
       const add = (id, perms) => {
@@ -346,6 +346,6 @@ export class Iam {
 }
 
 /** What the browser may see of a person: never the password hash or lock state. */
-/** How a person stands, as MZ shows it: active, locked (too many wrong passwords), off, or still to set their password. */
+/** How a person stands, as the calculator shows it: active, locked (too many wrong passwords), off, or still to set their password. */
 export const statusOf = (u, now = Date.now()) => (u.active === false ? 'disabled' : u.lockedUntil > now ? 'locked' : u.mustChangePassword ? 'pending' : 'active');
 export const publicUser = (u) => (u ? { id: u.id, email: u.email, name: u.name, title: u.title ?? '', role: u.role, teamId: u.teamId ?? null, active: u.active !== false, mustChangePassword: Boolean(u.mustChangePassword), status: statusOf(u), lockedUntil: u.lockedUntil > Date.now() ? new Date(u.lockedUntil).toISOString() : null, signIn: u.lastSignInMethod ?? (u.ssoCreated ? 'sso' : 'password'), createdAt: u.createdAt, lastSignInAt: u.lastSignInAt ?? null } : null);

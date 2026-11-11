@@ -1,5 +1,5 @@
 /**
- * Backups of the data folder, CxMissionZero's way (src/backup.js): everything people, teams, accounts, reports,
+ * Backups of the data folder, the calculator’s way (src/backup.js): everything people, teams, accounts, reports,
  * settings, certificates and the audit log are, in one compressed file, optionally sealed with a passphrase
  * (AES-256-GCM, key from scrypt). Taken every night and before every version switch, kept 14 deep in
  * DATA_DIR/backups; downloaded and restored by an Admin. The versions folder (app/) is never in a backup.

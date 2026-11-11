@@ -4,3 +4,4 @@ demo-data/
 .env
 *.log
 *.tmp
+dist/

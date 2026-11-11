@@ -1,5 +1,5 @@
 /**
- * Branding (Settings → Branding), as CxMissionZero has it: the app's name, the company's name, its logo and browser
+ * Branding (Settings → Branding): the app's name, the company's name, its logo and browser
  * icon, an accent colour, the look everyone sees, whether people may choose their own, and where the menu sits.
  *
  * A logo or icon is kept in the data folder as bytes (settings.json, base64), never as a link the browser follows:
@@ -10,7 +10,7 @@
 import dns from 'node:dns/promises';
 import https from 'node:https';
 
-import { outboundUrlProblem } from '../vendor/mz/src/outbound-url.js';
+import { outboundUrlProblem } from '../core/src/outbound-url.js';
 import { privateAddress } from './calculator.js';
 import { fail } from './store.js';
 

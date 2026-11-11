@@ -1,8 +1,8 @@
 /**
  * Accounts (the calculator's customers) and their projection reports, kept for everyone.
  *
- * Each account is exactly a Cx Credits Calculator customer (vendor/mz/public/calculator/profiles.js: its
- * projections, scope and settings, cleaned by MZ's own cleaners) plus what the command center adds:
+ * Each account is exactly a Cx Credits Calculator customer (core/public/calculator/profiles.js: its
+ * projections, scope and settings, cleaned by the calculator’s own cleaners) plus what the command center adds:
  *   teamId          the team (region) it belongs to: everyone in that team may work on it
  *   ownerId         the Sales Engineer accountable for it
  *   salesforceUrl   the Salesforce opportunity or account it is for: required before a report can be made
@@ -15,8 +15,8 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-import { impactSettings } from '../vendor/mz/public/calculator/model.js';
-import { MAX_PROFILES, migrate, newProfile, newReport, patchProfile, reportMeta, summary } from '../vendor/mz/public/calculator/profiles.js';
+import { impactSettings } from '../core/public/calculator/model.js';
+import { MAX_PROFILES, migrate, newProfile, newReport, patchProfile, reportMeta, summary } from '../core/public/calculator/profiles.js';
 import { Collection, fail } from './store.js';
 
 const SF_ID = /^(001|006)[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?$/;

@@ -1,5 +1,5 @@
 /**
- * The terms of use (TERMS.md), as CxMissionZero asks for them (src/terms.js): each person accepts the version in
+ * The terms of use (TERMS.md), as the calculator asks for them (src/terms.js): each person accepts the version in
  * force before they first use the command center, and again whenever its text changes (acceptance is tied to the
  * text's hash). Every acceptance is also in the audit log.
  */

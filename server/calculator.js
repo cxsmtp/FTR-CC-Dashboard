@@ -1,6 +1,6 @@
 /**
- * The Cx Credits Calculator, hosted for everyone: the page and the code are CxMissionZero's (vendor/mz, copied by
- * scripts/sync-mz.mjs), unchanged. What differs from the standalone calculator (FTR-CreditCalculator):
+ * The Cx Credits Calculator, hosted for everyone: its page and code live in core/ and are this product's own (changed
+ * here, not copied from anywhere). Around it:
  *
  *  - customers and reports are kept on this server, per team (src: ./accounts.js), not in one browser;
  *  - each person connects their own Checkmarx One tenant with an API key; the key is checked once and held in this
@@ -19,22 +19,21 @@ import { createHash, randomUUID } from 'node:crypto';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
-import { CxClient } from '../vendor/mz/src/cxone/client.js';
+import { CxClient } from '../core/src/cxone/client.js';
 import { recorded } from './activity.js';
-import { deriveConnection } from '../vendor/mz/src/cxone/endpoints.js';
-import { branchScopeOf } from '../vendor/mz/src/cxone/branches.js';
-import { DEFAULT_ENGINES, cleanEngines } from '../vendor/mz/src/engines.js';
-import { TenantReadStore, readFusionOffer, readJobView, readProgressOf, readTenant, seriesFor } from '../vendor/mz/src/projections.js';
-import { CLOC_FUSION, GIT_COUNT_LIMITS, clocFusionPage, createGitCounter, gitSource, listOrganizations, listRepositories, sweepLeftovers } from '../vendor/mz/src/fusion-git.js';
-import { MAX_PROJECTS, cleanOrigins, impactSettings, readLimit } from '../vendor/mz/public/calculator/model.js';
-import { summary } from '../vendor/mz/public/calculator/profiles.js';
-import { calculatorMarkup, reportRuntime, standaloneMarkup, wrapModule } from '../vendor/mz/src/standalone-calculator.js';
-import { licenceGateScript } from '../vendor/mz/src/licence-gate.js';
+import { deriveConnection } from '../core/src/cxone/endpoints.js';
+import { branchScopeOf } from '../core/src/cxone/branches.js';
+import { DEFAULT_ENGINES, cleanEngines } from '../core/src/engines.js';
+import { TenantReadStore, readFusionOffer, readJobView, readProgressOf, readTenant, seriesFor } from '../core/src/projections.js';
+import { CLOC_FUSION, GIT_COUNT_LIMITS, clocFusionPage, createGitCounter, gitSource, listOrganizations, listRepositories, sweepLeftovers } from '../core/src/fusion-git.js';
+import { MAX_PROJECTS, cleanOrigins, impactSettings, readLimit } from '../core/public/calculator/model.js';
+import { summary } from '../core/public/calculator/profiles.js';
+import { calculatorMarkup, reportRuntime, standaloneMarkup, wrapModule } from '../core/src/standalone-calculator.js';
+import { licenceGateScript } from '../core/src/licence-gate.js';
 import { fail } from './store.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MZ_PUBLIC = path.join(ROOT, 'vendor', 'mz', 'public');
-export const MZ_SOURCE = JSON.parse(fs.readFileSync(path.join(ROOT, 'vendor', 'mz', 'SOURCE.json'), 'utf8'));
+const MZ_PUBLIC = path.join(ROOT, 'core', 'public');
 
 // ---- Hosts the server may call -------------------------------------------------------------------
 
@@ -87,19 +86,19 @@ const inlined = (css, root) =>
   });
 const scriptText = (s) => s.replace(/\r\n?/g, '\n').replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 const contentHash = (t) => `'sha256-${createHash('sha256').update(t, 'utf8').digest('base64')}'`;
-/** MZ's own bundle order (src/standalone-calculator.js), with this server's entry in place of its standalone.js. */
+/** the calculator’s own bundle order (src/standalone-calculator.js), with this server's entry in place of its standalone.js. */
 const MODULES = (() => {
-  const text = fs.readFileSync(path.join(ROOT, 'vendor', 'mz', 'src', 'standalone-calculator.js'), 'utf8');
+  const text = fs.readFileSync(path.join(ROOT, 'core', 'src', 'standalone-calculator.js'), 'utf8');
   const list = JSON.parse((/^const MODULES = (\[[^\]]*\]);/m.exec(text)?.[1] ?? '[]').replace(/'/g, '"'));
-  if (!list.includes('calculator/standalone.js')) throw new Error('vendor/mz: the calculator bundle no longer ends with calculator/standalone.js; check scripts/sync-mz.mjs');
+  if (!list.includes('calculator/standalone.js')) throw new Error('core: the calculator bundle no longer ends with calculator/standalone.js; check scripts/sync-mz.mjs');
   return list.map((f) => (f === 'calculator/standalone.js' ? 'calculator/hosted.js' : f));
 })();
 
 let built = null;
 
 /**
- * The hosted page, built once per start: MZ's calculator markup and modules bundled as the standalone calculator
- * is, with client/calculator-hosted.js in place of MZ's standalone.js. Its content security policy allows only its
+ * The hosted page, built once per start: the calculator’s calculator markup and modules bundled as the standalone calculator
+ * is, with client/calculator-hosted.js in place of the calculator’s standalone.js. Its content security policy allows only its
  * own scripts (by hash) and calls to this server. The per-request settings go in a JSON element no script hash
  * depends on.
  */
@@ -122,8 +121,7 @@ export function calculatorPage({ productCode = '' } = {}) {
   const html = head
     .replace('<!--CSS-->', `<style>${css}</style>`)
     .replace('<!--CALCULATOR-->', markup)
-    .replace('<!--SCRIPTS-->', `${seed ? `<script>${seed}</script>\n` : ''}<script>${gate}</script>\n<script type="application/json" id="cx-report-runtime">${JSON.stringify(reportRuntime({ root: MZ_PUBLIC })).replace(/</g, '\\u003c')}</script>\n${vendorScripts.map((t) => `<script>${t}</script>`).join('\n')}\n<script type="module">${main}</script>`)
-    .replaceAll('{{MZ}}', MZ_SOURCE.label);
+    .replace('<!--SCRIPTS-->', `${seed ? `<script>${seed}</script>\n` : ''}<script>${gate}</script>\n<script type="application/json" id="cx-report-runtime">${JSON.stringify(reportRuntime({ root: MZ_PUBLIC })).replace(/</g, '\\u003c')}</script>\n${vendorScripts.map((t) => `<script>${t}</script>`).join('\n')}\n<script type="module">${main}</script>`);
   // The same page for everyone (each person's settings come from /api/cc/calc-config): compressed once, cached by ETag.
   const gz = zlib.gzipSync(html, { level: 9 });
   const etag = `"cc-${createHash('sha256').update(html).digest('hex').slice(0, 20)}"`;

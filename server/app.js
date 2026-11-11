@@ -21,20 +21,20 @@ import { ActivityLog } from './activity.js';
 import { CallMemory, explainCall } from './resilience.js';
 import { DEFAULT_SUPPORT_EMAIL, KINDS as SUPPORT_KINDS, STATUSES as SUPPORT_STATUSES, SupportDesk, supportEmail } from './support.js';
 import { FusionRates, engineKey, rateModels, withRates } from './fusion-rates.js';
-import { DEFAULT_TR } from '../vendor/mz/public/calculator/model.js';
-import { leverData } from '../vendor/mz/public/calculator/levers.js';
+import { DEFAULT_TR } from '../core/public/calculator/model.js';
+import { leverData } from '../core/public/calculator/levers.js';
 import { IntegrityService } from './integrity/service.js';
 import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
 import { recoverDataDir } from './recover.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
 import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
-import { HSTS_AGES, HttpsManager } from '../vendor/mz/src/https-manager.js';
-import { AcmeService, CHALLENGE_PREFIX, RENEW_DAYS, cleanNames, validName } from '../vendor/mz/src/acme.js';
-import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, MZ_SOURCE, calculatorPage, impactSettings, summary } from './calculator.js';
+import { HSTS_AGES, HttpsManager } from '../core/src/https-manager.js';
+import { AcmeService, CHALLENGE_PREFIX, RENEW_DAYS, cleanNames, validName } from '../core/src/acme.js';
+import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, calculatorPage, impactSettings, summary } from './calculator.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
-/** The version as people see it, MZ's way: CC-01.01.00. */
+/** The version as people see it, the calculator’s way: CC-01.01.00. */
 export const versionLabel = (v = VERSION) => `CC-${String(v).split('.').map((n) => n.padStart(2, '0')).join('.')}`;
 const COOKIE = 'cc_session';
 const BODY_LIMIT = 256 * 1024;
@@ -100,7 +100,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const sso = new Sso({ settings: () => settings.value.sso, publicUrl: config.publicUrl });
   const isAdminUser = (user) => user.role === 'admin' || iam.permissionsOf({ ...user, active: true }).has('users.manage');
 
-  // ---- HTTPS (CxMissionZero's HttpsManager and Let's Encrypt client, as they are) ------------------------------------
+  // ---- HTTPS (the calculator’s HttpsManager and Let's Encrypt client, as they are) ------------------------------------
   const httpsManager = new HttpsManager({ dataDir: config.dataDir, env: config.env ?? process.env, log: { log, warn: log } });
   const ACME_DIRECTORY = String(config.env?.ACME_DIRECTORY_URL ?? '').trim();
   const acme = new AcmeService({ dataDir: config.dataDir, https: httpsManager, log: { log, warn: log }, ...(ACME_DIRECTORY ? { directories: { production: ACME_DIRECTORY, staging: ACME_DIRECTORY } } : {}) });
@@ -118,7 +118,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     } else audit.record({ action: 'https.letsencrypt.failed', target: names, details: { error: event.error } });
   });
 
-  // ---- Email (Settings → Email server) and forgotten passwords, as CxMissionZero does them ---------------------
+  // ---- Email (Settings → Email server) and forgotten passwords, as the calculator does them ---------------------
   const secrets = new Secrets(config.dataDir);
   if (!settings.value.smtp && config.smtp?.host) {
     // First start with SMTP_* in the environment: those settings, still to be tested by an Admin.
@@ -295,7 +295,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const r = (method, pattern, ...handlers) => router.add(method, pattern, ...handlers);
 
   // ---- Health and sign-in ------------------------------------------------------------------------------
-  r('GET', '/healthz', () => ({ ok: true, version: VERSION, mz: MZ_SOURCE.label }));
+  r('GET', '/healthz', () => ({ ok: true, version: VERSION }));
   // ---- Branding (Settings → Branding, server/branding.js): what every page shows, even before signing in ------------
   const branding = () => ({ ...DEFAULT_BRANDING, ...(settings.value.branding ?? {}) });
   const brandingView = () => {
@@ -557,7 +557,6 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       picture: ctx.user.picture ? `/api/people/${ctx.user.id}/picture?v=${encodeURIComponent(ctx.user.picture.at)}` : null,
       sessions: iam.sessionsOf(ctx.user.id),
       impersonating: ctx.impersonator ? { by: { name: ctx.impersonator.name, email: ctx.impersonator.email }, until: new Date(ctx.session.actAs.until).toISOString() } : null,
-      mz: MZ_SOURCE.label,
     };
   });
   r('POST', '/api/me/password', ownSelf, async (req, ctx, body) => {
@@ -1269,7 +1268,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'settings.update', '', { changed: Object.keys(body ?? {}) });
     return { ...settings.value, effective: hosts() };
   });
-  // ---- HTTPS (Settings → HTTPS), as CxMissionZero runs it ----------------------------------------------------------------
+  // ---- HTTPS (Settings → HTTPS), as the calculator runs it ----------------------------------------------------------------
   const hostOf = (req) => String(req.headers.host ?? '').trim().toLowerCase();
   function httpsHosts(req, extra = []) {
     const hosts = new Set();
@@ -1354,7 +1353,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return acmeView(req);
   });
 
-  // ---- Backups (CxMissionZero's way): nightly, before every version switch, by hand; download and restore -------------
+  // ---- Backups (the calculator’s way): nightly, before every version switch, by hand; download and restore -------------
   for (const e of recovered) audit.record({ action: e.outcome === 'restored' ? 'recover.restored' : 'recover.setAside', target: e.file, details: e });
   let lastBackup = { ok: true, at: null, error: '' };
   const takeBackup = (reason) => {
@@ -1486,7 +1485,6 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const report = {
       generatedAt: new Date().toISOString(),
       version: versionLabel(),
-      mz: MZ_SOURCE.label,
       node: process.version,
       platform: `${process.platform} ${process.arch}`,
       uptimeMinutes: Math.round((Date.now() - startedAt) / 60000),
@@ -1630,7 +1628,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'account.create', a.name, { id: a.id, team: teams.get(ctx.team)?.name });
     return { customer: withTrRates(withRates(a, ratesFor(ctx.user.id))) };
   });
-  r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../vendor/mz/src/standalone-calculator.js')).reportRuntime());
+  r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../core/src/standalone-calculator.js')).reportRuntime());
   r('GET', '/api/projections/reports', calcTeam, (req, ctx, body, res, url) => ({ reports: accounts.reportsOf(ctx.teamSet, String(url.searchParams.get('customer') ?? '')) }));
   r('POST', '/api/projections/reports', calcTeam, (req, ctx, body) => {
     {
@@ -1948,7 +1946,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
 
   // ---- The requests ---------------------------------------------------------------------------------------------
   const PUBLIC_DIR = path.join(config.root, 'public');
-  const SAMPLES = path.join(config.root, 'vendor', 'mz', 'public', 'calculator', 'samples');
+  const SAMPLES = path.join(config.root, 'core', 'public', 'calculator', 'samples');
   const LEGAL = { '/legal/terms': 'TERMS.md', '/legal/license': 'LICENSE', '/legal/guide': 'docs/USER-GUIDE.md', '/legal/changelog': 'CHANGELOG.md' };
 
   const PUBLIC_POSTS = new Set(['/api/auth/signin', '/api/auth/forgot', '/api/auth/reset/check', '/api/auth/reset/confirm']);
@@ -1979,8 +1977,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (method === 'GET' && LEGAL[pathname]) {
       return send(res, 200, fs.readFileSync(path.join(config.root, LEGAL[pathname]), 'utf8'), { 'Content-Type': 'text/plain; charset=utf-8' });
     }
-    // MZ's .xlsx reader (from the calculator), for reading sheets people upload in the dashboard.
-    if (method === 'GET' && pathname === '/xlsx-lite.js') return serveStatic(path.join(config.root, 'vendor', 'mz', 'public', 'calculator', 'vendor'), req, res, 'xlsx-lite.js') || send(res, 404, 'Not found');
+    // the calculator’s .xlsx reader (from the calculator), for reading sheets people upload in the dashboard.
+    if (method === 'GET' && pathname === '/xlsx-lite.js') return serveStatic(path.join(config.root, 'core', 'public', 'calculator', 'vendor'), req, res, 'xlsx-lite.js') || send(res, 404, 'Not found');
     if (method === 'GET' && pathname.startsWith('/calc-assets/samples/')) {
       const ctx = context(req);
       if (!ctx) return send(res, 401, { error: 'Sign in first.' });

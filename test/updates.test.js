@@ -19,7 +19,7 @@ before(() => {
   // A real release of this tree, as 9.9.9.
   const src = path.join(tmp, 'src');
   fs.mkdirSync(src);
-  for (const f of ['server', 'vendor', 'public', 'client', 'scripts', 'package.json', 'LICENSE', 'TERMS.md']) fs.cpSync(path.join(ROOT, f), path.join(src, f), { recursive: true });
+  for (const f of ['server', 'core', 'public', 'client', 'scripts', 'package.json', 'LICENSE', 'TERMS.md']) fs.cpSync(path.join(ROOT, f), path.join(src, f), { recursive: true });
   const pkg = JSON.parse(fs.readFileSync(path.join(src, 'package.json'), 'utf8'));
   fs.writeFileSync(path.join(src, 'package.json'), JSON.stringify({ ...pkg, version: '9.9.9' }));
   execFileSync(process.execPath, [path.join(src, 'scripts', 'make-release.mjs'), path.join(tmp, 'dist')]);

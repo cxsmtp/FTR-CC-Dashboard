@@ -4,11 +4,11 @@
  * and the figures the report was built from, as JSON in <script id="cx-live">.
  *
  * Here only that JSON is read. The file's HTML and scripts are never run or kept. The figures are worked out again
- * with the calculator's own model (vendor/mz/public/calculator/levers.js), so what is recorded is what their numbers
+ * with the calculator's own model (core/public/calculator/levers.js), so what is recorded is what their numbers
  * give, not what the file claims.
  */
-import { leverData } from '../vendor/mz/public/calculator/levers.js';
-import { creditSummary, fusionTotal } from '../vendor/mz/public/calculator/model.js';
+import { leverData } from '../core/public/calculator/levers.js';
+import { creditSummary, fusionTotal } from '../core/public/calculator/model.js';
 import { fail } from './store.js';
 
 const MAX_HTML = 40 * 1024 * 1024;

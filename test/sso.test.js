@@ -5,7 +5,7 @@ import zlib from 'node:zlib';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { SignedXml } from 'xml-crypto';
 
-import { makeCertificate } from '../vendor/mz/src/tls.js';
+import { makeCertificate } from '../core/src/tls.js';
 import { client, start } from './helpers.js';
 
 let env;

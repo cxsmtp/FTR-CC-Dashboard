@@ -1446,7 +1446,7 @@ async function peopleList() {
   state.people = await api('/api/people');
   return state.people;
 }
-// People, roles and sign-in, as CxMissionZero's Access page: for Leaders (their teams), Executives and Admins (everyone).
+// People, roles and sign-in: for Leaders (their teams), Executives and Admins (everyone).
 let peopleTab = 'people';
 const STATUS = { active: ['ok', 'Active'], locked: ['bad', 'Locked'], disabled: ['bad', 'Off'], pending: ['warn', 'Must set password'] };
 const PAGE = 25;
@@ -1798,7 +1798,7 @@ function showTemporary(email, temporary) {
   dlg.showModal();
 }
 
-/** Roles as columns, permissions as rows, MZ's matrix: tick, compare, save; never a permission you do not hold. */
+/** Roles as columns, permissions as rows: tick, compare, save; never a permission you do not hold. */
 function rolesMatrix(d) {
   const edit = can('roles.manage');
   const groups = [...new Set(d.permissions.map((p) => p.group))];
@@ -2687,7 +2687,7 @@ const ADMIN_VIEWS = {
   },
 };
 
-// ---- Email server (SMTP), as CxMissionZero sets it up ---------------------------------------------------------------
+// ---- Email server (SMTP) ---------------------------------------------------------------
 function smtpPanel(m) {
   const x = m.smtp;
   const status = m.verified ? `<span class="chip ok"><i></i>Tested ${esc(dateTime(m.verifiedAt))}</span>` : x.host ? '<span class="chip warn"><i></i>Not tested: nothing is sent until it is</span>' : '<span class="chip"><i></i>Not set up</span>';
@@ -2969,7 +2969,7 @@ function md(text) {
   if (list) out.push('</ul>');
   return out.join('');
 }
-/** About, as CxMissionZero lays it out: one panel of facts and the terms card, then every version. */
+/** About: one panel of facts and the terms card, then every version. */
 async function aboutHtml() {
   const me = state.me;
   const b = state.branding ?? {};
@@ -2981,7 +2981,6 @@ async function aboutHtml() {
       <p class="muted">Where every Sales Engineer works out the credits an account needs, keeps each projection report and what was shared with the customer, and where leaders see the whole picture across every team and region.</p>
       <dl class="about-facts">
         <div><dt>Version</dt><dd>${esc(me.versionLabel)} <span class="muted">(${esc(me.version)})</span>${can('system.update') ? ' · <a href="#/admin/updates">Versions and updates</a>' : ''}</dd></div>
-        <div><dt>Calculator</dt><dd>Cx Credits Calculator from CxMissionZero ${esc(me.mz)}</dd></div>
         <div><dt>Licence</dt><dd>PolyForm Internal Use 1.0.0 · <button type="button" class="link" data-doc="license">read it</button></dd></div>
         <div><dt>Project</dt><dd><a href="https://github.com/cxsmtp/FTR-CC-Dashboard" target="_blank" rel="noopener noreferrer">github.com/cxsmtp/FTR-CC-Dashboard</a></dd></div>
         <div><dt>Terms accepted</dt><dd>${accepted ? `Version ${esc(me.terms.version)}${me.terms.at ? `, ${esc(dateTime(me.terms.at))}` : ''}` : 'Not yet'}</dd></div>
@@ -3237,7 +3236,7 @@ async function viewHelp(view) {
   }
 }
 
-// ---- Your profile, as CxMissionZero has it: who you are here, and how the command center appears to you ---------------
+// ---- Your profile: who you are here, and how the command center appears to you ---------------
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'AED', 'SAR', 'QAR', 'KWD', 'BHD', 'OMR', 'ILS', 'TRY', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'ZAR', 'NGN', 'KES', 'EGP', 'JPY', 'CNY', 'HKD', 'SGD', 'AUD', 'NZD', 'KRW', 'TWD', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'CAD', 'MXN', 'BRL', 'ARS', 'CLP', 'COP'];
 async function viewProfile() {
   state.me = await api('/api/me');

@@ -39,7 +39,7 @@ test('the calculator gets the rates: engines read take theirs, none read gives t
   const opened = withRates({ id: 'a', fusion: { models: [] } }, eff);
   assert.equal(opened.fusion.models.length, 3);
   assert.equal(opened.fusion.models.find((m) => m.id === opened.fusion.defaultModel).name, 'Haiku 4.5');
-  // MZ's own list (names, no rates) takes the rates by name.
+  // the calculator’s own list (names, no rates) takes the rates by name.
   const mz = withRates({ id: 'a', fusion: { models: [{ id: 'catalog-opus-5-5', name: 'opus-5.5', creditsPer10k: null }, { id: 'catalog-mythos', name: 'mythos-5.1', creditsPer10k: null }] } }, eff);
   assert.equal(mz.fusion.models.find((m) => m.name === 'opus-5.5').creditsPer10k, 2);
   assert.equal(mz.fusion.models.find((m) => m.name === 'mythos-5.1').creditsPer10k, null);

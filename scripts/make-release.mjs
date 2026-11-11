@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Build a release the command center can install from Settings → Updates:
- *   dist/ftr-cc-dashboard-<version>.tar.gz   the app (server, public, client, vendor, docs, production node_modules)
+ *   dist/ftr-cc-dashboard-<version>.tar.gz   the app (server, public, client, core, docs, production node_modules)
  *                                            with MANIFEST.json: every file and its SHA-256
  *   dist/SHA256SUMS                          the archive's SHA-256
  *   dist/MANIFEST.json                       the same file list as in the archive, for the workflow to sign
@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.resolve(process.argv[2] ?? path.join(ROOT, 'dist'));
 const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
-const INCLUDE = ['server', 'public', 'client', 'vendor', 'docs', 'scripts', 'node_modules', 'package.json', 'package-lock.json', 'LICENSE', 'TERMS.md', 'README.md', 'CHANGELOG.md'];
+const INCLUDE = ['server', 'public', 'client', 'core', 'docs', 'scripts', 'node_modules', 'package.json', 'package-lock.json', 'LICENSE', 'TERMS.md', 'README.md', 'CHANGELOG.md'];
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 
 const files = {};

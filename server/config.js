@@ -19,7 +19,7 @@ const bool = (v, fallback) => (v === undefined || v === '' ? fallback : /^(1|tru
 
 export function loadConfig(env = process.env) {
   loadDotEnv();
-  // HTTPS by default (MZ's way: your certificate when given, else a self-signed one until an Admin uploads one or
+  // HTTPS by default (the calculator’s way: your certificate when given, else a self-signed one until an Admin uploads one or
   // gets one from Let's Encrypt under Settings → HTTPS). HTTPS=off for a laptop or behind a proxy that does HTTPS.
   if (env.TLS_CERT && !env.TLS_CERT_FILE) env.TLS_CERT_FILE = env.TLS_CERT;
   if (env.TLS_KEY && !env.TLS_KEY_FILE) env.TLS_KEY_FILE = env.TLS_KEY;

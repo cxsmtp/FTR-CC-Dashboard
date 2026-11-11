@@ -1,5 +1,5 @@
-/* The hosted calculator's frame: MZ's standalone head (src/standalone-calculator.js), the command center's nav and
-   the account bar. The calculator itself is styled by MZ's styles.css and nextgen.css, unchanged. */
+/* The hosted calculator's frame: the calculator’s standalone head (src/standalone-calculator.js), the command center's nav and
+   the account bar. The calculator itself is styled by the calculator’s styles.css and nextgen.css, unchanged. */
 .shell.standalone { display: block; min-height: 100vh; }
 .shell.standalone .content { margin: 0 auto; max-width: 1480px; padding: 8px clamp(14px, 2.6vw, 36px) 28px; }
 .shell.standalone .sa-top { position: static; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; padding: 14px 0; }
@@ -117,7 +117,7 @@
 
 /* ==========================================================================
    One command center: the dashboard's menu, palette, background and buttons around the calculator.
-   The calculator is MZ's (styles.css, nextgen.css); its colour tokens are set here from the dashboard's
+   The calculator is the calculator’s (styles.css, nextgen.css); its colour tokens are set here from the dashboard's
    (public/app.css), for light and dark and each of the six palettes, so both pages look and switch as one.
    ========================================================================== */
 html[data-cc][data-ui], html[data-cc][data-ui][data-theme="dark"] {
@@ -137,7 +137,7 @@ html[data-cc][data-ui], html[data-cc][data-ui][data-theme="dark"] {
   --glow: 0 0 0 1px rgba(139, 92, 246, .25), 0 10px 40px -10px rgba(34, 211, 238, .25);
   --cc-side: linear-gradient(180deg, rgba(10, 15, 35, .55), rgba(10, 15, 35, .2));
   --cc-orb: .35;
-  /* MZ's tokens, from the dashboard's */
+  /* the calculator’s tokens, from the dashboard's */
   --bg: #050816;
   --surface: #0f1630;
   --surface-2: #131b3a;
@@ -183,7 +183,7 @@ html[data-cc][data-ui][data-theme="light"] {
   --shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 18px 40px -28px rgba(30, 41, 100, .35);
   --shadow-pop: 0 0 0 1px rgba(51, 65, 140, .1), 0 18px 36px -18px rgba(30, 41, 100, .4);
 }
-/* What follows the palette: MZ's accent, primary and states. */
+/* What follows the palette: the calculator’s accent, primary and states. */
 html[data-cc][data-ui][data-theme] {
   --accent: var(--violet);
   --accent-2: var(--cyan);
@@ -282,13 +282,13 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
   .cc-me { margin: 0; }
 }
 @media (prefers-reduced-motion: reduce) { html[data-cc] .cc-bg .orb { animation: none; } }
-/* MZ's buttons draw their sheen with !important: primary buttons take the palette through the same variable. */
+/* the calculator’s buttons draw their sheen with !important: primary buttons take the palette through the same variable. */
 html[data-cc][data-ui] button.primary, html[data-cc][data-ui] a.button.primary { --btn-sheen: var(--grad); --btn-hi: rgba(255, 255, 255, .18); --btn-lo: transparent; --btn-drop: 0 8px 24px -10px color-mix(in srgb, var(--violet) 80%, transparent); border-color: transparent; }
 html[data-cc][data-ui] .cc-seg button:not(.primary) { --btn-sheen: none; --btn-drop: 0 0 transparent; --btn-hi: transparent; --btn-lo: transparent; }
 html[data-cc][data-ui] .cc-swatches button.cc-swatch { display: flex; width: 100%; height: auto; min-height: 0; padding: 10px; flex-direction: column; align-items: flex-start; justify-content: flex-start; white-space: normal; text-align: left; border-radius: 14px; }
 html[data-cc][data-ui] .cc-swatches button.cc-swatch b { font-size: 13.5px; }
 
-/* The account is named in the account bar (as in Salesforce): MZ's Customer ▾ picker is not shown. */
+/* The account is named in the account bar (as in Salesforce): the calculator’s Customer ▾ picker is not shown. */
 html[data-cc] .calc-cust-pick, html[data-cc] #calc-rename-field { display: none !important; }
 .hc-name > span:first-child small { color: var(--muted); font-weight: 400; }
 .hc-name input { flex: 1; min-width: 0; }
@@ -534,7 +534,7 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 .hc-fold-sum .hc-3d { margin-left: auto; }
 .hc-fold-sum .hc-3d + button { margin-left: 0; }
 .hc-3d[hidden] { display: none !important; }
-/* As a <button> (the folded bar) MZ draws its sheen and shadow through these variables: the same 3D look through them. */
+/* As a <button> (the folded bar) the calculator draws its sheen and shadow through these variables: the same 3D look through them. */
 html[data-cc][data-ui] button.hc-3d {
   --btn-sheen: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 82%, #fff) 0%, var(--cyan) 45%, color-mix(in srgb, var(--cyan) 70%, #000) 100%);
   --btn-hi: rgba(255, 255, 255, .45); --btn-lo: rgba(0, 0, 0, .18);
@@ -671,7 +671,7 @@ html[data-cc] .calc-report-opts { flex: 0 1 auto !important; }
 html[data-cc] .calc-report-go { margin-left: auto !important; flex: none; display: inline-flex !important; gap: 8px; align-items: center; }
 html[data-cc] .calc-report-go > button { height: var(--hc-h) !important; min-height: 0 !important; border-radius: 10px !important; font-size: var(--hc-fs) !important; display: inline-flex !important; align-items: center; white-space: nowrap; }
 .hc-meta #hc-kept { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* MZ's "Customer view" toggle: replaced by "In meeting with the customer" (a tab of its own). */
+/* the calculator’s "Customer view" toggle: replaced by "In meeting with the customer" (a tab of its own). */
 html[data-cc] #calc-present { display: none !important; }
 /* No account open (after + New): the projection area waits, empty, for the new account's name. */
 html[data-no-account] .content > main > * { display: none !important; }

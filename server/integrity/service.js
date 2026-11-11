@@ -1,11 +1,11 @@
 /**
  * Software integrity: is the code running here exactly what this repository's release workflow built?
- * CxMissionZero's src/integrity/service.js, on this command center's release file list (MANIFEST.json).
+ * the calculator’s src/integrity/service.js, on this command center's release file list (MANIFEST.json).
  *
  *  - Files: every file of the running version against MANIFEST.json, the list the release build wrote
  *    (scripts/make-release.mjs); a changed, missing or added file is found at once, with no network.
  *  - Origin: GitHub's build attestation of that very file (signed by .github/workflows/release.yml with Sigstore,
- *    recorded in its public log) is fetched from api.github.com and checked here (sigstore.js, CxMissionZero's).
+ *    recorded in its public log) is fetched from api.github.com and checked here (sigstore.js, the calculator’s).
  *    Once confirmed for a file list, the answer is kept in the data folder, so a server without internet still
  *    knows after a reload.
  *

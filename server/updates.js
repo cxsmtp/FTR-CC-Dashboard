@@ -1,5 +1,5 @@
 /**
- * Updates without downtime or data loss, CxMissionZero's way (docs/updating.md there), from this repository's GitHub
+ * Updates without downtime or data loss, the calculator’s way (docs/updating.md there), from this repository's GitHub
  * Releases instead of a container registry.
  *
  * - **Only what was released is installed.** A release carries `ftr-cc-dashboard-<version>.tar.gz` and `SHA256SUMS`.
@@ -25,7 +25,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 
-import { TarParser, stripTop } from '../vendor/mz/src/cloc-fusion/tar.js';
+import { TarParser, stripTop } from '../core/src/cloc-fusion/tar.js';
 import { Doc, fail } from './store.js';
 
 export const SWITCH_EXIT_CODE = 75;

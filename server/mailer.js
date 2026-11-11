@@ -1,5 +1,5 @@
 /**
- * Email: the SMTP server an Admin sets up (Settings → Email server), adapted from CxMissionZero (src/mailer.js).
+ * Email: the SMTP server an Admin sets up (Settings → Email server), adapted from the calculator (src/mailer.js).
  *
  * - Nothing is sent until a connection test has succeeded for exactly the settings in force (a fingerprint of
  *   host, port, TLS, login and password), so a typo is caught by the Admin, not by someone waiting for a link.

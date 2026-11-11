@@ -1,7 +1,7 @@
 /**
  * Who may do what, and over which accounts.
  *
- * Two things decide it, as in CxMissionZero (src/iam.js):
+ * Two things decide it, as in the calculator (src/iam.js):
  *
  *  1. The role: a set of permissions. Five are built in (Admin, Executive, Leader, Sales Engineer, Viewer);
  *     an Admin can add others. Nobody can hand out more than they hold.

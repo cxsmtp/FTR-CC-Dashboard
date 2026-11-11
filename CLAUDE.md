@@ -20,3 +20,8 @@ Rules from the owner, for every change:
   (public/app.js drafts) until the form is sent.
 - Terms of use, the licence and the user guide open in the app (the reading overlay), never as a bare file.
 - Run `npm test` before pushing.
+- The calculator's code (core/) is this product's own: change it in place. Nothing is synced in from another product.
+- Two looks: Standard (public/standard.css, the one design system: one accent, plain surfaces, no gradients) and
+  Command Center. New screens are built for Standard first and must not bring back gradients, glass or glow there.
+- The menu is Overview, Accounts, Calculator and Settings; anything else goes under Settings (public/app.js
+  `settingsNav`).

@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.59.00 — 2026-11-11
+
+- **The calculator is this product's own.** Its code moved into the app's own `core/` folder, the script that copied it in from another product is gone, and About, the health check and the guides no longer name where it came from. Nothing changes in what it does. (The terms of use are left exactly as they are, so nobody is asked to accept them again.)
+
 ## CC-01.58.00 — 2026-11-11
 
 The Standard look, rebuilt as one plain design system, and the first screens people meet made simple.

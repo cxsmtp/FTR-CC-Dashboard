@@ -4,7 +4,7 @@ Everything under **Settings** is for the **Admin** role only. HTTPS, single sign
 
 ## Run it with Podman (two commands)
 
-As with CxMissionZero: one command to get the image, one to run it.
+One command to get the image, one to run it.
 
 **1. Get the image.**
 
@@ -88,7 +88,7 @@ With compose: `podman compose up -d` (port 7443; change the left side of the por
 
 On the first start the Admin is created. Their one-time password is in `DATA_DIR/initial-admin-password.txt`, and the file is deleted once they choose their own. Locked out? Run `node scripts/reset-admin.mjs you@yourcompany.com`.
 
-## Settings → HTTPS (from CxMissionZero)
+## Settings → HTTPS
 
 The server is **HTTPS by default**. It uses a self-signed certificate until you give it one; browsers warn until then. A single port answers both http and https: each connection's first byte says which it is.
 

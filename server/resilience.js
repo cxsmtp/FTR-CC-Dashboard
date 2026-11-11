@@ -1,7 +1,7 @@
 /**
  * Calls to Checkmarx One that did not succeed: why, what was done about it, and what is done differently next time.
  *
- * The client (vendor/mz/src/cxone/client.js) already signs in again on a 401, and waits and tries again on 429, 502,
+ * The client (core/src/cxone/client.js) already signs in again on a 401, and waits and tries again on 429, 502,
  * 503, 504 and a dropped connection; what reaches the log has been through that. Here:
  *   - explainCall(): the reason in plain words, what was done (the read goes on: a fallback, or the item left out),
  *     and the lesson; and a verdict: "expected" (an optional API this tenant does not offer), "recovered" (the read got
@@ -17,7 +17,7 @@ import path from 'node:path';
 const WEEK = 7 * 86_400_000;
 /** Calls at once to a tenant that asked to slow down (the client's own limit is 24). */
 export const SLOW_AT_ONCE = 6;
-/** The optional APIs a read tries (vendor/mz/src/projections.js FUSION_MODEL_PATHS, CREDIT_BALANCE_PATHS). */
+/** The optional APIs a read tries (core/src/projections.js FUSION_MODEL_PATHS, CREDIT_BALANCE_PATHS). */
 const OPTIONAL = /^\/api\/(fusion\/models|fusion\/config|scan-config\/fusion\/models|fusion\/credits|credits\/balance|credits\/info|configuration\/tenant)$/;
 const SAST_META = /^\/api\/sast-metadata\/([^/?]+)$/;
 
