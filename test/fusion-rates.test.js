@@ -110,3 +110,28 @@ test('Customer Success works out projections for an SE they choose: no report un
   assert.equal((await cs.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se1.id })).status, 200);
   assert.equal((await cs.post('/api/projections/reports', { customerId: id, data: reportData() }, h)).status, 200);
 });
+
+test('triage and remediation credits: the Admin’s, in every projection, whatever the page sends', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const se = await client(env.base, 'se1@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  assert.equal((await lead.put('/api/tr-rates', { triageCost: { Critical: 9 } })).status, 403);
+  assert.equal((await admin.put('/api/tr-rates', { triageCost: { Critical: -1 } })).status, 400);
+  const r = await admin.put('/api/tr-rates', { triageCost: { Critical: 2 }, remediationCost: { Low: 4 } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.trRates.triageCost.Critical, 2);
+  assert.equal(r.data.trRates.triageCost.High, 1);
+  const made = await se.post('/api/projections', { name: 'Fixed Rates Co' }, h);
+  const id = made.data.customer.id;
+  assert.equal(made.data.customer.tr.triageCost.Critical, 2);
+  assert.equal(made.data.customer.tr.remediationCost.Low, 4);
+  // The page sends its own: the Admin's are kept.
+  const tr = { ...made.data.customer.tr, triageCost: { Critical: 50, High: 50, Medium: 50, Low: 50 } };
+  assert.equal((await se.put(`/api/projections/${id}`, { tr }, h)).status, 200);
+  const again = await se.get(`/api/projections/${id}`, h);
+  assert.equal(again.data.customer.tr.triageCost.Critical, 2);
+  assert.equal(again.data.customer.tr.triageCost.High, 1);
+  assert.match(JSON.stringify((await admin.get('/api/audit?limit=50')).data), /tr\.rates/);
+  await admin.put('/api/tr-rates', { triageCost: { Critical: 1 }, remediationCost: { Low: 3 } });
+});

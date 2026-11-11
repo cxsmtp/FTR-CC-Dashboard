@@ -679,3 +679,5 @@ html[data-cc] .calc-report-opts { flex: 0 1 auto !important; }
 html[data-cc] .calc-report-go { margin-left: auto !important; flex: none; display: inline-flex !important; gap: 8px; align-items: center; }
 html[data-cc] .calc-report-go > button { height: var(--hc-h) !important; min-height: 0 !important; border-radius: 10px !important; font-size: var(--hc-fs) !important; display: inline-flex !important; align-items: center; white-space: nowrap; }
 .hc-meta #hc-kept { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* MZ's "Customer view" toggle: replaced by "In meeting with the customer" (a tab of its own). */
+html[data-cc] #calc-present { display: none !important; }

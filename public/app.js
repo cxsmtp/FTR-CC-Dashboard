@@ -2939,6 +2939,9 @@ async function viewRates(params) {
       <div class="flex mt"><button type="button" class="sm" id="add-engine">${icon('plus')}Add an engine</button><span class="muted small">Name it as Checkmarx One does (“Opus 5.5”, “claude-opus-5-5” and “Claude Opus 5.5” are the same engine).</span></div></form>
       <div class="saved-foot" id="rates-saved">All changes are saved.</div></div>`
     : `<div class="panel"><h2>The Admin’s rates <small>for everyone, unless a team sets its own</small></h2><div class="tw"><table><thead><tr><th>Engine</th><th class="num">Credits per 10K LOC</th></tr></thead><tbody>${d.admin.models.map((m) => `<tr><td><b>${esc(m.name)}</b>${m.name === d.admin.defaultModel ? ' <span class="chip star">Default</span>' : ''}</td><td class="num">${m.creditsPer10k ? num(m.creditsPer10k, 3) : '<span class="chip warn"><i></i>needs a rate</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
+    <div class="panel mt"><h2>Triage &amp; remediation credits <small>per finding, for everyone: ${d.canAdmin ? 'only you (the Admin) can change them; the calculator and the reports show them as they are' : 'set by the Admin; the calculator and the reports use them as they are'}</small></h2>
+      <form id="tr-rates" class="form" autocomplete="off" data-nodraft><div class="tw"><table class="rates"><thead><tr><th>Severity</th><th class="num">Credits to triage one</th><th class="num">Credits to remediate one</th></tr></thead><tbody>${['Critical', 'High', 'Medium', 'Low'].map((sv) => `<tr><td><b>${sv}</b></td><td class="num">${d.canAdmin ? `<input type="number" min="0" max="1000" step="0.5" name="t-${sv}" value="${esc(d.trRates.triageCost[sv])}" aria-label="${sv}: credits to triage one finding" />` : num(d.trRates.triageCost[sv], 3)}</td><td class="num">${d.canAdmin ? `<input type="number" min="0" max="1000" step="0.5" name="r-${sv}" value="${esc(d.trRates.remediationCost[sv])}" aria-label="${sv}: credits to remediate one finding" />` : num(d.trRates.remediationCost[sv], 3)}</td></tr>`).join('')}</tbody></table></div></form>
+      ${d.canAdmin ? '<div class="saved-foot" id="tr-saved">All changes are saved.</div>' : ''}</div>
     ${team ? `<div class="panel mt"><h2>For a team <small>leaders and above: your team’s own rate, used by its people and the teams below it (unless they set theirs)</small></h2>
       <div class="row"><label class="f">Team<select id="rates-team">${d.teams.map((t) => `<option value="${esc(t.id)}"${t.id === team.id ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label>
       <label class="f">Default engine for Fusion<select id="team-default" ${d.canTeams ? '' : 'disabled'}><option value="">The Admin’s${eff.defaultFrom === 'admin' || !team.own?.defaultModel ? '' : ''} (${esc(d.admin.defaultModel || 'none')})</option>${eff.models.map((m) => `<option${team.own?.defaultModel === m.name ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label></div>
@@ -2995,6 +2998,17 @@ async function viewRates(params) {
       body.append(tr);
       tr.querySelector('input').focus();
     };
+  }
+  // ---- triage & remediation credits: the Admin's, saved as typed; a refused change goes back to the last good one ----
+  if (d.canAdmin && $('#tr-rates')) {
+    autosave($('#tr-rates'), async (form) => {
+      const body = { triageCost: {}, remediationCost: {} };
+      for (const sv of ['Critical', 'High', 'Medium', 'Low']) {
+        body.triageCost[sv] = form.elements[`t-${sv}`].value;
+        body.remediationCost[sv] = form.elements[`r-${sv}`].value;
+      }
+      await api('/api/tr-rates', { method: 'PUT', body });
+    }, { status: $('#tr-saved') });
   }
   // ---- a team's own: each rate saved as typed; "Back to the Admin's rate" removes it ----
   const teamSay = (t, bad) => {

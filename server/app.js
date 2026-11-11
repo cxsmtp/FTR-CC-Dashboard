@@ -20,6 +20,7 @@ import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
 import { CallMemory, explainCall } from './resilience.js';
 import { FusionRates, engineKey, rateModels, withRates } from './fusion-rates.js';
+import { DEFAULT_TR } from '../vendor/mz/public/calculator/model.js';
 import { IntegrityService } from './integrity/service.js';
 import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
@@ -65,6 +66,15 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const fusionRates = new FusionRates(settings);
   const ratesForTeam = (teamId) => fusionRates.effective(teamPath(teams.list(), teamId));
   const ratesFor = (userId) => ratesForTeam(iam.byId(userId)?.teamId);
+  // Triage & remediation credits per finding: one figure per severity for everyone, set by the Admin only.
+  const SEVS = ['Critical', 'High', 'Medium', 'Low'];
+  const trRates = () => {
+    const v = settings.value.trRates ?? {};
+    const one = (k) => Object.fromEntries(SEVS.map((sv) => [sv, Number.isFinite(Number(v[k]?.[sv])) ? Number(v[k][sv]) : DEFAULT_TR[k][sv]]));
+    return { triageCost: one('triageCost'), remediationCost: one('remediationCost') };
+  };
+  /** A projection with the Admin's triage and remediation credits, whatever it held. */
+  const withTrRates = (projection) => (projection?.tr && typeof projection.tr === 'object' ? { ...projection, tr: { ...projection.tr, ...trRates() } } : projection);
   calc.rates = {
     rate: (userId, models) => rateModels(models ?? [], ratesFor(userId)),
     detected: (userId, names, tenant) => fusionRates.noteDetected(names, { by: iam.byId(userId)?.name ?? '', tenant }),
@@ -1455,7 +1465,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/projections', calcTeam, (req, ctx, body) => {
     const a = accounts.create({ name: body?.name, teamId: ctx.team, user: ctx.user });
     record(ctx, req, 'account.create', a.name, { id: a.id, team: teams.get(ctx.team)?.name });
-    return { customer: withRates(a, ratesFor(ctx.user.id)) };
+    return { customer: withTrRates(withRates(a, ratesFor(ctx.user.id))) };
   });
   r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../vendor/mz/src/standalone-calculator.js')).reportRuntime());
   r('GET', '/api/projections/reports', calcTeam, (req, ctx, body, res, url) => ({ reports: accounts.reportsOf(ctx.teamSet, String(url.searchParams.get('customer') ?? '')) }));
@@ -1629,6 +1639,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       canTeams: ctx.permissions.has('users.manage') || admin,
       teams: mine.map((t) => ({ id: t.id, name: t.name, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), own: fusionRates.teams[t.id] ?? null, effective: ratesForTeam(t.id) })),
       myTeamId: ctx.user.teamId,
+      trRates: trRates(),
     };
   };
   r('GET', '/api/fusion-rates', signedIn, (req, ctx) => ratesView(ctx));
@@ -1641,6 +1652,25 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'fusion.rates', changes.join('; ') || 'no change', { models: after.models, defaultModel: after.defaultModel });
     return ratesView(ctx);
   });
+  r('PUT', '/api/tr-rates', perm('settings.manage'), (req, ctx, body) => {
+    const before = trRates();
+    const next = {};
+    for (const k of ['triageCost', 'remediationCost']) {
+      next[k] = {};
+      for (const sv of SEVS) {
+        const raw = body?.[k]?.[sv] ?? before[k][sv];
+        const n = Number(String(raw).replace(',', '.'));
+        if (!Number.isFinite(n) || n < 0 || n > 1000) throw fail(400, `${sv}: credits are a number from 0 to 1000.`);
+        next[k][sv] = Math.round(n * 1000) / 1000;
+      }
+    }
+    settings.value.trRates = next;
+    settings.save();
+    const changes = [];
+    for (const k of ['triageCost', 'remediationCost']) for (const sv of SEVS) if (before[k][sv] !== next[k][sv]) changes.push(`${sv} ${k === 'triageCost' ? 'triage' : 'remediation'} ${before[k][sv]} → ${next[k][sv]}`);
+    record(ctx, req, 'tr.rates', changes.join('; ') || 'no change', next);
+    return ratesView(ctx);
+  });
   r('PUT', '/api/fusion-rates/teams/:teamId', signedIn, (req, ctx, body, res, url, params) => {
     if (!ctx.permissions.has('users.manage') && !ctx.permissions.has('settings.manage')) throw fail(403, 'Leaders and above set a team\u2019s rates.');
     needTeam(ctx.scope, String(params.teamId));
@@ -1649,10 +1679,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'fusion.rates.team', `${teams.get(String(params.teamId))?.name ?? params.teamId}: ${what.join('; ')}`, { teamId: params.teamId, own });
     return ratesView(ctx);
   });
-  r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: forBrowser(withRates(accounts.get(params.id, ctx.teamSet), ratesFor(ctx.user.id))) }));
+  r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: forBrowser(withTrRates(withRates(accounts.get(params.id, ctx.teamSet), ratesFor(ctx.user.id)))) }));
   r('PUT', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
     const patch = {};
     for (const key of ['name', 'tr', 'fusion', 'fusionNew', 'totals', 'scope', 'impact']) if (body?.[key] !== undefined) patch[key] = body[key];
+    // The triage and remediation credits are the Admin's, whatever the page sent.
+    if (patch.tr && typeof patch.tr === 'object') patch.tr = { ...patch.tr, ...trRates() };
     const saved = summary(accounts.update(params.id, ctx.teamSet, patch, ctx.user));
     if ((patch.tr !== undefined || patch.fusion !== undefined) && calc.markApplied(ctx.user.id, params.id)) {
       accounts.markRead(params.id);

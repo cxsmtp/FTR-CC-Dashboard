@@ -511,7 +511,7 @@ h2{margin:0 0 12px;font-size:18px;font-weight:600} h3{margin:18px 0 6px;font-siz
 .card{border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
 .card h3{margin:0 0 8px}
 .figure{margin:0 0 6px;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums} .figure span{font-size:13px;color:var(--muted);font-weight:400}
-.impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .beta-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;background:#ffe2a8;border:1px solid #f0b443;vertical-align:middle} .impact-tile.beta{border-style:dashed} .beta-note{border-left:3px solid #f0b443;padding-left:10px} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
+.impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .lv-num[data-fixed]{background:transparent;border-color:transparent;pointer-events:none;color:var(--ink)} .beta-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;background:#ffe2a8;border:1px solid #f0b443;vertical-align:middle} .impact-tile.beta{border-style:dashed} .beta-note{border-left:3px solid #f0b443;padding-left:10px} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
 .sevs{list-style:none;margin:0 0 8px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:13px}
 .sevs li{display:flex;align-items:center;gap:6px} .sevs i{width:8px;height:8px;border-radius:2px;display:inline-block} .sevs b{margin-inline-start:auto;font-variant-numeric:tabular-nums;font-weight:500}
 table.calc{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
@@ -694,8 +694,8 @@ function leversPanel(data, live, L) {
     return `<tr><th scope="row"><i class="dot" style="background:${SEVERITY_COLOURS[s]}"></i>${w(s)}</th>
       <td data-label="${w('Backlog to include')}">${slider(`sel.${s}`, r.selected, r.backlog, w('{0}: backlog to include', w(s)), w('{0} of {1}', num(r.selected), num(r.backlog)))}</td>
       <td data-label="${w('False positives')}">${slider(`fp.${s}`, r.fp, 100, w('{0}: false positives %', w(s)), `${num(r.fp)}%`)}</td>
-      <td data-label="${w('Credits to triage one')}">${box(`tc.${s}`, r.triageCost, w('{0}: credits to triage one finding', w(s)))}</td>
-      <td data-label="${w('Credits to remediate one')}">${box(`rc.${s}`, r.remediationCost, w('{0}: credits to remediate one finding', w(s)))}</td></tr>`;
+      <td data-label="${w('Credits to triage one')}">${box(`tc.${s}`, r.triageCost, w('{0}: credits to triage one finding', w(s)), ' readonly tabindex="-1" data-fixed title="Set by Checkmarx"')}</td>
+      <td data-label="${w('Credits to remediate one')}">${box(`rc.${s}`, r.remediationCost, w('{0}: credits to remediate one finding', w(s)), ' readonly tabindex="-1" data-fixed title="Set by Checkmarx"')}</td></tr>`;
   }).join('') : '';
   const ahead = tr?.ahead ?? {};
   const periods = [...new Set([3, 6, 12, 18, 24, 36, live.inputs.months])].sort((a, b) => a - b);

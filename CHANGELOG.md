@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.40.00 — 2026-11-11
+
+- **Triage & remediation credits are one rate for everyone, set by the Admin.** Under **Fusion engines & rates → Triage & remediation credits**, the Admin sets the credits to triage one finding and to remediate one, per severity (they save as you type). Everywhere else they are shown, never changed: the calculator’s **Customize per severity** and the report’s own levers are read-only, every projection uses the Admin’s figures whatever is sent, and a customer’s version never brings its own. They start at today’s figures (1 to triage, 3 to remediate), so nothing changes until the Admin changes them; every change is in the audit log.
+- **Customer view** is gone from the calculator: **In meeting with the customer** replaces it.
+
 ## CC-01.39.00 — 2026-11-11
 
 - **The calculator, aligned and sleek.** Every field and button in the account panel and in Projection settings has one height and one shape, and sits on one baseline per row; sizes follow the screen (34px controls on a laptop, up to 42px on a large monitor).

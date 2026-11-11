@@ -81,7 +81,8 @@ export function preferencesPatch(profile, inputs) {
   const plan = inputs.tr?.plan;
   if (plan && profile.tr) {
     patch.tr = { ...profile.tr };
-    for (const k of ['selected', 'fpPercent', 'triageCost', 'remediationCost']) if (plan[k] && typeof plan[k] === 'object') patch.tr[k] = { ...(profile.tr[k] ?? {}), ...plan[k] };
+    // Triage and remediation credits are the Admin's for everyone: a customer's version never brings its own.
+    for (const k of ['selected', 'fpPercent']) if (plan[k] && typeof plan[k] === 'object') patch.tr[k] = { ...(profile.tr[k] ?? {}), ...plan[k] };
     for (const k of ['includeFuture', 'aiDeclinePercent', 'newPacePercent', 'fusionUpliftPercent']) if (plan[k] !== undefined) patch.tr[k] = plan[k];
   }
   if (profile.fusion && (inputs.months || inputs.fusion)) {

@@ -15,3 +15,6 @@
 - **Findings still to come: off by default** (`DEFAULT_TR.includeFuture = false` in `public/calculator/model.js`, and
   `aheadSettings` takes the default only when a projection never said): new projections and **Defaults** leave them
   out until ticked; every saved projection keeps its own choice.
+- **Triage and remediation credits are the Admin's**: shown, not changed — `page.js` (Customize per severity: the two
+  inputs disabled) and `report.js` (the report's levers: read-only). The server applies the Admin's figures to every
+  projection (server/app.js `withTrRates`).

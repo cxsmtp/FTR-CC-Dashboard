@@ -607,9 +607,9 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
             <input type="range" min="0" max="${esc(open)}" value="${esc(chosen)}" data-f="selected" aria-label="${s}: to triage" style="--p:${fill(chosen, open)}%" />
             <div class="calc-row"><input type="number" min="0" max="${esc(open)}" value="${esc(chosen)}" data-f="selected" aria-label="${s}: to triage" />
               <span><button type="button" class="ghost small-btn" data-set="0">None</button><button type="button" class="ghost small-btn" data-set="all">All</button></span></div>
-            <label class="calc-row"><span>Credits per triage</span><input type="number" min="0" step="0.5" value="${esc(d.triageCost)}" data-f="triageCost" /></label>
+            <label class="calc-row"><span>Credits per triage</span><input type="number" min="0" step="0.5" value="${esc(d.triageCost)}" data-f="triageCost" disabled title="Set by the Admin for everyone" /></label>
             <label class="calc-row"><span>False positives %</span><input type="number" min="0" max="100" step="1" value="${esc(d.fpPercent)}" data-f="fpPercent" /></label>
-            <label class="calc-row"><span>Credits per remediation</span><input type="number" min="0" step="0.5" value="${esc(d.remediationCost)}" data-f="remediationCost" /></label>
+            <label class="calc-row"><span>Credits per remediation</span><input type="number" min="0" step="0.5" value="${esc(d.remediationCost)}" data-f="remediationCost" disabled title="Set by the Admin for everyone" /></label>
             <p class="calc-sev-result"><span>To triage</span> <b>${num(R[s].toTriage)}</b> · <span>to remediate</span> <b>${num(R[s].truePositives)}</b> · <b class="calc-gold">${num(R[s].credits, 1)}</b> <span>credits</span></p>
             <button type="button" class="${c.dirty[s] ? 'primary' : 'secondary'} calc-apply" data-apply${c.dirty[s] ? '' : ' disabled'}>${c.dirty[s] ? 'Apply' : 'Applied'}</button>
           </div>`;
