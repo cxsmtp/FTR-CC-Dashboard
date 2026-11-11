@@ -178,7 +178,7 @@ function themePicker() {
   dlg.innerHTML = `<form method="dialog"><div class="dh"><h2>Theme</h2><p class="muted small">Yours, on every device you sign in on.</p></div><div class="db">
     <div class="seg" id="modes">${['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${cur.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('')}</div>
     <div class="swatches mt">${THEMES.map(([id, name, note]) => `<button type="button" class="swatch${cur.accent === id ? ' on' : ''}" data-a="${id}"><span class="sw sw-${id}"></span><b>${name}</b><small>${note}</small></button>`).join('')}</div>
-    <div class="ops-pick" id="ops-pick"${cur.accent === 'command' ? '' : ' hidden'}><span class="muted small">Command Center colour</span>${OPS.map(([id, c]) => `<button type="button" data-o="${id}" style="--c:${c}" class="${(me.prefs?.ops ?? 'green') === id ? 'on' : ''}" title="${id[0].toUpperCase()}${id.slice(1)}" aria-label="${id}"></button>`).join('')}</div></div>
+    <div class="ops-pick" id="ops-pick"${cur.accent === 'command' ? '' : ' hidden'}><span class="muted small">Command Center colour</span>${OPS.map(([id, c]) => `<button type="button" data-o="${id}" data-css="--c:${c}" class="${(me.prefs?.ops ?? 'green') === id ? 'on' : ''}" title="${id[0].toUpperCase()}${id.slice(1)}" aria-label="${id}"></button>`).join('')}</div></div>
     <div class="df"><button value="ok" class="primary">Done</button></div></form>`;
   document.body.append(dlg);
   const save = async () => {
@@ -210,6 +210,22 @@ function themePicker() {
   dlg.addEventListener('close', () => dlg.remove());
   dlg.showModal();
 }
+
+// ---- Values a piece of the page carries into its style (a ring's share, a split's height, a swatch's colour) ----
+// The page's content policy runs no style written into the HTML, so they are given as data-css="--name:value" and set
+// here, as each piece arrives.
+function applyCss(root = document) {
+  for (const el of root.querySelectorAll?.('[data-css]') ?? []) {
+    for (const part of el.dataset.css.split(';')) {
+      const i = part.indexOf(':');
+      if (i > 0) el.style.setProperty(part.slice(0, i).trim(), part.slice(i + 1).trim());
+    }
+    el.removeAttribute('data-css');
+  }
+}
+new MutationObserver((changes) => {
+  for (const c of changes) for (const node of c.addedNodes) if (node.nodeType === 1) applyCss(node.parentElement ?? node);
+}).observe(document.documentElement, { childList: true, subtree: true });
 
 // ---- Settings: everything that is not Overview, Accounts or the Calculator, in one place ----
 const SETTINGS_PAGES = ['people', 'teams', 'rates', 'audit', 'activity', 'admin'];
@@ -455,20 +471,9 @@ function viewLogin() {
   $('#app').className = 'app bare';
   $('#app').innerHTML = `
   <div class="auth fade">
-    <section class="pitch">
-      ${brandHtml()}
-      <h1 class="serif">Every credit projection.<br/><em>One command center.</em></h1>
-      <p>Work out what each account needs for Triage &amp; Remediation and Checkmarx Fusion, keep every report in one place, and give leaders the full picture across every team and region.</p>
-      <div class="feats">
-        <div class="feat"><b>Cx Credits Calculator</b>Read the customer's Checkmarx One tenant, or count a prospect's code from git or cloc-fusion.</div>
-        <div class="feat"><b>Tied to Salesforce</b>Every account carries its opportunity or account link, one click away.</div>
-        <div class="feat"><b>Primary &amp; shared</b>One primary report per account, and a record of what went to the customer.</div>
-        <div class="feat"><b>Team-based access</b>See your team's accounts; leaders see every team below them.</div>
-      </div>
-    </section>
     <section class="card">
+      <div class="auth-brand">${brandHtml()}</div>
       <h2>Sign in</h2>
-      <p class="lead">With your work email and password.</p>
       <form class="form" id="login" autocomplete="on">
         <label class="f">Work email<input type="email" name="email" autocomplete="username" required autofocus /></label>
         <label class="f">Password<input type="password" name="password" autocomplete="current-password" required /></label>
@@ -477,7 +482,7 @@ function viewLogin() {
         <a href="#/forgot" class="small" id="forgot-link">Forgot your password?</a>
       </form>
       <div id="sso-box" hidden><div class="or"><span>or</span></div><a class="btn sso" id="sso-btn" href="/saml/login">${icon('people')}<span id="sso-label">Sign in with SSO</span></a></div>
-      <p class="foot">First time? Your Admin sent you a one-time password: sign in with it and you will choose your own, accept the terms of use and see a quick guide.<br/>Internal use only · <a href="#/legal" data-doc="terms">Terms of use &amp; license</a></p>
+      <p class="foot">Internal use only · <a href="#/legal" data-doc="terms">Terms of use &amp; license</a></p>
     </section>
   </div>`;
   fetch('/api/auth/sso').then((r) => r.json()).then((x) => {
@@ -512,7 +517,7 @@ function viewLogin() {
 // ---- Forgot your password? ------------------------------------------------------------------------------
 function authCard(inner) {
   $('#app').className = 'app bare';
-  $('#app').innerHTML = `<div class="auth fade"><section class="pitch">${brandHtml()}<h1 class="serif">Back in, <em>safely.</em></h1><p>A link to choose a new password goes to your own work email. It works once, for 30 minutes, and every place you were signed in is signed out when you use it.</p></section><section class="card">${inner}</section></div>`;
+  $('#app').innerHTML = `<div class="auth fade"><section class="card"><div class="auth-brand">${brandHtml()}</div>${inner}<p class="foot">The link goes to your work email, works once and lasts 30 minutes.</p></section></div>`;
 }
 async function viewForgot(params) {
   const { available } = await api('/api/auth/reset').catch(() => ({ available: false }));
@@ -760,7 +765,7 @@ function guideHtml(persona, { first = false, tabs = [] } = {}) {
       <p>${esc(g.tagline)}</p><p class="muted small">${esc(state.me.role.name)} · ${esc(state.me.team?.path ?? 'no team yet')}</p></div>
     </div>
     ${tabs.length > 1 ? `<div class="gx-tabs" role="tablist">${tabs.map((t) => `<button type="button" role="tab" data-guide="${t}" aria-selected="${t === persona}" class="${t === persona ? 'on' : ''}">${esc(GUIDES[t].name)}${t === personaOf() ? ' <small>yours</small>' : ''}</button>`).join('')}</div>` : ''}
-    <ol class="gx-steps">${g.steps.map(([k, t, p, href, cta], i) => `<li class="gx-step" style="--i:${i}"><div class="gx-art">${art(k)}<b class="gx-n">${i + 1}</b></div><h3>${esc(t)}</h3><p>${esc(p)}</p>${first ? '' : `<a class="gx-go" href="${href.startsWith('/calculator') ? href : `#${href}`}">${esc(cta)} →</a>`}</li>`).join('')}</ol>
+    <ol class="gx-steps">${g.steps.map(([k, t, p, href, cta], i) => `<li class="gx-step" data-css="--i:${i}"><div class="gx-art">${art(k)}<b class="gx-n">${i + 1}</b></div><h3>${esc(t)}</h3><p>${esc(p)}</p>${first ? '' : `<a class="gx-go" href="${href.startsWith('/calculator') ? href : `#${href}`}">${esc(cta)} →</a>`}</li>`).join('')}</ol>
     <div class="callout mt">Figures are supporting information worked out from the customer’s data at a moment in time; Checkmarx’s own records are authoritative. Paste a customer’s key only into the Calculator, and use read-only git tokens.</div>
   </div>`;
 }
@@ -780,10 +785,10 @@ function teamSelect(id, selected, { all = true } = {}) {
 }
 
 // ---- The Overview's cards: small, each with a picture of its number; everyone chooses which they see ------------------
-const ring = (p, kind = '') => `<span class="ring ${kind}" style="--p:${Math.max(0, Math.min(100, p))}"><b>${p}%</b></span>`;
+const ring = (p, kind = '') => `<span class="ring ${kind}" data-css="--p:${Math.max(0, Math.min(100, p))}"><b>${p}%</b></span>`;
 const glyph = (name, kind = '') => `<span class="glyph ${kind}">${icon(name)}</span>`;
 const OV_CARDS = [
-  ['projected', 'Projected credits', (t) => ({ v: num(Math.round(t.credits)), s: `T&R ${num(Math.round(t.trCredits))} · Fusion ${num(Math.round(t.fusionCredits))}`, g: `<span class="split" title="T&R and Fusion"><i style="--w:${pct(t.trCredits, t.credits)}"></i></span>`, hero: true })],
+  ['projected', 'Projected credits', (t) => ({ v: num(Math.round(t.credits)), s: `T&R ${num(Math.round(t.trCredits))} · Fusion ${num(Math.round(t.fusionCredits))}`, g: '', hero: true })],
   ['sold', 'Credits sold', (t) => ({ v: num(Math.round(t.sold)), s: `${num(t.accountsWithSales)} account${t.accountsWithSales === 1 ? '' : 's'}`, g: ring(pct(t.sold, t.credits), 'ok') })],
   ['needed', 'Still needed', (t) => ({ v: num(Math.round(t.remaining)), s: 'projected, not sold yet', g: ring(pct(t.remaining, t.credits), 'need') })],
   ['accounts', 'Accounts', (t) => ({ v: num(t.accounts), s: `${num(t.withReport)} with a report`, g: ring(pct(t.withReport, t.accounts)) })],
@@ -799,7 +804,7 @@ const cardOf = (id) => OV_CARDS.find(([c]) => c === id);
 function overviewTiles(t) {
   return `<div class="tiles">${myCards().map(cardOf).map(([id, label, f]) => {
     const c = f(t);
-    return `<div class="tile${c.hero ? ' hero' : ''}${c.warn ? ' warn' : ''}" data-card="${id}"><div class="tile-g">${c.g}</div><div class="tile-t"><span class="k">${esc(label)}</span><b class="v">${c.v}</b><span class="s">${c.s}</span></div></div>`;
+    return `<div class="tile${c.hero ? ' hero' : ''}${c.warn ? ' warn' : ''}" data-card="${id}">${c.g ? `<div class="tile-g">${c.g}</div>` : ''}<div class="tile-t"><span class="k">${esc(label)}</span><b class="v">${c.v}</b><span class="s">${c.s}</span></div></div>`;
   }).join('')}</div>`;
 }
 function cardsPicker(onDone) {

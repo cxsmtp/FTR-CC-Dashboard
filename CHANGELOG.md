@@ -2,6 +2,17 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.58.00 — 2026-11-11
+
+The Standard look, rebuilt as one plain design system, and the first screens people meet made simple.
+
+- **The Standard look**: one accent colour, plain panels, no gradients, glass or glow; one type family; controls of one height; quiet table headers and figures that line up. Light and dark. It is the same on the dashboard and on the calculator page. The Command Center look is as it was.
+- **Sign-in is just the name and the form.** The headline, the description and the four feature cards are gone; on a phone the form is the first and only thing on the screen.
+- **The calculator starts with one thing to do**: the customer's name (and the team it goes in). The Salesforce link, the data source, Impact and the rest appear once the account is open. The status strip, the dashed box and the "Click New" message no longer compete with it.
+- **"In meeting with the customer" and "The customer's version"** are plain buttons in the Standard look.
+- **Overview**: the rings show their share again (they were drawn empty), and the Projected credits card is just its figure.
+- The calculator's footer no longer names where the calculator came from.
+
 ## CC-01.57.00 — 2026-11-11
 
 Less to look at, the same work done. A first pass over the whole product: what is not needed is gone, and the menu is three pages and Settings.

@@ -121,6 +121,7 @@ export async function startHosted() {
   }
   let toastTimer = null;
   const toast = (message, kind = '', ms = 6000) => {
+    if (!message) return;
     const el = $('toast');
     el.textContent = message;
     el.className = `toast ${kind}`;
@@ -301,7 +302,8 @@ export async function startHosted() {
     const url = new URL(path, location.origin);
     // A customer made on the first visit in MZ's own name is not an account here: only "New" makes one.
     if (method === 'POST' && url.pathname === '/api/projections') {
-      if (!newByClick) throw fail(409, 'Click New to add an account.');
+      // Nothing to say: the page already asks for the customer's name.
+      if (!newByClick) throw fail(409, '');
       newByClick = false;
     }
     const work = workOf(method, url.pathname);

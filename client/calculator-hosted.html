@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<meta name="generator" content="FTR Credits Command Center · calculator from CxMissionZero {{MZ}}" />
+<meta name="generator" content="FTR Credits Command Center" />
 <link rel="icon" href="/brand/icon" id="favicon" />
 <title>Calculator · FTR Credits Command Center</title>
 <!--CSS-->
@@ -43,7 +43,7 @@
         <div class="hc-fold-sum" id="hc-fold-sum"></div>
         <div class="hc-row1">
           <div class="field hc-name"><span><label for="hc-name">Customer name</label> <small>as in Salesforce</small></span>
-            <span class="hc-sf-row"><input id="hc-name" list="hc-names" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Type the account's name, or pick one" /><button type="button" class="ghost sm" id="hc-new" title="Start another account">+ New</button></span>
+            <span class="hc-sf-row"><input id="hc-name" list="hc-names" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Customer name" /><button type="button" class="ghost sm" id="hc-new" title="Start another account">+ New</button></span>
             <datalist id="hc-names"></datalist></div>
           <label class="field hc-sf"><span>Salesforce opportunity or account link <b class="hc-req">required</b></span>
             <span class="hc-sf-row"><input id="hc-sf" type="url" inputmode="url" spellcheck="false" placeholder="https://yourorg.lightning.force.com/lightning/r/Opportunity/006…/view" /><button type="button" class="primary sm" id="hc-sf-save">Save</button><a id="hc-sf-open" class="ghost sm hc-btn" target="_blank" rel="noopener noreferrer" hidden title="Open in Salesforce">↗</a></span>
@@ -51,6 +51,7 @@
           <label class="field hc-team"><span>Team (region)</span><select id="hc-team"></select></label>
           <label class="field hc-owner"><span>Accountable SE</span><select id="hc-owner"></select></label>
         </div>
+        <p class="hc-start" id="hc-start">Type the customer’s name as it is in Salesforce and press <kbd>Enter</kbd>. A name you worked on before opens that account; a new one starts a new calculation in the team chosen.</p>
         <div class="hc-src">
           <span class="hc-src-l">Data from</span>
           <div class="hc-seg" role="tablist" aria-label="Where the data comes from"><button type="button" role="tab" data-src="cxone" class="on">Checkmarx One</button><button type="button" role="tab" data-src="git">Git</button><button type="button" role="tab" data-src="cloc">cloc-fusion</button></div>
@@ -97,7 +98,7 @@
     <main>
 <!--CALCULATOR-->
     </main>
-    <footer class="sa-foot"><span>FTR Credits Command Center · calculator from CxMissionZero {{MZ}} · <a href="/#/legal?doc=terms">Terms of use &amp; license</a> (PolyForm Internal Use 1.0.0)</span><span>Supporting information only: Checkmarx's own records are authoritative.</span></footer>
+    <footer class="sa-foot"><span>FTR Credits Command Center · <a href="/#/legal?doc=terms">Terms of use &amp; license</a></span><span>Supporting information only: Checkmarx's own records are authoritative.</span></footer>
   </div>
 </div>
 </div>

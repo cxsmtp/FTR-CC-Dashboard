@@ -1,0 +1,181 @@
+/* The Standard look: the command center's own, in light and dark. One accent colour, plain surfaces, no gradients, no
+   glass. Loaded after app.css (and after the calculator's styles on its page); the Command Center look is left as it is.
+
+   Scale: text 12 / 14 / 16 / 22 px; controls 34 px high; corners 8 px (controls) and 10 px (panels). */
+
+/* ---- Tokens ----------------------------------------------------------------------------------------------------- */
+:root:not([data-accent="command"]),
+html[data-cc][data-ui]:not([data-accent="command"]),
+html[data-cc][data-ui][data-theme="dark"]:not([data-accent="command"]) {
+  --brand: #5cb8d0;
+  --on-brand: #06222b;
+  --bg: #0f1417;
+  --bg2: #141b20;
+  --panel: #161e24;
+  --panel-solid: #161e24;
+  --panel-hi: #1e2932;
+  --line: #25313a;
+  --line-hi: #36454f;
+  --text: #e6ecef;
+  --muted: #94a3af;
+  --faint: #6c7b87;
+  --cyan: var(--brand);
+  --violet: var(--brand);
+  --green: #4cc38a;
+  --amber: #e3b341;
+  --red: #f0716b;
+  --grad: linear-gradient(var(--brand), var(--brand));
+  --glow: 0 0 0 1px var(--line-hi);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  --radius: 10px;
+  /* The calculator page's own names for the same things. */
+  --cc-panel: var(--panel);
+  --cc-panel-solid: var(--panel);
+  --cc-panel-hi: var(--panel-hi);
+  --cc-side: var(--panel);
+  --cc-orb: 0;
+  --surface: var(--panel);
+  --surface-2: #1a232a;
+  --surface-3: var(--panel-hi);
+  --border: var(--line);
+  --border-strong: var(--line-hi);
+  --ng-head: var(--muted);
+  --accent-ink: var(--on-brand);
+  --primary-ink: var(--on-brand);
+  --shadow-sm: none;
+  --shadow-pop: 0 0 0 1px var(--line-hi), 0 12px 28px -12px rgba(0, 0, 0, .6);
+  --radius-sm: 8px;
+  color-scheme: dark;
+}
+:root:not([data-accent="command"])[data-theme="light"],
+html[data-cc][data-ui][data-theme="light"]:not([data-accent="command"]) {
+  --brand: #0b6b86;
+  --on-brand: #ffffff;
+  --bg: #f4f6f7;
+  --bg2: #eceff1;
+  --panel: #ffffff;
+  --panel-solid: #ffffff;
+  --panel-hi: #f1f4f6;
+  --line: #e0e5e9;
+  --line-hi: #ccd4da;
+  --text: #17212a;
+  --muted: #566573;
+  --faint: #8794a0;
+  --green: #18794e;
+  --amber: #9a6700;
+  --red: #c4302b;
+  --shadow: 0 1px 2px rgba(16, 24, 32, .06);
+  --surface-2: #f7f9fa;
+  --shadow-sm: 0 1px 1px rgba(16, 24, 32, .04);
+  --shadow-pop: 0 0 0 1px var(--line), 0 12px 28px -14px rgba(16, 24, 32, .25);
+  color-scheme: light;
+}
+
+/* ---- Page ------------------------------------------------------------------------------------------------------- */
+:root:not([data-accent="command"]) body { background: var(--bg); }
+:root:not([data-accent="command"]) .bg, html[data-cc]:not([data-accent="command"]) .cc-bg { background: var(--bg); }
+:root:not([data-accent="command"]) .bg > *, html[data-cc]:not([data-accent="command"]) .cc-bg > * { display: none; }
+:root:not([data-accent="command"]) a { color: var(--brand); }
+
+/* ---- Type: one family, four sizes ------------------------------------------------------------------------------- */
+:root:not([data-accent="command"]) .serif,
+html[data-cc][data-ui]:not([data-accent="command"]) h1 { font-family: "Plex", system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 600; letter-spacing: -.01em; }
+:root:not([data-accent="command"]) .head h1, :root:not([data-accent="command"]) .ht h1 { font-size: 22px; line-height: 1.25; }
+:root:not([data-accent="command"]) .panel h2 { font-size: 16px; }
+:root:not([data-accent="command"]) .head p, :root:not([data-accent="command"]) .crumbs { color: var(--muted); }
+
+/* ---- Frame: side menu and top bar ------------------------------------------------------------------------------- */
+:root:not([data-accent="command"]) .side, html[data-cc]:not([data-accent="command"]) .cc-side { background: var(--panel); backdrop-filter: none; border-right: 1px solid var(--line); }
+:root:not([data-accent="command"]) .topbar, html[data-cc]:not([data-accent="command"]) .cc-topbar { background: var(--bg); backdrop-filter: none; border-bottom: 1px solid var(--line); }
+:root:not([data-accent="command"]) .nav a, html[data-cc]:not([data-accent="command"]) .cc-nav a { border-radius: 8px; }
+:root:not([data-accent="command"]) .nav a.on, html[data-cc]:not([data-accent="command"]) .cc-nav a.on { background: color-mix(in srgb, var(--brand) 11%, transparent); box-shadow: inset 2px 0 0 var(--brand); color: var(--text); }
+:root:not([data-accent="command"]) .brand .logo { box-shadow: none; }
+:root:not([data-accent="command"]) .set-nav a.on { background: color-mix(in srgb, var(--brand) 11%, transparent); }
+:root:not([data-accent="command"]) .tb-who, :root:not([data-accent="command"]) .jump, html[data-cc]:not([data-accent="command"]) .cc-who, html[data-cc]:not([data-accent="command"]) .cc-jump { background: var(--panel); box-shadow: none; }
+
+/* ---- Surfaces: plain panels, one small shadow -------------------------------------------------------------------- */
+:root:not([data-accent="command"]) .panel,
+:root:not([data-accent="command"]) .kpi,
+:root:not([data-accent="command"]) .tile,
+:root:not([data-accent="command"]) .auth .card,
+:root:not([data-accent="command"]) .bulk { background: var(--panel); backdrop-filter: none; box-shadow: var(--shadow); border-radius: var(--radius); border-color: var(--line); }
+:root:not([data-accent="command"]) dialog,
+:root:not([data-accent="command"]) .toast,
+:root:not([data-accent="command"]) .menu-list,
+:root:not([data-accent="command"]) .mp-menu { background: var(--panel); backdrop-filter: none; box-shadow: var(--shadow-pop, 0 12px 28px -14px rgba(0, 0, 0, .4)); border-radius: var(--radius); border-color: var(--line-hi); }
+:root:not([data-accent="command"]) dialog::backdrop { backdrop-filter: none; background: rgba(10, 16, 20, .45); }
+:root:not([data-accent="command"]) .kpi::after { display: none; }
+:root:not([data-accent="command"]) .kpi.hero, :root:not([data-accent="command"]) .tile.hero { background: var(--panel); box-shadow: var(--shadow); }
+/* Figures are text, in the text's colour. */
+:root:not([data-accent="command"]) .kpi.hero .v,
+:root:not([data-accent="command"]) .tile.hero .v,
+:root:not([data-accent="command"]) .credits.big,
+:root:not([data-accent="command"]) .auth .pitch h1 em,
+html[data-cc]:not([data-accent="command"]) .shell.standalone .sa-top h1 { background: none; -webkit-background-clip: border-box; background-clip: border-box; -webkit-text-fill-color: currentColor; color: var(--text); }
+:root:not([data-accent="command"]) .credits { font-variant-numeric: tabular-nums; }
+:root:not([data-accent="command"]) td.num, :root:not([data-accent="command"]) th.num { font-variant-numeric: tabular-nums; }
+
+/* ---- Controls: 34 px high, 8 px corners; one filled button for the page's main action ----------------------------- */
+:root:not([data-accent="command"]) button, :root:not([data-accent="command"]) .btn { border-radius: 8px; min-height: 34px; padding: 6px 12px; background: var(--panel); border-color: var(--line-hi); box-shadow: none; transition: background .12s, border-color .12s; }
+:root:not([data-accent="command"]) button:hover, :root:not([data-accent="command"]) .btn:hover { border-color: var(--brand); background: var(--panel-hi); }
+:root:not([data-accent="command"]) button:active { transform: none; }
+:root:not([data-accent="command"]) button.sm, :root:not([data-accent="command"]) .btn.sm { min-height: 28px; padding: 3px 9px; border-radius: 7px; }
+:root:not([data-accent="command"]) button.primary, :root:not([data-accent="command"]) .btn.primary,
+:root:not([data-accent="command"]) .seg button.primary, :root:not([data-accent="command"]) .gx-tabs button.on { background: var(--brand); color: var(--on-brand); border: 1px solid var(--brand); box-shadow: none; }
+:root:not([data-accent="command"]) button.primary:hover, :root:not([data-accent="command"]) .btn.primary:hover { background: color-mix(in srgb, var(--brand) 88%, #000); border-color: transparent; box-shadow: none; }
+:root:not([data-accent="command"]) button.ghost, :root:not([data-accent="command"]) .btn.ghost { background: transparent; }
+:root:not([data-accent="command"]) button.danger { background: transparent; border-color: color-mix(in srgb, var(--red) 40%, transparent); color: var(--red); }
+:root:not([data-accent="command"]) .menu-list button, :root:not([data-accent="command"]) .cell-pen, :root:not([data-accent="command"]) button.link { min-height: 0; border: 0; background: transparent; }
+:root:not([data-accent="command"]) .menu-list button:hover { background: var(--panel-hi); }
+:root:not([data-accent="command"]) input, :root:not([data-accent="command"]) select, :root:not([data-accent="command"]) textarea { border-radius: 8px; background: var(--panel); border-color: var(--line-hi); padding: 6px 10px; }
+:root:not([data-accent="command"]) input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not([type="range"]), :root:not([data-accent="command"]) select { min-height: 34px; }
+:root:not([data-accent="command"]) input:focus, :root:not([data-accent="command"]) select:focus, :root:not([data-accent="command"]) textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+:root:not([data-accent="command"]) :focus-visible { outline: 2px solid color-mix(in srgb, var(--brand) 70%, transparent); outline-offset: 2px; }
+:root:not([data-accent="command"]) .search input { padding-left: 34px; }
+
+/* ---- People, bars, rings ----------------------------------------------------------------------------------------- */
+:root:not([data-accent="command"]) .avatar { background: color-mix(in srgb, var(--brand) 15%, var(--panel)); color: var(--brand); font-weight: 600; }
+:root:not([data-accent="command"]) .bar .track i, :root:not([data-accent="command"]) .rank-list .rl-bar i, :root:not([data-accent="command"]) .kpi .meter i { box-shadow: none; }
+:root:not([data-accent="command"]) .sold-bar .track i { background: var(--green); }
+:root:not([data-accent="command"]) .team-three .rank { background: color-mix(in srgb, var(--brand) 15%, var(--panel)); color: var(--brand); }
+:root:not([data-accent="command"]) .gx-step:hover { transform: none; box-shadow: var(--shadow); }
+
+/* ---- Tables: quiet headers, rows that read across ------------------------------------------------------------------ */
+:root:not([data-accent="command"]) table { border-collapse: collapse; }
+:root:not([data-accent="command"]) th { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .02em; text-transform: none; background: transparent; border-bottom: 1px solid var(--line-hi); }
+:root:not([data-accent="command"]) td { border-bottom: 1px solid var(--line); }
+:root:not([data-accent="command"]) tr.click:hover td { background: var(--panel-hi); }
+:root:not([data-accent="command"]) .chip { border-radius: 6px; font-weight: 500; }
+
+/* ---- The calculator page ----------------------------------------------------------------------------------------- */
+html[data-cc][data-ui]:not([data-accent="command"]) .panel,
+html[data-cc]:not([data-accent="command"]) .hc-account,
+html[data-cc]:not([data-accent="command"]) .sa-connect,
+html[data-cc]:not([data-accent="command"]) .hc-status,
+html[data-cc]:not([data-accent="command"]) .hc-meet-head,
+html[data-cc]:not([data-accent="command"]) .hc-meet-src { background: var(--panel); border-color: var(--line); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: none; }
+html[data-cc][data-ui]:not([data-accent="command"]) button.primary,
+html[data-cc][data-ui]:not([data-accent="command"]) a.button.primary,
+html[data-cc][data-ui]:not([data-accent="command"]) .hc-btn.primary { --btn-sheen: var(--brand); --btn-hi: transparent; --btn-lo: transparent; --btn-drop: 0 0 0 transparent; --btn-glow: 0 0 0 transparent; background: var(--brand); color: var(--on-brand); box-shadow: none; border: 1px solid var(--brand); }
+html[data-cc][data-ui]:not([data-accent="command"]) button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--brand) 88%, #000); filter: none; box-shadow: none; }
+html[data-cc]:not([data-accent="command"]) .hc-dialog { border-radius: var(--radius); box-shadow: var(--shadow-pop); }
+html[data-cc]:not([data-accent="command"]) .hc-mh-title h1 { background: none; -webkit-text-fill-color: currentColor; color: var(--text); }
+/* "In meeting with the customer": a plain button with its red dot, not a banner. */
+html[data-cc][data-ui]:not([data-accent="command"]) button.hc-meet-btn { --btn-sheen: transparent; --btn-hi: transparent; --btn-drop: 0 0 0 transparent; background: var(--panel) !important; color: var(--text) !important; border: 1px solid var(--line-hi) !important; box-shadow: none !important; border-radius: 8px !important; font-weight: 500; }
+html[data-cc]:not([data-accent="command"]) .hc-meet-dot { background: #d93025; animation: none; box-shadow: none; }
+html[data-cc]:not([data-accent="command"]) .hc-seg button.on { background: var(--brand); color: var(--on-brand); box-shadow: none; }
+html[data-cc]:not([data-accent="command"]) .hc-3d { background: var(--panel); color: var(--text); border: 1px solid var(--line-hi); box-shadow: 0 2px 0 var(--line-hi); border-radius: 8px; }
+html[data-cc]:not([data-accent="command"]) .hc-3d:hover { border-color: var(--brand); }
+html[data-cc]:not([data-accent="command"]) .hc-3d:active { transform: translateY(2px); box-shadow: none; }
+
+/* ---- The look picker's samples ------------------------------------------------------------------------------------- */
+.sw-aurora { background: #0b6b86; }
+.lc-aurora { --lc-paper: #f4f6f7; --lc-side: #ffffff; --lc-ink: #17212a; --lc-line: #ccd4da; --lc-accent: #0b6b86; }
+
+/* ---- Menu links read as text; only the page you are on carries the accent ------------------------------------------ */
+:root:not([data-accent="command"]) .nav a, html[data-cc]:not([data-accent="command"]) .cc-nav a,
+:root:not([data-accent="command"]) .set-nav a { color: var(--text); }
+:root:not([data-accent="command"]) .side-links a, :root:not([data-accent="command"]) .ver, html[data-cc]:not([data-accent="command"]) .cc-side-links a, html[data-cc]:not([data-accent="command"]) .cc-ver { color: var(--muted); }
+:root:not([data-accent="command"]) .brand, :root:not([data-accent="command"]) .brand b, html[data-cc]:not([data-accent="command"]) .cc-brand, html[data-cc]:not([data-accent="command"]) .cc-brand b { color: var(--text); }
+html[data-cc]:not([data-accent="command"]) a.cc-brand, html[data-cc]:not([data-accent="command"]) a.cc-brand * { color: var(--text); }
+html[data-cc]:not([data-accent="command"]) a.cc-brand small, html[data-cc]:not([data-accent="command"]) a.cc-brand .cc-tag { color: var(--muted); }
