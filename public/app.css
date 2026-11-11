@@ -888,3 +888,57 @@ input.cell-edit, select.cell-edit { width: 100%; min-width: 140px; padding: 5px 
 .share-inline { display: flex; gap: 6px; align-items: center; }
 .share-inline input { width: 150px; min-width: 0; padding: 5px 8px; }
 .share-inline input { width: 210px; }
+
+/* ---- One screen, little scrolling ---------------------------------------------------------------------------------
+   The sign-in page fits the window (everything scales with its height); every page is tighter: smaller headings,
+   panels, cards and table rows, so more of each fits before scrolling. */
+@media (min-width: 901px) {
+  .auth { height: 100vh; min-height: 520px; overflow: hidden; align-items: center; }
+  .auth .pitch { padding: clamp(18px, 4vh, 56px) clamp(24px, 4vw, 64px); gap: clamp(10px, 2.2vh, 22px); }
+  .auth .pitch .brand { margin: 0; }
+  .auth .pitch h1 { font-size: clamp(26px, min(3.6vw, 6.4vh), 52px); line-height: 1.04; }
+  .auth .pitch p { font-size: clamp(13px, 1.9vh, 16px); }
+  .auth .feats { grid-template-columns: repeat(2, minmax(0, 250px)); gap: clamp(6px, 1.2vh, 12px); }
+  .auth .feat { padding: clamp(8px, 1.4vh, 14px) 12px; font-size: clamp(11.5px, 1.6vh, 13px); line-height: 1.35; }
+  .auth .card { padding: clamp(18px, 3.2vh, 30px) 28px; }
+  .auth .card p.lead { margin-bottom: clamp(10px, 2vh, 20px); }
+  .auth .card .form { gap: clamp(8px, 1.6vh, 14px); }
+  .auth .foot { margin-top: clamp(8px, 1.8vh, 18px); font-size: 11.5px; line-height: 1.5; }
+}
+@media (min-width: 901px) and (max-height: 700px) {
+  .auth .feat { font-size: 0; padding: 8px 12px; }
+  .auth .feat b { font-size: 12.5px; margin: 0; }
+}
+.main { padding-top: 12px; padding-bottom: 28px; }
+.head { margin-bottom: 12px; gap: 10px; }
+.head h1 { font-size: clamp(20px, 2vw, 26px); }
+.head p { font-size: 13px; margin-top: 2px; }
+.head.compact { margin-bottom: 8px; }
+.crumbs { margin-bottom: 2px; }
+.panel { padding: 14px 16px; }
+.panel h2 { margin-bottom: 10px; }
+.kpis { gap: 10px; margin-bottom: 12px; }
+.kpi { padding: 12px 14px; }
+.tiles { gap: 8px; margin-bottom: 10px; }
+.mt { margin-top: 12px; }
+th { padding: 6px 10px; }
+td { padding: 7px 10px; }
+.tabs { margin-bottom: 12px; }
+.saved-banner { margin-bottom: 10px; padding: 6px 12px; font-size: 13px; }
+.saved-foot { margin-top: 10px; padding: 7px 14px; }
+.acct-strip > div { padding: 10px 14px; }
+/* Lists scroll inside their panel (headers stay), so a page fits the window instead of growing without end. */
+#main .tw { max-height: max(300px, calc(100vh - 260px)); overflow: auto; }
+#main .tw thead th { position: sticky; top: 0; z-index: 2; background: var(--panel-solid, var(--panel)); }
+#main[data-page="activity"] .why-panel .tw { max-height: 300px; }
+/* Overview: the cards in one row, the chart and the lists at a fixed height. */
+#main[data-page="overview"] .tiles { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); grid-auto-flow: dense; }
+#main[data-page="overview"] .chart svg { height: 150px; }
+#main[data-page="overview"] .tree.ov, #main[data-page="overview"] .bars { max-height: 230px; overflow: auto; }
+#main[data-page="overview"] .tw { max-height: 260px; }
+#main[data-page="overview"] .grid { gap: 12px; }
+/* The audit's explanation: one line; open it for what was done and what happens next time. */
+details.why { margin-top: 4px; padding: 4px 8px; }
+details.why > summary { cursor: pointer; list-style: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 460px; }
+details.why > summary::-webkit-details-marker { display: none; }
+details.why[open] > summary { white-space: normal; margin-bottom: 4px; }

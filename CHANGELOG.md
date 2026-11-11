@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.38.00 — 2026-11-11
+
+- **The sign-in page fits one screen**, whatever the window: the headline, text, the four features and the sign-in card scale with its height (on a short window the features show their titles only).
+- **Far less scrolling everywhere.** Tighter headings, panels, cards and table rows on every page. Long lists scroll inside their own panel with the column headers kept in view, so the page fits the window: Accounts now fits one screen (was three), CxOne API audit under two (was fourteen), the Overview one and a half (was three).
+  - Overview: the cards in one row, a shorter activity chart, the teams, SEs and largest projections at a fixed height.
+  - CxOne API audit: each explanation is one line; open it for what was done and what happens next time.
+
 ## CC-01.37.00 — 2026-11-11
 
 - **In meeting with the customer.** A strong red button in the calculator (and on the folded bar) opens this customer’s calculator alone, in a new tab, to share on screen: your logo and organisation, the customer’s name and today’s date on top, then the projection, its settings, Triage & remediation, Fusion, Impact and **Generate projection report**, in your theme.
