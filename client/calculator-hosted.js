@@ -580,6 +580,7 @@ export async function startHosted() {
       $('hc-owner').innerHTML = '';
       $('hc-reports').innerHTML = '<span>Open or add an account below.</span>';
       $('hc-impact').checked = false;
+      $('hc-account').classList.toggle('impact-on', $('hc-impact').checked);
       $('hc-impact').disabled = true;
       $('hc-kept').textContent = '';
       $('hc-refresh').hidden = $('hc-forget').hidden = $('hc-upload-l').hidden = $('hc-prev-l').hidden = true;
@@ -617,6 +618,7 @@ export async function startHosted() {
       }
       $('hc-impact').disabled = false;
       $('hc-impact').checked = Boolean(a.impactEnabled);
+      $('hc-account').classList.toggle('impact-on', $('hc-impact').checked);
       $('hc-currency').hidden = !a.impactCurrencyConfirmed;
       $('hc-currency').textContent = `Currency: ${a.impactCurrency} · change`;
       if (impactShown !== Boolean(a.impactEnabled)) {
@@ -1155,7 +1157,12 @@ export async function startHosted() {
       b.setAttribute('aria-selected', String(b.dataset.src === src));
     }
     for (const p of panes) p.hidden = p.dataset.pane !== src;
+    // A Fusion-only customer (Git or cloc-fusion): Impact (soft savings of triage & remediation) and the Checkmarx One
+    // key's state do not apply; Impact stays in view when it is already on, to turn it off.
+    $('hc-account').dataset.src = src;
+    $('hc-account').classList.toggle('impact-on', $('hc-impact').checked);
   };
+  $('hc-impact').addEventListener('change', () => $('hc-account').classList.toggle('impact-on', $('hc-impact').checked));
   for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.src));
   // Git and cloc-fusion are the calculator's own Fusion tabs: open the one asked for, and bring it into view.
   for (const b of document.querySelectorAll('[data-open-tab]')) b.addEventListener('click', () => {
@@ -1194,6 +1201,28 @@ export async function startHosted() {
     $('hc-git-address').placeholder = kind ? GIT_HOME[kind] : 'https://github.com';
     $('hc-git-go').textContent = kind ? `Connect to ${GIT_NAMES[kind]} →` : 'Connect to Git →';
   }
+  // What the Git count says (its progress, its result, why it could not go on) shows under the token, where it was given.
+  {
+    const mirror = () => {
+      const st = document.getElementById('calc-git-status');
+      const prog = document.getElementById('calc-git-progress');
+      const sum = document.getElementById('calc-git-summary');
+      const out = $('hc-git-status');
+      if (!out || !st) return;
+      const progress = prog && !prog.hidden ? prog.innerText.replace(/\s+/g, ' ').trim().slice(0, 220) : '';
+      const summary = sum && !sum.hidden ? sum.innerText.replace(/\s+/g, ' ').trim().slice(0, 220) : '';
+      const said = st.textContent.trim();
+      const text = said || progress || summary;
+      if (!text) return;
+      out.textContent = text;
+      out.className = `status ${/error|bad/.test(st.className) && said ? 'error' : /ok/.test(st.className) || (!said && summary) ? 'ok' : 'muted'}`;
+    };
+    const watch = new MutationObserver(mirror);
+    for (const id of ['calc-git-status', 'calc-git-progress', 'calc-git-summary']) {
+      const el = document.getElementById(id);
+      if (el) watch.observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+    }
+  }
   $('hc-git-token').addEventListener('input', gitShow);
   $('hc-git-provider').addEventListener('change', gitShow);
   function gitList() {
@@ -1226,8 +1255,8 @@ export async function startHosted() {
     gitList();
     status.textContent = `${GIT_NAMES[added]} token added: finding its organisations and counting the repositories…`;
     calculator.git.open?.();
-    fold(true);
     calculator.git.count?.();
+    setTimeout(() => document.querySelector('[data-ptpanel="calculator:fusion-git"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
   });
   gitShow();
 

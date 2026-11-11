@@ -701,3 +701,11 @@ html[data-no-account] .content > main::before { content: "A new calculation: typ
 .tejas-card { width: 210px !important; left: -6px !important; padding: 14px !important; font-family: "Plex", system-ui, -apple-system, "Segoe UI", sans-serif !important; letter-spacing: 0 !important; text-transform: none !important; }
 .tejas-card * { text-transform: none !important; letter-spacing: 0 !important; font-family: inherit !important; }
 .tejas-card img { width: 104px !important; height: 104px !important; }
+#hc-git-status.error { color: var(--red) !important; font-weight: 600; }
+#hc-git-status.ok { color: var(--green) !important; }
+/* Fusion only (Git or cloc-fusion): no Impact, no Checkmarx One key line (Impact stays while on, to turn it off) */
+.hc-account:is([data-src="git"], [data-src="cloc"]):not(.impact-on) .hc-meta .hc-impact,
+.hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-kept,
+.hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-refresh,
+.hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-forget { display: none !important; }
+.hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-meet { margin-left: auto; }

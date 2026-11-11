@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.51.00 — 2026-11-11
+
+- **Git: you see what happens.** After **Connect to GitHub** (GitLab, Bitbucket, Azure DevOps), everything the count says shows right under the token: finding the organisations, listing the repositories, counting (with its progress), the result, and, when it cannot go on, why (in red: the token refused, an organisation it may not read, a host the server may not reach…). The page also scrolls to the Fusion · from Git results. Before, the messages went to a folded part of the Fusion tab and the top kept saying it was counting.
+- **Fusion-only customers**: with **Git** or **cloc-fusion** chosen as the data source, **Impact** and the Checkmarx One key line (and Refresh / Forget the key) are not shown, as they apply to Checkmarx One only; Impact stays in view while on, to turn it off.
+
 ## CC-01.50.00 — 2026-11-11
 
 - **Get help: support cases and enhancement requests.** **Get help** in the menu (and in Jump to): **Submit a support case** (with its priority) or **Request an enhancement**. Each gets a number (SUP-0001, ENH-0001), a status (New, In progress, Waiting for reply, Completed, Declined) and a conversation.
