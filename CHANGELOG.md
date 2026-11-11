@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.44.00 — 2026-11-11
+
+- **The calculator always opens on a new calculation.** From the menu, the home page, **Open calculator** on the Overview or **New in calculator** on the Accounts page (and on a reload), nothing of the last calculation is shown: no account is open, the customer’s Checkmarx One key and git tokens from before are dropped, and the page waits for the new account’s name. Type a name to start one, or pick an existing account by its name. **Open in calculator** on an account page still opens that account.
+
 ## CC-01.43.00 — 2026-11-11
 
 - **Connect reads Checkmarx One at once.** The moment the API key is given and connected, the calculator reads that customer’s tenant for the account open (as **Read from Checkmarx One** does), also when the account already had data. Before, it read only for an empty account, and could reuse a read made in the last minutes, even one made for another customer.

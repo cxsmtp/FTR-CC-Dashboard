@@ -117,7 +117,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
 
   // ---- Customers ----------------------------------------------------------------------------
 
-  async function load({ reopen = true } = {}) {
+  async function load({ reopen = true, fresh = false } = {}) {
     gateImpact();
     let body;
     try {
@@ -132,6 +132,11 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     renderCustomers();
     renderOrg();
     if (!reopen && c.open && c.customers.some((x) => x.id === c.open.id)) return loadReports();
+    // A fresh start (the command center's Calculator): no customer opened, nothing of the last one on the page.
+    if (fresh) {
+      show(null);
+      return loadReports();
+    }
     let last = '';
     try {
       last = localStorage.getItem(OPEN_KEY) || '';

@@ -950,7 +950,7 @@ export async function startHosted() {
   });
   // + New: a clean page for a new calculation. The open projection is saved and closed, the account panel emptied,
   // the customer's Checkmarx One key and git tokens dropped (a new customer is a new tenant); then the new name.
-  $('hc-new').addEventListener('click', async () => {
+  async function freshStart({ focus = true } = {}) {
     naming = true;
     try {
       localStorage.removeItem(OPEN_KEY);
@@ -972,9 +972,12 @@ export async function startHosted() {
     const field = $('hc-name');
     field.value = '';
     field.placeholder = 'The new account\u2019s name, as in Salesforce, then Enter';
-    field.focus();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+    if (focus) {
+      field.focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+  $('hc-new').addEventListener('click', () => freshStart());
   $('hc-name').addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && naming) {
       naming = false;
@@ -1310,6 +1313,8 @@ export async function startHosted() {
   for (const hint of document.querySelectorAll('#page-calculator .hint')) if (hint.textContent.includes('They start from Settings → Impact')) hint.textContent = 'Kept with this account: the minutes to triage and to remediate a finding by hand, and the developers\u2019 hourly rate, in the currency confirmed above.';
   renderStatus();
   startHelpTips();
-  calculator.load();
+  const fresh = !params.get('account');
+  await calculator.load({ fresh });
+  if (fresh && !meeting) await freshStart();
   watchWork();
 }

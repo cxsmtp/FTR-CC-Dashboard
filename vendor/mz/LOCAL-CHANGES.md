@@ -20,3 +20,5 @@
   projection (server/app.js `withTrRates`).
 - **`close()`** on what `initCalculator` returns (`page.js`): closes the open customer (saved first), for the command
   center's **+ New**.
+- **`load({ fresh: true })`** (`page.js`): lists the customers and opens none, for the command center's Calculator,
+  which always starts a new calculation unless a link names an account.
