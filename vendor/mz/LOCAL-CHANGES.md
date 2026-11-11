@@ -12,3 +12,6 @@
   `cc-command`, Command Center in its chosen colour) and `reportLook` keeps the maker's light or dark for them;
   `page.js` `appLook()` hands them over when the page is the command center's (`html[data-cc]`). The HTML report,
   its live levers and the PDF summary all take it.
+- **Findings still to come: off by default** (`DEFAULT_TR.includeFuture = false` in `public/calculator/model.js`, and
+  `aheadSettings` takes the default only when a projection never said): new projections and **Defaults** leave them
+  out until ticked; every saved projection keeps its own choice.

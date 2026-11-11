@@ -2,6 +2,14 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.39.00 — 2026-11-11
+
+- **The calculator, aligned and sleek.** Every field and button in the account panel and in Projection settings has one height and one shape, and sits on one baseline per row; sizes follow the screen (34px controls on a laptop, up to 42px on a large monitor).
+  - Account panel: name, Salesforce link (with Save and ↗), team and SE on one line; Data from, the key and Connect on the next; Impact and the key’s state on the left, then **Refresh**, **Forget the key**, **In meeting**, **The customer’s version** and **Fold** together on the right. Disconnect shows only once connected.
+  - Folded: the customer, their link, team, SE and connection, then **In meeting**, **The customer’s version** and **Edit**, on one line.
+  - Projection settings: lighter borders, a calmer totals card, the report options as one row of pills with **Generate projection report** on the right.
+- **Findings still to come are off by default** for new projections (and for **Defaults**): tick **Count findings still to come** to count them. Projections already saved keep their own choice.
+
 ## CC-01.38.00 — 2026-11-11
 
 - **The sign-in page fits one screen**, whatever the window: the headline, text, the four features and the sign-in card scale with its height (on a short window the features show their titles only).

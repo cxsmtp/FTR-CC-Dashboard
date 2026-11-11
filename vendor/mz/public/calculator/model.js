@@ -21,7 +21,8 @@ export const DEFAULT_TR = Object.freeze({
   remediationCost: { Critical: 3, High: 3, Medium: 3, Low: 3 },
   fpPercent: { Critical: 30, High: 30, Medium: 30, Low: 30 },
   lookbackMonths: 12,
-  includeFuture: true,
+  // Findings still to come are left out until the SE ticks them (a projection saved before keeps its own choice).
+  includeFuture: false,
   fusionUpliftPercent: 5,
   // New findings fall as teams adopt AI (assist, triage, remediation): this much fewer over a year.
   aiDeclinePercent: 2,
@@ -176,7 +177,7 @@ export function aheadSettings(value = {}) {
   const v = value && typeof value === 'object' ? value : {};
   const pct = (x, fallback, hi) => clamp(amount(x) ?? fallback, 0, hi);
   return {
-    includeFuture: v.includeFuture !== false,
+    includeFuture: v.includeFuture === undefined ? DEFAULT_TR.includeFuture : v.includeFuture !== false,
     fusionUpliftPercent: pct(v.fusionUpliftPercent, DEFAULT_TR.fusionUpliftPercent, 300),
     aiDeclinePercent: pct(v.aiDeclinePercent, DEFAULT_TR.aiDeclinePercent, 90),
     newPacePercent: pct(v.newPacePercent, DEFAULT_TR.newPacePercent, 300),
