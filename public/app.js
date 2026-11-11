@@ -219,6 +219,11 @@ async function watchWork() {
       el.href = href;
       el.innerHTML = `<span class="tick">✓</span><span><b>Data for ${esc(name)} is ready</b><small>${r.projects !== null ? `${num(r.projects)} projects read · ` : ''}open it to generate the report →</small></span>`;
       if (workSeen === 'running') toast(`Checkmarx One for ${name} is read: open it in the calculator to generate the report.`, 'ok');
+    } else if (r?.state === 'interrupted') {
+      el.hidden = false;
+      el.className = 'bgwork failed';
+      el.href = href;
+      el.innerHTML = `<span class="tick">↻</span><span><b>The read for ${esc(name)} was cut off</b><small>The server restarted meanwhile: open it and read again →</small></span>`;
     } else if (r?.state === 'failed' && !r.applied) {
       el.hidden = false;
       el.className = 'bgwork failed';
@@ -1605,12 +1610,15 @@ const ADMIN_VIEWS = {
     $('#tab').innerHTML = `<div class="grid g2">
       <div class="panel"><h2>Backups <small>nightly, before every version switch, and by hand · the newest 14 kept</small></h2>
         <p class="muted small">Everything: people, teams, accounts, reports, settings, certificates and the audit log. ${b.sealed ? 'Sealed with BACKUP_PASSPHRASE.' : 'Not sealed: set BACKUP_PASSPHRASE to seal them with a passphrase.'} Kept in <span class="mono">${esc(b.dir)}</span>.</p>
+        ${b.separate ? '<div class="callout">Backups go to their own place (BACKUP_DIR), away from the data: losing one disk does not lose both.</div>' : '<div class="callout warn">Backups are in the data volume itself. Mount a second volume or a network share and set <b>BACKUP_DIR</b> to it, so losing one disk does not lose both.</div>'}
+        ${b.last && !b.last.ok ? `<div class="callout warn mt">The last backup failed (${esc(dateTime(b.last.at))}): ${esc(b.last.error)}</div>` : ''}
         <div class="flex"><button class="primary" id="now">${icon('plus')}Back up now</button></div>
         <div class="tw mt"><table><tbody>${b.backups.map((x) => `<tr><td class="small mono">${esc(x.name)}</td><td class="small">${esc(dateTime(x.at))}</td><td class="num small">${esc((x.bytes / 1024).toFixed(0))} KB</td><td class="actions"><button class="sm ghost" data-dl="${esc(x.name)}">${icon('download')}Download</button></td></tr>`).join('') || '<tr><td><div class="empty"><b>No backups yet</b></div></td></tr>'}</tbody></table></div>
         <h3 class="mt">Restore</h3>
         <form class="form" id="rs"><label class="f">A backup file<input type="file" name="file" accept=".ccbackup" /></label><label class="f">Its passphrase <span class="muted">if sealed</span><input type="password" name="pass" autocomplete="off" /></label><div class="flex"><button type="submit" class="danger">Check and restore</button></div><div class="small" id="rsres"></div></form></div>
       <div class="panel"><h2>Health</h2>
         ${v ? `<p>${v.ok ? `<span class="chip ok"><i></i>Audit log intact</span> ${esc(v.events)} events, each chained to the one before.` : `<span class="chip bad"><i></i>Audit log broken</span> at event ${esc(v.brokenAt)}: ${esc(v.why)}.`}</p>` : ''}
+        ${b.recovered?.length ? `<h3>Repaired at start</h3><ul class="small">${b.recovered.map((e) => `<li>${esc(dateTime(e.at))}: <span class="mono">${esc(e.target)}</span> ${e.action === 'recover.restored' ? `could not be read and was restored from ${esc(e.details.backup)}` : 'could not be read, was in no backup, and was set aside'} (the damaged file is kept as ${esc(e.details.kept)})</li>`).join('')}</ul>` : '<p class="small muted">Every data file is checked at start; one that cannot be read is restored from the newest backup that has it. Nothing needed repairing.</p>'}
         <p class="muted small">The troubleshooting report has versions, health, settings in force, update events, backups and recent errors, and no secrets, keys or customer data.</p>
         <div class="flex"><button id="diag">${icon('download')}Download troubleshooting report</button>${can('audit.view') ? `<a class="btn ghost" href="/api/audit/export.csv" download>${icon('download')}Audit log (CSV)</a>` : ''}</div></div>
     </div>`;

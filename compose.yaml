@@ -7,8 +7,11 @@ services:
     ports:
       - "7443:7443"
     env_file: .env
+    environment:
+      BACKUP_DIR: /backups
     volumes:
       - ftr-cc-data:/data
+      - ftr-cc-backups:/backups
     read_only: true
     tmpfs:
       - /tmp
@@ -17,3 +20,4 @@ services:
     cap_drop: [ALL]
 volumes:
   ftr-cc-data:
+  ftr-cc-backups:

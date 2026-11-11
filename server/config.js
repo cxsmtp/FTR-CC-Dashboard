@@ -31,6 +31,8 @@ export function loadConfig(env = process.env) {
     host: env.HOST ?? '0.0.0.0',
     port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 7443,
     dataDir: path.resolve(ROOT, env.DATA_DIR ?? 'data'),
+    // Backups somewhere else than the data (a second volume or a network share), so losing one disk loses not both.
+    backupDir: env.BACKUP_DIR ? path.resolve(ROOT, env.BACKUP_DIR) : '',
     publicUrl: env.PUBLIC_URL ?? '',
     env,
     // Secure cookies whenever the server is reached over https (directly, or behind a proxy that says so).

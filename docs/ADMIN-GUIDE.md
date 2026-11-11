@@ -20,19 +20,19 @@ Or, once a release is published to ghcr.io (see `.github/workflows/container.yml
 podman pull ghcr.io/cxsmtp/ftr-cc-dashboard:latest
 ```
 
-**2. Run it.** HTTPS on port 7443, data in the `ftr-cc-data` volume.
+**2. Run it.** HTTPS on port 7443. The data goes in the `ftr-cc-data` volume and the backups in their own volume, `ftr-cc-backups`. If the container stops answering its health check, Podman restarts it.
 
 Windows cmd, one line:
 
 ```
-podman run -d --name ftr-cc --restart unless-stopped -p 7443:7443 -v ftr-cc-data:/data -e ADMIN_EMAIL=you@yourcompany.com -e PUBLIC_URL=https://cc.yourcompany.com:7443 --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true ftr-cc-dashboard
+podman run -d --name ftr-cc --restart unless-stopped --health-on-failure=restart -p 7443:7443 -v ftr-cc-data:/data -v ftr-cc-backups:/backups -e BACKUP_DIR=/backups -e ADMIN_EMAIL=you@yourcompany.com -e PUBLIC_URL=https://cc.yourcompany.com:7443 --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true ftr-cc-dashboard
 ```
 
 bash:
 
 ```bash
-podman run -d --name ftr-cc --restart unless-stopped -p 7443:7443 -v ftr-cc-data:/data \
-  -e ADMIN_EMAIL=you@yourcompany.com -e PUBLIC_URL=https://cc.yourcompany.com:7443 \
+podman run -d --name ftr-cc --restart unless-stopped --health-on-failure=restart -p 7443:7443 \
+  -v ftr-cc-data:/data -v ftr-cc-backups:/backups -e BACKUP_DIR=/backups -e ADMIN_EMAIL=you@yourcompany.com -e PUBLIC_URL=https://cc.yourcompany.com:7443 \
   --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true ftr-cc-dashboard
 ```
 
@@ -65,6 +65,14 @@ podman rm -f ftr-cc
 ```
 
 Then run step 2 again. The data stays in the volume.
+
+**Backups and recovery, by themselves.**
+- **Backups:** nightly, before every update or rollback, and before every restore. The newest 14 are kept in `/backups`.
+- **Keep them on another disk.** Point the second volume at another disk or a network share, for example `-v /mnt/nas/ftr-cc:/backups`. Set `BACKUP_PASSPHRASE` to seal them.
+- **Damaged data files** are restored from the newest good backup at start, with the damaged copy kept beside them. It is recorded in the audit log and shown under Settings → Backups & health.
+- **A crash** is restarted by the launcher; **a version that fails to start** is rolled back.
+- **A Checkmarx One read cut off by a restart** starts again by itself with the account's kept key.
+- **A container that stops answering** is restarted by Podman (`--health-on-failure=restart`; Podman 4.6 or later, where systemd runs the health checks: Linux hosts and Podman machines on Windows and macOS).
 
 **Size.** 1 vCPU and 1 GB is enough for 200 people working at once. See [Performance and sizing](docs/performance.md).
 

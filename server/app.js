@@ -18,6 +18,7 @@ import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } fro
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore } from './updates.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
+import { recoverDataDir } from './recover.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
 import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
 import { HSTS_AGES, HttpsManager } from '../vendor/mz/src/https-manager.js';
@@ -39,6 +40,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     baseLog(line);
   };
   fs.mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
+  // Self-healing start: a data file that cannot be read is brought back from the newest backup that has it.
+  const backupDir = config.backupDir || path.join(config.dataDir, 'backups');
+  const backupPassphrase = String(config.env?.BACKUP_PASSPHRASE ?? '');
+  const recovered = recoverDataDir({ dataDir: config.dataDir, backupDir, passphrase: backupPassphrase, log });
   const iam = new Iam(config.dataDir);
   const teams = new Teams(config.dataDir);
   const accounts = new Accounts(config.dataDir);
@@ -954,15 +959,23 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
 
   // ---- Backups (CxMissionZero's way): nightly, before every version switch, by hand; download and restore -------------
-  const backupDir = path.join(config.dataDir, 'backups');
-  const backupPassphrase = String(config.env?.BACKUP_PASSPHRASE ?? '');
+  for (const e of recovered) audit.record({ action: e.outcome === 'restored' ? 'recover.restored' : 'recover.setAside', target: e.file, details: e });
+  let lastBackup = { ok: true, at: null, error: '' };
   const takeBackup = (reason) => {
-    const b = writeBackupTo(backupDir, { dataDir: config.dataDir, passphrase: backupPassphrase, version: VERSION, reason });
-    audit.record({ action: 'backup.written', target: b.name, details: { reason, bytes: b.bytes, sha256: b.sha256, sealed: Boolean(backupPassphrase) } });
-    return b.name;
+    try {
+      const b = writeBackupTo(backupDir, { dataDir: config.dataDir, passphrase: backupPassphrase, version: VERSION, reason });
+      audit.record({ action: 'backup.written', target: b.name, details: { reason, bytes: b.bytes, sha256: b.sha256, sealed: Boolean(backupPassphrase), dir: backupDir } });
+      lastBackup = { ok: true, at: new Date().toISOString(), error: '' };
+      return b.name;
+    } catch (error) {
+      lastBackup = { ok: false, at: new Date().toISOString(), error: error.message };
+      audit.record({ action: 'backup.failed', details: { reason, error: error.message, dir: backupDir } });
+      log(`! [backup] Could not write a backup to ${backupDir}: ${error.message}`);
+      throw Object.assign(new Error(`The backup could not be written to ${backupDir}: ${error.message}`), { status: 500 });
+    }
   };
   const backupPerm = perm('backup.manage');
-  r('GET', '/api/backups', backupPerm, () => ({ backups: listBackups(backupDir), sealed: Boolean(backupPassphrase), dir: backupDir }));
+  r('GET', '/api/backups', backupPerm, () => ({ backups: listBackups(backupDir), sealed: Boolean(backupPassphrase), dir: backupDir, separate: Boolean(config.backupDir), last: lastBackup, recovered: audit.recent({ limit: 20, filter: (e) => e.action.startsWith('recover.') }) }));
   r('POST', '/api/backups', backupPerm, (req, ctx) => ({ name: takeBackup(`by ${ctx.user.email}`), backups: listBackups(backupDir) }));
   r('GET', '/api/backups/:name', backupPerm, (req, ctx, body, res, url, params) => {
     const item = listBackups(backupDir).find((b) => b.name === params.name);
@@ -1059,7 +1072,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       sso: { ready: sso.ready() },
       email: { ready: mailReady(), resetReady: resetReady().ready },
       updates: { running: VERSION, supervised, auto: versionStore.state.auto, lastCheck: versionStore.state.lastCheck, failed: versionStore.state.failed, events: (versionStore.state.events ?? []).slice(0, 10) },
-      backups: { count: listBackups(backupDir).length, last: listBackups(backupDir)[0] ?? null, sealed: Boolean(backupPassphrase) },
+      backups: { dir: backupDir, separate: Boolean(config.backupDir), count: listBackups(backupDir).length, last: listBackups(backupDir)[0] ?? null, lastAttempt: lastBackup, sealed: Boolean(backupPassphrase) },
+      recovered: audit.recent({ limit: 20, filter: (e) => e.action.startsWith('recover.') }),
       counts: { people: iam.users().length, teams: teams.list().length, accounts: accounts.accounts.size, reports: accounts.reports.size },
       audit: audit.verify(),
       recentErrors: recentErrors.slice(-20),
@@ -1154,7 +1168,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     // Which account it is for, so the dashboard can say so and the calculator puts it there when the person comes back.
     const id = String(req.headers['x-account'] ?? '');
     const meta = id && accounts.accounts.meta(id);
-    return calc.startRead(ctx.user.id, body, meta && ctx.teamSet.has(meta.teamId) ? { id: meta.id, name: meta.name, teamId: meta.teamId } : null);
+    const account = meta && ctx.teamSet.has(meta.teamId) ? { id: meta.id, name: meta.name, teamId: meta.teamId } : null;
+    const view = calc.startRead(ctx.user.id, body, account);
+    // Kept on disk until its result is in its account: a restart meanwhile starts it again.
+    pendingReads.value.reads[ctx.user.id] = { account, input: { branches: body?.branches, maxProjects: body?.maxProjects }, startedAt: new Date().toISOString() };
+    pendingReads.save();
+    return view;
   });
   r('GET', '/api/cc/work', perm('calculator.use'), (req, ctx) => calc.work(ctx.user.id));
   /** The calculator page's settings for this person (the page itself is the same for everyone). */
@@ -1187,7 +1206,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const patch = {};
     for (const key of ['name', 'tr', 'fusion', 'fusionNew', 'totals', 'scope', 'impact']) if (body?.[key] !== undefined) patch[key] = body[key];
     const saved = summary(accounts.update(params.id, ctx.teamSet, patch, ctx.user));
-    if ((patch.tr !== undefined || patch.fusion !== undefined) && calc.markApplied(ctx.user.id, params.id)) accounts.markRead(params.id);
+    if ((patch.tr !== undefined || patch.fusion !== undefined) && calc.markApplied(ctx.user.id, params.id)) {
+      accounts.markRead(params.id);
+      forgetPending(ctx.user.id);
+    }
     return { customer: saved };
   });
   r('DELETE', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
@@ -1362,6 +1384,45 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (target.startsWith('/api/')) return send(res, 426, { error: `The command center uses HTTPS only: ${origin}`, movedTo: origin });
     return send(res, 308, '', { Location: `${origin}${target}` });
   }
+  // ---- Reads that a restart cut off: started again with the account's kept key, or the person told to read again --------
+  const pendingReads = new Doc(path.join(config.dataDir, 'reads.json'), () => ({ reads: {} }));
+  pendingReads.value.reads ??= {};
+  const forgetPending = (userId) => {
+    if (pendingReads.value.reads[userId]) {
+      delete pendingReads.value.reads[userId];
+      pendingReads.save();
+    }
+  };
+  calc.onFinish = (userId, job) => {
+    if (job.state === 'failed') forgetPending(userId);
+  };
+  async function resumeReads() {
+    for (const [userId, p] of Object.entries(pendingReads.value.reads)) {
+      const user = iam.byId(userId);
+      if (!user || user.active === false || Date.now() - Date.parse(p.startedAt) > 24 * 3600 * 1000) {
+        forgetPending(userId);
+        continue;
+      }
+      const meta = p.account && accounts.accounts.meta(p.account.id);
+      const kept = meta && accounts.accounts.get(meta.id)?.cxone;
+      const key = kept?.sealedKey ? JSON.parse(secrets.open(kept.sealedKey) || 'null') : null;
+      if (key?.apiKey) {
+        try {
+          await calc.connectKey(userId, key);
+          calc.startRead(userId, p.input, p.account);
+          audit.record({ action: 'cxone.read.resumed', target: p.account.name, details: { user: user.email, startedAt: p.startedAt } });
+          log(`[recover] The read for ${p.account.name} cut off by the restart was started again (the account's kept key).`);
+          continue;
+        } catch (error) {
+          log(`! [recover] The read for ${p.account.name} could not be started again: ${error.message}`);
+        }
+      }
+      calc.interrupted.set(userId, { account: p.account, at: p.startedAt });
+      audit.record({ action: 'cxone.read.interrupted', target: p.account?.name ?? '', details: { user: user.email } });
+      forgetPending(userId);
+    }
+  }
+
   /** After the server listens: Let's Encrypt from LETSENCRYPT_DOMAIN, renewals, scheduled jobs. */
   async function started() {
     await ready;
@@ -1377,6 +1438,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
     acme.startRenewal();
     for (const job of startJobs) job();
+    await resumeReads().catch((error) => log(`! [recover] ${error.message}`));
   }
   stopJobs.push(() => acme.stop(), () => httpsManager.stop());
   const stop = () => stopJobs.forEach((j) => j());

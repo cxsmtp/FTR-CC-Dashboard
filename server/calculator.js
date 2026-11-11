@@ -134,6 +134,10 @@ export function calculatorPage({ productCode = '' } = {}) {
 
 export class CalculatorService {
   #links = new Map(); // userId -> { client, connection, job, read }
+  /** Reads a restart cut off, with no kept key to start them again: userId -> { account, at }. */
+  interrupted = new Map();
+  /** Told when a read ends (done or failed), to forget what was saved for resuming it. */
+  onFinish = () => {};
   constructor({ cxoneHosts, gitHosts, log = console.log, connect = (c) => new CxClient(c) }) {
     this.cxoneHosts = cxoneHosts;
     this.gitHosts = gitHosts;
@@ -196,10 +200,13 @@ export class CalculatorService {
       .then(([{ perProject, ...tenant }, offer]) => {
         state.read.save(perProject);
         Object.assign(job, { state: 'done', result: { ...tenant, ...offer }, finishedAt: new Date().toISOString(), live: null });
+        this.onFinish(userId, job);
       })
       .catch((error) => {
         Object.assign(job, { state: 'failed', error: error.status === 401 || error.status === 403 ? 'Checkmarx One refused the read: check the API key may read projects and scans.' : `Checkmarx One could not be read: ${error.message}`, finishedAt: new Date().toISOString(), live: null });
+        this.onFinish(userId, job);
       });
+    this.interrupted.delete(userId);
     return readJobView(job);
   }
 
@@ -227,6 +234,8 @@ export class CalculatorService {
   /** What runs for this person in the background, for the dashboard: the read, and the git count. */
   work(userId) {
     const job = this.#links.get(userId)?.job;
+    const cut = this.interrupted.get(userId);
+    if (!job && cut) return { read: { state: 'interrupted', account: cut.account, startedAt: cut.at, applied: false }, connected: false };
     return {
       read: job ? { state: job.state, step: job.step, done: job.done, total: job.total, startedAt: job.startedAt, finishedAt: job.finishedAt ?? null, error: job.error ?? null, account: job.account, applied: Boolean(job.applied), projects: job.result?.projects?.length ?? null } : null,
       connected: Boolean(this.#links.get(userId)?.client),

@@ -2,6 +2,17 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.07.00 — 2026-11-11
+
+- **Self-healing start.** Every data file is checked when the server starts.
+  - A file that cannot be read is put aside and restored from the newest backup with a good copy.
+  - An account or report that no backup has is set aside, so the server still starts.
+  - People, teams or settings with no good copy stop the start and name the file, rather than guess.
+  - Every repair is in the audit log and shown under Settings → Backups & health.
+- **Backups on their own disk.** `BACKUP_DIR` sends backups to a second volume or a network share, so losing one disk does not lose both. The container has a `/backups` volume for it. A backup that fails is reported in the audit log and in Backups & health. An update or rollback does not go ahead without its backup.
+- **Reads resume after a restart.** A Checkmarx One read cut off by a restart starts again by itself with the account's kept key. Without a kept key, the dashboard says the read was cut off and to read again.
+- **Podman restarts an unresponsive container.** The run command adds `--health-on-failure=restart`.
+
 ## CC-01.06.00 — 2026-11-11
 
 - **Two commands with Podman, as CxMissionZero.** `podman build` (or `podman pull` from ghcr.io once published) and `podman run`, and it is live on HTTPS. The container runs as a non-root user on a read-only root filesystem, with all capabilities dropped and its data in one volume. It has a health check and starts through the launcher, so updates and rollback work inside it.
