@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-ui="nextgen" data-look="future" class="sa-future" data-theme="light">
+<html lang="en" data-ui="nextgen" data-cc data-theme="light" data-accent="aurora">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,19 +9,20 @@
 <!--CSS-->
 </head>
 <body>
+<div class="cc-bg" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div></div>
+<div class="cc-app">
+<aside class="cc-side" id="cc-side" aria-label="Command center">
+  <a class="cc-brand" href="/#/overview"><span class="cc-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17 9 10l4 3 7-8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>FTR Credits</b><small>Command Center</small></span></a>
+  <nav class="cc-nav" id="cc-nav"></nav>
+  <a class="cc-work" id="cc-work" hidden></a>
+  <div class="cc-me">
+    <div class="cc-who"><span class="cc-avatar" id="cc-avatar"></span><span><b id="cc-name"></b><small id="cc-role"></small></span></div>
+    <div class="cc-row"><button type="button" class="ghost sm" id="cc-theme"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>Theme</button><button type="button" class="ghost sm" id="hc-signout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/></svg>Sign out</button></div>
+  </div>
+  <a class="cc-ver" id="cc-ver" href="/#/about" title="About, version and what is new"></a>
+</aside>
 <div class="shell standalone hosted">
   <div class="content">
-    <nav class="hc-nav" aria-label="Command center">
-      <a class="hc-brand" href="/#/overview"><span class="hc-logo" aria-hidden="true"></span><b>FTR Credits</b> <span>Command Center</span></a>
-      <a href="/#/overview">Dashboard</a>
-      <a href="/#/accounts">Accounts</a>
-      <a href="/calculator" aria-current="page">Calculator</a>
-      <a href="/#/guide">Guide</a>
-      <span class="hc-spacer"></span>
-      <span class="hc-me" id="hc-me"></span>
-      <button type="button" class="ghost sm" id="sa-theme" aria-label="Light or dark" title="Light or dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" /></svg></button>
-      <button type="button" class="ghost sm" id="hc-signout">Sign out</button>
-    </nav>
     <div class="hc-status-wrap"><div class="hc-status" id="hc-status" role="status" aria-live="polite"></div><div class="hc-work" id="hc-work" hidden aria-live="polite"></div></div>
     <header class="topbar sa-top">
       <div class="topbar-title">
@@ -59,8 +60,10 @@
     <footer class="sa-foot"><span>FTR Credits Command Center · calculator from CxMissionZero {{MZ}} · PolyForm Internal Use License 1.0.0 · <a href="/legal/terms" target="_blank" rel="noopener">Terms of use</a></span><span>Supporting information only: Checkmarx's own records are authoritative.</span></footer>
   </div>
 </div>
+</div>
 <dialog id="hc-cur-dialog" class="hc-dialog"><form method="dialog"><h2>Impact currency</h2><p id="hc-cur-why"></p><label class="field"><span>Currency for this account</span><select id="hc-cur-select"></select></label><p class="hint">Then set the minutes to triage and to remediate a finding and the developers' hourly rate on the <b>Impact</b> tab. The soft savings appear in the report and its PDF once Impact is on.</p><div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary" id="hc-cur-ok">Confirm and turn Impact on</button></div></form></dialog>
 <dialog id="hc-cv-dialog" class="hc-dialog hc-wide"><form method="dialog"><h2>The customer's version</h2><div id="hc-cv-body"></div><label class="hc-check"><input type="checkbox" id="hc-cv-primary" checked /> Make it the primary report (the dashboards then count it)</label><label class="hc-check"><input type="checkbox" id="hc-cv-prefs" checked /> Use their numbers in the calculator for this account from now on</label><label class="field"><span>Note <small>optional</small></span><input id="hc-cv-note" maxlength="300" placeholder="Worked out with their AppSec lead, 12 Nov" /></label><div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary" id="hc-cv-ok">Record their version</button></div></form></dialog>
+<dialog id="cc-theme-dialog" class="hc-dialog cc-theme-dialog"><form method="dialog"><h2>Theme</h2><p class="hc-sub">Yours, on every device you sign in on: the dashboard and the calculator alike.</p><div class="cc-seg" id="cc-modes"></div><div class="cc-swatches" id="cc-swatches"></div><div class="hc-dialog-actions"><button value="ok" class="primary">Done</button></div></form></dialog>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <!--SCRIPTS-->
 </body>

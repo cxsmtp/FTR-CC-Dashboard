@@ -1186,6 +1186,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     ownTeamId: ctx.user.teamId,
     organisationName: settings.value.organisationName,
     exportsEnabled: settings.value.features?.exports === true,
+    // The menu and the look, as on the dashboard.
+    teamName: teams.get(ctx.user.teamId)?.name ?? '',
+    versionLabel: versionLabel(),
+    prefs: { mode: ctx.user.prefs?.mode, accent: ctx.user.prefs?.accent },
+    theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
   }));
   r('GET', '/api/projections/read', calcTeam, (req, ctx, body, res, url) => calc.readView(ctx.user.id, url.searchParams.get('since')));
   r('POST', '/api/projections/series', calcTeam, (req, ctx, body) => calc.series(ctx.user.id, body));

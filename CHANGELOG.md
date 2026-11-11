@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.08.00 — 2026-11-11
+
+- **The calculator is part of the dashboard.** It opens inside the command center's own menu, as every other page does: Overview, Accounts, People, Calculator, Quick guide, Teams, Settings and Audit log, with your name, **Theme**, **Sign out** and the version at the bottom.
+- **One look everywhere.** The calculator takes the dashboard's colours, background, buttons and panels, in light, dark or your system's, and in each of the six palettes. **Theme** in the calculator is the same picker as on the dashboard and is saved to you, so a change on either page follows you to the other and to every device.
+- **Background reads in the calculator's menu too.** A Checkmarx One read running on the server shows in the menu with its progress, wherever you are.
+
 ## CC-01.07.00 — 2026-11-11
 
 - **Self-healing start.** Every data file is checked when the server starts.

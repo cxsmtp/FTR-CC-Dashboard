@@ -7,12 +7,43 @@ import { initCalculator } from './page.js';
 import { startHelpTips } from '../help-tips.js';
 
 const THEME_KEY = 'cxcalc-theme';
+const ACCENT_KEY = 'cc-accent';
+const ACCENTS = [
+  ['aurora', 'Aurora', 'Cyan to violet: the command center\u2019s own'],
+  ['ocean', 'Ocean', 'Deep blue to teal'],
+  ['emerald', 'Emerald', 'Green and teal, calm'],
+  ['sunset', 'Sunset', 'Amber to rose'],
+  ['royal', 'Royal', 'Indigo to magenta'],
+  ['graphite', 'Graphite', 'Quiet greys with one blue'],
+];
+const ADMIN_PERMS = ['settings.manage', 'security.sso', 'security.https', 'system.update', 'backup.manage'];
+const media = matchMedia('(prefers-color-scheme: dark)');
+let themeMode = 'light';
+/** The same look as the dashboard: light, dark or the system's, in one of six palettes (public/app.js applyTheme). */
+function applyTheme(mode = themeMode, accent) {
+  themeMode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light';
+  const root = document.documentElement;
+  root.dataset.theme = themeMode === 'system' ? (media.matches ? 'dark' : 'light') : themeMode;
+  if (accent && ACCENTS.some(([id]) => id === accent)) root.dataset.accent = accent;
+  try {
+    localStorage.setItem(THEME_KEY, root.dataset.theme);
+    localStorage.setItem(ACCENT_KEY, root.dataset.accent);
+  } catch {}
+}
+media.addEventListener?.('change', () => themeMode === 'system' && applyTheme('system'));
+
 const OPEN_KEY = 'mz-calc-customer';
 const TEAM_KEY = 'cc-calc-team';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
 export async function startHosted() {
+  // The look the dashboard last had on this device, at once; then this person's own, from the server.
+  try {
+    applyTheme(localStorage.getItem(THEME_KEY) || 'light', localStorage.getItem(ACCENT_KEY) || 'aurora');
+  } catch {
+    applyTheme('light', 'aurora');
+  }
   // This person's settings (the page itself is the same for everyone, so it is cached).
   let cfg = {};
   try {
@@ -63,7 +94,74 @@ export async function startHosted() {
       localStorage.setItem(OPEN_KEY, params.get('account'));
     } catch {}
   }
-  $('hc-me').textContent = `${cfg.user?.name ?? ''} · ${cfg.roleName ?? ''}`;
+  const look = { mode: cfg.prefs?.mode ?? cfg.theme?.mode ?? 'light', accent: cfg.prefs?.accent ?? cfg.theme?.accent ?? 'aurora' };
+  applyTheme(look.mode, look.accent);
+  renderMenu();
+
+  // ---- The command center's menu, as on every dashboard page --------------------------------------
+  function renderMenu() {
+    const ICONS = {
+      overview: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
+      accounts: '<path d="M3 7h18M3 12h18M3 17h12"/>',
+      calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h4"/>',
+      people: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.8-3.5 3.2-5.5 6-5.5s5.2 2 6 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.5c2.4.2 4 1.9 4.5 4.5"/>',
+      teams: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v4M12 11.5 5 16.5M12 11.5l7 5"/>',
+      admin: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+      audit: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>',
+      guide: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5h0"/>',
+    };
+    const can = (p) => perms.has(p);
+    const link = (href, ic, label, show = true, on = false) => (show ? `<a href="${href}"${on ? ' class="on" aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[ic]}</svg><span>${label}</span></a>` : '');
+    const settings = ADMIN_PERMS.some(can);
+    const admin = can('users.manage') || can('teams.manage') || settings || can('audit.view');
+    $('cc-nav').innerHTML = `<div class="cc-label">Insight</div>
+      ${link('/#/overview', 'overview', 'Overview', can('dashboard.view'))}
+      ${link('/#/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
+      ${link('/#/people', 'people', can('users.manage') ? 'People &amp; roles' : 'People')}
+      <div class="cc-label">Work</div>
+      ${link('/calculator', 'calc', 'Calculator', true, true)}
+      ${link('/#/guide', 'guide', 'Quick guide')}
+      ${admin ? '<div class="cc-label">Administration</div>' : ''}
+      ${link('/#/teams', 'teams', 'Teams', can('teams.manage') || can('dashboard.view'))}
+      ${link('/#/admin', 'admin', 'Settings', settings)}
+      ${link('/#/audit', 'audit', 'Audit log', can('audit.view'))}`;
+    const name = cfg.user?.name ?? '';
+    $('cc-avatar').textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+    $('cc-name').textContent = name;
+    $('cc-role').textContent = `${cfg.roleName ?? ''}${cfg.teamName ? ` · ${cfg.teamName}` : ''}`;
+    $('cc-ver').textContent = cfg.versionLabel ?? '';
+  }
+
+  // A Checkmarx One read on the server, as the dashboard's menu shows it: for another account than the one open.
+  async function watchWork() {
+    let w;
+    try {
+      w = await server('/api/cc/work');
+    } catch {
+      return setTimeout(watchWork, 30_000);
+    }
+    const el = $('cc-work');
+    const r = w.read;
+    const name = r?.account?.name ?? 'an account';
+    el.href = r?.account ? `/calculator?team=${encodeURIComponent(r.account.teamId)}&account=${encodeURIComponent(r.account.id)}` : '/calculator';
+    el.hidden = true;
+    if (r?.state === 'running') {
+      const pct = r.total ? Math.min(100, Math.round((r.done / r.total) * 100)) : 0;
+      el.className = 'cc-work running';
+      el.innerHTML = `<span class="hc-orbit"><i></i><i></i><i></i></span><span><b>Reading Checkmarx One</b><small>${esc(name)} · ${r.total ? `${num(r.done)} of ${num(r.total)}` : 'starting'}</small><span class="bar"><i></i></span></span>`;
+      el.querySelector('.bar i').style.width = `${pct}%`;
+      el.hidden = false;
+    } else if (r?.state === 'done' && !r.applied) {
+      el.className = 'cc-work done';
+      el.innerHTML = `<span class="tick">✓</span><span><b>Data for ${esc(name)} is ready</b><small>Open it to generate the report →</small></span>`;
+      el.hidden = false;
+    } else if ((r?.state === 'failed' && !r.applied) || r?.state === 'interrupted') {
+      el.className = 'cc-work failed';
+      el.innerHTML = `<span class="tick">!</span><span><b>The read for ${esc(name)} stopped</b><small>${esc(r.error ?? 'Open it and read again')}</small></span>`;
+      el.hidden = false;
+    }
+    setTimeout(watchWork, r?.state === 'running' ? 2500 : 30_000);
+  }
 
   // ---- Requests to the server ----------------------------------------------------------------------
   async function server(path, { method = 'GET', body, headers = {} } = {}) {
@@ -484,23 +582,26 @@ export async function startHosted() {
     location.href = '/#/login';
   });
 
-  // ---- Theme ----------------------------------------------------------------------------------------
-  const applyTheme = (theme) => {
-    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
-    else delete document.documentElement.dataset.theme;
-  };
-  try {
-    applyTheme(localStorage.getItem(THEME_KEY) || 'light');
-  } catch {
-    applyTheme('light');
-  }
-  $('sa-theme').addEventListener('click', () => {
-    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    const next = dark ? 'light' : 'dark';
-    applyTheme(next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {}
+  // ---- Theme: the same picker as the dashboard's, saved to this person ---------------------------------
+  $('cc-theme').addEventListener('click', () => {
+    const dlg = $('cc-theme-dialog');
+    const paint = () => {
+      $('cc-modes').innerHTML = ['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${look.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('');
+      $('cc-swatches').innerHTML = ACCENTS.map(([id, name, note]) => `<button type="button" class="cc-swatch${look.accent === id ? ' on' : ''}" data-a="${id}"><span class="cc-sw ${id}"></span><b>${name}</b><small>${note}</small></button>`).join('');
+    };
+    paint();
+    dlg.onclick = async (event) => {
+      const b = event.target.closest?.('[data-m],[data-a]');
+      if (!b) return;
+      if (b.dataset.m) look.mode = b.dataset.m;
+      if (b.dataset.a) look.accent = b.dataset.a;
+      applyTheme(look.mode, look.accent);
+      paint();
+      try {
+        await server('/api/me/prefs', { method: 'PUT', body: { mode: look.mode, accent: look.accent } });
+      } catch {}
+    };
+    dlg.showModal();
   });
 
   // ---- The calculator's tabs (in MZ, app.js switches them) -------------------------------------------
@@ -618,4 +719,5 @@ export async function startHosted() {
   renderStatus();
   startHelpTips();
   calculator.load();
+  watchWork();
 }

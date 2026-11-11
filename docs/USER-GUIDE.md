@@ -18,7 +18,7 @@ If your Admin turned on single sign-on, click **Sign in with SSO** (or the name 
 
 ### Your theme
 
-**Theme** at the bottom of the menu: light, dark or your system's, in six palettes. Your choice follows you to every device. The version (CC-xx.xx.xx) is under it: click it for **About** and what is new.
+**Theme** at the bottom of the menu: light, dark or your system's, in six palettes. The calculator has the same menu and the same theme: a change on any page follows you everywhere, on every device. The version (CC-xx.xx.xx) is under it: click it for **About** and what is new.
 
 ## 2. Who sees what
 
