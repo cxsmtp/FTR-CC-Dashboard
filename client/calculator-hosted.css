@@ -739,3 +739,6 @@ html[data-cc] .calc-head > #calc-heart { border: 0 !important; padding: 0 !impor
 /* The tabs wrap onto a second line on a narrow screen; nothing runs off the side. */
 html[data-cc] [data-ptabs="calculator"] { display: flex; flex-wrap: wrap; gap: 2px 4px; overflow: visible; max-width: 100%; }
 html[data-cc] [data-ptabs="calculator"] [data-pt] { white-space: nowrap; }
+
+/* Lines of code show whole: six and seven digits fit (they were cut to their first five). */
+html[data-cc] input.calc-num[data-p="loc"], html[data-cc] input.calc-num[data-n="loc"] { width: 13ch !important; min-width: 13ch; text-align: end; font-variant-numeric: tabular-nums; }

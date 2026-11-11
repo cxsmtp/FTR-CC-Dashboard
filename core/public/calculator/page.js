@@ -548,7 +548,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
           : '';
     return `<div class="calc-engines calc-edit" role="group" aria-label="Engines counted">
           <span class="hint"><b>Engines counted</b></span>
-          ${ENGINES.map((e) => `<label class="pill-check"><input type="checkbox" data-engine="${e.key}"${chosen.has(e.key) ? ' checked' : ''}${live ? '' : ' disabled'} /> <span translate="no">${e.label}</span>${e.ai ? '' : ' <small>No AI</small>'}</label>`).join('')}
+          ${live ? ENGINES.map((e) => `<label class="pill-check"><input type="checkbox" data-engine="${e.key}"${chosen.has(e.key) ? ' checked' : ''} /> <span translate="no">${e.label}</span>${e.ai ? '' : ' <small>No AI</small>'}</label>`).join('') : ''}
           ${note}${origins}
         </div>`;
   }

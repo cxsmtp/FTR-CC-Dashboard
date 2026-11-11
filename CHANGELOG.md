@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.61.00 — 2026-11-11
+
+Two things shown wrongly in the calculator, put right. No figure, filter or saved setting changes.
+
+- **Lines of code show whole.** In the Fusion project tables a figure of six or seven digits was cut to its first five (221,676 read as 22167, beside "23 blocks"). The field is now wide enough; the figures themselves were always right.
+- **Engines counted**: with the two exports (no read from Checkmarx One) the six engine boxes could not be ticked; only the sentence that says why is shown now. After a read they are there to choose, as before.
+
 ## CC-01.60.00 — 2026-11-11
 
 - **The calculator lines up.** The projection, its tabs and everything under them share one left and right edge with the account panel above (they sat inset before). The folded **Projection settings** is one line: its title and **Show settings**; the empty band under it is gone. On a narrow screen the tabs wrap onto a second line and nothing runs off the side.
