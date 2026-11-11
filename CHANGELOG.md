@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.60.00 — 2026-11-11
+
+- **The calculator lines up.** The projection, its tabs and everything under them share one left and right edge with the account panel above (they sat inset before). The folded **Projection settings** is one line: its title and **Show settings**; the empty band under it is gone. On a narrow screen the tabs wrap onto a second line and nothing runs off the side.
+- **Faster pages with big tables**: the small helper that sizes rings and bars now runs once per frame, not once for every piece of the page.
+- **Inside**: the dashboard's code is one file per page (17 files in `public/js/`) where it was a single 3,700-line file; every reference between them is checked. Nothing changes in what the pages do.
+
 ## CC-01.59.00 — 2026-11-11
 
 - **The calculator is this product's own.** Its code moved into the app's own `core/` folder, the script that copied it in from another product is gone, and About, the health check and the guides no longer name where it came from. Nothing changes in what it does. (The terms of use are left exactly as they are, so nobody is asked to accept them again.)

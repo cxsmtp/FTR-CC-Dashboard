@@ -725,3 +725,17 @@ html[data-meeting] .hc-meet-src .hc-remember { display: none !important; }
 .imp-bar span:nth-child(2) { flex: 1 1 260px; min-width: 0; }
 .imp-bar button { background: #fff !important; color: #92400e !important; border: 0 !important; font-weight: 700; }
 .imp-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; flex: none; }
+
+/* ---- One left edge: the projection lines up with the account panel above it; no box inside a box ---------------- */
+html[data-cc] .content > main { padding-left: 0 !important; padding-right: 0 !important; }
+html[data-cc] .calc-head > #calc-heart { border: 0 !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; }
+/* Folded: its title and the way to open it, on one line; nothing empty under it. */
+#calc-heart.hc-collapsed .calc-heart-sub { display: none; }
+#calc-heart.hc-collapsed .calc-source { display: none !important; }
+.shell.can-read #calc-heart.hc-collapsed .calc-source { display: flex !important; }
+#calc-heart .calc-heart-head { flex-wrap: nowrap; }
+#calc-heart .calc-heart-sub { flex: 1 1 auto; min-width: 0; }
+#calc-heart .hc-heart-toggle { flex: none; white-space: nowrap; }
+/* The tabs wrap onto a second line on a narrow screen; nothing runs off the side. */
+html[data-cc] [data-ptabs="calculator"] { display: flex; flex-wrap: wrap; gap: 2px 4px; overflow: visible; max-width: 100%; }
+html[data-cc] [data-ptabs="calculator"] [data-pt] { white-space: nowrap; }
