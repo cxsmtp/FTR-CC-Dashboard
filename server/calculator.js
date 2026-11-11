@@ -116,7 +116,7 @@ export function calculatorPage({ productCode = '' } = {}) {
   const main = `\n${scriptText(`const __m = [];\n${bundle}\nlet __started = false;\nwindow.__mzStart = () => {\n  if (__started) return;\n  __started = true;\n  __m[${index.get('calculator/hosted.js')}].startHosted();\n};\nif (!window.__mzBlocked) window.__mzStart();`)}\n`;
   const css = `\n${`${inlined(read('styles.css'), MZ_PUBLIC)}\n${inlined(read('nextgen.css'), MZ_PUBLIC)}\n${fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.css'), 'utf8')}`.replace(/\r\n?/g, '\n')}\n`;
   const scripts = [...(seed ? [seed] : []), gate, ...vendorScripts, main];
-  const csp = `default-src 'none'; script-src ${scripts.map(contentHash).join(' ')}; script-src-attr 'none'; style-src 'unsafe-inline'; style-src-elem ${contentHash(css)}; style-src-attr 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'self'; worker-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+  const csp = `default-src 'none'; script-src ${scripts.map(contentHash).join(' ')}; script-src-attr 'none'; style-src 'unsafe-inline'; style-src-elem ${contentHash(css)}; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'self'; worker-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
   const markup = standaloneMarkup(calculatorMarkup(read('index.html')), { launcher: true });
   const head = fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.html'), 'utf8');
   const html = head

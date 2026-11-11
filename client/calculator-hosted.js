@@ -95,8 +95,33 @@ export async function startHosted() {
       localStorage.setItem(OPEN_KEY, params.get('account'));
     } catch {}
   }
-  const look = { mode: cfg.prefs?.mode ?? cfg.theme?.mode ?? 'light', accent: cfg.prefs?.accent ?? cfg.theme?.accent ?? 'aurora' };
+  // The organisation's branding (Settings → Branding): the name, the logo, the accent, the menu, and whether people
+  // may choose their own look.
+  const brand = cfg.branding ?? {};
+  const own = brand.letChoose !== false;
+  const look = { mode: (own && cfg.prefs?.mode) || cfg.theme?.mode || 'light', accent: (own && cfg.prefs?.accent) || cfg.theme?.accent || 'aurora' };
   applyTheme(look.mode, look.accent);
+  {
+    const rootEl = document.documentElement;
+    rootEl.dataset.menu = brand.menu === 'top' ? 'top' : 'left';
+    rootEl.dataset.ownLook = own ? 'yes' : 'no';
+    if (/^#[0-9a-f]{6}$/i.test(brand.accent ?? '')) {
+      rootEl.style.setProperty('--cyan', brand.accent);
+      rootEl.style.setProperty('--violet', `color-mix(in srgb, ${brand.accent} 70%, #7c3aed)`);
+      rootEl.style.setProperty('--grad', `linear-gradient(120deg, ${brand.accent} 0%, color-mix(in srgb, ${brand.accent} 60%, #6366f1) 55%, color-mix(in srgb, ${brand.accent} 40%, #a855f7) 100%)`);
+    }
+    if (brand.appName) $('cc-app-name').textContent = brand.appName;
+    if (brand.tagline !== undefined) $('cc-tagline').textContent = brand.tagline || 'Command Center';
+    if (brand.logo) {
+      const img = document.createElement('img');
+      img.src = brand.logo;
+      img.alt = '';
+      $('cc-logo').replaceChildren(img);
+      $('cc-logo').classList.add('img');
+    }
+    if (brand.icon) document.getElementById('favicon')?.setAttribute('href', brand.icon);
+    document.title = `Calculator · ${brand.appName ?? 'FTR Credits'}`;
+  }
   renderMenu();
 
   // ---- The command center's menu, as on every dashboard page --------------------------------------

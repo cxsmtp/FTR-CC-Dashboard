@@ -392,3 +392,39 @@ test('roles can be renamed, built-in ones and Admin too; Admin keeps every permi
   assert.equal(se1.me.role.name, 'Solutions Engineer');
   assert.equal((await se1.get('/api/dashboard')).status, 200);
 });
+
+test('branding: name, look and logo for everyone; an SVG runs nothing; bad images and private addresses refused', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
+  const r = await admin.put('/api/settings/branding', { appName: 'Mission Control', tagline: 'EMEA', look: 'command', letChoose: false, menu: 'top', accent: '#1d4ed8', logo: { upload: `data:image/png;base64,${png.toString('base64')}` } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.appName, 'Mission Control');
+  assert.equal(r.data.look, 'command');
+  assert.equal(r.data.letChoose, false);
+  assert.match(r.data.logo, /^\/brand\/logo\?v=/);
+  // Before signing in, too: the sign-in page shows it.
+  const pub = await (await fetch(`${env.base}/api/branding`)).json();
+  assert.equal(pub.appName, 'Mission Control');
+  const logo = await fetch(`${env.base}/brand/logo`);
+  assert.equal(logo.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Buffer.from(await logo.arrayBuffer()), png);
+  // An SVG is kept, and served so that nothing in it runs.
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><circle r="4"/></svg>';
+  assert.equal((await admin.put('/api/settings/branding', { icon: { upload: Buffer.from(svg).toString('base64') } })).status, 200);
+  const icon = await fetch(`${env.base}/brand/icon`);
+  assert.equal(icon.headers.get('content-type'), 'image/svg+xml');
+  assert.match(icon.headers.get('content-security-policy'), /sandbox/);
+  // Refused, and the last good setting stays.
+  assert.equal((await admin.put('/api/settings/branding', { logo: { upload: Buffer.alloc(210 * 1024).toString('base64') } })).status, 413);
+  assert.equal((await admin.put('/api/settings/branding', { logo: { upload: Buffer.from('<html>hi</html>').toString('base64') } })).status, 415);
+  assert.equal((await admin.put('/api/settings/branding', { logo: { url: 'http://example.com/logo.png' } })).status, 400);
+  assert.equal((await admin.put('/api/settings/branding', { logo: { url: 'https://169.254.169.254/latest' } })).status, 400);
+  assert.equal((await admin.put('/api/settings/branding', { accent: 'blue' })).status, 400);
+  assert.deepEqual(Buffer.from(await (await fetch(`${env.base}/brand/logo`)).arrayBuffer()), png);
+  // Only Admins brand.
+  const se = await client(env.base, 'se1@t.example');
+  assert.equal((await se.put('/api/settings/branding', { appName: 'Mine' })).status, 403);
+  assert.equal(se.me.branding.letChoose, false);
+  // Back to the defaults for the other tests.
+  await admin.put('/api/settings/branding', { appName: 'FTR Credits', tagline: 'Command Center', look: 'aurora', letChoose: true, menu: 'left', accent: '', logo: null, icon: null });
+});

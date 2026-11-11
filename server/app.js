@@ -19,6 +19,7 @@ import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
 import { IntegrityService } from './integrity/service.js';
+import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
 import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
 import { recoverDataDir } from './recover.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
@@ -237,6 +238,75 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
 
   // ---- Health and sign-in ------------------------------------------------------------------------------
   r('GET', '/healthz', () => ({ ok: true, version: VERSION, mz: MZ_SOURCE.label }));
+  // ---- Branding (Settings → Branding, server/branding.js): what every page shows, even before signing in ------------
+  const branding = () => ({ ...DEFAULT_BRANDING, ...(settings.value.branding ?? {}) });
+  const brandingView = () => publicBranding(branding(), settings.value.theme);
+  r('GET', '/api/branding', () => brandingView());
+  const brandImage = (key, fallback) => (req, ctx, body, res) => {
+    const img = branding()[key];
+    if (img?.data) return send(res, 200, Buffer.from(img.data, 'base64'), imageHeaders(img));
+    if (fallback) return send(res, 200, fs.readFileSync(path.join(PUBLIC_DIR, fallback)), { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=3600' });
+    return send(res, 404, { error: 'No logo is set.' });
+  };
+  r('GET', '/brand/logo', brandImage('logo'));
+  r('GET', '/brand/icon', brandImage('icon', 'favicon.svg'));
+  /** Saved as it changes. Everything is checked first, so a refused change leaves what was there (the last good one). */
+  r('PUT', '/api/settings/branding', perm('settings.manage'), async (req, ctx, body) => {
+    const next = branding();
+    const theme = { ...(settings.value.theme ?? { mode: 'light', accent: 'aurora' }) };
+    const changed = [];
+    if (body?.appName !== undefined) {
+      next.appName = clean(body.appName, 40) || DEFAULT_BRANDING.appName;
+      changed.push('app name');
+    }
+    if (body?.tagline !== undefined) {
+      next.tagline = clean(body.tagline, 40);
+      changed.push('tagline');
+    }
+    if (body?.organisationName !== undefined) {
+      const org = clean(body.organisationName, 120);
+      if (!org) throw fail(400, 'Give the company name: it is on every report.');
+      settings.value.organisationName = org;
+      changed.push('company name');
+    }
+    if (body?.accent !== undefined) {
+      next.accent = cleanColour(body.accent);
+      changed.push('accent colour');
+    }
+    if (body?.look !== undefined) {
+      if (!LOOKS.includes(body.look)) throw fail(400, 'Choose one of the looks.');
+      theme.accent = body.look;
+      changed.push('look');
+    }
+    if (body?.mode !== undefined) {
+      if (!['light', 'dark', 'system'].includes(body.mode)) throw fail(400, 'Choose light, dark or system.');
+      theme.mode = body.mode;
+      changed.push('mode');
+    }
+    if (body?.letChoose !== undefined) {
+      next.letChoose = body.letChoose === true;
+      changed.push('let people choose');
+    }
+    if (body?.menu !== undefined) {
+      if (!['left', 'top'].includes(body.menu)) throw fail(400, 'Put the menu down the left side or across the top.');
+      next.menu = body.menu;
+      changed.push('menu');
+    }
+    for (const [key, what] of [['logo', 'The logo'], ['icon', 'The browser icon']]) {
+      const v = body?.[key];
+      if (v === undefined) continue;
+      if (v === null) next[key] = null;
+      else if (typeof v?.upload === 'string') next[key] = imageFromUpload(v.upload, what);
+      else if (typeof v?.url === 'string' && v.url.trim()) next[key] = await imageFromUrl(v.url.trim(), what);
+      else throw fail(400, `${what}: upload one, or give an https address.`);
+      changed.push(key);
+    }
+    settings.value.branding = next;
+    settings.value.theme = theme;
+    settings.save();
+    record(ctx, req, 'settings.branding', changed.join(', '), { changed });
+    return { ...brandingView(), organisationName: settings.value.organisationName, logoFrom: next.logo?.from ?? '', iconFrom: next.icon?.from ?? '', logoBytes: next.logo?.bytes ?? 0, iconBytes: next.icon?.bytes ?? 0 };
+  });
 
   r('POST', '/api/auth/signin', async (req, ctx, body, res) => {
     const ip = ipOf(req);
@@ -412,6 +482,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       versionLabel: versionLabel(),
       prefs: ctx.user.prefs ?? {},
       theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
+      branding: brandingView(),
       mz: MZ_SOURCE.label,
     };
   });
@@ -1389,6 +1460,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     versionLabel: versionLabel(),
     prefs: { mode: ctx.user.prefs?.mode, accent: ctx.user.prefs?.accent },
     theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
+    branding: brandingView(),
   }));
   r('GET', '/api/projections/read', calcTeam, (req, ctx, body, res, url) => calc.readView(ctx.user.id, url.searchParams.get('since')));
   r('POST', '/api/projections/series', calcTeam, (req, ctx, body) => calc.series(ctx.user.id, body));
@@ -1555,7 +1627,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         const origin = req.headers.origin;
         // The page's own address (whatever name or IP it was opened by), or PUBLIC_URL (behind a proxy that changes Host).
         if (origin && !sameSite(origin, req)) throw fail(403, 'That request came from another site.');
-        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') ? CALC_LIMIT : BODY_LIMIT);
+        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') ? CALC_LIMIT : pathname === '/api/settings/branding' ? 512 * 1024 : BODY_LIMIT);
       }
       let result;
       for (const h of match.handlers) result = await h(req, ctx, body, res, url, match.params);

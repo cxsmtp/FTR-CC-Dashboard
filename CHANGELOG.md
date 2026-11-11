@@ -2,6 +2,18 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.19.00 — 2026-11-11
+
+- **Branding (Settings → Branding), as in CxMissionZero**, saved as you type:
+  - the **app name** and the line under it, and the **company name** (on every report);
+  - the **company logo** and the **browser icon**: uploaded (PNG, JPEG, SVG or WebP, up to 200 KB) or from an https address, fetched once and kept on the server; an SVG is served so that nothing in it runs;
+  - an **accent colour**, or the look’s own;
+  - the **look of the app** for everyone, picked from cards that preview each look (light, dark or system);
+  - **Let people choose their own look**: off, everyone sees the organisation’s look and Theme is not offered;
+  - the **menu** down the left side or across the top.
+  It applies everywhere at once, the sign-in page, the dashboard and the calculator included. A change the server refuses (an image too large or not an image, an address that is not https or leads to a private network, a colour that is not one) is not saved: the last good setting stays, and the page says why.
+- The look for everyone and the company name moved here from General, so they are in one place.
+
 ## CC-01.18.00 — 2026-11-11
 
 - **A top bar on every page, as in CxMissionZero.** **Jump to…** (or Ctrl K) finds a page, an account or a person as you type, and opens it with Enter. **↻** refreshes the page. Lights show at a glance whether you are connected to Checkmarx One (and to which tenant), whether email is set up and tested, whether git hosts are allowed for Fusion, and, for Admins, when a newer version is ready or the software integrity check failed; each opens where it is fixed. **◑** switches light and dark. Your name and role open a menu with Theme, Quick guide, About and Sign out. The calculator has the same bar.

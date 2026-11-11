@@ -111,12 +111,43 @@ try {
 } catch {
   applyTheme('light', 'aurora');
 }
-/** The signed-in person's look: theirs, else the organisation's. */
+/** The signed-in person's look: theirs (when people may choose), else the organisation's. */
 function applyMyTheme() {
   const me = state.me;
   if (!me) return;
-  applyTheme(me.prefs?.mode ?? me.theme?.mode ?? 'light', me.prefs?.accent ?? me.theme?.accent ?? 'aurora');
+  if (me.branding) state.branding = me.branding;
+  const own = state.branding?.letChoose !== false;
+  applyTheme((own && me.prefs?.mode) || me.theme?.mode || 'light', (own && me.prefs?.accent) || me.theme?.accent || 'aurora');
+  applyBranding();
 }
+// ---- Branding (Settings → Branding): the name, the logo, the browser icon, the accent and where the menu sits --------
+state.branding = null;
+const brandHtml = () => {
+  const b = state.branding ?? {};
+  return `<div class="brand"><div class="logo${b.logo ? ' img' : ''}">${b.logo ? `<img src="${esc(b.logo)}" alt="" />` : LOGO}</div><div><b>${esc(b.appName ?? 'FTR Credits')}</b><span>${esc(b.tagline ?? 'Command Center')}</span></div></div>`;
+};
+function applyBranding(b = state.branding) {
+  if (!b) return;
+  state.branding = b;
+  const root = document.documentElement;
+  root.dataset.menu = b.menu === 'top' ? 'top' : 'left';
+  root.dataset.ownLook = b.letChoose === false ? 'no' : 'yes';
+  // The accent: the look's own, unless the organisation chose a colour.
+  for (const v of ['--cyan', '--violet', '--grad']) root.style.removeProperty(v);
+  if (/^#[0-9a-f]{6}$/i.test(b.accent ?? '')) {
+    root.style.setProperty('--cyan', b.accent);
+    root.style.setProperty('--violet', `color-mix(in srgb, ${b.accent} 70%, #7c3aed)`);
+    root.style.setProperty('--grad', `linear-gradient(120deg, ${b.accent} 0%, color-mix(in srgb, ${b.accent} 60%, #6366f1) 55%, color-mix(in srgb, ${b.accent} 40%, #a855f7) 100%)`);
+  }
+  document.title = `${b.appName ?? 'FTR Credits'} · ${b.tagline || 'Command Center'}`;
+  const fav = document.getElementById('favicon');
+  if (fav && b.icon && fav.getAttribute('href') !== b.icon) fav.setAttribute('href', b.icon);
+  for (const el of document.querySelectorAll('.brand')) el.outerHTML = brandHtml();
+}
+fetch('/api/branding', { credentials: 'same-origin' }).then((r) => r.json()).then((b) => {
+  state.branding ??= b;
+  applyBranding(state.branding);
+}).catch(() => {});
 function themePicker() {
   const me = state.me;
   const dlg = document.createElement('dialog');
@@ -155,7 +186,7 @@ function shell(active, content) {
   $('#app').className = 'app';
   $('#app').innerHTML = `
     <aside class="side">
-      <div class="brand"><div class="logo">${LOGO}</div><div><b>FTR Credits</b><span>Command Center</span></div></div>
+      ${brandHtml()}
       <nav class="nav">
         <div class="label">Insight</div>
         ${link('/overview', 'overview', 'Overview', can('dashboard.view'))}
@@ -374,7 +405,7 @@ function viewLogin() {
   $('#app').innerHTML = `
   <div class="auth fade">
     <section class="pitch">
-      <div class="brand"><div class="logo">${LOGO}</div><div><b>FTR Credits</b><span>Command Center</span></div></div>
+      ${brandHtml()}
       <h1 class="serif">Every credit projection.<br/><em>One command center.</em></h1>
       <p>Work out what each account needs for Triage &amp; Remediation and Checkmarx Fusion, keep every report in one place, and give leaders the full picture across every team and region.</p>
       <div class="feats">
@@ -430,7 +461,7 @@ function viewLogin() {
 // ---- Forgot your password? ------------------------------------------------------------------------------
 function authCard(inner) {
   $('#app').className = 'app bare';
-  $('#app').innerHTML = `<div class="auth fade"><section class="pitch"><div class="brand"><div class="logo">${LOGO}</div><div><b>FTR Credits</b><span>Command Center</span></div></div><h1 class="serif">Back in, <em>safely.</em></h1><p>A link to choose a new password goes to your own work email. It works once, for 30 minutes, and every place you were signed in is signed out when you use it.</p></section><section class="card">${inner}</section></div>`;
+  $('#app').innerHTML = `<div class="auth fade"><section class="pitch">${brandHtml()}<h1 class="serif">Back in, <em>safely.</em></h1><p>A link to choose a new password goes to your own work email. It works once, for 30 minutes, and every place you were signed in is signed out when you use it.</p></section><section class="card">${inner}</section></div>`;
 }
 async function viewForgot(params) {
   const { available } = await api('/api/auth/reset').catch(() => ({ available: false }));
@@ -1491,6 +1522,7 @@ async function viewTeams() {
 let adminTab = 'general';
 const cmpVer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
 const ADMIN_TABS = [
+  ['branding', 'Branding', 'settings.manage'],
   ['general', 'General', 'settings.manage'],
   ['email', 'Email (SMTP)', 'settings.manage'],
   ['sso', 'Single sign-on', 'security.sso'],
@@ -1531,27 +1563,112 @@ async function viewAdmin(tab = adminTab) {
 }
 
 const ADMIN_VIEWS = {
+  async branding() {
+    const [s, b] = await Promise.all([api('/api/settings'), api('/api/branding')]);
+    const look = { accent: b.look ?? 'aurora', mode: b.mode ?? 'light' };
+    $('#tab').innerHTML = `<div class="saved-banner">✓ Changes save as you type.</div>
+      <div class="panel brand-page"><h2>Branding</h2>
+      <form class="form" id="bf" autocomplete="off">
+        <div class="brand-grid">
+          <label class="f">App name<input name="appName" maxlength="40" value="${esc(b.appName)}" /></label>
+          <label class="f">Under the name<input name="tagline" maxlength="40" value="${esc(b.tagline ?? '')}" placeholder="Command Center" /></label>
+          <label class="f">Company name <small>on every report</small><input name="organisationName" maxlength="120" value="${esc(s.organisationName)}" /></label>
+          <label class="f">Accent colour <small>${b.accent ? `<button type="button" class="link" id="accent-reset">the look’s own</button>` : 'the look’s own'}</small><span class="colour"><input type="color" name="accent" value="${esc(b.accent || '#22d3ee')}" /><span id="accent-v">${esc(b.accent || 'From the look')}</span></span></label>
+        </div>
+        <div class="brand-grid two">
+          <div class="f">Company logo <small>https address, or upload one (PNG, JPEG, SVG or WebP, up to 200 KB)</small>
+            <div class="img-pick"><span class="img-prev" id="logo-prev">${b.logo ? `<img src="${esc(b.logo)}" alt="" />` : LOGO}</span><input name="logoUrl" type="url" placeholder="https://acme.com/logo.png" /><label class="btn sm">Upload<input type="file" id="logo-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden /></label>${b.logo ? '<button type="button" class="sm ghost" id="logo-rm">Remove</button>' : ''}</div></div>
+          <div class="f">Browser icon <small>https address, or upload one</small>
+            <div class="img-pick"><span class="img-prev small" id="icon-prev"><img src="${esc(b.icon ?? '/favicon.svg')}" alt="" /></span><input name="iconUrl" type="url" placeholder="https://acme.com/icon.png" /><label class="btn sm">Upload<input type="file" id="icon-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden /></label>${b.icon ? '<button type="button" class="sm ghost" id="icon-rm">Remove</button>' : ''}</div></div>
+        </div>
+        <div class="f">Look of the app <small>Everyone’s look, unless they pick their own under Theme. Every look is kept here to choose from.</small></div>
+        <div class="seg" id="b-modes">${['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${look.mode === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('')}</div>
+        <div class="looks" id="b-looks">${THEMES.map(([id, name, note]) => `<button type="button" class="look-card${look.accent === id ? ' on' : ''}" data-a="${id}"><span class="lc-prev lc-${id}"><i class="lc-side"></i><i class="lc-l1"></i><i class="lc-l2"></i><i class="lc-dot"></i></span><b>${esc(name)}</b><small>${esc(note)}</small></button>`).join('')}</div>
+        <label class="toggle"><input type="checkbox" name="letChoose" ${b.letChoose !== false ? 'checked' : ''} /><span class="tg"></span><span>Let people choose their own look <small>Off: everyone sees the look chosen here, and Theme is not offered.</small></span></label>
+        <label class="f">Menu<select name="menu"><option value="left"${b.menu !== 'top' ? ' selected' : ''}>Down the left side</option><option value="top"${b.menu === 'top' ? ' selected' : ''}>Across the top</option></select></label>
+      </form></div>
+      <div class="saved-foot" id="bsaved">All changes are saved.</div>`;
+    let good = b;
+    const say = (text, bad) => {
+      $('#bsaved').textContent = text;
+      $('#bsaved').classList.toggle('bad', Boolean(bad));
+    };
+    const save = async (patch) => {
+      say('Saving…');
+      try {
+        const r = await api('/api/settings/branding', { method: 'PUT', body: patch });
+        good = r;
+        state.branding = r;
+        state.me.theme = { mode: r.mode, accent: r.look };
+        state.me.branding = r;
+        applyMyTheme();
+        say(`All changes are saved ✓ ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+        return r;
+      } catch (error) {
+        // Refused: the last good setting stays, and the page shows it again.
+        say(`${error.message} The last saved setting is kept.`, true);
+        const f = $('#bf');
+        f.elements.appName.value = good.appName;
+        f.elements.tagline.value = good.tagline ?? '';
+        f.elements.menu.value = good.menu;
+        f.elements.letChoose.checked = good.letChoose !== false;
+        return null;
+      }
+    };
+    const form = $('#bf');
+    let timer = null;
+    for (const name of ['appName', 'tagline', 'organisationName']) form.elements[name].addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => save({ [name]: form.elements[name].value }), 600);
+    });
+    form.elements.accent.addEventListener('change', () => {
+      $('#accent-v').textContent = form.elements.accent.value;
+      save({ accent: form.elements.accent.value });
+    });
+    $('#accent-reset')?.addEventListener('click', async () => (await save({ accent: '' })) && viewAdmin('branding'));
+    form.elements.letChoose.addEventListener('change', () => save({ letChoose: form.elements.letChoose.checked }));
+    form.elements.menu.addEventListener('change', () => save({ menu: form.elements.menu.value }));
+    form.onsubmit = (e) => e.preventDefault();
+    for (const bt of $$('#b-modes [data-m]')) bt.onclick = () => {
+      $$('#b-modes [data-m]').forEach((x) => x.classList.toggle('primary', x === bt));
+      save({ mode: bt.dataset.m });
+    };
+    for (const bt of $$('#b-looks [data-a]')) bt.onclick = () => {
+      $$('#b-looks [data-a]').forEach((x) => x.classList.toggle('on', x === bt));
+      save({ look: bt.dataset.a });
+    };
+    const image = (key, file, url, rm) => {
+      $(file).onchange = async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        if (f.size > 200 * 1024) return say(`${f.name} is ${Math.round(f.size / 1024)} KB: at most 200 KB.`, true);
+        if (await save({ [key]: { upload: await fileToBase64(f) } })) viewAdmin('branding');
+      };
+      form.elements[url].addEventListener('change', async () => {
+        const v = form.elements[url].value.trim();
+        if (v && (await save({ [key]: { url: v } }))) viewAdmin('branding');
+      });
+      if ($(rm)) $(rm).onclick = async () => (await save({ [key]: null })) && viewAdmin('branding');
+    };
+    image('logo', '#logo-file', 'logoUrl', '#logo-rm');
+    image('icon', '#icon-file', 'iconUrl', '#icon-rm');
+  },
+
   async general() {
     const s = await api('/api/settings');
-    $('#tab').innerHTML = `<div class="panel"><h2>Organisation &amp; hosts</h2><form class="form" id="sf">
-      <label class="f">Organisation name on the reports<input name="org" maxlength="120" value="${esc(s.organisationName)}" /></label>
+    $('#tab').innerHTML = `<div class="panel"><h2>Hosts &amp; features <small>The name, logo and look are under Branding</small></h2><form class="form" id="sf">
       <label class="check"><input type="checkbox" name="exports" ${s.features?.exports ? 'checked' : ''} /><span>Allow the two Checkmarx One exports in the calculator <span class="chip warn">off by default</span><small>"Total" and "Fixed vulnerabilities by severity" from Checkmarx One → Analytics, dropped in by hand instead of reading the tenant with an API key. When on, the section stays collapsed until opened.</small></span></label>
-      <div class="look-org"><div class="look-h"><b>The look for everyone</b><small>What people see until they choose their own under Theme. Changes show here at once.</small></div>
-        <div class="seg" id="org-modes">${['light', 'dark', 'system'].map((m) => `<button type="button" data-m="${m}" class="${(s.theme?.mode ?? 'light') === m ? 'primary' : ''}">${m[0].toUpperCase()}${m.slice(1)}</button>`).join('')}</div>
-        <div class="swatches mt" id="org-accents">${THEMES.map(([id, name, note]) => `<button type="button" class="swatch${(s.theme?.accent ?? 'aurora') === id ? ' on' : ''}" data-a="${id}"><span class="sw sw-${id}"></span><b>${name}</b><small>${note}</small></button>`).join('')}</div>
-        <div class="flex mt"><button type="button" id="org-all">Apply to everyone now</button><span class="muted small">Replaces each person’s own choice with this one; they can still choose again.</span></div></div>
+
       <div class="row"><label class="f">Salesforce hosts${s.fromEnvironment.salesforce ? ' (set by SALESFORCE_HOSTS)' : ''}<textarea name="sfh" rows="3" ${s.fromEnvironment.salesforce ? 'disabled' : ''}>${esc(s.effective.salesforce.join('\n'))}</textarea></label>
       <label class="f">Checkmarx One hosts${s.fromEnvironment.cxone ? ' (set by CXONE_ALLOWED_HOSTS)' : ''}<textarea name="cxh" rows="3" ${s.fromEnvironment.cxone ? 'disabled' : ''}>${esc(s.effective.cxone.join('\n'))}</textarea></label>
       <label class="f">Git hosts${s.fromEnvironment.git ? ' (set by GIT_ALLOWED_HOSTS)' : ''}<textarea name="gh" rows="3" ${s.fromEnvironment.git ? 'disabled' : ''}>${esc(s.effective.git.join('\n'))}</textarea></label></div>
       <p class="muted small">A host here also allows every name below it (force.com allows acme.lightning.force.com). Private and link-local addresses are never called, whatever is listed.</p>
       <div class="flex"><span class="small muted" id="ssaved">Saved as you change it.</span><span class="err" id="serr"></span></div></form></div>`;
     // Saved as it changes; a value the server refuses goes back to the last one saved.
-    const look = { mode: s.theme?.mode ?? 'light', accent: s.theme?.accent ?? 'aurora' };
     let good = s;
-    const preview = () => applyTheme(look.mode, look.accent);
-    const save = async (extra = {}) => {
+    const save = async () => {
       const f = new FormData($('#sf'));
-      const body = { organisationName: f.get('org'), theme: { ...look, ...extra }, features: { exports: f.get('exports') === 'on' } };
+      const body = { features: { exports: f.get('exports') === 'on' } };
       if (!s.fromEnvironment.salesforce) body.salesforceHosts = f.get('sfh');
       if (!s.fromEnvironment.cxone) body.cxoneHosts = f.get('cxh');
       if (!s.fromEnvironment.git) body.gitHosts = f.get('gh');
@@ -1559,12 +1676,10 @@ const ADMIN_VIEWS = {
         good = await api('/api/settings', { method: 'PUT', body });
         $('#serr').textContent = '';
         $('#ssaved').textContent = `Saved \u2713 ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-        state.me.theme = { ...look };
         return true;
       } catch (error) {
         $('#serr').textContent = `${error.message} Back to what was saved.`;
         const form = $('#sf');
-        form.elements.org.value = good.organisationName;
         form.elements.exports.checked = Boolean(good.features?.exports);
         return false;
       }
@@ -1581,26 +1696,6 @@ const ADMIN_VIEWS = {
       clearTimeout(timer);
       save();
     });
-    for (const b of $$('#org-modes [data-m]')) b.onclick = () => {
-      look.mode = b.dataset.m;
-      $$('#org-modes [data-m]').forEach((x) => x.classList.toggle('primary', x === b));
-      if (!state.me.prefs?.mode) preview();
-      save();
-    };
-    for (const b of $$('#org-accents [data-a]')) b.onclick = () => {
-      look.accent = b.dataset.a;
-      $$('#org-accents [data-a]').forEach((x) => x.classList.toggle('on', x === b));
-      if (!state.me.prefs?.accent) preview();
-      save();
-    };
-    $('#org-all').onclick = async () => {
-      if (!confirm('Apply this look to everyone now? Each person\u2019s own choice is replaced; they can still choose again under Theme.')) return;
-      if (await save({ applyToAll: true })) {
-        state.me.prefs = { ...(state.me.prefs ?? {}), mode: undefined, accent: undefined };
-        preview();
-        toast('Everyone now has this look.', 'ok');
-      }
-    };
   },
 
   async email() {

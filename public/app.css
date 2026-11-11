@@ -644,3 +644,63 @@ dialog.jumpd { width: min(640px, 94vw); padding: 0; margin-top: 12vh; }
 .jd-list small { display: block; color: var(--muted); font-size: 12px; }
 @media (max-width: 1100px) { .tb-lights { display: none; } .jump { min-width: 0; } .jump span, .jump kbd { display: none; } }
 :root[data-accent="command"] .topbar { top: 30px; background: rgba(2, 12, 6, .85); }
+
+/* ---- Branding ---------------------------------------------------------------------------------------------------- */
+.brand .logo.img { background: none; box-shadow: none; overflow: hidden; }
+.brand .logo img { width: 100%; height: 100%; object-fit: contain; }
+.brand-page .form { gap: 18px; }
+.brand-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.brand-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.brand-page .f small { color: var(--muted); font-weight: 400; }
+.colour { display: flex; align-items: center; gap: 10px; }
+.colour input[type="color"] { width: 64px; height: 38px; padding: 3px; }
+.img-pick { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.img-pick input[type="url"] { flex: 1; }
+.img-prev { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--line); background: var(--grad); overflow: hidden; }
+.img-prev img { width: 100%; height: 100%; object-fit: contain; background: var(--panel-solid); }
+.img-prev svg { width: 24px; height: 24px; }
+.img-prev.small { width: 36px; height: 36px; background: var(--panel-solid); }
+.looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.look-card { display: grid; gap: 4px; justify-items: start; align-content: start; padding: 10px; border-radius: 16px; text-align: left; white-space: normal; background: var(--panel-hi); }
+.look-card.on { border-color: var(--cyan); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 25%, transparent); background: var(--panel-solid); }
+.look-card b { margin-top: 4px; }
+.look-card small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.lc-prev { position: relative; display: block; width: 100%; height: 64px; border-radius: 10px; overflow: hidden; background: var(--lc-paper); }
+.lc-prev i { position: absolute; display: block; }
+.lc-side { left: 0; top: 0; bottom: 0; width: 26%; background: var(--lc-side); }
+.lc-l1 { left: 34%; top: 14px; width: 40%; height: 7px; border-radius: 4px; background: var(--lc-ink); }
+.lc-l2 { left: 34%; top: 28px; width: 52%; height: 4px; border-radius: 4px; background: var(--lc-line); }
+.lc-dot { right: 12px; bottom: 10px; width: 14px; height: 14px; border-radius: 50%; background: var(--lc-accent); box-shadow: 0 0 10px var(--lc-accent); }
+.lc-aurora { --lc-paper: #f4f6fd; --lc-side: #0b1024; --lc-ink: #121735; --lc-line: #c7cde8; --lc-accent: linear-gradient(120deg, #22d3ee, #8b5cf6); }
+.lc-aurora .lc-dot, .lc-ocean .lc-dot, .lc-emerald .lc-dot, .lc-sunset .lc-dot, .lc-royal .lc-dot, .lc-graphite .lc-dot { background: var(--lc-accent); }
+.lc-ocean { --lc-paper: #eef6fb; --lc-side: #0c2340; --lc-ink: #0b2545; --lc-line: #bcd4e6; --lc-accent: linear-gradient(120deg, #0ea5e9, #2563eb); }
+.lc-emerald { --lc-paper: #effaf5; --lc-side: #06291e; --lc-ink: #073b2a; --lc-line: #bfe3d2; --lc-accent: linear-gradient(120deg, #10b981, #0d9488); }
+.lc-sunset { --lc-paper: #fff6ee; --lc-side: #2a1308; --lc-ink: #3b1a0a; --lc-line: #f2d2bb; --lc-accent: linear-gradient(120deg, #f59e0b, #e11d48); }
+.lc-royal { --lc-paper: #f5f3ff; --lc-side: #1e1546; --lc-ink: #221a4d; --lc-line: #d6cff5; --lc-accent: linear-gradient(120deg, #6366f1, #d946ef); }
+.lc-graphite { --lc-paper: #f3f4f6; --lc-side: #1f2937; --lc-ink: #111827; --lc-line: #d1d5db; --lc-accent: linear-gradient(120deg, #475569, #2563eb); }
+.lc-command { --lc-paper: #03100a; --lc-side: #021208; --lc-ink: #39ff88; --lc-line: rgba(57, 255, 136, .35); --lc-accent: #ffb000; background: repeating-linear-gradient(90deg, rgba(57, 255, 136, .12) 0 1px, transparent 1px 10px), var(--lc-paper); }
+.toggle { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-hi); cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle .tg { position: relative; width: 42px; height: 24px; flex: none; border-radius: 999px; background: var(--line-hi); transition: background .2s; }
+.toggle .tg::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .2s; }
+.toggle input:checked + .tg { background: var(--cyan); }
+.toggle input:checked + .tg::after { transform: translateX(18px); }
+.toggle input:focus-visible + .tg { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.toggle small { display: block; color: var(--muted); font-size: 12px; }
+.saved-foot { position: sticky; bottom: 12px; margin-top: 14px; padding: 10px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-solid); font-size: 13px; color: var(--muted); box-shadow: var(--shadow); }
+.saved-foot.bad { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+@media (max-width: 1000px) { .brand-grid, .brand-grid.two { grid-template-columns: 1fr; } }
+/* People may not choose their own look: Theme is not offered. */
+:root[data-own-look="no"] #theme, :root[data-own-look="no"] #tb-mode { display: none !important; }
+/* The menu across the top */
+:root[data-menu="top"] .app:not(.bare) { grid-template-columns: 1fr; }
+:root[data-menu="top"] .side { position: sticky; top: 0; z-index: 30; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px clamp(16px, 3vw, 40px); border-right: 0; border-bottom: 1px solid var(--line); }
+:root[data-menu="top"] .side .brand { padding: 0 10px 0 0; }
+:root[data-menu="top"] .side .nav { display: flex; flex-wrap: wrap; gap: 2px; }
+:root[data-menu="top"] .side .nav .label, :root[data-menu="top"] .side .side-links, :root[data-menu="top"] .side .side-lic { display: none; }
+:root[data-menu="top"] .side .nav a { padding: 7px 10px; }
+:root[data-menu="top"] .side .nav a.on { box-shadow: inset 0 -2px 0 var(--cyan); }
+:root[data-menu="top"] .side .guide-nav { margin: 0 0 0 auto; }
+:root[data-menu="top"] .side .ver { margin: 0; }
+:root[data-menu="top"] .side .bgwork { margin: 0; }
+:root[data-menu="top"] .topbar { top: 57px; }
