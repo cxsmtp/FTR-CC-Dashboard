@@ -25,7 +25,7 @@ export const PERMISSIONS = [
   { id: 'dashboard.export', group: 'Dashboards', label: 'Export', description: 'Download the accounts and reports in scope as CSV.' },
   { id: 'scope.all', group: 'Scope', label: 'See every team', description: 'Every team and account, whatever team they are in (Executives, Admins).' },
   { id: 'teams.manage', group: 'Administration', label: 'Manage teams', description: 'Create, rename, move and remove teams and choose their leaders.' },
-  { id: 'users.manage', group: 'Administration', label: 'Manage people', description: 'Invite people, give them a role and a team, reset their password, deactivate them; never beyond their own permissions.' },
+  { id: 'users.manage', group: 'Administration', label: 'Manage people', description: 'Invite people into the teams in their scope, give them a role and a team, reset their password, unlock them, sign them out, turn them off; never beyond their own permissions.' },
   { id: 'roles.manage', group: 'Administration', label: 'Manage roles', description: 'Create and change roles; never with permissions they do not hold.' },
   { id: 'audit.view', group: 'Administration', label: 'See the audit log', description: 'Who signed in, who changed what, every report generated and shared.' },
   { id: 'security.https', group: 'Administration', label: 'HTTPS and certificates', description: 'Upload and replace the server certificate, get one from Let\u2019s Encrypt, and move the server from http to HTTPS only. Admin only.', special: true },
@@ -38,8 +38,8 @@ export const PERMISSION_IDS = PERMISSIONS.map((p) => p.id);
 
 export const DEFAULT_ROLES = {
   admin: { name: 'Admin', description: 'Everything: people, teams, roles, settings and every account.', permissions: PERMISSION_IDS, builtin: true, locked: true },
-  executive: { name: 'Executive', description: 'Every team and account, read and work on them, and export. Not administration.', permissions: ['calculator.use', 'reports.share', 'reports.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view'], builtin: true },
-  leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports.', permissions: ['calculator.use', 'reports.share', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export'], builtin: true },
+  executive: { name: 'Executive', description: 'Every team and account: work on them, export, and manage people, teams and roles everywhere. Not the Admin settings.', permissions: ['calculator.use', 'reports.share', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'scope.all', 'audit.view', 'users.manage', 'teams.manage', 'roles.manage'], builtin: true },
+  leader: { name: 'Leader', description: 'Their own team and every team below the ones they lead: dashboards, projections, primary and shared reports, and their people (invite, change, reset, turn off).', permissions: ['calculator.use', 'reports.share', 'reports.delete', 'accounts.delete', 'dashboard.view', 'dashboard.export', 'users.manage'], builtin: true },
   se: { name: 'Sales Engineer', description: 'Their team’s accounts: generate projections, mark the primary report and record what was shared with the customer.', permissions: ['calculator.use', 'reports.share', 'dashboard.view'], builtin: true },
   viewer: { name: 'Viewer', description: 'Read only: the dashboards of their team (and teams they lead).', permissions: ['dashboard.view'], builtin: true },
 };

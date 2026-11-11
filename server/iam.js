@@ -60,6 +60,7 @@ export class Iam {
     this.doc = new Doc(path.join(dataDir, 'iam.json'), () => ({ roles: {}, users: [] }));
     this.sessions = new Doc(path.join(dataDir, 'sessions.json'), () => ({ sessions: {} }));
     this.#normalise();
+    if (this.migrated) this.save();
   }
 
   #normalise() {
@@ -75,6 +76,17 @@ export class Iam {
     }
     raw.roles = roles;
     raw.users = Array.isArray(raw.users) ? raw.users.filter((u) => u?.id && u?.email) : [];
+    // Changes to the built-in roles a newer version makes, once each (as CxMissionZero migrates its roles).
+    raw.migrations = Array.isArray(raw.migrations) ? raw.migrations : [];
+    if (!raw.migrations.includes('cc-1.2-people')) {
+      const add = (id, perms) => {
+        if (roles[id]) roles[id].permissions = [...new Set([...roles[id].permissions, ...perms])];
+      };
+      add('leader', ['users.manage']);
+      add('executive', ['users.manage', 'teams.manage', 'roles.manage', 'accounts.delete']);
+      raw.migrations.push('cc-1.2-people');
+      this.migrated = true;
+    }
   }
 
   save() {
@@ -131,12 +143,17 @@ export class Iam {
   }
 
   /** A new person with a temporary password, returned once: they choose their own at first sign-in. */
-  async create({ email, name, role, teamId = null, title = '' }) {
+  async create({ email, name, role, teamId = null, title = '', password = '' }) {
     const address = norm(email);
     if (!EMAIL.test(address)) throw fail(400, 'Give a valid email address.');
     if (this.byEmail(address)) throw fail(409, 'Someone with that email already has access.');
     if (!this.doc.value.roles[role]) throw fail(400, 'Choose a role.');
-    const temporary = generatePassword();
+    // A temporary password typed by whoever adds them (checked like any other), or one made here.
+    if (password) {
+      const problem = passwordProblem(password, address);
+      if (problem) throw fail(400, `Temporary password: ${problem}`);
+    }
+    const temporary = password || generatePassword();
     const user = { id: randomUUID(), email: address, name: clean(name) || address.split('@')[0], title: clean(title), role, teamId, active: true, passwordHash: await hashPassword(temporary), mustChangePassword: true, createdAt: new Date().toISOString(), failed: 0, lockedUntil: 0, lastSignInAt: null, guideSeenAt: null };
     this.users().push(user);
     this.save();
@@ -193,6 +210,19 @@ export class Iam {
     if (await checkPassword(next, user.passwordHash)) throw fail(400, 'Choose a password different from the current one.');
     Object.assign(user, { passwordHash: await hashPassword(next), mustChangePassword: false, failed: 0, lockedUntil: 0, passwordChangedAt: new Date().toISOString() });
     this.save();
+  }
+
+  /** After 5 wrong passwords an account waits 15 minutes; whoever manages it can lift that at once. */
+  unlock(id) {
+    const user = this.byId(id);
+    if (!user) throw fail(404, 'That person no longer has access.');
+    Object.assign(user, { failed: 0, lockedUntil: 0 });
+    this.save();
+  }
+
+  sessionsOf(userId) {
+    const now = Date.now();
+    return Object.values(this.sessions.value.sessions).filter((s) => s.userId === userId && now - s.lastUsedAt <= s.idleMs).length;
   }
 
   markGuideSeen(id) {
@@ -282,4 +312,6 @@ export class Iam {
 }
 
 /** What the browser may see of a person: never the password hash or lock state. */
-export const publicUser = (u) => (u ? { id: u.id, email: u.email, name: u.name, title: u.title ?? '', role: u.role, teamId: u.teamId ?? null, active: u.active !== false, mustChangePassword: Boolean(u.mustChangePassword), createdAt: u.createdAt, lastSignInAt: u.lastSignInAt ?? null } : null);
+/** How a person stands, as MZ shows it: active, locked (too many wrong passwords), off, or still to set their password. */
+export const statusOf = (u, now = Date.now()) => (u.active === false ? 'disabled' : u.lockedUntil > now ? 'locked' : u.mustChangePassword ? 'pending' : 'active');
+export const publicUser = (u) => (u ? { id: u.id, email: u.email, name: u.name, title: u.title ?? '', role: u.role, teamId: u.teamId ?? null, active: u.active !== false, mustChangePassword: Boolean(u.mustChangePassword), status: statusOf(u), lockedUntil: u.lockedUntil > Date.now() ? new Date(u.lockedUntil).toISOString() : null, signIn: u.lastSignInMethod ?? (u.ssoCreated ? 'sso' : 'password'), createdAt: u.createdAt, lastSignInAt: u.lastSignInAt ?? null } : null);

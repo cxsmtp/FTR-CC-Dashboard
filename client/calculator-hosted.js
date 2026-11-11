@@ -90,7 +90,7 @@ export function startHosted() {
     if (work) busy.start(work);
     let answer;
     try {
-      answer = await server(url.pathname + url.search, { method, body: options.body });
+      answer = await server(url.pathname + url.search, { method, body: options.body, headers: method === 'POST' && url.pathname === '/api/projections/read' && account ? { 'X-Account': account.id } : {} });
     } catch (error) {
       if (method === 'POST' && url.pathname === '/api/projections/reports') busy.report(false);
       throw error;
@@ -143,14 +143,15 @@ export function startHosted() {
       const label = job ? job.label : labels[labels.length - 1];
       const pct = job?.total ? Math.min(100, Math.round((job.done / job.total) * 100)) : null;
       el.hidden = false;
-      el.innerHTML = `<span class="hc-orbit"><i></i><i></i></span><b>${esc(label)}…</b>${job?.detail ? `<span>${esc(job.detail)}</span>` : ''}${pct !== null ? `<span class="hc-bar"><i></i></span><span>${pct}%</span>` : ''}`;
+      el.innerHTML = `<span class="hc-orbit"><i></i><i></i></span><b>${esc(label)}…</b>${job?.detail ? `<span>${esc(job.detail)}</span>` : ''}${pct !== null ? `<span class="hc-bar"><i></i></span><span>${pct}%</span>` : ''}${reading ? '<span class="hc-away">Runs on the server: you can leave this page and come back.</span>' : ''}`;
       if (pct !== null) el.querySelector('.hc-bar i').style.width = `${pct}%`;
     };
     const showOverlay = () => {
       shownAt = Date.now();
       overlay = document.createElement('div');
-      overlay.className = 'hc-overlay';
-      overlay.innerHTML = `<div class="hc-card"><div class="hc-orbit big"><i></i><i></i><i></i></div><h2>Generating the projection report</h2><ol class="hc-steps"><li class="on">Collecting the figures</li><li>Working out the credits and bundles</li><li>Writing the report</li></ol><p class="hc-note"></p></div>`;
+      // A card in the corner, not a wall: everything stays usable while the report is made.
+      overlay.className = 'hc-overlay hc-corner';
+      overlay.innerHTML = `<div class="hc-card"><div class="hc-orbit big"><i></i><i></i><i></i></div><h2>Generating the projection report</h2><p class="hc-sub">Keep working: it is saved to the account's reports when ready.</p><ol class="hc-steps"><li class="on">Collecting the figures</li><li>Working out the credits and bundles</li><li>Writing the report</li></ol><p class="hc-note"></p></div>`;
       document.body.append(overlay);
       const steps = overlay.querySelectorAll('.hc-steps li');
       [350, 750].forEach((ms, i) => setTimeout(() => steps[i + 1]?.classList.add('on'), ms));
@@ -486,7 +487,7 @@ export function startHosted() {
     shell.classList.toggle('can-read', connected);
     $('sa-disconnect').hidden = !connected;
     $('sa-key').placeholder = connected ? 'Connected: paste another key to switch' : 'Paste the API key (not kept: in memory for your session only)';
-    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : 'Not connected. A prospect not on Checkmarx One: use Fusion · from Git or Fusion · cloc-fusion, or the two exports.', connected ? 'ok' : 'muted');
+    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : `Not connected. A prospect not on Checkmarx One: use Fusion · from Git or Fusion · cloc-fusion${cfg.exportsEnabled ? ', or the two exports' : ''}.`, connected ? 'ok' : 'muted');
     calculator.refresh();
   };
   $('sa-connect').addEventListener('submit', async (event) => {
@@ -516,6 +517,19 @@ export function startHosted() {
   });
   server('/api/cc/cxone/status').then(showState, (error) => setStatus('sa-connect-status', error.message, 'error'));
 
+  // The two Checkmarx One exports: behind the Admin's flag (off by default); when on, always collapsed until opened by hand.
+  const alt = document.getElementById('calc-alt');
+  if (alt) {
+    if (!cfg.exportsEnabled) alt.hidden = true;
+    else {
+      let byHand = 0;
+      alt.querySelector('summary')?.addEventListener('click', () => (byHand = Date.now()));
+      alt.open = false;
+      new MutationObserver(() => {
+        if (alt.open && Date.now() - byHand > 600) alt.open = false;
+      }).observe(alt, { attributes: true, attributeFilter: ['open'] });
+    }
+  }
   const impactTab = document.querySelector('[data-ptabs="calculator"] [data-pt="impact"]');
   if (impactTab) impactTab.innerHTML = 'Impact <i class="hc-beta">beta</i>';
   for (const hint of document.querySelectorAll('#page-calculator .hint')) if (hint.textContent.includes('They start from Settings → Impact')) hint.textContent = 'Kept with this account: the minutes to triage and to remediate a finding by hand, and the developers\u2019 hourly rate, in the currency confirmed above.';

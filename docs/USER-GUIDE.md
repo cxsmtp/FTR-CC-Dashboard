@@ -43,7 +43,7 @@ Teams form a tree (Global → EMEA → …). The Admin sets it up under **Teams*
    - **A prospect not on Checkmarx One (Fusion forecast):**
      - **Fusion · from Git:** paste a **read-only** token for GitHub, GitLab, Bitbucket or Azure DevOps, pick the organisations and repositories, and count. The token is used only while the count runs.
      - **Fusion · cloc-fusion:** **Download cloc-fusion** and send it to the customer. They run it where their code is and send back the report, which you import here. Their code never leaves them.
-     - Or drop the two weekly exports from Checkmarx One → Analytics.
+     - Or, if an Admin turned it on (Settings → General), drop the two weekly exports from Checkmarx One → Analytics in the collapsed section.
 6. Check the figures: Triage & remediation, the Fusion tab used (**Use this instead** picks which one counts), the extra % and bundles.
 7. **Generate projection report.** It downloads the HTML report, and **Download PDF summary** gives the pages to present. Make as many reports as you need: each is kept.
 
@@ -79,6 +79,24 @@ Open **Accounts**, then the account:
 - **Overview:** the credits projected from each account's primary report (T&R and Fusion), accounts with a report, reports generated, reports shared with customers, and accounts still missing a Salesforce link. The team tree rolls up every team below. **Click a team** to see its accounts, or **an SE** to see theirs. **All my teams ▾** narrows everything to one team.
 - **Accounts:** search and filter by team, SE and status (missing Salesforce link, no report, not shared, shared, no primary). The **Opportunity/Account** chip opens Salesforce in a new tab. Click a row for the account's reports.
 - **Accounts CSV / Reports CSV:** export what you see, for a forecast call or a spreadsheet.
+
+## 5b. People & roles (Leaders, Executives, Admins)
+
+**People & roles** in the menu:
+- **People:**
+  - **Add person** with their role, team and a temporary password (typed, or **Generate**), with an optional welcome email.
+  - Filter by role, team and status: active, locked, off, or must set password.
+  - **Manage** on a row: edit role, team or name; reset password; unlock now; sign out everywhere; turn access off; remove.
+  - Leaders manage the people in the teams they lead; Executives and Admins manage everyone. Nobody can give a role with more than they hold.
+- **Roles & permissions:**
+  - the matrix of what each role may do, with search and "show only the differences";
+  - Executives and Admins tick and **Save role changes**, or make a **New role** (optionally starting from another);
+  - Admin-only permissions (HTTPS, single sign-on, updates, backups, settings) stay with Admins.
+- **Sign-in:** who may reset a forgotten password by email, single sign-on, and when idle sessions end.
+
+### Reading in the background
+
+Reading a large Checkmarx One tenant can take a while. It runs on the server, so you can leave the calculator and work elsewhere. The menu shows **Reading Checkmarx One** with its progress, then **Data for … is ready**. Click it, and the data is put into that account, ready for **Generate projection report**. Generating a report never blocks the page either: a small card in the corner follows it.
 
 ## 6. Admins
 

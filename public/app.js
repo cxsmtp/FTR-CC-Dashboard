@@ -156,7 +156,7 @@ function shell(active, content) {
         <div class="label">Insight</div>
         ${link('/overview', 'overview', 'Overview', can('dashboard.view'))}
         ${link('/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
-        ${link('/people', 'people', 'People')}
+        ${link('/people', 'people', can('users.manage') ? 'People & roles' : 'People')}
         <div class="label">Work</div>
         ${can('calculator.use') ? `<a href="/calculator">${icon('calc')}<span>Calculator</span></a>` : ''}
         ${link('/guide', 'guide', 'Quick guide')}
@@ -165,6 +165,7 @@ function shell(active, content) {
         ${link('/admin', 'admin', 'Settings', ADMIN_TABS.some(([, , p]) => can(p)))}
         ${link('/audit', 'audit', 'Audit log', can('audit.view'))}
       </nav>
+      <a class="bgwork" id="bgwork" hidden></a>
       <div class="me">
         <div class="who"><div class="avatar">${esc(initials(me.user.name))}</div><div><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></div></div>
         <div class="row"><button class="ghost sm" id="theme" title="Theme">${icon('theme')}Theme</button><button class="ghost sm" id="signout">${icon('out')}Sign out</button></div>
@@ -172,6 +173,7 @@ function shell(active, content) {
       <button class="ver" id="ver" title="About, version and what is new">${esc(me.versionLabel ?? '')}</button>
     </aside>
     <main class="main fade" id="main">${content}</main>`;
+  watchWork();
   $('#theme').onclick = themePicker;
   $('#ver').onclick = () => go('/about');
   $('#signout').onclick = signOut;
@@ -184,6 +186,47 @@ async function signOut() {
   go('/login');
 }
 const loading = () => '<div class="loading"><span class="spinner"></span>Loading…</div>';
+
+// ---- Work that runs on the server while people do something else: a Checkmarx One read --------------------------------
+let workTimer = null;
+let workSeen = '';
+async function watchWork() {
+  clearTimeout(workTimer);
+  if (!can('calculator.use') || !state.me) return;
+  let w;
+  try {
+    w = await api('/api/cc/work');
+  } catch {
+    return;
+  }
+  const el = $('#bgwork');
+  const r = w.read;
+  const name = r?.account?.name ?? 'an account';
+  const href = r?.account ? `/calculator?team=${encodeURIComponent(r.account.teamId)}&account=${encodeURIComponent(r.account.id)}` : '/calculator';
+  if (el) {
+    if (r?.state === 'running') {
+      const pct = r.total ? Math.min(100, Math.round((r.done / r.total) * 100)) : 0;
+      el.hidden = false;
+      el.className = 'bgwork running';
+      el.href = href;
+      el.innerHTML = `<span class="orbit sm"><i></i><i></i></span><span><b>Reading Checkmarx One</b><small>${esc(name)} · ${r.total ? `${num(r.done)} of ${num(r.total)}` : 'starting'}</small><span class="bar"><i data-w="${pct}"></i></span></span>`;
+      requestAnimationFrame(() => el.querySelector('[data-w]') && (el.querySelector('[data-w]').style.width = `${pct}%`));
+    } else if (r?.state === 'done' && !r.applied) {
+      el.hidden = false;
+      el.className = 'bgwork done';
+      el.href = href;
+      el.innerHTML = `<span class="tick">✓</span><span><b>Data for ${esc(name)} is ready</b><small>${r.projects !== null ? `${num(r.projects)} projects read · ` : ''}open it to generate the report →</small></span>`;
+      if (workSeen === 'running') toast(`Checkmarx One for ${name} is read: open it in the calculator to generate the report.`, 'ok');
+    } else if (r?.state === 'failed' && !r.applied) {
+      el.hidden = false;
+      el.className = 'bgwork failed';
+      el.href = href;
+      el.innerHTML = `<span class="tick">!</span><span><b>The read for ${esc(name)} stopped</b><small>${esc(r.error ?? '')}</small></span>`;
+    } else el.hidden = true;
+  }
+  workSeen = r?.state ?? '';
+  workTimer = setTimeout(watchWork, r?.state === 'running' ? 2500 : 30_000);
+}
 
 // ---- Sign in --------------------------------------------------------------------------------------------
 function viewLogin() {
@@ -656,27 +699,241 @@ async function peopleList() {
   state.people = await api('/api/people');
   return state.people;
 }
-async function viewPeople() {
+// People, roles and sign-in, as CxMissionZero's Access page: for Leaders (their teams), Executives and Admins (everyone).
+let peopleTab = 'people';
+const STATUS = { active: ['ok', 'Active'], locked: ['bad', 'Locked'], disabled: ['bad', 'Off'], pending: ['warn', 'Must set password'] };
+const PAGE = 25;
+async function viewPeople(tab = peopleTab) {
+  peopleTab = ['people', 'roles', 'signin'].includes(tab) ? tab : 'people';
+  if (peopleTab === 'signin' && !can('users.manage')) peopleTab = 'people';
+  if (peopleTab === 'roles' && !(can('users.manage') || can('roles.manage'))) peopleTab = 'people';
+  if (location.hash.split('?')[0] !== `#/people/${peopleTab}`) history.replaceState(null, '', `#/people/${peopleTab}`);
+  const manage = can('users.manage');
   shell('people', loading());
   const d = await peopleList();
+  const tabs = [['people', `People <em>${num(d.people.length)}</em>`], ...(manage || can('roles.manage') ? [['roles', `Roles &amp; permissions <em>${num(d.roles.length)}</em>`]] : []), ...(manage ? [['signin', 'Sign-in']] : [])];
+  $('#main').innerHTML = `<div class="head"><div><h1 class="serif">People</h1><p>${manage ? (can('scope.all') ? 'Everyone who can sign in, and what they may do. You manage people in every team.' : 'The people in the teams you lead. You can invite them, change their role and team, reset passwords, unlock, sign out and turn access off, never beyond your own permissions.') : 'The people in your teams and the teams you lead.'}</p></div></div>
+    <nav class="tabs" role="tablist">${tabs.map(([id, label]) => `<a role="tab" href="#/people/${id}" class="${id === peopleTab ? 'on' : ''}">${label}</a>`).join('')}</nav><div id="ptab"></div>`;
+  if (peopleTab === 'roles') return rolesMatrix(d);
+  if (peopleTab === 'signin') return signInTab();
+  return peopleTable(d);
+}
+
+function peopleTable(d) {
   const manage = can('users.manage');
-  $('#main').innerHTML = `
-    <div class="head"><div><h1 class="serif">People</h1><p>${manage ? 'Invite Sales Engineers and leaders, give them a role and a team, reset passwords and turn access off.' : 'The people in your teams and the teams you lead.'}</p></div>
-      <div class="tools">${manage ? `<button class="primary" id="invite">${icon('plus')}Invite someone</button>` : ''}</div></div>
-    <div class="panel"><div class="flex"><div class="search">${icon('search')}<input id="q" placeholder="Search people" /></div><span class="spacer"></span><span class="muted small">${num(d.people.length)} people</span></div>
-      <div class="tw mt"><table><thead><tr><th>Name</th><th>Role</th><th>Team</th><th>Leads</th><th>Last sign-in</th><th>Status</th>${manage ? '<th></th>' : ''}</tr></thead><tbody id="rows"></tbody></table></div></div>`;
-  const render = () => {
+  const roles = d.roles.filter((r) => r.grantable);
+  const teams = [...d.teams].sort((a, b) => a.path.localeCompare(b.path));
+  let page = 0;
+  $('#ptab').innerHTML = `<div class="panel">
+    <div class="flex"><h2 class="grow-h">People <small>everyone who can sign in, and what they may do</small></h2>${manage ? `<button class="primary" id="add-toggle">${icon('plus')}Add person</button>` : ''}</div>
+    ${manage ? `<form class="form add-form" id="add" hidden autocomplete="off">
+      <div class="row"><label class="f">Work email<input name="email" type="email" required /></label><label class="f">Name<input name="name" maxlength="120" /></label><label class="f">Title<input name="title" maxlength="120" placeholder="Sales Engineer" /></label></div>
+      <div class="row"><label class="f">Role<select name="role">${roles.map((r) => `<option value="${esc(r.id)}"${r.id === 'se' ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+      <label class="f">Team<select name="team" required>${teams.map((t) => `<option value="${esc(t.id)}"${t.id === state.me.team?.id ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label>
+      <label class="f">Temporary password <span class="muted">blank: one is made</span><span class="flex nowrap"><input name="password" autocomplete="off" spellcheck="false" placeholder="They choose their own at first sign-in" /><button type="button" class="sm" id="gen">Generate</button></span></label></div>
+      <label class="check"><input type="checkbox" name="welcome" ${d.mail ? 'checked' : 'disabled'} /><span>Email them a welcome<small>${d.mail ? 'Where to sign in, and how to set their password with "Forgot your password?". The temporary password is never emailed.' : 'Needs the email server (Settings → Email).'}</small></span></label>
+      <div class="flex"><button class="primary" type="submit">Add person</button><button type="button" class="ghost" id="add-cancel">Cancel</button><span class="err" id="add-err"></span></div><div id="add-secret"></div></form>` : ''}
+    <div class="flex mt"><div class="search">${icon('search')}<input id="q" placeholder="Search people, emails, titles" /></div>
+      <select id="f-role"><option value="">All roles</option>${d.roles.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select>
+      <select id="f-team"><option value="">All teams</option>${teams.map((t) => `<option value="${esc(t.id)}">${esc(t.path)}</option>`).join('')}</select>
+      <select id="f-status"><option value="">Any status</option>${Object.entries(STATUS).map(([k, [, l]]) => `<option value="${k}">${l}</option>`).join('')}</select>
+      <span class="spacer"></span><span class="muted small" id="count"></span></div>
+    <div class="tw mt"><table class="people"><thead><tr><th>Person</th><th>Role</th><th>Team</th><th>Sign-in</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="flex pager" id="pager"><span class="muted small" id="pinfo"></span><span class="spacer"></span><button class="sm" id="prev">Previous</button><button class="sm" id="next">Next</button></div></div>`;
+  const list = () => {
     const q = $('#q').value.trim().toLowerCase();
-    $('#rows').innerHTML = d.people
-      .filter((u) => !q || [u.name, u.email, u.team, u.roleName].some((s) => String(s).toLowerCase().includes(q)))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((u) => `<tr data-id="${esc(u.id)}"><td><div class="flex"><span class="avatar sm">${esc(initials(u.name))}</span><div><b>${esc(u.name)}</b><span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td><td>${esc(u.roleName)}</td><td title="${esc(u.teamPath)}">${esc(u.team || "—")}</td><td>${esc(u.leads.join(', ') || '—')}</td><td>${esc(ago(u.lastSignInAt))}</td><td>${!u.active ? '<span class="chip bad"><i></i>Off</span>' : u.mustChangePassword ? '<span class="chip warn"><i></i>Invited</span>' : '<span class="chip ok"><i></i>Active</span>'}</td>${manage ? `<td class="actions"><button class="sm" data-act="edit">Edit</button></td>` : ''}</tr>`)
-      .join('');
-    for (const b of $$('[data-act="edit"]')) b.onclick = () => editPerson(d, d.people.find((u) => u.id === b.closest('tr').dataset.id));
+    const [role, team, status] = [$('#f-role').value, $('#f-team').value, $('#f-status').value];
+    return d.people
+      .filter((u) => !q || [u.name, u.email, u.title, u.team].some((s) => String(s ?? '').toLowerCase().includes(q)))
+      .filter((u) => (!role || u.role === role) && (!team || u.teamId === team) && (!status || u.status === status))
+      .sort((a, b) => a.name.localeCompare(b.name));
   };
-  $('#q').oninput = render;
-  if ($('#invite')) $('#invite').onclick = () => editPerson(d, null);
+  const render = () => {
+    const all = list();
+    const pages = Math.max(1, Math.ceil(all.length / PAGE));
+    page = Math.min(page, pages - 1);
+    $('#count').textContent = `${num(all.length)} of ${num(d.people.length)}`;
+    $('#pager').hidden = pages < 2;
+    $('#pinfo').textContent = `Page ${page + 1} of ${pages}`;
+    $('#prev').disabled = page === 0;
+    $('#next').disabled = page >= pages - 1;
+    $('#rows').innerHTML = all.slice(page * PAGE, page * PAGE + PAGE).map((u) => {
+      const [kind, label] = STATUS[u.status] ?? STATUS.active;
+      const acts = u.manageable ? `<details class="menu"><summary class="btn sm">Manage</summary><div class="menu-list">
+        <button type="button" data-act="edit">Edit role, team, name</button>
+        <button type="button" data-act="reset">Reset password</button>
+        ${u.status === 'locked' ? '<button type="button" data-act="unlock">Unlock now</button>' : ''}
+        ${u.sessions ? `<button type="button" data-act="signout">Sign out everywhere (${num(u.sessions)})</button>` : ''}
+        <button type="button" data-act="toggle">${u.active ? 'Turn access off' : 'Turn access on'}</button>
+        <button type="button" data-act="remove" class="danger">Remove</button></div></details>` : '';
+      return `<tr data-id="${esc(u.id)}"><td><div class="flex nowrap"><span class="avatar sm">${esc(initials(u.name))}</span><div><b>${esc(u.name)}</b>${u.id === state.me.user.id ? ' <span class="chip">You</span>' : ''}<span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td>
+        <td><span class="chip role">${esc(u.roleName)}</span>${u.leads.length ? `<span class="sub">Leads ${esc(u.leads.join(', '))}</span>` : ''}</td><td title="${esc(u.teamPath)}">${esc(u.team || '—')}</td>
+        <td class="small">${u.signIn === 'sso' ? 'Single sign-on' : 'Password'}</td><td><span class="chip ${kind}"><i></i>${label}</span>${u.lockedUntil ? `<span class="sub">until ${esc(new Date(u.lockedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>` : ''}</td>
+        <td class="small">${esc(ago(u.lastSignInAt))}</td><td class="actions">${acts}</td></tr>`;
+    }).join('') || '<tr><td colspan="7"><div class="empty"><b>Nobody matches</b></div></td></tr>';
+    for (const b of $$('[data-act]')) b.onclick = () => personAction(d, d.people.find((u) => u.id === b.closest('tr').dataset.id), b.dataset.act);
+  };
+  for (const id of ['#q', '#f-role', '#f-team', '#f-status']) $(id)[id === '#q' ? 'oninput' : 'onchange'] = () => ((page = 0), render());
+  $('#prev').onclick = () => (page--, render());
+  $('#next').onclick = () => (page++, render());
+  if (manage) {
+    $('#add-toggle').onclick = () => ($('#add').hidden = !$('#add').hidden);
+    $('#add-cancel').onclick = () => ($('#add').hidden = true);
+    $('#gen').onclick = () => {
+      const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+      const bytes = crypto.getRandomValues(new Uint8Array(20));
+      $('#add [name=password]').value = [...bytes].map((x) => a[x % a.length]).join('').match(/.{5}/g).join('-');
+    };
+    $('#add').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        const r = await api('/api/people', { method: 'POST', body: { email: f.get('email'), name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team'), password: f.get('password'), sendWelcome: f.get('welcome') === 'on' } });
+        $('#add-err').textContent = '';
+        $('#add-secret').innerHTML = `<div class="callout mt"><b>${esc(r.user.email)} can sign in with this temporary password</b><p class="small muted">Give it to them over a channel only they read; it is shown once and they choose their own at first sign-in.${r.welcomed ? ' A welcome email is on its way.' : ''}</p><div class="secret">${esc(r.temporary)}</div></div>`;
+        e.target.reset();
+        d.people = (await peopleList()).people;
+        render();
+      } catch (error) {
+        $('#add-err').textContent = error.message;
+      }
+    };
+  }
   render();
+}
+
+async function personAction(d, u, act) {
+  const path = `/api/people/${encodeURIComponent(u.id)}`;
+  try {
+    if (act === 'edit') return editPerson(d, u);
+    if (act === 'reset') {
+      if (!confirm(`Give ${u.name} a new temporary password? Their current one stops working and they are signed out everywhere.`)) return;
+      const r = await api(`${path}/reset`, { method: 'POST', body: {} });
+      return showTemporary(u.email, r.temporary);
+    }
+    if (act === 'unlock') await api(`${path}/unlock`, { method: 'POST', body: {} });
+    if (act === 'signout') {
+      if (!confirm(`Sign ${u.name} out on every device?`)) return;
+      await api(`${path}/signout`, { method: 'POST', body: {} });
+    }
+    if (act === 'toggle') {
+      if (u.active && !confirm(`Turn off ${u.name}'s access? They are signed out at once; their accounts and reports stay with their team.`)) return;
+      await api(path, { method: 'PUT', body: { active: !u.active } });
+    }
+    if (act === 'remove') {
+      if (!confirm(`Remove ${u.name}? Their accounts and reports stay with their team.`)) return;
+      await api(path, { method: 'DELETE' });
+    }
+    toast('Done.', 'ok');
+    viewPeople('people');
+  } catch (error) {
+    toast(error.message, 'bad');
+  }
+}
+function showTemporary(email, temporary) {
+  const dlg = document.createElement('dialog');
+  dlg.innerHTML = `<form method="dialog"><div class="dh"><h2>New temporary password</h2></div><div class="db"><p class="small muted">For ${esc(email)}. Give it to them over a channel only they read: it is shown once, and they choose their own at sign-in.</p><div class="secret">${esc(temporary)}</div></div><div class="df"><button value="ok" class="primary">Done</button></div></form>`;
+  document.body.append(dlg);
+  dlg.addEventListener('close', () => (dlg.remove(), viewPeople('people')));
+  dlg.showModal();
+}
+
+/** Roles as columns, permissions as rows, MZ's matrix: tick, compare, save; never a permission you do not hold. */
+function rolesMatrix(d) {
+  const edit = can('roles.manage');
+  const groups = [...new Set(d.permissions.map((p) => p.group))];
+  const draft = Object.fromEntries(d.roles.map((r) => [r.id, new Set(r.permissions)]));
+  const editable = (r, p) => edit && !r.locked && !p.special && can(p.id);
+  $('#ptab').innerHTML = `<div class="panel"><div class="flex"><h2 class="grow-h">Roles &amp; permissions <small>changes apply at once to everyone with the role · <span class="chip">Admin only</span> stays with Admins</small></h2>${edit ? `<button id="newrole">${icon('plus')}New role</button>` : ''}</div>
+    <div class="flex mt"><div class="search">${icon('search')}<input id="pq" placeholder="Find a permission" /></div><label class="check inline"><input type="checkbox" id="diff" /><span>Show only the differences</span></label><span class="spacer"></span>${edit ? '<span class="small muted" id="dirty"></span><button class="primary" id="save" disabled>Save role changes</button><button class="ghost" id="discard" disabled>Discard</button>' : '<span class="small muted">Read only: an Executive or Admin changes roles.</span>'}</div>
+    <div class="tw mt matrix-wrap"><table class="matrix"><thead><tr><th>Permission</th>${d.roles.map((r) => `<th class="rc" title="${esc(r.description)}">${esc(r.name)}<span class="sub">${num(r.holders)} ${r.holders === 1 ? 'person' : 'people'}</span>${edit && !r.builtin ? `<button class="sm ghost" data-role-edit="${esc(r.id)}">Edit</button>` : ''}</th>`).join('')}</tr></thead><tbody id="mx"></tbody></table></div></div>`;
+  const render = () => {
+    const q = $('#pq').value.trim().toLowerCase();
+    const diff = $('#diff').checked;
+    $('#mx').innerHTML = groups.map((g) => {
+      const rows = d.permissions.filter((p) => p.group === g).filter((p) => !q || `${p.label} ${p.description}`.toLowerCase().includes(q)).filter((p) => !diff || new Set(d.roles.map((r) => draft[r.id].has(p.id))).size > 1);
+      if (!rows.length) return '';
+      return `<tr class="grp"><td colspan="${d.roles.length + 1}">${esc(g)}</td></tr>${rows.map((p) => `<tr><td><b>${esc(p.label)}</b>${p.special ? ' <span class="chip">Admin only</span>' : ''}<span class="sub">${esc(p.description)}</span></td>${d.roles.map((r) => `<td class="rc"><input type="checkbox" data-r="${esc(r.id)}" data-p="${esc(p.id)}" ${draft[r.id].has(p.id) ? 'checked' : ''} ${editable(r, p) ? '' : 'disabled'} aria-label="${esc(r.name)}: ${esc(p.label)}" /></td>`).join('')}</tr>`).join('')}`;
+    }).join('');
+    for (const box of $$('#mx input')) box.onchange = () => {
+      draft[box.dataset.r][box.checked ? 'add' : 'delete'](box.dataset.p);
+      dirty();
+    };
+  };
+  const changed = () => d.roles.filter((r) => { const a = new Set(r.permissions); const b = draft[r.id]; return a.size !== b.size || [...a].some((x) => !b.has(x)); });
+  const dirty = () => {
+    if (!edit) return;
+    const c = changed();
+    $('#save').disabled = $('#discard').disabled = !c.length;
+    $('#dirty').textContent = c.length ? `Changed: ${c.map((r) => r.name).join(', ')}` : '';
+  };
+  $('#pq').oninput = render;
+  $('#diff').onchange = render;
+  if (edit) {
+    $('#discard').onclick = () => viewPeople('roles');
+    $('#save').onclick = async () => {
+      try {
+        for (const r of changed()) await api(`/api/roles/${encodeURIComponent(r.id)}`, { method: 'PUT', body: { name: r.name, description: r.description, permissions: [...draft[r.id]] } });
+        toast('Roles saved.', 'ok');
+        viewPeople('roles');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    };
+    const roleForm = (r) => {
+      const dlg = document.createElement('dialog');
+      dlg.innerHTML = `<form class="form" id="rf"><div class="dh"><h2>${r ? `Edit ${esc(r.name)}` : 'New role'}</h2><p class="small muted">${r ? '' : 'Then tick its permissions in the matrix.'}</p></div><div class="db form"><label class="f">Name<input name="name" required maxlength="60" value="${esc(r?.name ?? '')}" /></label><label class="f">Description<input name="desc" maxlength="300" value="${esc(r?.description ?? '')}" /></label>${r ? '' : `<label class="f">Start from<select name="from"><option value="">Nothing</option>${d.roles.filter((x) => !x.locked).map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>`}<div class="err" id="rerr"></div></div>
+        <div class="df">${r && !r.builtin ? '<button type="button" class="danger" id="rdel">Remove</button><span class="spacer"></span>' : ''}<button type="button" class="ghost" id="rclose">Cancel</button><button class="primary" type="submit">${r ? 'Save' : 'Create role'}</button></div></form>`;
+      document.body.append(dlg);
+      dlg.showModal();
+      const close = () => (dlg.close(), dlg.remove());
+      $('#rclose', dlg).onclick = close;
+      $('#rf', dlg).onsubmit = async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        const from = d.roles.find((x) => x.id === f.get('from'));
+        try {
+          await api(`/api/roles/${encodeURIComponent(r?.id ?? 'new')}`, { method: 'PUT', body: { name: f.get('name'), description: f.get('desc'), permissions: r ? [...draft[r.id]] : (from?.permissions ?? []).filter((p) => can(p) && !d.permissions.find((x) => x.id === p)?.special) } });
+          close();
+          viewPeople('roles');
+        } catch (error) {
+          $('#rerr', dlg).textContent = error.message;
+        }
+      };
+      if ($('#rdel', dlg)) $('#rdel', dlg).onclick = async () => {
+        try {
+          await api(`/api/roles/${encodeURIComponent(r.id)}`, { method: 'DELETE' });
+          close();
+          viewPeople('roles');
+        } catch (error) {
+          $('#rerr', dlg).textContent = error.message;
+        }
+      };
+    };
+    $('#newrole').onclick = () => roleForm(null);
+    for (const b of $$('[data-role-edit]')) b.onclick = () => roleForm(d.roles.find((x) => x.id === b.dataset.roleEdit));
+  }
+  render();
+}
+
+async function signInTab() {
+  const s = await api('/api/people/signin');
+  $('#ptab').innerHTML = `<div class="grid g2"><div class="panel"><h2>Forgotten passwords</h2>
+    <p class="muted small">"Forgot your password?" sends a one-time link to the account's own email. It works once, for 30 minutes, signs the account out everywhere when used, and is followed by an email saying the password was changed. The answer never says whether an address has an account.</p>
+    <label class="f">Who may reset a forgotten password by email<select id="policy" ${s.canChange ? '' : 'disabled'}><option value="everyone"${s.passwordReset === 'everyone' ? ' selected' : ''}>Everyone with a password</option><option value="not-admins"${s.passwordReset === 'not-admins' ? ' selected' : ''}>Everyone except those who manage people</option><option value="off"${s.passwordReset === 'off' ? ' selected' : ''}>Nobody: a person who manages people sets a temporary password</option></select></label>
+    ${s.reset.ready ? '<div class="callout mt">"Forgot your password?" is working.</div>' : `<div class="callout warn mt">Not available yet: ${s.reset.missing.map(esc).join(' ')}</div>`}
+    ${s.canChange ? '' : '<p class="small muted mt">An Admin changes this.</p>'}</div>
+    <div class="panel"><h2>How people sign in</h2><dl class="kv"><dt>Passwords</dt><dd>At least 12 characters; locked 15 minutes after 5 wrong ones (unlock from People).</dd><dt>Single sign-on</dt><dd>${s.sso.ready ? `On ("${esc(s.sso.label)}")${s.sso.passwordSignIn === 'admins' ? '; passwords for Admins only' : ''}` : 'Off'}</dd><dt>Idle sign-out</dt><dd>After ${esc(s.idleHours)} hours; never longer than 7 days.</dd><dt>New people</dt><dd>A temporary password, then their own, the terms of use and the quick guide.</dd></dl>
+    ${can('security.sso') ? '<a class="btn mt" href="#/admin/sso">Single sign-on settings</a>' : ''}</div></div>`;
+  if (s.canChange) $('#policy').onchange = async (e) => {
+    try {
+      await api('/api/settings/smtp', { method: 'PUT', body: { passwordReset: e.target.value } });
+      toast('Saved.', 'ok');
+      viewPeople('signin');
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
 }
 
 function editPerson(d, u) {
@@ -818,7 +1075,6 @@ const ADMIN_TABS = [
   ['https', 'HTTPS', 'security.https'],
   ['updates', 'Updates', 'system.update'],
   ['backups', 'Backups & health', 'backup.manage'],
-  ['roles', 'Roles', 'roles.manage'],
 ];
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
@@ -857,6 +1113,7 @@ const ADMIN_VIEWS = {
     const s = await api('/api/settings');
     $('#tab').innerHTML = `<div class="panel"><h2>Organisation &amp; hosts</h2><form class="form" id="sf">
       <label class="f">Organisation name on the reports<input name="org" maxlength="120" value="${esc(s.organisationName)}" /></label>
+      <label class="check"><input type="checkbox" name="exports" ${s.features?.exports ? 'checked' : ''} /><span>Allow the two Checkmarx One exports in the calculator <span class="chip warn">off by default</span><small>"Total" and "Fixed vulnerabilities by severity" from Checkmarx One → Analytics, dropped in by hand instead of reading the tenant with an API key. When on, the section stays collapsed until opened.</small></span></label>
       <div class="row"><label class="f">Default theme for everyone<select name="accent">${THEMES.map(([id, name]) => `<option value="${id}"${(s.theme?.accent ?? 'aurora') === id ? ' selected' : ''}>${name}</option>`).join('')}</select></label><label class="f">Default mode<select name="mode">${['light', 'dark', 'system'].map((m) => `<option value="${m}"${(s.theme?.mode ?? 'light') === m ? ' selected' : ''}>${m[0].toUpperCase()}${m.slice(1)}</option>`).join('')}</select></label></div>
       <div class="row"><label class="f">Salesforce hosts${s.fromEnvironment.salesforce ? ' (set by SALESFORCE_HOSTS)' : ''}<textarea name="sfh" rows="3" ${s.fromEnvironment.salesforce ? 'disabled' : ''}>${esc(s.effective.salesforce.join('\n'))}</textarea></label>
       <label class="f">Checkmarx One hosts${s.fromEnvironment.cxone ? ' (set by CXONE_ALLOWED_HOSTS)' : ''}<textarea name="cxh" rows="3" ${s.fromEnvironment.cxone ? 'disabled' : ''}>${esc(s.effective.cxone.join('\n'))}</textarea></label>
@@ -866,7 +1123,7 @@ const ADMIN_VIEWS = {
     $('#sf').onsubmit = async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
-      const body = { organisationName: f.get('org'), theme: { accent: f.get('accent'), mode: f.get('mode') } };
+      const body = { organisationName: f.get('org'), theme: { accent: f.get('accent'), mode: f.get('mode') }, features: { exports: f.get('exports') === 'on' } };
       if (!s.fromEnvironment.salesforce) body.salesforceHosts = f.get('sfh');
       if (!s.fromEnvironment.cxone) body.cxoneHosts = f.get('cxh');
       if (!s.fromEnvironment.git) body.gitHosts = f.get('gh');
@@ -1348,6 +1605,7 @@ async function route() {
     if (path === '/accounts') return await viewAccounts(params);
     if (path.startsWith('/accounts/')) return await viewAccount(decodeURIComponent(path.slice('/accounts/'.length)));
     if (path === '/people') return await viewPeople();
+    if (path.startsWith('/people/')) return await viewPeople(path.slice('/people/'.length));
     if (path === '/teams') return await viewTeams();
     if (path === '/admin') return await viewAdmin();
     if (path.startsWith('/admin/')) return await viewAdmin(path.slice('/admin/'.length));

@@ -215,3 +215,52 @@ test('Admin-only settings: no other role can hold them, not even a leader’s', 
   const lead = await client(env.base, 'vp@t.example');
   for (const path of ['/api/https', '/api/settings/sso', '/api/updates', '/api/backups', '/api/settings', '/api/settings/smtp']) assert.equal((await lead.get(path)).status, 403, path);
 });
+
+test('people management, as MZ: leaders manage their teams, executives everyone; unlock, sign out, statuses', async () => {
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const vp = await client(env.base, 'vp@t.example');
+  // The leader adds an SE to their own team with a typed temporary password; not to another team, not as Admin.
+  const added = await lead.post('/api/people', { email: 'lead.added@t.example', name: 'Lead Added', role: 'se', teamId: env.teams.emea.id, password: 'Typed-temporary-pass-1' });
+  assert.equal(added.status, 200);
+  assert.equal(added.data.temporary, 'Typed-temporary-pass-1');
+  assert.equal((await lead.post('/api/people', { email: 'x2@t.example', name: 'X', role: 'se', teamId: env.teams.apac.id })).status, 403);
+  assert.equal((await lead.post('/api/people', { email: 'x3@t.example', name: 'X', role: 'admin', teamId: env.teams.emea.id })).status, 403);
+  assert.equal((await lead.post('/api/people', { email: 'x4@t.example', name: 'X', role: 'se', teamId: env.teams.emea.id, password: 'short' })).status, 400);
+  const people = (await lead.get('/api/people')).data.people;
+  const row = people.find((p) => p.email === 'lead.added@t.example');
+  assert.equal(row.status, 'pending');
+  assert.equal(row.manageable, true);
+  assert.equal(people.find((p) => p.email === 'apac@t.example'), undefined);
+  // Locked after wrong passwords; the leader unlocks.
+  for (let i = 0; i < 5; i++) await fetch(`${env.base}/api/auth/signin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'se2@t.example', password: 'wrong-wrong-wrong' }) });
+  assert.equal((await lead.get('/api/people')).data.people.find((p) => p.email === 'se2@t.example').status, 'locked');
+  assert.equal((await lead.post(`/api/people/${env.users.se2.id}/unlock`)).status, 200);
+  const se2 = await client(env.base, 'se2@t.example');
+  // Sign out everywhere ends their session.
+  assert.equal((await lead.post(`/api/people/${env.users.se2.id}/signout`)).status, 200);
+  assert.equal((await se2.get('/api/me')).status, 401);
+  // The leader cannot touch APAC; the VP-as-leader leads Global, so can.
+  assert.equal((await lead.post(`/api/people/${env.users.apacSe.id}/unlock`)).status, 404);
+  assert.equal((await vp.post(`/api/people/${env.users.apacSe.id}/unlock`)).status, 200);
+  // Leaders do not change roles; Executives and Admins do (never with Admin-only permissions).
+  assert.equal((await lead.put('/api/roles/viewer', { name: 'Viewer', permissions: ['dashboard.view'] })).status, 403);
+});
+
+test('the two Checkmarx One exports are off until an Admin turns them on', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const page = async () => (await (await fetch(`${env.base}/calculator`, { headers: { cookie: se1.cookie } })).text()).match(/"exportsEnabled":(true|false)/)?.[1];
+  assert.equal(await page(), 'false');
+  const admin = await client(env.base, 'admin@t.example');
+  await admin.put('/api/settings', { features: { exports: true } });
+  assert.equal(await page(), 'true');
+  await admin.put('/api/settings', { features: { exports: false } });
+});
+
+test('background work: what runs for this person, for the dashboard', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const w = await se1.get('/api/cc/work');
+  assert.equal(w.status, 200);
+  assert.equal(w.data.read, null);
+  const viewer = await client(env.base, 'viewer@t.example');
+  assert.equal((await viewer.get('/api/cc/work')).status, 403);
+});

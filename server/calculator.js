@@ -184,11 +184,12 @@ export class CalculatorService {
     return this.status(userId);
   }
 
-  startRead(userId, input) {
+  startRead(userId, input, account = null) {
     const state = this.#link(userId);
     if (!state.client) throw fail(409, 'Connect to Checkmarx One first: paste the customer\u2019s API key at the top. For a prospect who is not on Checkmarx One, use Fusion · from Git or Fusion · cloc-fusion.');
     if (state.job?.state === 'running') return readJobView(state.job);
-    const job = { id: randomUUID(), state: 'running', step: 'projects', done: 0, total: 0, read: 0, found: 0, startedAt: new Date().toISOString(), live: {} };
+    // The read runs here, on the server: the person can leave the calculator; it is followed again when they come back.
+    const job = { id: randomUUID(), state: 'running', step: 'projects', done: 0, total: 0, read: 0, found: 0, startedAt: new Date().toISOString(), live: {}, account, applied: false };
     state.job = job;
     const client = state.client;
     Promise.all([
@@ -205,8 +206,30 @@ export class CalculatorService {
     return readJobView(job);
   }
 
+  /**
+   * The read as the calculator follows it. A finished read not yet put into its account stays "just finished", so the
+   * calculator applies it when its account is opened again, however long the person was away.
+   */
   readView(userId, since) {
-    return readJobView(this.#links.get(userId)?.job, { since });
+    const job = this.#links.get(userId)?.job;
+    const view = readJobView(job, { since });
+    if (job?.state === 'done' && !job.applied) return { ...view, finishedAt: new Date().toISOString() };
+    return view;
+  }
+
+  /** The account's projection was saved after its read finished: it is in. */
+  markApplied(userId, accountId) {
+    const job = this.#links.get(userId)?.job;
+    if (job?.state === 'done' && (!job.account || job.account.id === accountId)) job.applied = true;
+  }
+
+  /** What runs for this person in the background, for the dashboard: the read, and the git count. */
+  work(userId) {
+    const job = this.#links.get(userId)?.job;
+    return {
+      read: job ? { state: job.state, step: job.step, done: job.done, total: job.total, startedAt: job.startedAt, finishedAt: job.finishedAt ?? null, error: job.error ?? null, account: job.account, applied: Boolean(job.applied), projects: job.result?.projects?.length ?? null } : null,
+      connected: Boolean(this.#links.get(userId)?.client),
+    };
   }
 
   series(userId, input) {

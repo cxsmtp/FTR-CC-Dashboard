@@ -120,7 +120,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const managesPeople = (user) => iam.permissionsOf({ ...user, active: true }).has('users.manage');
   // Sign-in attempts: per address and email (a guess at one account), and per address overall (many accounts);
   // the per-account lock in iam.js stops slow guessing. Behind a proxy, set TRUST_PROXY so each person has their address.
-  const signInPerAccount = new RateLimit({ max: 10, windowMs: 60_000 });
+  const signInPerAccount = new RateLimit({ max: config.signInPerAccountPerMinute ?? 10, windowMs: 60_000 });
   const signInPerAddress = new RateLimit({ max: config.signInPerMinute ?? 60, windowMs: 60_000 });
 
   // ---- First start: an Admin and a top team ---------------------------------------------------------
@@ -195,6 +195,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.password.refused', ip, details: { why: 'single sign-on only' } });
       throw fail(403, `Use ${sso.config().label}: passwords are kept for Admins.`);
     }
+    user.lastSignInMethod = 'password';
+    iam.save();
     const { token } = iam.openSession(user.id, { idleMs, ip, agent: req.headers['user-agent'] });
     res.setHeader('Set-Cookie', cookie(token, Math.floor(idleMs / 1000), req));
     audit.record({ actor: { id: user.id, email: user.email, name: user.name }, action: 'auth.signin', ip });
@@ -269,6 +271,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       iam.save();
     }
     user.lastSignInAt = new Date().toISOString();
+    user.lastSignInMethod = 'sso';
     iam.save();
     const { token } = iam.openSession(user.id, { idleMs, ip, agent: req.headers['user-agent'] });
     res.setHeader('Set-Cookie', cookie(token, Math.floor(idleMs / 1000), req));
@@ -577,8 +580,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // ---- People, teams, roles, settings, audit ---------------------------------------------------------------
   const visiblePeople = (ctx) => (ctx.permissions.has('scope.all') ? iam.users() : peopleInScope(ctx.user, ctx.scope, iam.users()));
   r('GET', '/api/people', ready2, (req, ctx) => ({
-    people: visiblePeople(ctx).map((u) => ({ ...publicUser(u), roleName: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, u.teamId).map((t) => t.name).join(' › '), leads: ctx.teams.filter((t) => t.leaderIds?.includes(u.id)).map((t) => t.name) })),
-    roles: Object.entries(iam.roles()).map(([id, role]) => ({ id, ...role, grantable: iam.canGrant(id, ctx.permissions) })),
+    people: visiblePeople(ctx).map((u) => ({ ...publicUser(u), roleName: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, u.teamId).map((t) => t.name).join(' › '), leads: ctx.teams.filter((t) => t.leaderIds?.includes(u.id)).map((t) => t.name), manageable: canManage(ctx, u) && u.id !== ctx.user.id, sessions: canManage(ctx, u) ? iam.sessionsOf(u.id) : undefined })),
+    roles: Object.entries(iam.roles()).map(([id, role]) => ({ id, ...role, grantable: iam.canGrant(id, ctx.permissions), holders: iam.users().filter((u) => u.role === id).length })),
     teams: ctx.teams.filter((t) => ctx.scope.has(t.id) || ctx.permissions.has('teams.manage')).map((t) => ({ ...t, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaders: (t.leaderIds ?? []).map((id) => ({ id, name: userName(id) })), members: iam.users().filter((u) => u.teamId === t.id).length })),
     permissions: PERMISSIONS,
     mail: resetReady().ready,
@@ -591,7 +594,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const teamId = String(body?.teamId ?? '');
     if (!teams.get(teamId)) throw fail(400, 'Choose their team.');
     if (!ctx.permissions.has('scope.all')) needTeam(ctx.scope, teamId);
-    const { user, temporary } = await iam.create({ email: body?.email, name: body?.name, title: body?.title, role, teamId });
+    const { user, temporary } = await iam.create({ email: body?.email, name: body?.name, title: body?.title, role, teamId, password: String(body?.password ?? '') });
     record(ctx, req, 'user.create', user.email, { role, team: teams.get(teamId)?.name });
     // A welcome email when the server can send one: where to sign in, and how to set a password with
     // "Forgot your password?". The one-time password itself is never emailed.
@@ -632,6 +635,21 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     calc.forget(target.id);
     record(ctx, req, 'user.reset', target.email);
     return { temporary };
+  });
+  r('POST', '/api/people/:id/unlock', perm('users.manage'), (req, ctx, body, res, url, params) => {
+    const target = iam.byId(params.id);
+    if (!target || !canManage(ctx, target)) throw fail(404, 'That person is not one you can change.');
+    iam.unlock(target.id);
+    record(ctx, req, 'user.unlock', target.email);
+    return { ok: true };
+  });
+  r('POST', '/api/people/:id/signout', perm('users.manage'), (req, ctx, body, res, url, params) => {
+    const target = iam.byId(params.id);
+    if (!target || !canManage(ctx, target)) throw fail(404, 'That person is not one you can change.');
+    iam.endSessionsOf(target.id, { except: target.id === ctx.user.id ? ctx.session.id : null });
+    calc.forget(target.id);
+    record(ctx, req, 'user.signout', target.email);
+    return { ok: true };
   });
   r('DELETE', '/api/people/:id', perm('users.manage'), (req, ctx, body, res, url, params) => {
     const target = iam.byId(params.id);
@@ -678,6 +696,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const hostList = (v) => (Array.isArray(v) ? v : String(v ?? '').split(/[\s,]+/)).map((h) => String(h).trim().toLowerCase().replace(/^\*\./, '')).filter((h) => /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(h)).slice(0, 50);
   r('PUT', '/api/settings', perm('settings.manage'), (req, ctx, body) => {
     if (body?.organisationName !== undefined) settings.value.organisationName = clean(body.organisationName, 120) || settings.value.organisationName;
+    if (body?.features !== undefined) settings.value.features = { ...(settings.value.features ?? {}), exports: body.features?.exports === true };
     if (body?.theme !== undefined) {
       const mode = ['light', 'dark', 'system'].includes(body.theme?.mode) ? body.theme.mode : 'light';
       const accent = ['aurora', 'ocean', 'emerald', 'sunset', 'royal', 'graphite'].includes(body.theme?.accent) ? body.theme.accent : 'aurora';
@@ -901,6 +920,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // ---- Email server (SMTP) --------------------------------------------------------------------------------------
   const smtpView = () => ({ smtp: publicSmtp(smtpNow()), verified: mailReady(), verifiedAt: settings.value.smtpVerifiedAt ?? null, passwordReset: resetPolicy(), reset: resetReady(), publicUrl: linkBase() });
   r('GET', '/api/settings/smtp', perm('settings.manage'), () => smtpView());
+  // The sign-in rules (People → Sign-in): who may reset a forgotten password by email, and whether email works.
+  r('GET', '/api/people/signin', perm('users.manage'), (req, ctx) => ({ canChange: ctx.permissions.has('settings.manage'), passwordReset: resetPolicy(), reset: resetReady(), sso: { ready: sso.ready(), passwordSignIn: sso.config().passwordSignIn, label: sso.config().label }, idleHours: config.sessionIdleHours }));
   r('PUT', '/api/settings/smtp', perm('settings.manage'), (req, ctx, body) => {
     if (body?.smtp) {
       const next = mergeSmtp(smtpNow(), body.smtp);
@@ -969,7 +990,13 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/projections/reports/:id/email', calcTeam, () => {
     throw fail(409, 'Download the report and send it to the customer yourself, then mark it shared on the account page.');
   });
-  r('POST', '/api/projections/read', calcTeam, (req, ctx, body) => calc.startRead(ctx.user.id, body));
+  r('POST', '/api/projections/read', calcTeam, (req, ctx, body) => {
+    // Which account it is for, so the dashboard can say so and the calculator puts it there when the person comes back.
+    const id = String(req.headers['x-account'] ?? '');
+    const meta = id && accounts.accounts.meta(id);
+    return calc.startRead(ctx.user.id, body, meta && ctx.teamSet.has(meta.teamId) ? { id: meta.id, name: meta.name, teamId: meta.teamId } : null);
+  });
+  r('GET', '/api/cc/work', perm('calculator.use'), (req, ctx) => calc.work(ctx.user.id));
   r('GET', '/api/projections/read', calcTeam, (req, ctx, body, res, url) => calc.readView(ctx.user.id, url.searchParams.get('since')));
   r('POST', '/api/projections/series', calcTeam, (req, ctx, body) => calc.series(ctx.user.id, body));
   r('GET', '/api/projections/git/connections', calcTeam, () => calc.gitConnections());
@@ -986,7 +1013,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('PUT', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
     const patch = {};
     for (const key of ['name', 'tr', 'fusion', 'fusionNew', 'totals', 'scope', 'impact']) if (body?.[key] !== undefined) patch[key] = body[key];
-    return { customer: summary(accounts.update(params.id, ctx.teamSet, patch, ctx.user)) };
+    const saved = summary(accounts.update(params.id, ctx.teamSet, patch, ctx.user));
+    if (patch.tr !== undefined || patch.fusion !== undefined) calc.markApplied(ctx.user.id, params.id);
+    return { customer: saved };
   });
   r('DELETE', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
     need(ctx.permissions, 'accounts.delete');
@@ -1038,7 +1067,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (ctx.user.mustChangePassword || !terms.acceptedBy(ctx.user.id)) return send(res, 302, '', { Location: '/#/welcome' });
       if (!ctx.permissions.has('calculator.use')) return send(res, 302, '', { Location: '/#/overview' });
       const scopeTeams = ctx.teams.filter((t) => ctx.scope.has(t.id)).map((t) => ({ id: t.id, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › ') })).sort((a, b) => a.path.localeCompare(b.path));
-      const { html, csp } = pageFor({ csrf: ctx.session.csrf, user: { id: ctx.user.id, name: ctx.user.name }, roleName: iam.roles()[ctx.user.role]?.name ?? '', permissions: [...ctx.permissions], teams: scopeTeams, ownTeamId: ctx.user.teamId, organisationName: settings.value.organisationName }, { productCode: config.productCode });
+      const { html, csp } = pageFor({ csrf: ctx.session.csrf, user: { id: ctx.user.id, name: ctx.user.name }, roleName: iam.roles()[ctx.user.role]?.name ?? '', permissions: [...ctx.permissions], teams: scopeTeams, ownTeamId: ctx.user.teamId, organisationName: settings.value.organisationName, exportsEnabled: settings.value.features?.exports === true }, { productCode: config.productCode });
       return send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp });
     }
 

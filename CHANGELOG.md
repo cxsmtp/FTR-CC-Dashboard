@@ -2,6 +2,19 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.02.00 — 2026-11-11
+
+- **People & roles, as in CxMissionZero, for Leaders, Executives and Admins.**
+  - Add a person in the page, with a typed or generated temporary password and an optional welcome email.
+  - Search and filter people by role, team and status: active, locked, off, or must set password.
+  - Per person: edit, reset password, unlock now, sign out everywhere, turn access off, remove.
+  - Leaders manage the people in the teams they lead; Executives and Admins manage everyone. Nobody can give more than they hold.
+- **Roles & permissions as a matrix.** Tick, find a permission, show only the differences, then save. Executives and Admins change roles; Leaders see them read-only. Admin-only permissions stay with Admins.
+- **Sign-in tab.** Who may reset a forgotten password by email, whether single sign-on is on, and how long an idle session lasts.
+- **Reading Checkmarx One runs on its own.** The read keeps running on the server when you leave the calculator. The menu shows its progress anywhere in the dashboard, then "Data ready". When you come back, the data is put into the account it was read for, ready to generate.
+- **Generating a report no longer blocks the page.** A small card in the corner follows it while you keep working.
+- **The two Checkmarx One exports are behind a flag.** Off by default (Settings → General). When on, the section stays collapsed until opened.
+
 ## CC-01.01.00 — 2026-11-10
 
 - **HTTPS by default, from CxMissionZero.** Under Settings → HTTPS you can upload the company certificate (PEM or .pfx), checked like a browser would check it. You can also create a request for IT, make a self-signed certificate, or get a free one from Let's Encrypt that renews by itself. The page switches between HTTP, HTTP + HTTPS and HTTPS only, on one port, and sets HSTS and the lowest TLS version.
