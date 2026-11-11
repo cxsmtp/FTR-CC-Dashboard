@@ -2039,6 +2039,175 @@ async function viewAbout() {
     <div class="panel"><h2>Version</h2><dl class="kv"><dt>Command center</dt><dd>${esc(state.me.versionLabel)} (${esc(state.me.version)})</dd><dt>Calculator</dt><dd>CxMissionZero ${esc(state.me.mz)}</dd><dt>Licence</dt><dd>PolyForm Internal Use 1.0.0: internal business use only</dd></dl>
     <p class="muted small mt">An independent project, not a Checkmarx product. Figures are supporting information only: Checkmarx's own records are authoritative.</p>${can('system.update') ? '<a class="btn mt" href="#/admin/updates">Updates and rollback</a>' : ''}</div></div>`;
 }
+// ---- Every table: sort low to high and back, and filter each column by its values (multi-select) -------------------
+/** What a cell sorts and filters by: data-sort / data-v, else its text without the small print under it. */
+function cellText(td) {
+  if (!td) return '';
+  if (td.dataset.v !== undefined) return td.dataset.v;
+  const c = td.cloneNode(true);
+  for (const x of c.querySelectorAll('.sub, button, .actions, svg, .avatar, .tx-tools')) x.remove();
+  return c.textContent.replace(/\s+/g, ' ').trim();
+}
+const YEAR = new Date().getFullYear();
+function sortKey(td) {
+  if (td?.dataset.sort !== undefined) {
+    const n = Number(td.dataset.sort);
+    return Number.isFinite(n) ? n : td.dataset.sort.toLowerCase();
+  }
+  const t = cellText(td);
+  if (!t || t === '—') return null;
+  const num = /^[-+]?[€$£₹]?\s?[\d,]*\.?\d+\s*(%|ms|s|credits|KB|MB|GB)?$/i.exec(t.split(' · ')[0]);
+  if (num) return Number(t.split(' · ')[0].replace(/[^\d.+-]/g, ''));
+  if (/\d{1,2}:\d{2}|\b(19|20)\d{2}\b|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(t)) {
+    const d = Date.parse(t) || Date.parse(t.replace(/^(\w{3} \d{1,2}),/, `$1 ${YEAR}`)) || Date.parse(`${t} ${YEAR}`);
+    if (Number.isFinite(d)) return d;
+  }
+  return t.toLowerCase();
+}
+const dataRows = (tbody) => [...tbody.rows].filter((r) => !(r.cells.length === 1 && r.cells[0].colSpan > 1) && !r.classList.contains('grp'));
+function enhanceTable(table) {
+  if (table.dataset.tx || table.classList.contains('matrix') || table.dataset.plain !== undefined || !table.tHead || !table.tBodies[0]) return;
+  table.dataset.tx = '1';
+  const tbody = table.tBodies[0];
+  const heads = [...table.tHead.rows[0].cells];
+  const state = { col: -1, dir: 0, filters: new Map() };
+  const bar = document.createElement('div');
+  bar.className = 'tx-bar';
+  bar.hidden = true;
+  table.closest('.tw')?.before(bar) ?? table.before(bar);
+  let observer;
+  const apply = () => {
+    observer?.disconnect();
+    const rows = dataRows(tbody);
+    let shown = 0;
+    for (const r of rows) {
+      const ok = [...state.filters].every(([i, set]) => set.has(cellText(r.cells[i])));
+      r.hidden = !ok;
+      if (ok) shown++;
+    }
+    if (state.dir) {
+      const dir = state.dir;
+      const keyed = rows.map((r, i) => [r, sortKey(r.cells[state.col]), i]);
+      // A column of numbers sorts as numbers; words in it ("No report", "—") go last either way.
+      const nums = keyed.filter(([, k]) => typeof k === 'number').length;
+      if (nums && nums >= keyed.filter(([, k]) => k !== null).length / 2) for (const x of keyed) if (typeof x[1] !== 'number') x[1] = null;
+      const sorted = keyed.sort((a, b) => {
+        if (a[1] === null && b[1] === null) return a[2] - b[2];
+        if (a[1] === null) return 1;
+        if (b[1] === null) return -1;
+        if (typeof a[1] === typeof b[1]) return (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[2] - b[2]) * dir;
+        return (typeof a[1] === 'number' ? -1 : 1) * dir;
+      });
+      for (const [r] of sorted) tbody.append(r);
+    }
+    for (const [i, th] of heads.entries()) {
+      th.classList.toggle('tx-asc', state.col === i && state.dir === 1);
+      th.classList.toggle('tx-desc', state.col === i && state.dir === -1);
+      th.classList.toggle('tx-filtered', state.filters.has(i));
+      th.setAttribute('aria-sort', state.col === i && state.dir ? (state.dir === 1 ? 'ascending' : 'descending') : 'none');
+    }
+    bar.hidden = !state.filters.size;
+    if (state.filters.size) bar.innerHTML = `Showing <b>${num(shown)}</b> of ${num(rows.length)} · ${[...state.filters.keys()].map((i) => esc(heads[i].dataset.txLabel)).join(', ')} filtered <button type="button" class="link" data-tx-clear>Clear filters</button>`;
+    observer?.observe(tbody, { childList: true });
+  };
+  bar.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-tx-clear]')) return;
+    state.filters.clear();
+    apply();
+  });
+  // Rows drawn again (a search, Older entries…): sorted and filtered the same way.
+  observer = new MutationObserver(() => apply());
+  observer.observe(tbody, { childList: true });
+  for (const [i, th] of heads.entries()) {
+    const label = th.childNodes[0]?.textContent?.trim() || th.textContent.trim();
+    if (!label || th.colSpan > 1) continue;
+    th.dataset.txLabel = label;
+    th.classList.add('tx-th');
+    const tools = document.createElement('span');
+    tools.className = 'tx-tools';
+    tools.innerHTML = `<button type="button" class="tx-sort" title="Sort: low to high, then high to low" aria-label="Sort by ${esc(label)}"></button><button type="button" class="tx-filter" title="Filter ${esc(label)}" aria-label="Filter by ${esc(label)}">⏷</button>`;
+    th.append(tools);
+    const sortIt = () => {
+      state.dir = state.col === i ? (state.dir === 1 ? -1 : state.dir === -1 ? 0 : 1) : 1;
+      state.col = state.dir ? i : -1;
+      apply();
+    };
+    tools.querySelector('.tx-sort').onclick = (e) => {
+      e.stopPropagation();
+      sortIt();
+    };
+    th.addEventListener('click', (e) => {
+      if (e.target.closest('.tx-tools, button, a, input, select')) return;
+      sortIt();
+    });
+    tools.querySelector('.tx-filter').onclick = (e) => {
+      e.stopPropagation();
+      openColumnFilter(th, i, label);
+    };
+  }
+  function openColumnFilter(th, i, label) {
+    document.querySelector('.tx-pop')?.remove();
+    const counts = new Map();
+    for (const r of dataRows(tbody)) {
+      const v = cellText(r.cells[i]);
+      counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    const values = [...counts.keys()].sort((a, b) => {
+      const ka = sortKey(Object.assign(document.createElement('td'), { textContent: a }));
+      const kb = sortKey(Object.assign(document.createElement('td'), { textContent: b }));
+      return ka === kb ? 0 : ka === null ? 1 : kb === null ? -1 : typeof ka === typeof kb ? (ka < kb ? -1 : 1) : typeof ka === 'number' ? -1 : 1;
+    });
+    const chosen = state.filters.get(i);
+    const pop = document.createElement('div');
+    pop.className = 'tx-pop mp-menu';
+    pop.innerHTML = `<div class="tx-pop-h"><b>${esc(label)}</b><span class="tx-sorts"><button type="button" class="sm ghost" data-dir="1">Low to high</button><button type="button" class="sm ghost" data-dir="-1">High to low</button></span></div>
+      ${values.length > 8 ? '<input class="mp-q" placeholder="Find…" />' : ''}<div class="mp-acts"><button type="button" class="link" data-mp="all">All</button><button type="button" class="link" data-mp="none">None</button></div>
+      <div class="mp-list">${values.slice(0, 500).map((v) => `<label><input type="checkbox" value="${esc(v)}" ${!chosen || chosen.has(v) ? 'checked' : ''} /><span>${esc(v || '(empty)')}</span><em>${num(counts.get(v))}</em></label>`).join('')}</div>`;
+    document.body.append(pop);
+    const r = th.getBoundingClientRect();
+    pop.style.top = `${window.scrollY + r.bottom + 6}px`;
+    pop.style.left = `${Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - pop.offsetWidth - 8))}px`;
+    const update = () => {
+      const on = [...pop.querySelectorAll('.mp-list input')].filter((x) => x.checked).map((x) => x.value);
+      if (on.length === values.length) state.filters.delete(i);
+      else state.filters.set(i, new Set(on));
+      apply();
+    };
+    pop.addEventListener('change', update);
+    pop.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-mp]')?.dataset.mp;
+      if (act) {
+        for (const x of pop.querySelectorAll('.mp-list label:not([hidden]) input')) x.checked = act === 'all';
+        update();
+      }
+      const dir = e.target.closest('[data-dir]')?.dataset.dir;
+      if (dir) {
+        state.col = i;
+        state.dir = Number(dir);
+        apply();
+      }
+    });
+    pop.querySelector('.mp-q')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      for (const l of pop.querySelectorAll('.mp-list label')) l.hidden = !l.textContent.toLowerCase().includes(q);
+    });
+    setTimeout(() => {
+      const close = (e) => {
+        if (pop.contains(e.target)) return;
+        pop.remove();
+        document.removeEventListener('click', close);
+      };
+      document.addEventListener('click', close);
+    });
+  }
+  apply();
+}
+/** Tables appear as pages draw: each is given sorting and filters once. */
+new MutationObserver(() => {
+  for (const t of document.querySelectorAll('#app table:not([data-tx])')) enhanceTable(t);
+}).observe(document.getElementById('app') ?? document.body, { childList: true, subtree: true });
+window.addEventListener('hashchange', () => document.querySelector('.tx-pop')?.remove());
+
 // ---- Router ---------------------------------------------------------------------------------------------------
 async function route() {
   const [pathPart, query = ''] = location.hash.replace(/^#/, '').split('?');

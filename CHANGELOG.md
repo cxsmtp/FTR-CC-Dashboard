@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.14.00 — 2026-11-11
+
+- **Every table sorts and filters.** Click a column’s heading (or ⇅) to sort low to high, again for high to low, again to clear: numbers, credits, percentages and dates sort as such, and words such as "No report" go last. The ⏷ by each heading filters the column by its values, several at once, with counts, a search and All / None; a bar above the table says how many rows show and clears the filters. It works on every table with headings: Accounts, the account’s reports and sales, Overview, People, the import check, Updates, Audit log and Checkmarx One activity; a sort stays as more rows are loaded.
+
 ## CC-01.13.00 — 2026-11-11
 
 - **Checkmarx One activity, under Insight, for everyone.** Every call the command center makes to a customer’s Checkmarx One tenant is recorded: who it was for, the tenant and the account, the request (method and API path; never a key, query or response), the result and how long it took. So are connections (and refused keys), tenant reads (started, finished with the number of projects, or failed) and every report generated in the calculator. Everyone sees their own activity and that of the teams they see (an SE their team, a leader every team below, Executives and Admins all), with **Only me**, and filters by people, tenant, what, account (each a multi-select), outcome and dates. The last 30 days are summed up on top: calls, failures, average time, tenants, reads and reports. The log is kept apart from the audit log and rotated at 20 MB (`ACTIVITY_MAX_MB`).

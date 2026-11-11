@@ -475,3 +475,20 @@ button.link { border: 0; background: none; padding: 0; color: var(--cyan); font-
 .switch input { width: auto; }
 .kpis.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .kpis.five { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Every table: sort and filter from the column header */
+th.tx-th { cursor: pointer; user-select: none; white-space: nowrap; }
+.tx-tools { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; opacity: .35; transition: opacity .15s; }
+th.tx-th:hover .tx-tools, th.tx-asc .tx-tools, th.tx-desc .tx-tools, th.tx-filtered .tx-tools { opacity: 1; }
+.tx-tools button { border: 0; background: none; padding: 0 3px; min-height: 0; font-size: 11px; color: var(--muted); line-height: 1; box-shadow: none; }
+.tx-tools button:hover { color: var(--cyan); }
+.tx-sort::after { content: "\21C5"; }
+th.tx-asc .tx-sort::after { content: "\25B2"; color: var(--cyan); }
+th.tx-desc .tx-sort::after { content: "\25BC"; color: var(--cyan); }
+th.tx-filtered .tx-filter { color: var(--cyan); }
+th.tx-filtered { color: var(--text); }
+.tx-bar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 8px 0 0; padding: 8px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--line)); background: color-mix(in srgb, var(--cyan) 6%, transparent); font-size: 13px; }
+.tx-pop { position: absolute; z-index: 60; }
+.tx-pop-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; }
+.tx-sorts { display: inline-flex; gap: 4px; }
+.mp-list label em { margin-left: auto; font-style: normal; color: var(--muted); font-size: 12px; }
