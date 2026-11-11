@@ -38,6 +38,8 @@ export function reportLook(look = {}) {
     // Files made from the app open light, whatever the maker's screen is set to; the reader can switch.
     theme: 'light',
     accent: Object.hasOwn(NEXTGEN_ACCENTS, look?.accent ?? '') ? look.accent : 'indigo',
+    // The FTR Credits Command Center's themes (cc-…): its accent (Command Center's colour) and the maker's light or dark.
+    ...(String(name).startsWith('cc-') ? { accent: String(look?.accent ?? '').replace(/[^a-z]/g, '').slice(0, 12) || 'green', theme: look?.theme === 'dark' ? 'dark' : 'light' } : {}),
   };
 }
 
@@ -104,6 +106,32 @@ export const LOOK_PALETTES = {
     head: '#2e2e33', headInk: '#f4f2f0',
   },
 };
+
+/*
+ * The FTR Credits Command Center's own themes, for the files made in it (its report, PDF and summary follow the
+ * platform): the same pages, ink and lines as public/app.css, each theme's colour; Command Center in its phosphor colour.
+ */
+{
+  const base = {
+    display: SANS, displayWeight: 600, radius: 14, labels: 'caps', head: '#0b1024', headInk: '#e8ecff',
+    light: { bg: '#f4f6fd', surface: '#ffffff', surface2: '#e9edfb', ink: '#121735', muted: '#56608a', line: '#dde2f3' },
+    dark: { bg: '#050816', surface: '#0f1630', surface2: '#0b1024', ink: '#e8ecff', muted: '#8f9bc4', line: '#1c2340' },
+  };
+  const themes = {
+    aurora: ['#0891b2', '#22d3ee', '#7c3aed'], ocean: ['#0369a1', '#0ea5e9', '#1d4ed8'], emerald: ['#047857', '#10b981', '#0f766e'],
+    sunset: ['#c2410c', '#f97316', '#be123c'], royal: ['#4f46e5', '#8b5cf6', '#c026d3'], graphite: ['#2563eb', '#60a5fa', '#334155'],
+  };
+  for (const [id, [light, dark, button]] of Object.entries(themes)) {
+    LOOK_PALETTES[`cc-${id}`] = { ...base, light: { ...base.light, accent: light, button, buttonInk: '#ffffff' }, dark: { ...base.dark, accent: dark, button: dark, buttonInk: '#050816' } };
+  }
+  LOOK_PALETTES['cc-command'] = {
+    display: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', displayWeight: 600, radius: 6, labels: 'caps', head: '#020805', headInk: '#d4ffe6',
+    light: { bg: '#eef5f0', surface: '#ffffff', surface2: '#e2ede6', ink: '#08281a', muted: '#3f6a54', line: '#cfe3d6', accent: '#008c48', button: '#008c48', buttonInk: '#ffffff' },
+    dark: { bg: '#020805', surface: '#051a0f', surface2: '#072414', ink: '#d4ffe6', muted: '#74b590', line: '#0f3320', accent: '#39ff88', button: '#39ff88', buttonInk: '#021208' },
+    accents: { cyan: ['#007c9c', '#00e5ff'], blue: ['#1c5ccc', '#4d9fff'], amber: ['#b06800', '#ffb000'], red: ['#c42020', '#ff4d4d'], violet: ['#7640d0', '#be82ff'] },
+  };
+  FILE_LOOKS.push(...Object.keys(LOOK_PALETTES).filter((k) => k.startsWith('cc-')));
+}
 
 /** A look's palette for a file, its accent applied; null for Command center and Classic (the files' own styles). */
 export function lookPalette(name, accent = 'indigo') {

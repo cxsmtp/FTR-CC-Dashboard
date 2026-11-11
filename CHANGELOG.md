@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.28.00 — 2026-11-11
+
+- **Reports follow the platform’s theme.** The projection report, its live levers and the PDF summary are made in the command center’s own theme (Aurora, Ocean, Emerald, Sunset, Royal, Graphite or Command Center in its chosen colour), and open light or dark as you have it. The reader can still switch Light, Dark or Auto in the report.
+
 ## CC-01.27.00 — 2026-11-11
 
 - **Command Center has a light view.** With the Command Center theme, **Light** is now the operations room by day: pale paper, dark ink, the same radar sweep, DEFCON strip and corner brackets. **Dark** stays the war room; **System** follows the computer.

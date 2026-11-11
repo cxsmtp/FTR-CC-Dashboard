@@ -69,6 +69,8 @@ const SOURCE_LABEL = {
 /** The look the app is in, for the report: next-gen or classic, the theme chosen and the accent. */
 function appLook() {
   const { ui, look, theme, accent } = document.documentElement.dataset;
+  // In the FTR Credits Command Center (html[data-cc]): its theme, light or dark as the maker has it, and Command Center's colour.
+  if ('cc' in document.documentElement.dataset) return { look: `cc-${accent || 'aurora'}`, ui: 'nextgen', theme: theme === 'dark' ? 'dark' : 'light', accent: accent === 'command' ? document.documentElement.dataset.ops || 'green' : '' };
   // html[data-look] is "studio", or "signal cabin" for the looks drawn on Signal's pages: the look is its last word.
   return { look: ui === 'nextgen' ? String(look ?? '').split(' ').pop() || 'nextgen' : 'classic', ui: ui === 'nextgen' ? 'nextgen' : 'classic', theme: theme ?? 'auto', accent: accent ?? 'indigo' };
 }
