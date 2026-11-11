@@ -23,4 +23,4 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "CC $GITHUB_REF_NAME" --notes-file <(node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const v=process.argv[1].slice(1);const m=s.split(/\n(?=## )/).find(x=>x.includes(v));console.log(m||'See CHANGELOG.md')" "$GITHUB_REF_NAME")
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "CC $GITHUB_REF_NAME" --notes-file <(node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const v='CC-'+process.argv[1].slice(1).split('.').map(n=>n.padStart(2,'0')).join('.');const m=s.split(/\n(?=## )/).find(x=>x.startsWith('## '+v));console.log(m||'See CHANGELOG.md')" "$GITHUB_REF_NAME")

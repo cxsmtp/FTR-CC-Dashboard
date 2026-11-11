@@ -11,8 +11,14 @@
  * - **Switch and roll back.** The launcher (server/launch.js) starts the chosen version. A version that does not come
  *   up within 150 s, or stops within 2 minutes of a switch, is rolled back by itself and never auto-installed again.
  *   Any installed version, or the built-in one, can be switched to by hand.
- * - **Auto-update** (off until an Admin turns it on): every 15 minutes, a newer release is installed and switched to,
- *   at the hour chosen.
+ * - **Checked every 15 minutes**, whether or not auto-update is on (a minute after start, then every 15 minutes), so
+ *   Settings → Updates always says what is new.
+ * - **Auto-update** (on unless an Admin turns it off): a newer release is installed and switched to as soon as it is
+ *   found, or at the hour chosen.
+ * - **Trusted checksums.** The first time a release is seen, its archive's SHA-256 and the SHA-256 of its SHA256SUMS
+ *   are kept in DATA_DIR/app/state.json (trust on first use). A release whose checksums later differ from what was kept
+ *   (re-published or changed) is never installed, by hand or by itself, and is shown as such. Installed versions are
+ *   checked against their manifest on every check, and a change is recorded.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -79,7 +85,16 @@ export class VersionStore {
     fs.mkdirSync(this.versionsDir, { recursive: true, mode: 0o700 });
     this.builtInDir = builtInDir;
     this.builtInVersion = builtInVersion;
-    this.doc = new Doc(path.join(this.root, 'state.json'), () => ({ current: null, previous: null, trialUntil: 0, failed: [], events: [], auto: { enabled: false, hour: 2 }, lastCheck: null }));
+    this.doc = new Doc(path.join(this.root, 'state.json'), () => ({ current: null, previous: null, trialUntil: 0, failed: [], events: [], auto: { enabled: true, mode: 'asap', hour: 2 }, trusted: {}, lastCheck: null }));
+    // Before CC 1.8 auto-update was off by default and only ran at an hour: on, as soon as found, unless an Admin chose otherwise.
+    const st = this.doc.value;
+    if (!st.auto?.mode) {
+      const chosen = (st.events ?? []).some((e) => e.type === 'auto');
+      st.auto = { enabled: chosen ? Boolean(st.auto?.enabled) : true, mode: chosen ? 'hour' : 'asap', hour: st.auto?.hour ?? 2 };
+      st.trusted ??= {};
+      this.doc.save();
+    }
+    st.trusted ??= {};
   }
   get state() {
     return this.doc.value;
@@ -170,10 +185,59 @@ export class UpdateService {
         return { version, name: r.name || r.tag_name, publishedAt: r.published_at, prerelease: Boolean(r.prerelease), notes: String(r.body ?? '').slice(0, 4000), url: r.html_url, archiveUrl: archive?.url ?? '', sumsUrl: sums?.url ?? '', size: archive?.size ?? 0, installable: Boolean(archive && sums) };
       })
       .sort((a, b) => compareVersions(b.version, a.version));
+    // The checksums of the newest releases, kept the first time they are seen and compared every time after.
+    for (const r of list.filter((x) => x.installable).slice(0, 5)) {
+      try {
+        await this.#pin(r);
+      } catch (error) {
+        r.pinError = error.message;
+      }
+    }
+    for (const r of list) {
+      const t = this.store.state.trusted?.[r.version];
+      r.sha256 = t?.archive ?? '';
+      r.tampered = Boolean(t?.tampered);
+    }
     this.cache = list;
     this.store.state.lastCheck = { at: new Date().toISOString(), newest: list.find((r) => !r.prerelease)?.version ?? null };
     this.store.save();
     return list;
+  }
+
+  /** The release's SHA256SUMS and the archive's SHA-256 in it: kept the first time, and must not change after. */
+  async #pin(release) {
+    const text = (await this.#get(release.sumsUrl, { binary: true, limit: 64 * 1024 })).toString('utf8');
+    const expected = text.split(/\r?\n/).map((l) => l.trim().split(/\s+\*?/)).find(([, name]) => name === ASSET(release.version))?.[0]?.toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(expected ?? '')) throw fail(422, `SHA256SUMS of ${release.version} does not list ${ASSET(release.version)}: not installed.`);
+    const sums = sha256(Buffer.from(text, 'utf8'));
+    const trusted = (this.store.state.trusted ??= {});
+    const kept = trusted[release.version];
+    if (!kept) {
+      trusted[release.version] = { archive: expected, sums, firstSeen: new Date().toISOString() };
+      this.store.record({ type: 'trusted', version: release.version, sha256: expected });
+    } else if (kept.archive !== expected || kept.sums !== sums) {
+      if (!kept.tampered) {
+        kept.tampered = { at: new Date().toISOString(), archive: expected, sums };
+        this.store.record({ type: 'checksum-changed', version: release.version, why: `its SHA256SUMS changed since ${kept.firstSeen.slice(0, 10)} (kept ${kept.archive.slice(0, 12)}…, now ${expected.slice(0, 12)}…)` });
+        this.log(`[updates] Release ${release.version} changed after it was published: it will not be installed.`);
+      }
+      throw fail(422, `Release ${release.version} changed after it was first seen (its checksums differ from those kept): not installed.`);
+    }
+    this.store.save();
+    return expected;
+  }
+
+  /** Installed versions whose files changed on disk: recorded once each. */
+  #verifyInstalled() {
+    const s = this.store.state;
+    s.changedOnDisk ??= [];
+    for (const v of this.store.installed()) {
+      const check = verifyFolder(this.store.dirOf(v));
+      if (!check.ok && !s.changedOnDisk.includes(v)) {
+        s.changedOnDisk.push(v);
+        this.store.record({ type: 'changed-on-disk', version: v, why: check.reason });
+      }
+    }
   }
 
   status() {
@@ -190,6 +254,8 @@ export class UpdateService {
       previous: s.previous,
       auto: s.auto,
       lastCheck: s.lastCheck,
+      checkEveryMinutes: 15,
+      trusted: Object.entries(s.trusted ?? {}).map(([version, t]) => ({ version, sha256: t.archive, sums: t.sums, firstSeen: t.firstSeen, tampered: Boolean(t.tampered) })).sort((a, b) => compareVersions(b.version, a.version)),
       events: (s.events ?? []).slice(0, 30),
       releases: (this.cache ?? []).map((r) => ({ ...r, installed: installed.includes(r.version), runningNow: r.version === this.running, failed: (s.failed ?? []).includes(r.version) })),
       busy: this.busy,
@@ -206,9 +272,8 @@ export class UpdateService {
     try {
       const release = (this.cache ?? (await this.check())).find((r) => r.version === version) ?? (await this.check()).find((r) => r.version === version);
       if (!release?.installable) throw fail(404, `Release ${version} has no ${ASSET(version)} and SHA256SUMS to install from.`);
-      const sums = (await this.#get(release.sumsUrl, { binary: true, limit: 64 * 1024 })).toString('utf8');
-      const expected = sums.split(/\r?\n/).map((l) => l.trim().split(/\s+\*?/)).find(([, name]) => name === ASSET(version))?.[0]?.toLowerCase();
-      if (!/^[a-f0-9]{64}$/.test(expected ?? '')) throw fail(422, `SHA256SUMS of ${version} does not list ${ASSET(version)}: not installed.`);
+      if (this.store.state.trusted?.[version]?.tampered) throw fail(422, `Release ${version} changed after it was first seen (its checksums differ from those kept): not installed.`);
+      const expected = await this.#pin(release);
       const archive = await this.#get(release.archiveUrl, { binary: true });
       const actual = sha256(archive);
       if (actual !== expected) throw fail(422, `The download of ${version} does not match its SHA-256 (expected ${expected.slice(0, 12)}…, got ${actual.slice(0, 12)}…): not installed.`);
@@ -270,9 +335,13 @@ export class UpdateService {
     return { switching: true, to: s.current.version };
   }
 
-  setAuto({ enabled, hour }, { by = '' } = {}) {
+  setAuto({ enabled, hour, mode }, { by = '' } = {}) {
     const auto = { ...this.store.state.auto };
     if (enabled !== undefined) auto.enabled = Boolean(enabled);
+    if (mode !== undefined) {
+      if (!['asap', 'hour'].includes(mode)) throw fail(400, 'Choose as soon as found, or at an hour.');
+      auto.mode = mode;
+    }
     if (hour !== undefined) {
       const h = Number(hour);
       if (!(Number.isInteger(h) && h >= 0 && h <= 23)) throw fail(400, 'Choose an hour from 0 to 23.');
@@ -293,13 +362,23 @@ export class UpdateService {
   stop() {
     clearInterval(this.#timer);
   }
+  /** Every 15 minutes: look for releases (always), check what is installed, and auto-update when it is on. */
   async autoTick(now = new Date()) {
+    if (this.busy) return null;
+    let releases;
+    try {
+      releases = await this.check();
+    } catch (error) {
+      this.store.state.lastCheck = { ...(this.store.state.lastCheck ?? {}), failedAt: now.toISOString(), error: error.message };
+      this.store.save();
+      throw error;
+    }
+    this.#verifyInstalled();
     const { auto, failed = [] } = this.store.state;
-    if (!auto?.enabled || !this.supervised || this.busy) return null;
-    const releases = await this.check();
-    const newest = releases.find((r) => !r.prerelease && r.installable && !failed.includes(r.version));
+    const newest = releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.pinError && !failed.includes(r.version));
     if (!newest || compareVersions(newest.version, this.running) <= 0) return null;
-    if (now.getHours() !== auto.hour) return { waiting: newest.version };
+    if (!auto?.enabled || !this.supervised) return { available: newest.version };
+    if (auto.mode === 'hour' && now.getHours() !== auto.hour) return { waiting: newest.version };
     if (!this.store.installed().includes(newest.version)) await this.install(newest.version, { by: 'auto-update' });
     return this.switchTo(newest.version, { by: 'auto-update', reason: 'auto-update' });
   }

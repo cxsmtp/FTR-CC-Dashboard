@@ -1035,7 +1035,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { ...updates.status(), ...out };
   });
   r('PUT', '/api/updates/auto', updPerm, (req, ctx, body) => {
-    const auto = updates.setAuto({ enabled: body?.enabled, hour: body?.hour }, { by: ctx.user.email });
+    const auto = updates.setAuto({ enabled: body?.enabled, hour: body?.hour, mode: body?.mode }, { by: ctx.user.email });
     record(ctx, req, 'updates.auto', auto.enabled ? `on at ${auto.hour}:00` : 'off');
     return updates.status();
   });

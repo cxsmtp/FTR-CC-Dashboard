@@ -6,6 +6,9 @@ Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero versio
 
 - **The calculator is part of the dashboard.** It opens inside the command center's own menu, as every other page does: Overview, Accounts, People, Calculator, Quick guide, Teams, Settings and Audit log, with your name, **Theme**, **Sign out** and the version at the bottom.
 - **One look everywhere.** The calculator takes the dashboard's colours, background, buttons and panels, in light, dark or your system's, and in each of the six palettes. **Theme** in the calculator is the same picker as on the dashboard and is saved to you, so a change on either page follows you to the other and to every device.
+- **Updates checked every 15 minutes, always.** The server looks for new releases a minute after it starts and every 15 minutes after, whether or not auto-update is on; Settings → Updates says when a newer one is available.
+- **Auto-update on by default, as soon as found.** A newer release is installed and switched to within 15 minutes, or at a set hour if an Admin prefers (Settings → Updates → When). A backup is taken first, and a version that does not come up is rolled back by itself, as before. Where an Admin had already chosen an hour or turned it off, that choice is kept.
+- **Trusted checksums.** The first time a release is seen, its archive's SHA-256 and its SHA256SUMS are kept on the server and listed under **Trusted checksums**. If a release's checksums ever change afterwards (re-published or tampered with), it is marked and never installed, by hand or by itself. Installed versions are checked against the SHA-256 of every file at each check, and any change is recorded.
 - **Background reads in the calculator's menu too.** A Checkmarx One read running on the server shows in the menu with its progress, wherever you are.
 
 ## CC-01.07.00 — 2026-11-11

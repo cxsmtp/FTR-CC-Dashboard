@@ -128,3 +128,42 @@ test('the audit log is chained: a changed line is found', () => {
   assert.equal(v.ok, false);
   assert.equal(v.brokenAt, 3);
 });
+
+test('checks for releases every tick even with auto-update off, and keeps their checksums', async () => {
+  const { store, svc } = service(release);
+  assert.equal(store.state.auto.enabled, true);
+  assert.equal(store.state.auto.mode, 'asap');
+  svc.setAuto({ enabled: false });
+  const out = await svc.autoTick();
+  assert.deepEqual(out, { available: '9.9.9' });
+  assert.ok(store.state.lastCheck.at);
+  assert.match(store.state.trusted['9.9.9'].archive, /^[a-f0-9]{64}$/);
+  assert.equal(svc.status().trusted[0].version, '9.9.9');
+});
+
+test('a release whose checksums changed after it was first seen is never installed', async () => {
+  const assets = { ...release };
+  const { store, svc } = service(assets, { fetchImpl: async (url) => fakeGithub(assets)(url) });
+  await svc.check();
+  const kept = store.state.trusted['9.9.9'].archive;
+  // The release is re-published with another archive and matching SHA256SUMS.
+  assets.archive = Buffer.concat([release.archive, Buffer.from('x')]);
+  assets.sums = Buffer.from(`${createHash('sha256').update(assets.archive).digest('hex')}  ftr-cc-dashboard-9.9.9.tar.gz\n`);
+  const list = await svc.check();
+  assert.equal(list[0].tampered, true);
+  assert.equal(store.state.trusted['9.9.9'].archive, kept);
+  await assert.rejects(svc.install('9.9.9'), /changed after it was first seen/);
+  assert.deepEqual(store.installed(), []);
+  assert.ok(store.state.events.some((e) => e.type === 'checksum-changed'));
+});
+
+test('auto-update installs as soon as found, or waits for its hour', async () => {
+  const exits = [];
+  const { store, svc } = service(release, { supervised: true, exit: (c) => exits.push(c) });
+  svc.setAuto({ mode: 'hour', hour: (new Date().getHours() + 1) % 24 });
+  assert.deepEqual(await svc.autoTick(), { waiting: '9.9.9' });
+  svc.setAuto({ mode: 'asap' });
+  const out = await svc.autoTick();
+  assert.equal(out.to, '9.9.9');
+  assert.equal(store.state.current.version, '9.9.9');
+});
