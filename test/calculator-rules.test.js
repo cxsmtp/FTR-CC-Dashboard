@@ -43,3 +43,23 @@ test('counted code on top of Checkmarx One: only the repositories that are not p
   assert.equal(newCustomerSettings({}).onTop, false);
   assert.deepEqual(newCustomerSettings({ onTopSkip: ['x'] }).onTopSkip, []);
 });
+
+test('triage & remediation by how often projects are scanned: a share for each group, and projects left out by hand', async () => {
+  const { trShares, sharesFull, weightedSeries, FREQUENCIES } = await import('../core/public/calculator/model.js');
+  assert.equal(sharesFull(trShares({})), true);
+  assert.equal(Object.keys(trShares({})).length, FREQUENCIES.length);
+  // "Only the active projects" ticked before the table: the groups scanned less often count for nothing.
+  const legacy = trShares({ activeOnly: true });
+  assert.equal(legacy.month, 100);
+  assert.equal(legacy['2-months'], 0);
+  assert.equal(legacy.rare, 0);
+  // A share set wins over the old tick; above 100 is 100, and something that is not a share (a negative) is as not set.
+  assert.deepEqual([trShares({ activeOnly: true, shares: { rare: 40 } }).rare, trShares({ shares: { year: 250 } }).year, trShares({ shares: { year: -3 } }).year], [40, 100, 100]);
+  assert.deepEqual(aheadSettings({ excluded: ['a', 'a', '', 7] }).excluded, ['a', '7']);
+  const series = (n) => ({ totals: { weeks: ['w1', 'w2'], bySeverity: { Critical: [n, n * 2], High: [0, 0], Medium: [0, 0], Low: [0, 0] }, meta: { projects: n } }, fixed: { weeks: ['w1', 'w2'], bySeverity: { Critical: [1, 1], High: [0, 0], Medium: [0, 0], Low: [0, 0] }, meta: { projects: n } } });
+  const mixed = weightedSeries([{ share: 100, series: series(10) }, { share: 50, series: series(4) }, { share: 0, series: series(99) }]);
+  assert.deepEqual(mixed.totals.bySeverity.Critical, [12, 24]);
+  assert.deepEqual(mixed.fixed.bySeverity.Critical, [1.5, 1.5]);
+  assert.equal(mixed.totals.meta.projects, 14);
+  assert.equal(weightedSeries([{ share: 0, series: series(1) }]), null);
+});

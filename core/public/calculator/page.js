@@ -12,8 +12,8 @@ import {
   LOOKBACKS,
   MAX_PROJECTS,
   SEVERITIES,
-  ACTIVE_LEVELS,
-  activeEnough,
+  sharesFull,
+  weightedSeries,
   aheadMonths,
   aheadSettings,
   amount,
@@ -549,15 +549,18 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         : meta.originSplit === false
           ? '<span class="hint calc-warn">This read is from before scan origins were recorded, so every scan is counted: read from Checkmarx One again to count only the scans chosen.</span>'
           : '';
-    // Only the active projects: ticked, the backlog and its trend are those of the projects scanned often enough.
+    // By how often projects are scanned: how much of each group's findings is counted (as Fusion's scans are set by
+    // the same groups). Every group in full unless set.
     const all = live ? fusion().projects.filter((p) => p.source !== 'manual' && counts(p)) : [];
-    const A = aheadSettings(tr());
-    const activeNow = all.filter((p) => activeEnough(p.frequency, A.activeAtLeast)).length;
-    const label = (id) => (FREQUENCIES.find((f) => f.id === id)?.label ?? id).replace(/^About /, '').replace(/^1 to 5 times a week$/, 'once a week');
-    const active = `<div class="calc-active calc-edit">
-          <label class="check"${live ? '' : ' title="Needs a read from Checkmarx One: the two exports do not say which project a finding is in."'}><input type="checkbox" data-active-only${A.activeOnly ? ' checked' : ''}${live ? '' : ' disabled'} /> Count only the active projects</label>
-          <label class="calc-active-at"><span>scanned at least</span> <select data-active-at aria-label="Scanned at least"${live ? '' : ' disabled'}>${ACTIVE_LEVELS.map((id) => `<option value="${id}"${id === A.activeAtLeast ? ' selected' : ''}>${esc(label(id))}</option>`).join('')}</select></label>
-          <span class="hint">${live ? `${num(activeNow)} of ${num(all.length)} projects are${A.activeOnly ? ': only their findings are counted' : '; every project is counted now'}.` : 'After a read from Checkmarx One.'}</span>
+    const shares = aheadSettings(tr()).shares;
+    const inGroup = (id) => all.filter((p) => (p.frequency ?? 'rare') === id).length;
+    const full = all.filter((p) => shares[p.frequency ?? 'rare'] === 100).length;
+    const out = all.filter((p) => shares[p.frequency ?? 'rare'] === 0).length;
+    const active = `<div class="calc-shares calc-edit">
+          <div class="calc-shares-head"><b>Findings counted, by how often projects are scanned</b>
+            <span class="hint">${live ? (sharesFull(shares) ? `Every project’s findings are counted (${num(all.length)} projects).` : `${num(full)} of ${num(all.length)} projects counted in full${out ? `, ${num(out)} left out` : ''}${all.length - full - out ? `, ${num(all.length - full - out)} in part` : ''}.`) : 'After a read from Checkmarx One: the two exports do not say which project a finding is in.'}</span>
+            ${live ? '<button type="button" class="link" data-shares="active" title="100% for projects scanned at least once a month, 0% for the rest">Active projects only</button><button type="button" class="link" data-shares="all">Every project</button>' : ''}</div>
+          <div class="calc-shares-grid">${FREQUENCIES.map((f) => `<label class="calc-share${shares[f.id] === 100 ? '' : shares[f.id] === 0 ? ' out' : ' changed'}" title="${esc(f.label)}"><span class="calc-share-name">${esc(f.short)}</span><span class="calc-share-in"><input type="text" inputmode="numeric" class="calc-num" data-share="${f.id}" value="${shares[f.id]}" aria-label="${esc(f.label)}: % of findings counted"${live ? '' : ' disabled'} /><i>%</i></span><span class="calc-share-n">${live ? `${num(inGroup(f.id))} projects` : '—'}</span></label>`).join('')}</div>
         </div>`;
     return `${active}<div class="calc-engines calc-edit" role="group" aria-label="Engines counted">
           <span class="hint"><b>Engines counted</b></span>
@@ -649,25 +652,50 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   }
 
   /** The consolidated backlog by project and severity (from Read from Checkmarx One); empty without per-project data. */
+  /** How much of a project's findings triage & remediation counts (0 to 100): its group's share, or 0 when left out by hand. */
+  const trShareOf = (p, A = aheadSettings(tr())) => (A.excluded.includes(String(p.id)) ? 0 : A.shares[p.frequency ?? 'rare'] ?? 100);
+  let planFind = '';
+  /**
+   * The plan by project: every project of the scope with its open findings, how often it is scanned, and how much of
+   * it is counted. Untick one to leave it out; the shares by scan frequency (above) and the scope (at the top) set
+   * the rest. Empty without per-project data (a read from Checkmarx One).
+   */
   function byProjectSeverity() {
+    const A = aheadSettings(tr());
+    const live = tr()?.totals?.meta?.source === 'cxone';
     const rows = (fusion()?.projects ?? [])
-      .filter((p) => p.source !== 'manual' && p.openBySeverity)
-      .map((p) => ({ name: p.name, sev: p.openBySeverity, total: SEVERITIES.reduce((n, s) => n + (p.openBySeverity[s] ?? 0), 0) }))
+      .filter((p) => p.source !== 'manual' && p.openBySeverity && counts(p))
+      .map((p) => ({ id: String(p.id), name: p.name, frequency: p.frequency ?? 'rare', share: trShareOf(p, A), byHand: A.excluded.includes(String(p.id)), sev: p.openBySeverity, total: SEVERITIES.reduce((n, s) => n + (p.openBySeverity[s] ?? 0), 0) }))
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
     if (!rows.length) return '';
-    const tot = Object.fromEntries(SEVERITIES.map((s) => [s, rows.reduce((n, r) => n + (r.sev[s] ?? 0), 0)]));
-    const grand = rows.reduce((n, r) => n + r.total, 0);
+    const counted = (r, s) => ((r.sev[s] ?? 0) * r.share) / 100;
+    const tot = Object.fromEntries(SEVERITIES.map((s) => [s, rows.reduce((n, r) => n + counted(r, s), 0)]));
+    const grand = SEVERITIES.reduce((n, s) => n + tot[s], 0);
+    const open = rows.reduce((n, r) => n + r.total, 0);
+    const inFull = rows.filter((r) => r.share === 100).length;
+    const out = rows.filter((r) => r.share === 0).length;
+    const short = (id) => FREQUENCIES.find((f) => f.id === id)?.short ?? id;
     const head = (s) => `<th class="num"><span class="calc-sev"><i translate="no" style="background:${SEVERITY_COLOURS[s]}"></i>${s}</span></th>`;
+    const q = planFind.trim().toLowerCase();
+    const shown = q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows;
     return `
       <details class="panel calc-fold calc-byproject" open>
-        <summary><h2>Open vulnerabilities by project</h2><span class="hint">Consolidated backlog</span></summary>
-        <p class="hint">${num(rows.length)} projects, ${num(grand)} open findings now, by severity, from each project's latest scan read from Checkmarx One.</p>
-        <div class="table-wrap"><table class="data-table calc-byproject-table">
-          <thead><tr><th>Project</th>${SEVERITIES.map(head).join('')}<th class="num">Total</th></tr></thead>
-          <tbody>${rows.map((r) => `<tr><td translate="no">${esc(r.name)}</td>${SEVERITIES.map((s) => `<td class="num">${num(r.sev[s] ?? 0)}</td>`).join('')}<td class="num calc-total">${num(r.total)}</td></tr>`).join('')}</tbody>
-          <tfoot><tr><td>All projects</td>${SEVERITIES.map((s) => `<td class="num">${num(tot[s])}</td>`).join('')}<td class="num calc-total">${num(grand)}</td></tr></tfoot>
+        <summary><h2>The plan by project</h2><span class="hint">Open findings, and what triage &amp; remediation counts of them</span></summary>
+        <div class="calc-plan-bar calc-edit">
+          <span class="hint"><b>${num(Math.round(grand))}</b> of ${num(open)} open findings counted · ${num(inFull)} of ${num(rows.length)} projects in full${out ? ` · ${num(out)} left out` : ''}${rows.length - inFull - out ? ` · ${num(rows.length - inFull - out)} in part` : ''}</span>
+          <input type="search" class="calc-plan-find" data-plan-find placeholder="Find a project" value="${esc(planFind)}" aria-label="Find a project" />
+          ${live ? '<button type="button" class="secondary" data-plan="all">Count all</button><button type="button" class="secondary" data-plan="none">Count none</button>' : ''}
+        </div>
+        <div class="table-wrap calc-plan-wrap"><table class="data-table calc-byproject-table">
+          <thead><tr><th class="calc-plan-c">Count</th><th>Project</th><th>Scanned</th><th class="num">Counted</th>${SEVERITIES.map(head).join('')}<th class="num">Total</th></tr></thead>
+          <tbody>${shown.map((r) => `<tr class="${r.share === 0 ? 'calc-plan-out' : ''}" data-plan-row="${esc(r.id)}">
+            <td class="calc-plan-c"><input type="checkbox" data-plan-project="${esc(r.id)}"${r.byHand ? '' : ' checked'}${live ? '' : ' disabled'} aria-label="Count ${esc(r.name)}" /></td>
+            <td translate="no" class="calc-plan-name" title="${esc(r.name)}">${esc(r.name)}</td><td class="calc-plan-f">${esc(short(r.frequency))}</td><td class="num">${r.share}%</td>
+            ${SEVERITIES.map((s) => `<td class="num">${num(r.sev[s] ?? 0)}</td>`).join('')}<td class="num calc-total">${num(r.total)}</td></tr>`).join('') || `<tr><td colspan="${SEVERITIES.length + 5}" class="hint">No project matches.</td></tr>`}</tbody>
+          <tfoot><tr><td></td><td>Counted</td><td></td><td class="num">${open ? num(Math.round((grand / open) * 100)) : 0}%</td>${SEVERITIES.map((s) => `<td class="num">${num(Math.round(tot[s]))}</td>`).join('')}<td class="num calc-total">${num(Math.round(grand))}</td></tr></tfoot>
         </table></div>
+        <p class="hint">Follows the projects chosen at the top (scope) and the shares by scan frequency above. ${live ? 'Untick a project to leave it out of triage &amp; remediation; Fusion keeps it.' : 'To change it, read from Checkmarx One: the two exports do not say which project a finding is in.'}</p>
       </details>`;
   }
 
@@ -781,6 +809,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   }
 
   $('calc-tr').addEventListener('input', (event) => {
+    // Find a project in the plan: the rows that match, as it is typed (nothing is worked out again).
+    if (event.target.matches('[data-plan-find]')) {
+      planFind = event.target.value;
+      const q = planFind.trim().toLowerCase();
+      for (const row of $('calc-tr').querySelectorAll('[data-plan-row]')) row.hidden = Boolean(q) && !row.querySelector('.calc-plan-name').textContent.toLowerCase().includes(q);
+      return;
+    }
     const box = event.target.closest('.calc-sev-box');
     if (box && event.target.dataset.f) setDraft(box, event.target.dataset.f, event.target.value);
   });
@@ -809,6 +844,21 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       save({ tr: c.open.tr });
       renderTr();
     }
+    const planAll = event.target.closest('[data-plan]');
+    if (planAll) {
+      const none = planAll.dataset.plan === 'none';
+      c.open.tr = { ...tr(), excluded: none ? fusion().projects.filter((p) => p.source !== 'manual' && counts(p)).map((p) => String(p.id)) : [] };
+      save({ tr: c.open.tr });
+      return applyScope();
+    }
+    const pickShares = event.target.closest('[data-shares]');
+    if (pickShares) {
+      const activeOnes = pickShares.dataset.shares === 'active';
+      const order = FREQUENCIES.map((f) => f.id);
+      c.open.tr = { ...tr(), activeOnly: false, shares: Object.fromEntries(order.map((id, i) => [id, !activeOnes || i <= order.indexOf('month') ? 100 : 0])) };
+      save({ tr: c.open.tr });
+      return applyScope();
+    }
     if (event.target.closest('[data-ahead-reset]')) {
       c.open.tr = { ...tr(), includeFuture: DEFAULT_TR.includeFuture, fusionUpliftPercent: DEFAULT_TR.fusionUpliftPercent, aiDeclinePercent: DEFAULT_TR.aiDeclinePercent, newPacePercent: DEFAULT_TR.newPacePercent };
       save({ tr: c.open.tr });
@@ -817,10 +867,18 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   });
   // What is still to come: changes count at once (the figures follow as it is typed).
   $('calc-tr').addEventListener('change', (event) => {
-    // Only the active projects, or every project: the backlog is added up again from the last read.
-    if (event.target.matches('[data-active-only], [data-active-at]')) {
-      const box = $('calc-tr');
-      c.open.tr = { ...tr(), activeOnly: box.querySelector('[data-active-only]').checked, activeAtLeast: box.querySelector('[data-active-at]').value };
+    // A project counted or left out, one by one.
+    if (event.target.matches('[data-plan-project]')) {
+      const id = event.target.dataset.planProject;
+      const before = aheadSettings(tr()).excluded;
+      c.open.tr = { ...tr(), excluded: event.target.checked ? before.filter((x) => x !== id) : [...before, id] };
+      save({ tr: c.open.tr });
+      return applyScope();
+    }
+    // A group's share of findings: the backlog is added up again from the last read.
+    if (event.target.matches('[data-share]')) {
+      const shares = { ...aheadSettings(tr()).shares, [event.target.dataset.share]: amount(event.target.value) ?? 100 };
+      c.open.tr = { ...tr(), shares, activeOnly: false };
       save({ tr: c.open.tr });
       return applyScope();
     }
@@ -931,14 +989,25 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     if (unpriced) $('calc-models-warn').innerHTML = `<b translate="no">${esc(def.name)}</b> is the default model, used by the projects, and has no price yet: type its credits per 10K LOC, or Fusion credits stay 0.`;
   }
 
+  let rulesModels = false;
+  document.getElementById('page-calculator').addEventListener('click', (event) => {
+    if (!event.target.closest('[data-rule-models]')) return;
+    rulesModels = !rulesModels;
+    renderRules();
+  });
   function renderRules() {
     const f = fusion();
     const rows = scoped();
-    const ruleRow = (key, label, count, rule, attr) => `<tr ${attr}="${key}">
+    const ruleRow = (key, label, count, rule, attr, title = '') => `<tr ${attr}="${key}"${title ? ` title="${esc(title)}"` : ''}>
       <td>${label}</td><td class="num">${num(count)}</td>
       <td><input type="text" inputmode="numeric" class="calc-num" value="${esc(rule.scans ?? '')}" data-r="scans" placeholder="${esc(num(f.defaultScans))} (default)" aria-label="Fusion scans per project" /></td>
       <td><select data-r="model" aria-label="Model">${modelOptions(rule.model, defaultLabel())}</select></td></tr>`;
-    $('calc-freq').innerHTML = FREQUENCIES.map((q) => ruleRow(q.id, q.label, rows.filter((p) => p.frequency === q.id).length, f.byFrequency[q.id], 'data-freq')).join('');
+    // A model of its own for a group is rare: its picker shows when one is set, or when asked for.
+    for (const [body, rules] of [['calc-freq', f.byFrequency], ['calc-crit', f.byCriticality]]) {
+      const table = $(body).closest('table');
+      table.classList.toggle('show-models', rulesModels || Object.values(rules ?? {}).some((r) => r?.model));
+    }
+    $('calc-freq').innerHTML = FREQUENCIES.map((q) => ruleRow(q.id, esc(q.short), rows.filter((p) => p.frequency === q.id).length, f.byFrequency[q.id], 'data-freq', q.label)).join('');
     // Folded unless a criticality has its own number or model, so a plan made with it is never hidden.
     if (CRITICALITIES.some((k) => f.byCriticality[k]?.scans != null || f.byCriticality[k]?.model)) $('calc-crit-fold').open = true;
     $('calc-crit').innerHTML = [...CRITICALITIES.map((k) => ruleRow(k, `${k}${k === 5 ? ' (most critical)' : k === 1 ? ' (least critical)' : ''}`, rows.filter((p) => p.criticality === k).length, f.byCriticality[k], 'data-crit'))].join('');
@@ -2504,14 +2573,24 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       return renderTr();
     }
     const inScopeNow = fusion().projects.filter((p) => p.source !== 'manual' && counts(p));
+    // Triage & remediation only: each group of projects (by how often they are scanned) with its share of findings.
+    // Fusion keeps every project of the scope.
+    const shares = aheadSettings(tr()).shares;
+    const byShare = new Map();
     const A = aheadSettings(tr());
-    // Triage & remediation only: ticked, the projects scanned often enough; Fusion keeps every project of the scope.
-    const forTr = A.activeOnly ? inScopeNow.filter((p) => activeEnough(p.frequency, A.activeAtLeast)) : inScopeNow;
-    const ids = forTr.map((p) => p.id);
+    for (const p of inScopeNow) {
+      const share = trShareOf(p, A);
+      if (share > 0) byShare.set(share, [...(byShare.get(share) ?? []), p.id]);
+    }
+    const ids = [...byShare.values()].flat();
     try {
       // Only the scans from the scan origins chosen count (null: every scan).
-      const series = await api('/api/projections/series', { method: 'POST', body: JSON.stringify({ projectIds: ids, engines: trEngines(), origins: scope().origins }), quiet: true });
-      c.open.tr = { ...tr(), totals: series.totals, fixed: series.fixed, activeCount: A.activeOnly ? forTr.length : null, activeOf: A.activeOnly ? inScopeNow.length : null };
+      const ask = (projectIds) => api('/api/projections/series', { method: 'POST', body: JSON.stringify({ projectIds, engines: trEngines(), origins: scope().origins }), quiet: true });
+      let series;
+      if (byShare.size <= 1 && (byShare.keys().next().value ?? 100) === 100) series = await ask(ids);
+      else series = weightedSeries(await Promise.all([...byShare].map(async ([share, list]) => ({ share, series: await ask(list) })))) ?? (await ask([]));
+      const partial = !sharesFull(shares) || A.excluded.length > 0;
+      c.open.tr = { ...tr(), totals: series.totals, fixed: series.fixed, activeCount: partial ? ids.length : null, activeOf: partial ? inScopeNow.length : null };
       save({ tr: c.open.tr });
       if (!quiet) setStatus('calc-scope-status', `${num(ids.length)} projects counted.`, 'ok');
     } catch (error) {
@@ -3137,7 +3216,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     renderTr();
     renderFusion();
     // The read counts SAST and SCA, every scan, for the whole tenant: a scope, other engines, or only some scan origins are added up from it.
-    if (narrowed() || trEngines().join() !== DEFAULT_ENGINES.join() || scope().origins || aheadSettings(tr()).activeOnly) applyScope({ quiet: true });
+    if (narrowed() || trEngines().join() !== DEFAULT_ENGINES.join() || scope().origins || !sharesFull(aheadSettings(tr()).shares) || aheadSettings(tr()).excluded.length) applyScope({ quiet: true });
     if (!body.tr) setStatus('calc-read-note', `Read ${num(read.length)} projects from Checkmarx One; none had a scan to read the findings of.`, 'warn');
     else if (read.length === 1) setStatus('calc-read-note', 'Read 1 project and its scans from Checkmarx One.', 'ok');
     else setStatus('calc-read-note', `Read ${num(read.length)} projects and their scans from Checkmarx One.`, 'ok');

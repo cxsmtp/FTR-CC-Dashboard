@@ -188,7 +188,47 @@ export function aheadSettings(value = {}) {
     activeAtLeast: ACTIVE_LEVELS.includes(v.activeAtLeast) ? v.activeAtLeast : DEFAULT_ACTIVE_LEVEL,
     activeCount: wholeNumber(v.activeCount),
     activeOf: wholeNumber(v.activeOf),
+    // How much of each group's findings is counted, by how often its projects are scanned (% for each scan
+    // frequency; 100 where not said). "Only the active projects" ticked before this table is the same as 0% for
+    // the groups scanned less often.
+    shares: trShares(v),
+    // Projects left out of triage & remediation one by one (by id), whatever their group.
+    excluded: Array.isArray(v.excluded) ? [...new Set(v.excluded.map((id) => String(id ?? '').slice(0, 200)).filter(Boolean))].slice(0, MAX_PROJECTS) : [],
   };
+}
+
+/**
+ * Triage & remediation by how often projects are scanned: the share (0 to 100%) of each group's findings that is
+ * counted, for every scan frequency. Every group is 100% unless set; a projection with "only the active projects"
+ * ticked (and no share set) has 0% for the groups scanned less often than it asks.
+ */
+export function trShares(value = {}) {
+  const v = value && typeof value === 'object' ? value : {};
+  const given = v.shares && typeof v.shares === 'object' ? v.shares : null;
+  const legacy = !given && v.activeOnly === true;
+  return Object.fromEntries(FREQUENCIES.map((f) => {
+    const n = given ? amount(given[f.id]) : null;
+    return [f.id, n === null ? (legacy && !activeEnough(f.id, v.activeAtLeast) ? 0 : 100) : clamp(Math.round(n), 0, 100)];
+  }));
+}
+/** Is every group counted in full? */
+export const sharesFull = (shares) => FREQUENCIES.every((f) => (shares?.[f.id] ?? 100) === 100);
+
+/**
+ * Backlog series added up with a share each: `parts` = [{ share (%), series: { totals, fixed } }] as the server
+ * gives them for a set of projects (weeks, bySeverity and, when known, SAST's own part). The weeks and the notes
+ * (meta) are the first part's; SAST's part is kept only when every part has it.
+ */
+export function weightedSeries(parts = []) {
+  const used = parts.filter((p) => p?.series?.totals && Number(p.share) > 0);
+  if (!used.length) return null;
+  const mix = (key) => {
+    const first = used[0].series[key];
+    const add = (field) => Object.fromEntries(SEVERITIES.map((sv) => [sv, (first[field]?.[sv] ?? []).map((_, w) => Math.round(used.reduce((n, p) => n + ((Number(p.series[key][field]?.[sv]?.[w]) || 0) * Number(p.share)) / 100, 0) * 100) / 100)]));
+    const meta = { ...first.meta, projects: used.reduce((n, p) => n + (Number(p.series[key].meta?.projects) || 0), 0), scans: used.reduce((n, p) => n + (Number(p.series[key].meta?.scans) || 0), 0) };
+    return { weeks: first.weeks, bySeverity: add('bySeverity'), ...(used.every((p) => p.series[key].sast) ? { sast: add('sast') } : {}), meta };
+  };
+  return { totals: mix('totals'), fixed: mix('fixed') };
 }
 
 /**
@@ -389,15 +429,15 @@ export function weeklyTrend(totalRows, fixedRows, weeks = 52) {
  * the bucket takes, with some slack (26 scans a year is every 14.04 days: once in 2 weeks).
  */
 export const FREQUENCIES = [
-  { id: 'more-5-week', label: 'More than 5 times a week', days: 7 / 5.0001, perYear: 52 },
-  { id: '1-5-week', label: '1 to 5 times a week', days: 7.5, perYear: 26 },
-  { id: '2-weeks', label: 'About once in 2 weeks', days: 15.5, perYear: 12 },
-  { id: 'month', label: 'About once a month', days: 31.5, perYear: 6 },
-  { id: '2-months', label: 'About once in 2 months', days: 63, perYear: 4 },
-  { id: '3-months', label: 'About once in 3 months', days: 95, perYear: 4 },
-  { id: '6-months', label: 'About once in 6 months', days: 190, perYear: 2 },
-  { id: 'year', label: 'About once a year', days: 366, perYear: 1 },
-  { id: 'rare', label: 'Not in the last year', days: Infinity, perYear: 1 },
+  { id: 'more-5-week', short: '5+ a week', label: 'More than 5 times a week', days: 7 / 5.0001, perYear: 52 },
+  { id: '1-5-week', short: '1–5 a week', label: '1 to 5 times a week', days: 7.5, perYear: 26 },
+  { id: '2-weeks', short: 'Every 2 weeks', label: 'About once in 2 weeks', days: 15.5, perYear: 12 },
+  { id: 'month', short: 'Monthly', label: 'About once a month', days: 31.5, perYear: 6 },
+  { id: '2-months', short: 'Every 2 months', label: 'About once in 2 months', days: 63, perYear: 4 },
+  { id: '3-months', short: 'Every 3 months', label: 'About once in 3 months', days: 95, perYear: 4 },
+  { id: '6-months', short: 'Every 6 months', label: 'About once in 6 months', days: 190, perYear: 2 },
+  { id: 'year', short: 'Yearly', label: 'About once a year', days: 366, perYear: 1 },
+  { id: 'rare', short: 'Not in a year', label: 'Not in the last year', days: Infinity, perYear: 1 },
 ];
 export const CRITICALITIES = [5, 4, 3, 2, 1];
 export const COMBINE = ['higher', 'frequency', 'criticality'];

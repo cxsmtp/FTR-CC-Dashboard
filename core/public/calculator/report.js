@@ -301,12 +301,15 @@ export function assumptionItems(data, sum, L) {
     const each = (key, digits = 2) => (same(key) ? num(rows[0]?.[key], digits) : SEVERITIES.map((s) => `${w(s)} ${num(tr.rows?.[s]?.[key], digits)}`).join(', '));
     items.push(w('{0} credit(s) per triage; {1} per remediation.', each('triageCost'), each('remediationCost')));
     items.push(w('False positives expected: {0}%.', each('fp', 0)));
-    if (tr.ahead?.activeOnly) {
-      const often = L.frequency(tr.ahead.activeAtLeast);
+    // Counted by how often projects are scanned: said when some group is not counted in full.
+    const shares = tr.ahead?.shares;
+    if (shares && Object.values(shares).some((v) => v !== 100)) {
+      const part = Object.entries(shares).filter(([, v]) => v !== 100).map(([id, v]) => `${L.frequency(id)} ${num(v)}%`).join(', ');
       items.push(Number.isFinite(tr.ahead.activeCount) && Number.isFinite(tr.ahead.activeOf)
-        ? w('Only the active projects are counted for triage & remediation: {0} of {1}, scanned at least: {2}.', num(tr.ahead.activeCount), num(tr.ahead.activeOf), often)
-        : w('Only the active projects are counted for triage & remediation, scanned at least: {0}.', often));
+        ? w('Triage & remediation counts the findings of {0} of {1} projects, by how often they are scanned: {2}; the others in full.', num(tr.ahead.activeCount), num(tr.ahead.activeOf), part)
+        : w('Triage & remediation counts findings by how often projects are scanned: {0}; the others in full.', part));
     }
+    if (tr.ahead?.excluded?.length) items.push(w('{0} project(s) are left out of triage & remediation by hand.', num(tr.ahead.excluded.length)));
     if (tr.ahead) {
       if (!tr.ahead.includeFuture) items.push(w('Findings still to come are not counted.'));
       else if (Number.isFinite(tr.totals?.selected) && tr.totals.selected < tr.totals.backlog) items.push(w('New findings are counted in the same share per severity as the backlog chosen.'));

@@ -2,6 +2,16 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.63.00 — 2026-11-12
+
+Triage & remediation planned the way Fusion is: by how often projects are scanned, and project by project. Every group and every project is counted in full until someone changes it, so no saved projection moves.
+
+- **Scan-frequency groups as cards.** "Fusion scans by how often projects are scanned" is one row of nine small cards (5+ a week … Not in a year), each with its number of scans and how many projects are in it, in place of a nine-row table: about a sixth of the height. The model of a group shows only when one is set, or with **Model per group**. Criticality uses the same cards.
+- **The same for triage & remediation.** On its tab, **Findings counted, by how often projects are scanned**: a % for each group (100 everywhere to start). **Active projects only** sets 100% for projects scanned at least monthly and 0% for the rest; **Every project** puts it back. It replaces yesterday's checkbox; a projection that had it ticked keeps exactly what it counted.
+- **The plan by project** (was "Open vulnerabilities by project"): every project of the scope with how often it is scanned, how much of it is counted, and its open findings by severity. Untick a project to leave it out of triage & remediation (Fusion keeps it); **Count all**, **Count none**, and **Find a project**. The total row is what is counted, and the line above says how many projects are in full, in part and left out. The list scrolls inside its own frame, with its headings and total in view.
+- The scope chosen at the top, the shares and the ticks work together: the backlog, its trend, the credits and the report follow all three. The report's assumptions say which groups are not counted in full and how many projects were left out by hand.
+- These need a read from Checkmarx One (the two exports do not say which project a finding is in); with the exports the cards and the ticks are shown but cannot be changed. How often a project is *scanned* is what is known for triage & remediation; commits are known only for repositories counted from Git or cloc-fusion, which have no findings to triage.
+
 ## CC-01.62.00 — 2026-11-12
 
 The calculator, for the two conversations it is used in: a customer already on Checkmarx One, and a new customer where only Fusion applies. Nothing saved changes: every new choice is off until someone makes it.

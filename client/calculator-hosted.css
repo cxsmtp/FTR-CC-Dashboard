@@ -745,14 +745,46 @@ html[data-cc] input.calc-num[data-p="loc"], html[data-cc] input.calc-num[data-n=
 
 /* Rates are the Admin's (Settings → Engines & rates): the calculator shows no pricing table of its own. */
 html[data-cc] #calc-fusion-pricing { display: none !important; }
-/* Triage & remediation: only the active projects (one checkbox, how often at least, and what that leaves in). */
-.calc-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 10px; }
-.calc-active .check { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
-.calc-active-at { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
-.calc-active-at select { width: auto; min-width: 150px; }
 /* Counted code on top of Checkmarx One. */
 .calc-fh-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 
 /* A new customer, Fusion only: no triage & remediation on the page (its tab, its half of the summary, Impact). */
 html[data-fusion-only] [data-ptabs="calculator"] [data-pt="tr"], html[data-fusion-only] [data-ptabs="calculator"] [data-pt="fusion"],
 html[data-fusion-only] [data-ptabs="calculator"] [data-pt="impact"], html[data-fusion-only] #calc-mix-tr { display: none !important; }
+
+/* ---- By how often projects are scanned: one small card per group, all in a row --------------------------------------
+   Fusion (scans per project) and triage & remediation (% of findings counted) use the same card: the group's short
+   name, the number to set, and how many projects are in it. */
+html[data-cc] table.calc-rules { display: block; width: 100%; border: 0; background: transparent; }
+html[data-cc] table.calc-rules thead { display: none; }
+html[data-cc] table.calc-rules tbody, .calc-shares-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+html[data-cc] table.calc-rules tr, .calc-share { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px 10px 7px; border: 1px solid var(--line, var(--border)); border-radius: 8px; background: var(--panel, var(--surface)); min-width: 0; cursor: default; }
+html[data-cc] table.calc-rules td { display: block; padding: 0 !important; border: 0 !important; background: transparent !important; min-width: 0; text-align: left !important; }
+html[data-cc] table.calc-rules td:first-child, .calc-share-name { order: 1; font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-cc] table.calc-rules td:nth-child(3), .calc-share-in { order: 2; }
+html[data-cc] table.calc-rules td:nth-child(2), .calc-share-n { order: 3; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+html[data-cc] table.calc-rules td:nth-child(2)::after { content: " projects"; }
+html[data-cc] table.calc-rules td:nth-child(4) { order: 4; display: none; }
+html[data-cc] table.calc-rules.show-models td:nth-child(4) { display: block; }
+html[data-cc] table.calc-rules td input, .calc-share-in input { width: 100% !important; min-width: 0 !important; height: 30px !important; min-height: 0 !important; padding: 0 8px !important; text-align: center !important; font-size: 15px !important; font-weight: 600; font-variant-numeric: tabular-nums; }
+html[data-cc] table.calc-rules td select { width: 100% !important; min-width: 0; height: 26px !important; min-height: 0 !important; padding: 0 18px 0 6px !important; font-size: 11.5px !important; }
+.calc-share-in { position: relative; display: block; }
+.calc-share-in i { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 12px; color: var(--muted); pointer-events: none; }
+.calc-share.changed { border-color: var(--amber, #b45309); }
+.calc-share.out { opacity: .62; border-style: dashed; }
+.calc-shares { margin: 0 0 12px; display: grid; gap: 8px; }
+.calc-shares-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.calc-shares-head .hint { flex: 1 1 260px; }
+
+/* ---- The plan by project: tick what triage & remediation counts ---------------------------------------------------- */
+.calc-plan-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; }
+.calc-plan-bar .hint { flex: 1 1 280px; }
+.calc-plan-find { width: 220px !important; height: 30px !important; min-height: 0 !important; }
+.calc-plan-wrap { max-height: 460px; overflow-y: auto; overflow-x: hidden; }
+.calc-plan-wrap thead th { position: sticky; top: 0; z-index: 1; background: var(--panel, var(--surface)); }
+.calc-plan-wrap tfoot td { position: sticky; bottom: 0; background: var(--panel, var(--surface)); font-weight: 600; border-top: 1px solid var(--line-hi, var(--border)); }
+html[data-cc] .calc-byproject-table th, html[data-cc] .calc-byproject-table td { padding-top: 5px !important; padding-bottom: 5px !important; }
+.calc-plan-c { width: 52px; text-align: center !important; }
+.calc-plan-name { max-width: 0; width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calc-plan-f { color: var(--muted); white-space: nowrap; }
+tr.calc-plan-out td:not(.calc-plan-c) { opacity: .5; }
