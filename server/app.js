@@ -311,17 +311,22 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const v = publicBranding(branding(), settings.value.theme);
     // With no logo of the organisation's, the default one (when the build carries it).
     if (!v.logo && fs.existsSync(path.join(config.root, 'public', 'brand', 'default-logo.png'))) v.logo = '/brand/logo?v=default';
-    if (!v.icon && fs.existsSync(path.join(config.root, 'public', 'brand', 'default-logo.png'))) v.icon = '/brand/icon?v=default';
+    if (!v.icon && fs.existsSync(path.join(config.root, 'public', 'brand', 'default-logo.png'))) v.icon = '/brand/logo?v=default'; // the same picture: fetched once
     return v;
   };
   r('GET', '/api/branding', () => brandingView());
   // The command center's own logo and icon when Branding sets none: public/brand/default-logo.png, when it is there.
   const DEFAULT_LOGO = path.join(config.root, 'public', 'brand', 'default-logo.png');
   const hasDefaultLogo = () => fs.existsSync(DEFAULT_LOGO);
+  let defaultLogo = null;
+  /** Read once: the file does not change while this version runs. */
+  const defaultLogoBytes = () => (defaultLogo ??= fs.readFileSync(DEFAULT_LOGO));
   const brandImage = (key, fallback) => (req, ctx, body, res) => {
     const img = branding()[key];
     if (img?.data) return send(res, 200, Buffer.from(img.data, 'base64'), imageHeaders(img));
-    if (hasDefaultLogo()) return send(res, 200, fs.readFileSync(DEFAULT_LOGO), { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600' });
+    // Asked for by its versioned address (?v=…), it never changes: kept by the browser for a day, not asked again.
+    const keep = new URL(req.url, 'http://x').searchParams.has('v') ? 'public, max-age=86400' : 'public, max-age=3600';
+    if (hasDefaultLogo()) return send(res, 200, defaultLogoBytes(), { 'Content-Type': 'image/png', 'Cache-Control': keep });
     if (fallback) return send(res, 200, fs.readFileSync(path.join(PUBLIC_DIR, fallback)), { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=3600' });
     return send(res, 404, { error: 'No logo is set.' });
   };

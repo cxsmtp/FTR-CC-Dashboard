@@ -2,6 +2,20 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.94.00 — 2026-11-12
+
+- **Faster page clicks on a far network.**
+  - Connections stay open between clicks for 2 minutes (they closed after 5 seconds), so a page opened after reading
+    another does not wait for a new connection and its secure handshake first.
+  - Pages open at once from what was already loaded, however old, and ask for the latest behind it: when something
+    changed, the page is drawn again in place (not while you type or a dialog is open). Saving anything still asks
+    for everything fresh.
+  - An account's side panel, Engines & rates, the audit log and the CxOne API audit are kept like the lists.
+  - Pointing at a menu link or an account starts loading it before the click.
+  - The default logo and icon are the same picture: fetched once, and kept by the browser for a day.
+  - Measured with a 210 ms network: an account's side panel opens in about 60 ms (was about 270 ms), Accounts after a
+    pause in about 70 ms (was about 320 ms).
+
 ## CC-01.93.00 — 2026-11-12
 
 - **cloc-fusion report: two real buttons.** With cloc-fusion report picked as the source, **Browse their report** (filled)

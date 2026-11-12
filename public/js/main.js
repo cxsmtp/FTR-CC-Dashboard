@@ -3,7 +3,7 @@ import { viewAccount, viewAccounts } from './accounts.js';
 import { viewActivity } from './activity.js';
 import { viewAudit } from './audit.js';
 import { firstStepsDone, home, viewForgot, viewLogin, viewReset, viewWelcome } from './auth.js';
-import { $, api, applyMyTheme, can, esc, go, state, toast, warm } from './core.js';
+import { $, api, applyMyTheme, can, esc, go, setRedraw, state, toast, warm } from './core.js';
 import { viewGuide } from './guide.js';
 import { viewHelp } from './help.js';
 import { viewOverview } from './overview.js';
@@ -87,4 +87,5 @@ document.addEventListener('click', (e) => {
   if (a) toast(`${a.textContent.trim() || 'Export'}: your file is being made and downloads in a moment.`, 'ok', 4000);
 });
 window.addEventListener('hashchange', route);
+setRedraw(route);
 route();

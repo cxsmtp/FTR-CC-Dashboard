@@ -63,26 +63,84 @@ export const state = { me: null, people: null };
  * once the tab is closed (never written to the device).
  */
 const KEPT = new Map();
+/** Fresh enough to show without asking again; older, it is still shown at once, and asked for again behind it. */
 const KEPT_MS = 30_000;
-const keepable = (path) => /^\/api\/(accounts|people|dashboard)(\?|$)/.test(path);
+/** The lists and records the pages open with (not the ones that change as you watch, nor anything with secrets). */
+const keepable = (path) => /^\/api\/(accounts|people|dashboard|fusion-rates|tr-rates)(\?|$)|^\/api\/cc\/accounts\/[^/?]+$|^\/api\/(audit|activity)(\?|$)/.test(path);
 export const forgetKept = () => KEPT.clear();
 /** Ask for the lists in the background, so the next page has them already. */
 export function warm(paths) {
-  for (const p of paths) if (!KEPT.has(p)) api(p).catch(() => {});
+  for (const p of paths) {
+    const hit = KEPT.get(p);
+    if (keepable(p) && (!hit || Date.now() - hit.at >= KEPT_MS)) refreshKept(p);
+  }
 }
+/** Asks again for a kept answer; when the page showing the old one is still open and it changed, the page is drawn again. */
+function refreshKept(path, shownOn = null) {
+  const before = KEPT.get(path);
+  if (before?.refreshing) return before.refreshing;
+  const data = fetchApi(path);
+  const entry = { at: Date.now(), data, refreshing: null };
+  if (before) before.refreshing = data;
+  data.then(
+    async (fresh) => {
+      const old = before ? await before.data.catch(() => null) : null;
+      KEPT.set(path, entry);
+      if (shownOn && old && location.hash === shownOn && JSON.stringify(old) !== JSON.stringify(fresh)) redrawQuietly();
+    },
+    () => {
+      if (before) before.refreshing = null;
+      else KEPT.delete(path);
+    },
+  );
+  if (!before) KEPT.set(path, entry);
+  return data;
+}
+/** The page again with what just came in, unless someone is typing or a dialog is open: their work comes first. */
+let redrawSoon = null;
+function redrawQuietly() {
+  clearTimeout(redrawSoon);
+  redrawSoon = setTimeout(() => {
+    const busy = document.activeElement?.matches?.('input, textarea, select, [contenteditable]') || document.querySelector('dialog[open], .menu[open]');
+    if (busy) return;
+    const y = window.scrollY;
+    const drawer = document.querySelector('#acct-drawer .drawer');
+    const dy = drawer?.scrollTop ?? 0;
+    Promise.resolve(onRedraw?.()).then(() => {
+      window.scrollTo(0, y);
+      const d = document.querySelector('#acct-drawer .drawer');
+      if (d) d.scrollTop = dy;
+    });
+  }, 150);
+}
+let onRedraw = null;
+/** The router: how a page is drawn again when newer data came in behind it. */
+export const setRedraw = (fn) => (onRedraw = fn);
 export async function api(path, { method = 'GET', body } = {}) {
   if (method === 'GET' && keepable(path)) {
     const hit = KEPT.get(path);
-    if (hit && Date.now() - hit.at < KEPT_MS) return structuredClone(await hit.data);
-    const data = fetchApi(path, { method, body });
-    KEPT.set(path, { at: Date.now(), data });
-    data.catch(() => KEPT.delete(path));
-    return structuredClone(await data);
+    if (hit) {
+      // Shown at once from what is kept; asked again behind it when it is not fresh, and the page redrawn if it changed.
+      if (Date.now() - hit.at >= KEPT_MS) refreshKept(path, location.hash);
+      return structuredClone(await hit.data);
+    }
+    return structuredClone(await refreshKept(path));
   }
   const out = await fetchApi(path, { method, body });
   if (method !== 'GET') KEPT.clear();
   return out;
 }
+/** Pointing at a link or an account: its data is asked for before the click, so the page opens at once. */
+const HOVER_DATA = { '#/overview': ['/api/dashboard'], '#/accounts': ['/api/accounts'], '#/people': ['/api/people'], '#/people/people': ['/api/people'], '#/rates': ['/api/fusion-rates', '/api/tr-rates'] };
+document.addEventListener('pointerover', (e) => {
+  if (!state.me) return;
+  const row = e.target.closest?.('[data-account]');
+  if (row?.dataset.account && !row.closest('#acct-drawer')) return warm([`/api/cc/accounts/${encodeURIComponent(row.dataset.account)}`]);
+  const link = e.target.closest?.('a[href^="#/"]');
+  const href = link?.getAttribute('href')?.split('?')[0];
+  if (href?.startsWith('#/accounts/')) return warm([`/api/cc/accounts/${href.slice('#/accounts/'.length)}`]);
+  if (href && HOVER_DATA[href]) warm(HOVER_DATA[href]);
+}, { passive: true });
 async function fetchApi(path, { method = 'GET', body } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';

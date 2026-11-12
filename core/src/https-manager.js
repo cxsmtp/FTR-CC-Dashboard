@@ -770,6 +770,12 @@ export class HttpsManager {
     const secure = https.createServer(this.contextOptions() ?? {}, app);
     this.#certStamp = this.#certificateStamp();
     secure.on('tlsClientError', () => {}); // a browser that does not trust the certificate yet hangs up; nothing to report
+    // A connection is kept open between clicks (2 minutes, not Node's 5 seconds): the next page does not wait for a new
+    // connection and its TLS handshake, which costs several round trips on a far network.
+    for (const srv of [plain, secure]) {
+      srv.keepAliveTimeout = 120_000;
+      srv.headersTimeout = 125_000;
+    }
     this.#secureServers.add(secure);
     const front = net.createServer((socket) => {
       socket.on('error', () => {}); // a client that vanishes before saying anything
