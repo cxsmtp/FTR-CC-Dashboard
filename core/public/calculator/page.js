@@ -1373,6 +1373,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     $('calc-git-steps').hidden = !on || git.stepsFolded === true;
     // How the server measures: not said where nothing is measured.
     $('calc-git-how').hidden = !on;
+    $('calc-git-details').hidden = !on;
     for (const id of ['calc-git-progress', 'calc-git-summary']) if (!on) $(id).hidden = true;
     if (shown === 'git' && on) loadConnections();
   }
@@ -2081,11 +2082,11 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       const all = git.queueDone;
       git.queueDone = null;
       if (!all.failed) return setStatus('calc-git-status', `${num(all.done)} counted with ${num(all.runs)} tokens: each is a project below.`, 'ok');
-      return setStatus('calc-git-status', `${num(all.done)} counted, ${num(all.failed)} not, with ${num(all.runs)} tokens: each says why above.`, all.done ? 'warn' : 'error');
+      return setStatus('calc-git-status', `${num(all.done)} counted, ${num(all.failed)} not, with ${num(all.runs)} tokens: each says why under Repository by repository.`, all.done ? 'warn' : 'error');
     }
     git.queueDone = null;
     if (!failed) setStatus('calc-git-status', done === 1 ? 'Counted: it is a project below.' : `${num(done)} counted: each is a project below.`, 'ok');
-    else setStatus('calc-git-status', `${num(done)} counted, ${num(failed)} not: each says why above.`, done ? 'warn' : 'error');
+    else setStatus('calc-git-status', `${num(done)} counted, ${num(failed)} not: each says why under Repository by repository.`, done ? 'warn' : 'error');
   }
 
   /** The run's figures: repositories measured, their code lines (the languages counted), developers (each once), Fusion scans. */
@@ -2106,11 +2107,56 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     ].join('');
   }
 
+  /** While a count runs: a small card at the right, with how far it is and what it is on. It goes by itself when the run ends. */
+  let flashLive = false;
+  let flashTimer = null;
+  function gitFlash(rows, { done, failed, left }) {
+    let el = document.getElementById('calc-git-flash');
+    if (!rows.length || (!left && !flashLive)) {
+      if (!rows.length) {
+        el?.remove();
+        flashLive = false;
+      }
+      return;
+    }
+    clearTimeout(flashTimer);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'calc-git-flash';
+      el.className = 'calc-git-flash';
+      el.setAttribute('role', 'status');
+      el.innerHTML = '<b></b><span class="calc-git-flash-n"></span><span class="calc-git-flash-bar"><i></i></span><small translate="no"></small><button type="button" class="link">Details</button>';
+      el.querySelector('button').addEventListener('click', () => {
+        const d = $('calc-git-details');
+        d.open = true;
+        d.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+      document.body.append(el);
+    }
+    flashLive = left > 0;
+    const now = rows.find((r) => !['done', 'failed', 'waiting', 'queued', undefined].includes(r.state)) ?? rows.find((r) => r.state !== 'done' && r.state !== 'failed');
+    const doing = { counting: now?.total ? `counting ${num(now.done)} of ${num(now.total)} files` : 'counting', files: 'fetching its files', history: 'reading its commits', clone: 'fetching', fetching: 'fetching' }[now?.state] ?? 'waiting';
+    el.querySelector('b').textContent = left ? 'Counting from git' : failed ? 'Counted from git, some not' : 'Counted from git';
+    el.querySelector('.calc-git-flash-n').textContent = `${num(done + failed)} of ${num(rows.length)}${failed ? ` · ${num(failed)} not counted` : ''}`;
+    el.querySelector('i').style.width = `${Math.round(((done + failed) / rows.length) * 100)}%`;
+    el.querySelector('small').textContent = now ? `${now.path || String(now.url ?? '').replace(/^https?:\/\/[^/]+\//, '')}: ${doing}` : '';
+    el.classList.toggle('calc-git-flash-bad', !left && failed > 0);
+    if (!left) flashTimer = setTimeout(() => el.remove(), failed ? 9000 : 5000);
+  }
+
   /** One line a repository: waiting, fetching, its commits, counting n of m files, what it found, or why not. */
   function renderProgress() {
     const box = $('calc-git-progress');
     const rows = (git.run?.rows ?? []).filter(Boolean);
     box.hidden = !rows.length;
+    // The list stays folded at the bottom, for whoever wants a repository's detail: its heading says how the run stands.
+    const done = rows.filter((r) => r.state === 'done').length;
+    const failed = rows.filter((r) => r.state === 'failed').length;
+    const left = rows.length - done - failed;
+    const sum = $('calc-git-details-sum');
+    sum.textContent = rows.length ? `Repository by repository: ${num(done)} counted${failed ? `, ${num(failed)} not` : ''}${left ? `, ${num(left)} to go` : ''} · how it is measured` : 'How it is measured';
+    sum.classList.toggle('calc-warn', failed > 0);
+    gitFlash(rows, { done, failed, left });
     const out = new Set(fnew()?.leftOut ?? []);
     box.innerHTML = rows
       .map((r) => {

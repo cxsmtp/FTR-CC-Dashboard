@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.68.00 — 2026-11-12
+
+- **Calculator: the count from git no longer makes the page long.** While repositories are counted, a small card at the right says how far the run is (4 of 23, and what it is on) and goes by itself when it ends. The list repository by repository, and how it is measured, are folded into one line at the bottom of the section ("Repository by repository: 22 counted, 1 not · how it is measured"): open it for any repository's detail, or with Details on the card.
+
 ## CC-01.67.00 — 2026-11-12
 
 - **An account opens beside the list, not instead of it.** Click an account in Accounts and it opens as a wide side panel over the list: the same details, sales and reports, each table fitting the panel. Close it with ✕, Esc, a click outside or the browser's Back, and the list is where it was, with its search and filters. A link to an account still works: the list is drawn and the account opens on it.

@@ -4519,3 +4519,19 @@ button.gv-sugg:hover:not(:disabled) { border-color: var(--accent); }
 :root:not([data-phone]) :is(.m-more, .m-select, .m-sev, .m-scope-row, .m-sheet, .m-backdrop, .m-detail-head) { display: none !important; }
 [dir="rtl"] details.calc-fold > summary h2::before { content: "◂"; }
 [dir="rtl"] details.calc-fold[open] > summary h2::before { transform: rotate(-90deg); }
+/* The count from git, repository by repository: folded at the bottom; while it runs, a small card at the right says how far it is. */
+.calc-git-details { margin: 0 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.calc-git-details > summary { padding: 7px 12px; cursor: pointer; color: var(--muted); font-size: 12.5px; }
+.calc-git-details > summary .calc-warn { color: var(--bad); }
+.calc-git-details[open] > summary { border-bottom: 1px solid var(--border); }
+.calc-git-details > .calc-git-progress { margin: 10px; max-height: 320px; }
+.calc-git-details > .calc-git-how { margin: 10px; }
+.calc-git-flash { position: fixed; right: 18px; bottom: 76px; z-index: 60; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; width: min(340px, calc(100vw - 36px)); box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, .18); font-size: 13px; animation: calc-git-flash-in .2s ease-out; }
+@keyframes calc-git-flash-in { from { transform: translateX(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .calc-git-flash { animation: none; } }
+.calc-git-flash-n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.calc-git-flash-bar { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.calc-git-flash-bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+.calc-git-flash-bad .calc-git-flash-bar i { background: var(--bad); }
+.calc-git-flash small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11.5px; }
+.calc-git-flash .link { font-size: 12px; justify-self: end; }
