@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.74.00 — 2026-11-12
+
+- **Calculator: no footer line.** "FTR Credits Command Center · Terms of use & license" and "Supporting information only" no longer show under the calculator. The terms and the licence are where they always are: under the version in the menu, and on the About page.
+
 ## CC-01.73.00 — 2026-11-12
 
 - **Calculator: the tabs are a band across the page.** Triage & remediation, the Fusion tabs and Generated reports are now large buttons side by side over the full width, in a tinted band with its own border; the one in view is filled in the accent colour with a shadow. On a narrow screen they wrap onto two rows.
