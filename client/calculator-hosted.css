@@ -794,3 +794,22 @@ tr.calc-plan-out td:not(.calc-plan-c) { opacity: .5; }
 .hc-pane .hc-or { flex: none; color: var(--muted); font-size: calc(var(--hc-fs, 13px) - 1px); }
 .hc-account.no-sf .hc-cf-up { opacity: .5; pointer-events: none; }
 .hc-pane .hc-git #hc-git-token { flex: 1 1 180px; }
+/* Projection settings, compact: the projects, their search options, what is applied and Apply on one line. */
+html[data-cc] #calc-heart { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: start; }
+html[data-cc] #calc-heart > * { grid-column: 1 / -1; }
+html[data-cc] #calc-heart > .calc-scope { grid-column: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0; padding: 0; border: 0; min-height: var(--hc-h, 34px); }
+html[data-cc] #calc-heart > .calc-scope > .calc-scope-fold[open] { flex: 1 1 100%; }
+html[data-cc] #calc-heart > .calc-scope > .calc-scope-fold > summary { cursor: pointer; font-size: var(--hc-fs, 13px); color: var(--muted); }
+html[data-cc] #calc-heart > .calc-pending.idle { grid-column: 2; display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; padding: 0; border: 0; background: none; font-size: calc(var(--hc-fs, 13px) - 1px); }
+html[data-cc] #calc-heart > .calc-pending.idle ul { display: none; }
+html[data-cc] #calc-heart > .calc-pending.idle ~ .calc-apply-hint { display: none; }
+html[data-cc] #calc-heart > .calc-source:not(:has(> :not(.calc-source-state):is(button, label, span, details):not([hidden]))) { display: none; }
+html[data-cc] #calc-heart .calc-heart-head { margin-bottom: 0 !important; }
+@media (max-width: 760px) { html[data-cc] #calc-heart > .calc-scope, html[data-cc] #calc-heart > .calc-pending.idle { grid-column: 1 / -1; } }
+html[data-cc] #calc-heart > .calc-source { padding-top: 0 !important; padding-bottom: 0 !important; border: 0 !important; margin: 0 !important; min-height: 0 !important; }
+/* The calculator's tabs are where the work is: a strip of its own, the tab in view filled, so nobody misses them. */
+html[data-cc] [data-ptabs="calculator"] { gap: 4px !important; padding: 5px !important; border: 1px solid var(--line, var(--border)) !important; border-radius: 12px !important; background: color-mix(in srgb, var(--brand, var(--cyan, #0e6b7c)) 7%, var(--panel, var(--surface))) !important; width: fit-content; }
+html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt] { margin: 0 !important; padding: 8px 16px !important; border: 0 !important; border-radius: 8px !important; box-shadow: none !important; background: transparent !important; color: var(--text) !important; font-weight: 600 !important; font-size: calc(var(--hc-fs, 13px) + .5px) !important; }
+html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt]:hover { background: color-mix(in srgb, var(--brand, var(--cyan, #0e6b7c)) 14%, transparent) !important; }
+html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt].active, html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt][aria-selected="true"] { background: var(--brand, var(--cyan, #0e6b7c)) !important; color: var(--on-brand, #fff) !important; box-shadow: 0 1px 3px rgba(0, 0, 0, .18) !important; }
+html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt].active *, html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt][aria-selected="true"] * { color: inherit !important; }

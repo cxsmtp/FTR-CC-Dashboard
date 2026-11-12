@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.71.00 — 2026-11-12
+
+- **Calculator: Projection settings without the white space.** The projects, Search options, "Every setting is applied" and Apply are on one line; the empty band above them and the explanation under them are gone while nothing waits to be applied. With changes waiting, the list of changes, Undo, Apply and the explanation show as before.
+- **Calculator: the tabs stand out.** Triage & remediation, the Fusion tabs and Generated reports are a strip of their own, with the tab in view filled in the accent colour, so a new user does not miss them.
+
 ## CC-01.70.00 — 2026-11-12
 
 - **Calculator, Code repositories: two things, side by side.** *Upload their cloc-fusion report* (the customer made it), or their read-only git token and *Connect to Git*. The switch between "with their token" and "cloc-fusion report" of CC-01.69.00 is gone. What the upload read shows right under it, and the calculator opens on its repositories.
