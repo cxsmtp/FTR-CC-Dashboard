@@ -84,7 +84,7 @@ export function guideHtml(persona, { first = false, tabs = [] } = {}) {
     </div>
     ${tabs.length > 1 ? `<div class="gx-tabs" role="tablist">${tabs.map((t) => `<button type="button" role="tab" data-guide="${t}" aria-selected="${t === persona}" class="${t === persona ? 'on' : ''}">${esc(GUIDES[t].name)}${t === personaOf() ? ' <small>yours</small>' : ''}</button>`).join('')}</div>` : ''}
     <ol class="gx-steps">${g.steps.map(([k, t, p, href, cta], i) => `<li class="gx-step" data-css="--i:${i}"><div class="gx-art">${art(k)}<b class="gx-n">${i + 1}</b></div><h3>${esc(t)}</h3><p>${esc(p)}</p>${first ? '' : `<a class="gx-go" href="${href.startsWith('/calculator') ? href : `#${href}`}">${esc(cta)} →</a>`}</li>`).join('')}</ol>
-    ${persona === 'admin' ? '' : `<div class="panel mt gx-limits"><h2>Limits to know</h2><ul>${LIMITS.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></div>`}
+    <div class="panel mt gx-limits"><h2>Limits to know</h2><ul>${LIMITS.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></div>
     <div class="callout mt">Figures are supporting information worked out from the customer’s data at a moment in time; Checkmarx’s own records are authoritative. Paste a customer’s key only into the Calculator, and use read-only git tokens.</div>
   </div>`;
 }

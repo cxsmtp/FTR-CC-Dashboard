@@ -143,7 +143,7 @@ export function applyMyTheme() {
 }
 // ---- Branding (Settings → Branding): the name, the logo, the browser icon, the accent and where the menu sits --------
 state.branding = null;
-export const TEJAS_LINE = 'Tejas - Built for speed, engineered for dominance—Tejas turns every airspace into its own.';
+export const TEJAS_LINE = 'Tejas \u2014 built for speed, engineered for dominance. Every projection here is a sortie in Checkmarx\u2019s growth: one customer, one codebase, one credit at a time.';
 export const brandHtml = () => {
   const b = state.branding ?? {};
   // The default logo is Tejas: pointed at, it shows itself, larger, with its line.

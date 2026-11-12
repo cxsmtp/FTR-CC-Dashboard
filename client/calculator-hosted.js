@@ -183,7 +183,7 @@ export async function startHosted() {
       $('cc-logo').classList.add('img');
       // The default logo is Tejas: pointed at, it shows itself, larger, with its line.
       if (String(brand.logo).includes('v=default')) {
-        const line = 'Tejas - Built for speed, engineered for dominance—Tejas turns every airspace into its own.';
+        const line = 'Tejas \u2014 built for speed, engineered for dominance. Every projection here is a sortie in Checkmarx\u2019s growth: one customer, one codebase, one credit at a time.';
         const card = document.createElement('span');
         card.className = 'tejas-card';
         card.setAttribute('role', 'tooltip');

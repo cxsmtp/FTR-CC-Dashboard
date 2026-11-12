@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.84.00 — 2026-11-12
+
+- The Tejas card tells Checkmarx's growth story: *Tejas — built for speed, engineered for dominance. Every projection here is a sortie in Checkmarx's growth: one customer, one codebase, one credit at a time.*
+- The quick guide's *Limits to know* shows in every guide, the Admin's too.
+
 ## CC-01.83.00 — 2026-11-12
 
 One customer's data in another's account: the last line closed, and the accounts it reached put right in one click.
