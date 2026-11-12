@@ -588,7 +588,7 @@ export function fusionEstimate(projects = [], value = {}) {
 export const CLOC_LEFT_OUT = Object.freeze(['JSON', 'YAML', 'Markdown', 'XML', 'CSV', 'Text', 'SVG', 'HTML']);
 export const MAX_CLOC_LANGUAGES = 80;
 /** Fusion scans a new customer's project is given over the period, until the reader says otherwise. */
-export const NEW_CUSTOMER_SCANS = 12;
+export const NEW_CUSTOMER_SCANS = 4;
 const CLOC_META = new Set(['header', 'SUM', 'by_file', 'by_lang']);
 
 /** "C:\\code\\payments-api.json" → "payments-api". */
@@ -750,9 +750,10 @@ export function newCustomerEstimate(value = {}, fusionValue = {}) {
     const devs90 = wholeNumber(p.activity?.devs90);
     const commits = wholeNumber(p.activity?.commits);
     const source = fusionSourceOf(p);
-    return { ...p, source, inBasis: (!own.basis || own.basis === source) && !(skip && skip.has(repoKey(p.name))), inCxone: Boolean(skip && skip.has(repoKey(p.name))), lines, included, units, frequency, criticality, commits, devs90, scans, scansFrom: from, model, rate, credits, languages, unknownLines: lines === null, unknownRate: included && units > 0 && scans > 0 && rate === null };
+    return { ...p, source, inBasis: !(skip && skip.has(repoKey(p.name))), inCxone: Boolean(skip && skip.has(repoKey(p.name))), lines, included, units, frequency, criticality, commits, devs90, scans, scansFrom: from, model, rate, credits, languages, unknownLines: lines === null, unknownRate: included && units > 0 && scans > 0 && rate === null };
   });
-  // Only the counted code the basis names is in the credits (the Git tab's or the cloc-fusion tab's).
+  // The counted code is one estimate: repositories counted from git and those from a cloc-fusion report or cloc results
+  // alike (Fusion · from Git), less any already in Checkmarx One when it is added on top.
   const counted = rows.filter((r) => r.inBasis && r.included && r.units);
   const totals = {
     projects: counted.length,

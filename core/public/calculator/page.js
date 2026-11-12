@@ -1044,10 +1044,32 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       const table = $(body).closest('table');
       table.classList.toggle('show-models', rulesModels || Object.values(rules ?? {}).some((r) => r?.model));
     }
-    $('calc-freq').innerHTML = FREQUENCIES.map((q) => ruleRow(q.id, esc(q.short), rows.filter((p) => p.frequency === q.id).length, f.byFrequency[q.id], 'data-freq', q.label)).join('');
+    // On Fusion · from Git the groups count the repositories, by how often each changes (commits on its default branch).
+    const onGit = Boolean($('calc-freq-panel')?.closest('[data-ptpanel="calculator:fusion-git"]'));
+    const grouped = onGit ? fnewEstimate().rows.filter((r) => r.included) : rows;
+    $('calc-freq-panel')?.classList.toggle('calc-freq-git', onGit);
+    for (const [cls, show] of [['.calc-explain', !onGit], ['.calc-explain-git', onGit]]) {
+      const el = $('calc-freq-panel')?.querySelector(cls);
+      if (el) el.hidden = !show;
+    }
+    const head = $('calc-freq-panel')?.querySelector('h2');
+    if (head) head.textContent = onGit ? 'Fusion scans by how often repositories change' : 'Fusion scans by how often projects are scanned';
+    $('calc-freq').innerHTML = FREQUENCIES.map((q) => ruleRow(q.id, esc(q.short), grouped.filter((p) => p.frequency === q.id).length, f.byFrequency[q.id], 'data-freq', q.label)).join('');
     // Folded unless a criticality has its own number or model, so a plan made with it is never hidden.
     if (CRITICALITIES.some((k) => f.byCriticality[k]?.scans != null || f.byCriticality[k]?.model)) $('calc-crit-fold').open = true;
     $('calc-crit').innerHTML = [...CRITICALITIES.map((k) => ruleRow(k, `${k}${k === 5 ? ' (most critical)' : k === 1 ? ' (least critical)' : ''}`, rows.filter((p) => p.criticality === k).length, f.byCriticality[k], 'data-crit'))].join('');
+  }
+
+  /**
+   * Why the blocks are more than the lines over 10K: each project (repository) is rounded up to whole 10K-LOC blocks
+   * on its own, so a 2,000-line one is a whole block.
+   */
+  function blocksWhy(t) {
+    const pooled = Math.ceil((t.lines || 0) / 10000);
+    const what = t.projects === 1 ? 'project' : 'projects';
+    return t.units > pooled
+      ? `${num(t.lines)} code lines in ${num(t.projects)} ${what}: each rounded up to whole blocks on its own (a 2,000-line one is 1 block), so ${num(t.units)}, not ${num(pooled)}`
+      : `${num(t.lines)} code lines in ${num(t.projects)} ${what}, each rounded up to whole blocks`;
   }
 
   function renderKpis(est = estimate()) {
@@ -1060,7 +1082,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const kpi = (label, value, sub, cls = '') => `<div class="rp-kpi ${cls}"><span class="rp-tile-label">${esc(label)}</span><span class="rp-kpi-value">${value}</span><span class="rp-tile-sub">${sub}</span></div>`;
     $('calc-fkpis').innerHTML = [
       kpi('Projects', num(t.projects), t.unknownLines ? `<span class="calc-warn">Still without lines of code: ${num(t.unknownLines)}</span>` : 'Included, with lines of code'),
-      kpi('10K-LOC blocks', num(t.units), `${num(t.lines)} lines, each project rounded up`),
+      kpi('10K-LOC blocks', num(t.units), blocksWhy(t)),
       kpi('Fusion scans', num(t.scans), `Over ${num(est.settings.periodMonths)} months`),
       kpi('Credits', num(t.credits, 1), t.unknownRate ? `<span class="calc-warn">Projects whose model has no credits per 10K LOC: ${num(t.unknownRate)}</span>` : `Over ${num(est.settings.periodMonths)} months`, 'calc-gold'),
       c.remainingCredits !== null ? kpi('Credits remaining in the tenant', num(c.remainingCredits), c.remainingCredits >= t.credits ? 'Enough for this projection' : `<span class="calc-warn">Short by ${num(t.credits - c.remainingCredits, 1)}</span>`) : '',
@@ -1228,7 +1250,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     $('calc-fnew-kpis').innerHTML = f.projects.length
       ? [
           fnewKpi('Projects', num(tot.projects), tot.unknownLines ? `<span class="calc-warn">Still without lines of code: ${num(tot.unknownLines)}</span>` : 'Included, with lines of code'),
-          fnewKpi('10K-LOC blocks', num(tot.units), `${num(tot.lines)} code lines, each project rounded up`),
+          fnewKpi('10K-LOC blocks', num(tot.units), blocksWhy(tot)),
           fnewKpi('Fusion scans', num(tot.scans), tot.withActivity ? esc(`Over ${num(est.settings.periodMonths)} months · ${num(tot.byRule)} by change frequency`) : `Over ${num(est.settings.periodMonths)} months`),
           fnewKpi('Credits', num(tot.credits, 1), tot.unknownRate ? `<span class="calc-warn">Projects whose model has no credits per 10K LOC: ${num(tot.unknownRate)}</span>` : `Over ${num(est.settings.periodMonths)} months`, 'calc-gold'),
         ].join('')
@@ -1411,11 +1433,10 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   };
   showFsub();
 
-  // ---- The three Fusion tabs: Checkmarx One, from Git, cloc-fusion; one estimate in the credits ---------
+  // ---- The two Fusion tabs: Checkmarx One, and code counted (from Git or a cloc-fusion report); one in the credits --
   const BASES = {
     cxone: { tab: 'fusion', kick: 'Fusion · existing customer', title: 'From Checkmarx One projects', short: 'Checkmarx One', what: 'projects' },
-    git: { tab: 'fusion-git', kick: 'Fusion · from Git', title: 'From code counted in git', short: 'from Git', what: 'repositories' },
-    cloc: { tab: 'fusion-cloc', kick: 'Fusion · cloc-fusion', title: 'From a cloc-fusion report or cloc results', short: 'cloc-fusion', what: 'repositories' },
+    git: { tab: 'fusion-git', kick: 'Fusion · from Git', title: 'From code counted in git or by cloc-fusion', short: 'from Git', what: 'repositories' },
   };
   /** The estimate in the credits: one of the three, or none. A customer saved with both parts on counts both until one is chosen. */
   function basis() {
@@ -1424,21 +1445,21 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const nw = !fnewOff();
     if (cx && nw) return 'both';
     if (cx) return 'cxone';
-    if (nw) return fnew().basis ?? 'git';
+    if (nw) return 'git';
     return 'none';
   }
   /** Every estimate, worked out whichever is chosen, so each tab can show its own and the others beside it. */
   function estimates() {
     const cx = fusionEstimate(scoped(), { ...fusion(), optOut: false }).totals;
     const one = (b) => newCustomerEstimate({ ...fnew(), basis: b, optOut: false, onTop: false }, fusion()).totals;
-    return { cxone: cx, git: one('git'), cloc: one('cloc') };
+    return { cxone: cx, git: one('git') };
   }
   /** The names (short, lower case) of the Checkmarx One projects in the scope. */
   const cxNames = () => new Set(scoped().map((p) => repoKey(p.name)));
   /** What `b`'s repositories that are not in Checkmarx One would add on top of it. */
   const onTopOf = (b) => {
     const names = cxNames();
-    const skip = fnewEstimate().rows.filter((r) => r.source === b && names.has(repoKey(r.name))).map((r) => repoKey(r.name));
+    const skip = fnewEstimate().rows.filter((r) => names.has(repoKey(r.name))).map((r) => repoKey(r.name));
     return { skip, totals: newCustomerEstimate({ ...fnew(), basis: b, optOut: false, onTop: true, onTopSkip: skip }, fusion()).totals };
   };
   /** Checkmarx One's projects, plus the counted repositories that are not there yet (by name): nothing counted twice. */
@@ -1501,7 +1522,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   function renderBasis() {
     if (!c.open) return;
     if (fnew().onTop && basis() === 'both') {
-      const skip = onTopOf(fnew().basis ?? 'git').skip;
+      const skip = onTopOf('git').skip;
       if (skip.slice().sort().join('\n') !== [...(fnew().onTopSkip ?? [])].sort().join('\n')) {
         fnew().onTopSkip = skip;
         saveFnew();
@@ -1509,19 +1530,15 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     }
     const all = estimates();
     if (autoBasis(all)) return;
-    const view = document.querySelector('#page-calculator [data-ptpanel^="calculator:fusion-"]:not([hidden])')?.dataset.ptpanel.split(':')[1];
-    const shownRows = fnewEstimate().rows.filter((r) => (view === 'fusion-cloc' ? r.source === 'cloc' : r.source === 'git'));
+    const shownRows = fnewEstimate().rows;
     $('calc-fnew-log-count').textContent = shownRows.length ? `(${num(shownRows.length)})` : '(none yet)';
     const used = basis();
     const months = horizon();
-    // Repositories git (or cloc-fusion) counted that are not projects in Checkmarx One yet: by name.
-    const inCx = new Set(scoped().map((p) => String(p.name ?? '').toLowerCase().split('/').pop()));
-    const notInCx = (b) => fnewEstimate().rows.filter((r) => r.source === b && r.included && !inCx.has(String(r.name ?? '').toLowerCase().split('/').pop()));
     for (const [b, d] of Object.entries(BASES)) {
       const box = $(`calc-fh-${d.tab}`);
       if (!box) continue;
       const t = all[b];
-      const top = used === 'both' && fnew().onTop ? fnew().basis ?? 'git' : null;
+      const top = used === 'both' && fnew().onTop ? 'git' : null;
       const on = used === b || (used === 'both' && (b === 'cxone' || b === top));
       const connection = b === 'cxone'
         ? (tr()?.totals?.meta?.source === 'cxone' || scoped().length ? `<span class="calc-fh-pill ok">Read from Checkmarx One · ${num(scoped().length)} projects</span>` : '<span class="calc-fh-pill">Not read yet: connect the key at the top and Read from Checkmarx One</span>')
@@ -1529,7 +1546,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
           ? (t.projects ? `<span class="calc-fh-pill ok">Counted from git · ${num(t.projects)} repositories</span>` : '<span class="calc-fh-pill">Nothing counted yet: give a token below and count the repositories</span>')
           : (t.projects ? `<span class="calc-fh-pill ok">Imported · ${num(t.projects)} repositories</span>` : '<span class="calc-fh-pill">Nothing imported yet: download cloc-fusion, send it to the customer, import the report they send back</span>');
       const facts = t.projects
-        ? `<span><b>${num(t.projects)}</b> ${d.what}</span><span><b>${num(t.lines)}</b> lines of code</span><span><b>${num(t.units)}</b> 10K-LOC blocks</span><span><b>${num(t.scans)}</b> Fusion scans</span><span class="hint">${b === 'cxone' ? 'scans from how often each project was scanned in the last 12 months' : 'scans from the commits on each default branch'}</span>`
+        ? `<span><b>${num(t.projects)}</b> ${d.what}</span><span><b>${num(t.lines)}</b> lines of code</span><span title="${esc(blocksWhy(t))}"><b>${num(t.units)}</b> 10K-LOC blocks</span><span><b>${num(t.scans)}</b> Fusion scans</span><span class="hint">${b === 'cxone' ? 'scans from how often each project was scanned in the last 12 months' : 'scans from the commits on each default branch'}</span>`
         : '';
       const others = Object.entries(BASES).filter(([k]) => k !== b && all[k].projects).map(([k, o]) => `<div class="calc-fh-alt">${esc(o.short)}: ${credits(all[k])}${used === k ? ' · <b>in use</b>' : ` · <button type="button" class="link" data-use-basis="${esc(k)}">use instead</button>`}</div>`).join('');
       // On top of Checkmarx One: what the repositories that are not there yet add, in credits and as a share of its own.
@@ -1576,13 +1593,16 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const slot = panel.querySelector('.calc-fslot');
     // The visuals draw the estimate in the credits: shown on that estimate's tab only.
     const viz = $('calc-fusion-viz-panel');
-    const mine = { fusion: 'cxone', 'fusion-git': 'git', 'fusion-cloc': 'cloc' }[view];
+    const mine = { fusion: 'cxone', 'fusion-git': 'git' }[view];
     const inUse = basis();
     viz?.classList.toggle('calc-viz-elsewhere', !(inUse === mine || (inUse === 'both' && mine === 'cxone')));
     const parts = [viz, $('calc-fusion-pricing')];
     const counted = document.querySelector('#page-calculator .calc-fsub[data-fsub="new"]');
+    const freq = $('calc-freq-panel');
     if (view === 'fusion') {
       slot.append(...parts.filter(Boolean));
+      // The scans by how often projects are scanned go back among Checkmarx One's settings.
+      if (freq && freqHome && freq.previousSibling !== freqHome) freqHome.after(freq);
       // The tiles go back to their place among the counted code's settings.
       const kpis = $('calc-fnew-kpis');
       const home = $('calc-fnew-log');
@@ -1593,19 +1613,29 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       // The tiles (repositories, lines, developers, scans) lead the tab, under its header.
       const kpis = $('calc-fnew-kpis');
       if (kpis) slot.prepend(kpis);
-      // Git: count from git only. cloc-fusion: its report, or cloc results.
-      for (const label of document.querySelectorAll('#calc-fnew-ways .mode')) {
-        const v = label.querySelector('input')?.value;
-        label.hidden = view === 'fusion-git' ? true : v === 'git';
-      }
-      $('calc-fnew-ways').hidden = view === 'fusion-git';
-      if (view === 'fusion-git') showWay('git');
-      else if (way === 'git' || !['report', 'cloc'].includes(document.querySelector('input[name="calc-fnew-way"]:checked')?.value)) showWay('report');
+      // The same scans by how often a repository changes, as for Checkmarx One's projects by how often they are scanned.
+      if (freq) counted.after(freq);
+      // Counted from git, or from the customer's cloc-fusion report (or cloc results): all three ways, on one tab.
+      for (const label of document.querySelectorAll('#calc-fnew-ways .mode')) label.hidden = false;
+      $('calc-fnew-ways').hidden = false;
+      // The source picked at the top of the hosted calculator says which way leads.
+      const src = document.documentElement.dataset.src;
+      if (src === 'cloc' && way === 'git') showWay('report');
+      else if (src === 'git' && way !== 'git') showWay('git');
     }
+    if (c.open) renderRules();
     panel.classList.toggle('calc-fview-new', view !== 'fusion');
     panel.dataset.fview = view;
     renderBasis();
   }
+  // Where the scans by how often projects are scanned sit among Checkmarx One's settings, to go back to.
+  const freqHome = (() => {
+    const freq = $('calc-freq-panel');
+    if (!freq) return null;
+    const mark = document.createComment('calc-freq-panel');
+    freq.before(mark);
+    return mark;
+  })();
   for (const panel of document.querySelectorAll('#page-calculator [data-ptpanel^="calculator:fusion"]')) new MutationObserver(placeFusion).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
 
   /** The Admin's git connections, once: each one a choice in step 1, beside a token typed for one run. */

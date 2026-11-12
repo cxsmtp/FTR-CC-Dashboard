@@ -765,7 +765,7 @@ export async function startHosted() {
     const src = document.documentElement.dataset.src;
     const fusionOnly = Boolean(account) && (src === 'git' || src === 'cloc') && !cxState.connected && !trSource && !fusionCx;
     document.documentElement.toggleAttribute('data-fusion-only', fusionOnly);
-    if (fusionOnly && document.querySelector('[data-ptabs="calculator"] [data-pt="tr"].active')) document.querySelector(`[data-ptabs="calculator"] [data-pt="fusion-${src}"]`)?.click();
+    if (fusionOnly && document.querySelector('[data-ptabs="calculator"] [data-pt="tr"].active')) document.querySelector('[data-ptabs="calculator"] [data-pt="fusion-git"]')?.click();
     const parts = [
       '<span class="hc-label">Status</span>',
       account ? `<span class="hc-st cust"><i></i><b>${esc(account.name)}</b></span>` : '',
@@ -1320,12 +1320,11 @@ export async function startHosted() {
   const panes = [...document.querySelectorAll('.hc-pane')];
   const pick = (src) => {
     for (const b of document.querySelectorAll('.hc-seg [data-src]')) {
-      // Code repositories is one choice, counted here with a token (git) or by the customer (cloc-fusion).
-      const on = b.dataset.src === src || b.dataset.also === src;
+      const on = b.dataset.src === src;
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', String(on));
     }
-    for (const p of panes) p.hidden = p.dataset.pane !== src && p.dataset.also !== src;
+    for (const p of panes) p.hidden = p.dataset.pane !== src;
     // A Fusion-only customer (Git or cloc-fusion): Impact (soft savings of triage & remediation) and the Checkmarx One
     // key's state do not apply; Impact stays in view when it is already on, to turn it off.
     $('hc-account').dataset.src = src;
@@ -1333,12 +1332,14 @@ export async function startHosted() {
     // In a meeting the account panel is hidden: the page itself says which Fusion tab belongs to the source.
     document.documentElement.dataset.src = src;
     renderStatus();
-    if (meeting && src !== 'cxone') document.querySelector(`[data-ptabs="calculator"] [data-pt="fusion-${src}"]`)?.click();
+    // Code from Git and from a cloc-fusion report share one tab: Fusion · from Git.
+    if (meeting && src !== 'cxone') document.querySelector('[data-ptabs="calculator"] [data-pt="fusion-git"]')?.click();
   };
   $('hc-impact').addEventListener('change', () => $('hc-account').classList.toggle('impact-on', $('hc-impact').checked));
-  for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.also && b.dataset.also === document.documentElement.dataset.src ? b.dataset.also : b.dataset.src));
-  // The customer's cloc-fusion report, given here: read by the calculator's own importer (Fusion · cloc-fusion), which
-  // takes any of the files cloc-fusion writes; what it read shows under the button.
+  for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.src));
+  // The customer's cloc-fusion report, given here: read by the calculator's own importer, which takes any of the files
+  // cloc-fusion writes. Its repositories join those counted from git, on Fusion · from Git; what it read shows beside.
+  $('hc-cf-dl').addEventListener('click', () => document.getElementById('calc-cf-download')?.click());
   $('hc-cf-file').addEventListener('change', (e) => {
     const files = e.target.files;
     const into = document.getElementById('calc-cf-file');
@@ -1347,14 +1348,15 @@ export async function startHosted() {
     into.files = files;
     into.dispatchEvent(new Event('change', { bubbles: true }));
     e.target.value = '';
-    document.querySelector('[data-ptabs="calculator"] [data-pt="fusion-cloc"]')?.click();
+    document.querySelector('[data-ptabs="calculator"] [data-pt="fusion-git"]')?.click();
+    document.querySelector('input[name="calc-fnew-way"][value="report"]')?.click();
   });
   {
     const said = document.getElementById('calc-cf-status');
     if (said) new MutationObserver(() => {
       if (!said.textContent.trim()) return;
-      $('hc-git-status').textContent = said.textContent;
-      $('hc-git-status').className = `status ${/ok/.test(said.className) ? 'ok' : 'muted'}`;
+      $('hc-cf-status').textContent = said.textContent;
+      $('hc-cf-status').className = `status ${/ok/.test(said.className) ? 'ok' : 'muted'}`;
     }).observe(said, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   }
   // Git and cloc-fusion are the calculator's own Fusion tabs: open the one asked for, and bring it into view.

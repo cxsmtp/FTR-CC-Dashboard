@@ -3578,7 +3578,6 @@ BITBUCKET_TOKEN_2=…  BITBUCKET_URL_2=https://bitbucket.acme.com</pre>
               <button type="button" role="tab" class="ptab" data-pt="tr">Triage &amp; remediation</button>
               <button type="button" role="tab" class="ptab" data-pt="fusion">Fusion · Checkmarx One</button>
               <button type="button" role="tab" class="ptab" data-pt="fusion-git">Fusion · from Git</button>
-              <button type="button" role="tab" class="ptab" data-pt="fusion-cloc">Fusion · cloc-fusion</button>
               <button type="button" role="tab" class="ptab" data-pt="impact">Impact</button>
               <button type="button" role="tab" class="ptab" data-pt="reports">Generated reports <em class="calc-saved-count" id="calc-saved-count"></em></button>
             </div>
@@ -3633,9 +3632,10 @@ BITBUCKET_TOKEN_2=…  BITBUCKET_URL_2=https://bitbucket.acme.com</pre>
                     <select id="calc-combine"><option value="higher">Use the higher</option><option value="frequency">Scan frequency wins</option><option value="criticality">Criticality wins</option></select></label>
                 </div>
               </section>
-              <section class="panel">
+              <section class="panel" id="calc-freq-panel">
                 <div class="calc-section-head"><h2>Fusion scans by how often projects are scanned</h2><button type="button" class="link" data-rule-models>Model per group</button></div>
                 <p class="hint calc-explain">Projects are grouped by how often Checkmarx One scanned them in the last 12 months. Each row is the number of Fusion scans one project of that group needs over the projection period: it starts at the scans the group runs today, so the forecast follows how the customer really works. Change a number to plan more or fewer; leave it empty to use the default. <button type="button" class="link" id="calc-suggest">Back to the suggested numbers</button></p>
+                <p class="hint calc-explain-git" hidden>Repositories counted from git or by cloc-fusion are grouped by how often they change: the commits on their default branch in the last year. The same numbers as for Checkmarx One projects scanned that often (they are one setting); change a number to plan more or fewer scans, or leave it empty to use the default.</p>
                 <div class="table-wrap"><table class="data-table calc-rules"><thead><tr><th>Scanned today</th><th>Projects</th><th>Fusion scans per project</th><th>Model</th></tr></thead><tbody id="calc-freq"></tbody></table></div>
               </section>
               <details class="panel calc-fold" id="calc-crit-fold">
@@ -3757,10 +3757,10 @@ BITBUCKET_TOKEN_2=…  BITBUCKET_URL_2=https://bitbucket.acme.com</pre>
               <section class="panel">
                 <h2>How it is counted</h2>
                 <div class="calc-terms">
-                  <label class="field"><span>Fusion scans per project, when how often it changes is not known</span><input type="number" id="calc-fnew-scans" min="0" step="1" /></label>
+                  <label class="field"><span>Default Fusion scans per repository</span><input type="number" id="calc-fnew-scans" min="0" step="1" /></label>
                   <label class="field"><span>Model</span><select id="calc-fnew-model"></select></label>
                 </div>
-                <p class="hint">A project counted from git or read from a cloc-fusion report knows how often it changes (commits on its default branch): it gets the Fusion scans of that change frequency from the Fusion — existing customer tab, as a Checkmarx One project scanned that often does. Scans typed for a project win.</p>
+                <p class="hint">Only for a repository whose commits are not known (cloc results, or added by hand). The others get their scans from how often they change, in the cards above. Scans typed for one repository always win.</p>
                 <h3 class="calc-sub">What counts as code</h3>
                 <p class="hint">Languages found. A crossed-out one is not counted (not code Fusion scans): click a language to count it, or to leave it out.</p>
                 <div class="calc-langs" id="calc-fnew-langs"></div>
@@ -3784,10 +3784,6 @@ BITBUCKET_TOKEN_2=…  BITBUCKET_URL_2=https://bitbucket.acme.com</pre>
               <div class="calc-fslot" data-fslot="fusion-git"></div>
             </div>
 
-            <div data-ptpanel="calculator:fusion-cloc" class="calc-panel" hidden>
-              <section class="calc-fh" id="calc-fh-fusion-cloc" aria-live="polite"></section>
-              <div class="calc-fslot" data-fslot="fusion-cloc"></div>
-            </div>
 
             <div data-ptpanel="calculator:impact" class="calc-panel" hidden>
               <section class="panel">

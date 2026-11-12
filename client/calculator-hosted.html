@@ -55,7 +55,7 @@
         <p class="hc-start" id="hc-start">Type the customer’s name as it is in Salesforce. A name you worked on before opens that account. A new one needs its <b>Salesforce link</b> too: paste it and press <kbd>Enter</kbd>. The account is kept once you bring in its data (read Checkmarx One, upload, or count code); started and left with nothing, it is discarded after a day.</p>
         <div class="hc-src">
           <span class="hc-src-l">Data from</span>
-          <div class="hc-seg" role="tablist" aria-label="Where the data comes from"><button type="button" role="tab" data-src="cxone" class="on">Checkmarx One</button><button type="button" role="tab" data-src="git" data-also="cloc" title="The customer's code, counted here with their read-only token, or by them with cloc-fusion">Code repositories</button></div>
+          <div class="hc-seg" role="tablist" aria-label="Where the data comes from"><button type="button" role="tab" data-src="cxone" class="on">Checkmarx One</button><button type="button" role="tab" data-src="git" title="Count the customer's repositories here, with their read-only git token">Git</button><button type="button" role="tab" data-src="cloc" title="The customer counts their own code with cloc-fusion and sends you its report">cloc-fusion report</button></div>
           <div class="hc-pane" data-pane="cxone">
             <form class="sa-connect" id="sa-connect" autocomplete="off">
               <input type="password" id="sa-key" spellcheck="false" placeholder="The customer's API key (in memory for your session only)" autocomplete="off" aria-label="The customer's Checkmarx One API key" />
@@ -72,10 +72,16 @@
               <span class="status" id="sa-connect-status" aria-live="polite"></span>
             </form>
           </div>
-          <div class="hc-pane" data-pane="git" data-also="cloc" hidden>
-            <form class="sa-connect hc-git" id="hc-git" autocomplete="off">
+          <div class="hc-pane" data-pane="cloc" hidden>
+            <div class="sa-connect hc-git hc-cloc">
               <label class="hc-file hc-cf-up" id="hc-cf-l" title="The report the customer made with cloc-fusion: its JSON, HTML, CSV or Markdown file. Their code and token never leave them.">⇪ Upload their cloc-fusion report<input type="file" id="hc-cf-file" accept=".json,.html,.htm,.csv,.md,application/json,text/html,text/csv,text/markdown" multiple hidden /></label>
-              <span class="hc-or">or</span>
+              <button type="button" class="ghost sm" id="hc-cf-dl" title="cloc-fusion: one HTML file, nothing to install. The customer opens it, adds their own read-only token, and sends you the report it writes.">⇩ Download cloc-fusion</button>
+              <span class="hint hc-cf-how">Send it to the customer; upload the report they send back (JSON, HTML, CSV or Markdown).</span>
+              <span class="status" id="hc-cf-status" aria-live="polite"></span>
+            </div>
+          </div>
+          <div class="hc-pane" data-pane="git" hidden>
+            <form class="sa-connect hc-git" id="hc-git" autocomplete="off">
               <input type="password" id="hc-git-token" spellcheck="false" placeholder="Their read-only git token: GitHub, GitLab, Bitbucket or Azure DevOps (in memory only)" autocomplete="off" aria-label="The customer's git token" />
               <span class="hc-git-kind" id="hc-git-kind" aria-live="polite"></span>
               <select id="hc-git-provider" aria-label="Git host" hidden><option value="">Which git host?</option><option value="github">GitHub</option><option value="gitlab">GitLab</option><option value="bitbucket">Bitbucket</option><option value="azure">Azure DevOps</option></select>

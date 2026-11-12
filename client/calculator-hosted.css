@@ -714,7 +714,7 @@ html[data-no-account] .hc-account { max-width: 1200px; }
 .hc-meet-src .hc-src { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; width: 100%; min-width: 0; }
 .hc-meet-src .hc-pane { flex: 1 1 320px; min-width: 0; }
 html[data-meeting][data-src="git"] [data-ptabs="calculator"] [data-pt="fusion-git"],
-html[data-meeting][data-src="cloc"] [data-ptabs="calculator"] [data-pt="fusion-cloc"] { display: revert !important; }
+html[data-meeting][data-src="cloc"] [data-ptabs="calculator"] [data-pt="fusion-git"] { display: revert !important; }
 html[data-meeting] .hc-meet-src .hc-remember { display: none !important; }
 
 /* False positives: one small box for every severity, beside the per-severity results (not a field in each). */
@@ -828,3 +828,9 @@ html[data-opening] .hc-row1, html[data-opening] .hc-start { visibility: hidden; 
 .hc-opening-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--brand, #0e6b7c); animation: hc-opening 1s ease-in-out infinite alternate; }
 @keyframes hc-opening { from { opacity: .3; transform: scale(.8); } }
 @media (prefers-reduced-motion: reduce) { .hc-opening-dot { animation: none; } }
+
+/* cloc-fusion report: upload and download on one line, with a word on how. */
+.hc-cloc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.hc-cloc .hc-cf-how { flex: 1 1 220px; min-width: 0; color: var(--muted); font-size: calc(var(--hc-fs, 13px) - 1px); }
+.hc-cloc #hc-cf-dl { flex: none; white-space: nowrap; }
+html[data-cc] .calc-freq-git table.calc-rules td:nth-child(2)::after { content: " repositories"; }

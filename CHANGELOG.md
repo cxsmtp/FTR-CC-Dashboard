@@ -2,6 +2,21 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.92.00 — 2026-11-12
+
+- **Three sources in the calculator: Checkmarx One, Git, cloc-fusion report.** Git takes the customer's read-only token.
+  cloc-fusion report has, on one line, the upload (any file cloc-fusion writes: JSON, HTML, CSV or Markdown) and
+  **Download cloc-fusion** to send to the customer, in place of the token.
+- **One tab for counted code.** Repositories counted from git and those from a cloc-fusion report (or cloc results) land
+  together on Fusion · from Git, as one estimate; the separate cloc-fusion tab is gone. An account that used the
+  cloc-fusion estimate keeps it, now on that tab.
+- **Scans by how often repositories change, on Fusion · from Git.** The same cards as Checkmarx One's (they are one
+  setting), counting the repositories in each group by the commits on their default branch.
+- **10K-LOC blocks explained.** Each repository is rounded up to whole blocks on its own (a 2,000-line one is a whole
+  block), so the blocks can be more than the lines over 10K: the tile says both numbers.
+- **Default Fusion scans per repository: 4**, for a repository whose commits are not known (was 12), with a shorter
+  explanation. Accounts that already have a number keep it.
+
 ## CC-01.91.00 — 2026-11-12
 
 - **One account per Salesforce link.** An opportunity or account link already on an account cannot be given to another
