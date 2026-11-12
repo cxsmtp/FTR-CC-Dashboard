@@ -12,6 +12,8 @@ import {
   LOOKBACKS,
   MAX_PROJECTS,
   SEVERITIES,
+  ACTIVE_LEVELS,
+  activeEnough,
   aheadMonths,
   aheadSettings,
   amount,
@@ -34,6 +36,7 @@ import {
   sortProjects,
   planForecast,
   readLimit,
+  repoKey,
   scopeActive,
   seriesRows,
   settingChanges,
@@ -546,7 +549,17 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         : meta.originSplit === false
           ? '<span class="hint calc-warn">This read is from before scan origins were recorded, so every scan is counted: read from Checkmarx One again to count only the scans chosen.</span>'
           : '';
-    return `<div class="calc-engines calc-edit" role="group" aria-label="Engines counted">
+    // Only the active projects: ticked, the backlog and its trend are those of the projects scanned often enough.
+    const all = live ? fusion().projects.filter((p) => p.source !== 'manual' && counts(p)) : [];
+    const A = aheadSettings(tr());
+    const activeNow = all.filter((p) => activeEnough(p.frequency, A.activeAtLeast)).length;
+    const label = (id) => (FREQUENCIES.find((f) => f.id === id)?.label ?? id).replace(/^About /, '').replace(/^1 to 5 times a week$/, 'once a week');
+    const active = `<div class="calc-active calc-edit">
+          <label class="check"${live ? '' : ' title="Needs a read from Checkmarx One: the two exports do not say which project a finding is in."'}><input type="checkbox" data-active-only${A.activeOnly ? ' checked' : ''}${live ? '' : ' disabled'} /> Count only the active projects</label>
+          <label class="calc-active-at"><span>scanned at least</span> <select data-active-at aria-label="Scanned at least"${live ? '' : ' disabled'}>${ACTIVE_LEVELS.map((id) => `<option value="${id}"${id === A.activeAtLeast ? ' selected' : ''}>${esc(label(id))}</option>`).join('')}</select></label>
+          <span class="hint">${live ? `${num(activeNow)} of ${num(all.length)} projects are${A.activeOnly ? ': only their findings are counted' : '; every project is counted now'}.` : 'After a read from Checkmarx One.'}</span>
+        </div>`;
+    return `${active}<div class="calc-engines calc-edit" role="group" aria-label="Engines counted">
           <span class="hint"><b>Engines counted</b></span>
           ${live ? ENGINES.map((e) => `<label class="pill-check"><input type="checkbox" data-engine="${e.key}"${chosen.has(e.key) ? ' checked' : ''} /> <span translate="no">${e.label}</span>${e.ai ? '' : ' <small>No AI</small>'}</label>`).join('') : ''}
           ${note}${origins}
@@ -804,6 +817,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   });
   // What is still to come: changes count at once (the figures follow as it is typed).
   $('calc-tr').addEventListener('change', (event) => {
+    // Only the active projects, or every project: the backlog is added up again from the last read.
+    if (event.target.matches('[data-active-only], [data-active-at]')) {
+      const box = $('calc-tr');
+      c.open.tr = { ...tr(), activeOnly: box.querySelector('[data-active-only]').checked, activeAtLeast: box.querySelector('[data-active-at]').value };
+      save({ tr: c.open.tr });
+      return applyScope();
+    }
     const engine = event.target.dataset.engine;
     if (engine) {
       const chosen = [...$('calc-tr').querySelectorAll('[data-engine]:checked')].map((box) => box.dataset.engine);
@@ -858,7 +878,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   let rowsShown = ROWS_PAGE;
   const saveFusion = () => save({ fusion: fusion() });
   const modelOptions = (selected, blank) =>
-    `<option value="">${esc(blank)}</option>` + fusion().models.map((m) => `<option value="${esc(m.id)}"${m.id === selected ? ' selected' : ''}>${esc(m.name || 'Unnamed model')}${m.creditsPer10k === null ? '' : ` · ${num(m.creditsPer10k, 2)}`}</option>`).join('');
+    `<option value="">${esc(blank)}</option>` + fusion().models.filter((m) => m.creditsPer10k !== null || m.id === selected).map((m) => `<option value="${esc(m.id)}"${m.id === selected ? ' selected' : ''}>${esc(m.name || 'Unnamed model')}${m.creditsPer10k === null ? '' : ` · ${num(m.creditsPer10k, 2)}`}</option>`).join('');
   /** "Default model" says which one it is, so picking that same model is seen to change nothing. */
   const defaultLabel = () => {
     const m = fusion().models.find((x) => x.id === fusion().defaultModel);
@@ -1303,13 +1323,37 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   /** Every estimate, worked out whichever is chosen, so each tab can show its own and the others beside it. */
   function estimates() {
     const cx = fusionEstimate(scoped(), { ...fusion(), optOut: false }).totals;
-    const one = (b) => newCustomerEstimate({ ...fnew(), basis: b, optOut: false }, fusion()).totals;
+    const one = (b) => newCustomerEstimate({ ...fnew(), basis: b, optOut: false, onTop: false }, fusion()).totals;
     return { cxone: cx, git: one('git'), cloc: one('cloc') };
+  }
+  /** The names (short, lower case) of the Checkmarx One projects in the scope. */
+  const cxNames = () => new Set(scoped().map((p) => repoKey(p.name)));
+  /** What `b`'s repositories that are not in Checkmarx One would add on top of it. */
+  const onTopOf = (b) => {
+    const names = cxNames();
+    const skip = fnewEstimate().rows.filter((r) => r.source === b && names.has(repoKey(r.name))).map((r) => repoKey(r.name));
+    return { skip, totals: newCustomerEstimate({ ...fnew(), basis: b, optOut: false, onTop: true, onTopSkip: skip }, fusion()).totals };
+  };
+  /** Checkmarx One's projects, plus the counted repositories that are not there yet (by name): nothing counted twice. */
+  function useOnTop(b) {
+    if (!c.open || !(b === 'git' || b === 'cloc')) return;
+    Object.assign(fnew(), { basisByHand: true, basis: b, onTop: true, onTopSkip: onTopOf(b).skip, optOut: false });
+    fusion().optOut = false;
+    if (c.next) Object.assign(c.next, { fusionOn: true, fusionNewOn: true });
+    saveFusion();
+    saveFnew();
+    renderFusion();
+    renderFusionNew();
+    renderTr();
+    renderPending();
+    renderSummary();
+    placeFusion();
   }
   /** Use one estimate (or none) in the credits: at once, as picking it is the whole change. */
   function useBasis(b, { byHand = true } = {}) {
     if (!c.open) return;
     fnew().basisByHand = byHand;
+    Object.assign(fnew(), { onTop: false, onTopSkip: [] });
     if (b === 'git' || b === 'cloc') fnew().basis = b;
     fusion().optOut = b !== 'cxone';
     fnew().optOut = !(b === 'git' || b === 'cloc');
@@ -1333,8 +1377,12 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     if (!c.open || autoPicking || fnew().basisByHand) return false;
     const order = Object.keys(BASES).filter((k) => all[k].projects);
     if (!order.length) return false;
-    const best = order.reduce((a, k) => (all[k].credits > all[a].credits || (all[k].credits === all[a].credits && all[k].units > all[a].units) ? k : a));
-    if (best === basis()) return false;
+    // The estimate in use stays while it has anything to count: none is swapped for a bigger one. With nothing in use
+    // yet, Checkmarx One's when it was read, else the code counted (git before cloc-fusion).
+    const now = basis();
+    if (now === 'both' || (all[now]?.projects ?? 0) > 0) return false;
+    const best = order[0];
+    if (best === now) return false;
     autoPicking = true;
     try {
       useBasis(best, { byHand: false });
@@ -1345,6 +1393,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   }
   function renderBasis() {
     if (!c.open) return;
+    if (fnew().onTop && basis() === 'both') {
+      const skip = onTopOf(fnew().basis ?? 'git').skip;
+      if (skip.slice().sort().join('\n') !== [...(fnew().onTopSkip ?? [])].sort().join('\n')) {
+        fnew().onTopSkip = skip;
+        saveFnew();
+      }
+    }
     const all = estimates();
     if (autoBasis(all)) return;
     const view = document.querySelector('#page-calculator [data-ptpanel^="calculator:fusion-"]:not([hidden])')?.dataset.ptpanel.split(':')[1];
@@ -1359,7 +1414,8 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       const box = $(`calc-fh-${d.tab}`);
       if (!box) continue;
       const t = all[b];
-      const on = used === b || (used === 'both' && b === 'cxone');
+      const top = used === 'both' && fnew().onTop ? fnew().basis ?? 'git' : null;
+      const on = used === b || (used === 'both' && (b === 'cxone' || b === top));
       const connection = b === 'cxone'
         ? (tr()?.totals?.meta?.source === 'cxone' || scoped().length ? `<span class="calc-fh-pill ok">Read from Checkmarx One · ${num(scoped().length)} projects</span>` : '<span class="calc-fh-pill">Not read yet: connect the key at the top and Read from Checkmarx One</span>')
         : b === 'git'
@@ -1369,7 +1425,18 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         ? `<span><b>${num(t.projects)}</b> ${d.what}</span><span><b>${num(t.lines)}</b> lines of code</span><span><b>${num(t.units)}</b> 10K-LOC blocks</span><span><b>${num(t.scans)}</b> Fusion scans</span><span class="hint">${b === 'cxone' ? 'scans from how often each project was scanned in the last 12 months' : 'scans from the commits on each default branch'}</span>`
         : '';
       const others = Object.entries(BASES).filter(([k]) => k !== b && all[k].projects).map(([k, o]) => `<div class="calc-fh-alt">${esc(o.short)}: ${credits(all[k])}${used === k ? ' · <b>in use</b>' : ` · <button type="button" class="link" data-use-basis="${esc(k)}">use instead</button>`}</div>`).join('');
-      const extra = b !== 'cxone' && scoped().length && notInCx(b).length ? `<div class="calc-fh-foot">${num(notInCx(b).length)} of these repositories are not projects in Checkmarx One yet (matched by name).</div>` : '';
+      // On top of Checkmarx One: what the repositories that are not there yet add, in credits and as a share of its own.
+      const pctOf = (extraCredits) => (all.cxone.credits > 0 ? ` (+${num(Math.round((extraCredits / all.cxone.credits) * 1000) / 10, 1)}% on Checkmarx One’s ${credits(all.cxone)})` : '');
+      let extra = '';
+      if (b !== 'cxone' && scoped().length && t.projects) {
+        const add = onTopOf(b).totals;
+        if (top === b) extra = `<div class="calc-fh-foot calc-fh-top"><b>✓ On top of Checkmarx One:</b> ${num(add.projects)} repositories that are not projects there, <b>+${num(Math.round(add.credits))}</b> credits${pctOf(add.credits)}. <button type="button" class="link" data-use-basis="cxone">Take them out</button></div>`;
+        else if (add.projects) extra = `<div class="calc-fh-foot calc-fh-top">${num(add.projects)} of these repositories are not projects in Checkmarx One yet (matched by name): <b>+${num(Math.round(add.credits))}</b> credits${pctOf(add.credits)}. <button type="button" class="secondary" data-on-top="${esc(b)}">Add them on top of Checkmarx One</button></div>`;
+        else extra = '<div class="calc-fh-foot">Every one of these repositories is already a project in Checkmarx One (matched by name): nothing to add.</div>';
+      } else if (b === 'cxone' && top) {
+        const add = onTopOf(top).totals;
+        extra = `<div class="calc-fh-foot calc-fh-top"><b>Plus ${num(add.projects)} repositories ${top === 'git' ? 'counted from git' : 'from cloc-fusion'}</b> that are not projects here: +${num(Math.round(add.credits))} credits${pctOf(add.credits)}.</div>`;
+      }
       const both = used === 'both' && b !== 'git' && b !== 'cloc' ? '' : '';
       box.innerHTML = `
         <div class="calc-fh-main">
@@ -1380,14 +1447,16 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         </div>
         <div class="calc-fh-side">
           <div class="calc-fh-credits"><b>${credits(t)}</b><span>credits over ${num(months)} months</span></div>
-          ${on ? `<span class="calc-fh-used">✓ Used in the credits</span>${fnew().basisByHand ? '' : '<span class="calc-fh-auto">the highest estimate, picked by itself</span>'}` : `<button type="button" class="primary" data-use-basis="${esc(b)}"${t.projects ? '' : ' disabled'}>${used === 'none' ? 'Use this' : 'Use this instead'}</button>`}
+          ${on ? `<span class="calc-fh-used">✓ ${top === b ? 'Added on top' : 'Used in the credits'}</span>` : `<button type="button" class="primary" data-use-basis="${esc(b)}"${t.projects ? '' : ' disabled'}>${used === 'none' ? 'Use this' : 'Use this instead'}</button>`}
           ${others}
           ${used === 'none' ? '<div class="calc-fh-alt"><b>Fusion is left out</b></div>' : '<button type="button" class="link calc-fh-out" data-use-basis="none">Leave Fusion out</button>'}
         </div>
-        ${used === 'both' ? `<div class="calc-fh-foot">Both Checkmarx One and the counted code are in the credits (saved that way before). Pick one with <b>Use this instead</b>, so no code is counted twice.</div>` : ''}${extra}${both}`;
+        ${used === 'both' && !top ? `<div class="calc-fh-foot">Both Checkmarx One and the counted code are in the credits (saved that way before). Pick one with <b>Use this instead</b>, or add only the repositories that are not in Checkmarx One, so no code is counted twice.</div>` : ''}${extra}${both}`;
     }
   }
   document.getElementById('page-calculator').addEventListener('click', (event) => {
+    const onTop = event.target.closest('[data-on-top]');
+    if (onTop) return useOnTop(onTop.dataset.onTop);
     const pick = event.target.closest('[data-use-basis]');
     if (pick && !pick.disabled) useBasis(pick.dataset.useBasis);
   });
@@ -2434,11 +2503,15 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       if (!quiet && narrowed()) setStatus('calc-scope-status', 'Fusion follows the scope. Triage & remediation comes from the two exports, which cover every project.', 'warn');
       return renderTr();
     }
-    const ids = fusion().projects.filter((p) => p.source !== 'manual' && counts(p)).map((p) => p.id);
+    const inScopeNow = fusion().projects.filter((p) => p.source !== 'manual' && counts(p));
+    const A = aheadSettings(tr());
+    // Triage & remediation only: ticked, the projects scanned often enough; Fusion keeps every project of the scope.
+    const forTr = A.activeOnly ? inScopeNow.filter((p) => activeEnough(p.frequency, A.activeAtLeast)) : inScopeNow;
+    const ids = forTr.map((p) => p.id);
     try {
       // Only the scans from the scan origins chosen count (null: every scan).
       const series = await api('/api/projections/series', { method: 'POST', body: JSON.stringify({ projectIds: ids, engines: trEngines(), origins: scope().origins }), quiet: true });
-      c.open.tr = { ...tr(), totals: series.totals, fixed: series.fixed };
+      c.open.tr = { ...tr(), totals: series.totals, fixed: series.fixed, activeCount: A.activeOnly ? forTr.length : null, activeOf: A.activeOnly ? inScopeNow.length : null };
       save({ tr: c.open.tr });
       if (!quiet) setStatus('calc-scope-status', `${num(ids.length)} projects counted.`, 'ok');
     } catch (error) {
@@ -3064,7 +3137,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     renderTr();
     renderFusion();
     // The read counts SAST and SCA, every scan, for the whole tenant: a scope, other engines, or only some scan origins are added up from it.
-    if (narrowed() || trEngines().join() !== DEFAULT_ENGINES.join() || scope().origins) applyScope({ quiet: true });
+    if (narrowed() || trEngines().join() !== DEFAULT_ENGINES.join() || scope().origins || aheadSettings(tr()).activeOnly) applyScope({ quiet: true });
     if (!body.tr) setStatus('calc-read-note', `Read ${num(read.length)} projects from Checkmarx One; none had a scan to read the findings of.`, 'warn');
     else if (read.length === 1) setStatus('calc-read-note', 'Read 1 project and its scans from Checkmarx One.', 'ok');
     else setStatus('calc-read-note', `Read ${num(read.length)} projects and their scans from Checkmarx One.`, 'ok');
@@ -3485,8 +3558,10 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
             byModel: fn.byModel,
             byFrequency: fn.byFrequency,
             totals: fn.totals,
+            // Added on top of Checkmarx One: only the repositories that are not projects there.
+            onTop: fn.settings.onTop === true,
             details,
-            rows: details ? fn.rows.map((r) => ({ name: r.name, file: r.file, included: r.included, lines: r.lines, units: r.units, frequency: r.frequency, commits: r.commits, windowDays: r.activity?.windowDays ?? null, devs90: r.devs90, criticality: r.criticality, scans: r.scans, scansFrom: r.scansFrom, model: r.model, credits: r.credits, languages: r.languages.filter((l) => l.counted && l.lines > 0).slice(0, 6) })) : [],
+            rows: details ? fn.rows.filter((r) => r.inBasis).map((r) => ({ name: r.name, file: r.file, included: r.included, lines: r.lines, units: r.units, frequency: r.frequency, commits: r.commits, windowDays: r.activity?.windowDays ?? null, devs90: r.devs90, criticality: r.criticality, scans: r.scans, scansFrom: r.scansFrom, model: r.model, credits: r.credits, languages: r.languages.filter((l) => l.counted && l.lines > 0).slice(0, 6) })) : [],
           }
         : null,
     };

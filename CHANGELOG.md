@@ -2,6 +2,17 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.62.00 — 2026-11-12
+
+The calculator, for the two conversations it is used in: a customer already on Checkmarx One, and a new customer where only Fusion applies. Nothing saved changes: every new choice is off until someone makes it.
+
+- **Triage & remediation: count only the active projects.** One checkbox on the Triage & remediation tab, with how often at least (once a month unless changed): ticked, the backlog and its trend are those of the projects scanned that often, and the page says how many that is ("46 of 60"). Fusion keeps every project. It needs a read from Checkmarx One (the two exports do not say which project a finding is in). The report's assumptions say so when it is on.
+- **Repositories on top of Checkmarx One.** On the Git and cloc-fusion tabs, when some of the repositories counted are not projects in Checkmarx One (matched by name): what they add, in credits and as a percentage of Checkmarx One's Fusion credits, and **Add them on top of Checkmarx One**. Only those are added, so no code is counted twice; **Take them out** undoes it. The report names that part "Fusion — repositories not in Checkmarx One".
+- **No estimate is swapped for a bigger one by itself.** The one in use stays. With nothing in use yet, it is Checkmarx One's once read, else the code counted. (Before, the highest of the three was picked automatically.)
+- **No pricing table in the calculator.** Rates are the Admin's (Settings → Engines & rates): the "Fusion pricing" panel is gone from the three Fusion tabs, and engines without a rate are no longer offered in the model lists. A projection that already uses one keeps it.
+- **A new customer, Fusion only.** With Git or cloc-fusion as the source, no Checkmarx One key and no backlog, the Triage & remediation tab, its half of the summary, the Checkmarx One Fusion tab and Impact are not shown; the status says "New customer · Fusion only". They come back with a key or the two exports.
+- **Long lines count as several.** A line of code longer than 512 characters counts as one line per 512 characters, in the count from Git here and in the cloc-fusion tool handed to customers (its checksum changes with it), so minified or generated code weighs what it holds. Files named `*.min.js`, bundles, `node_modules` and build folders are still left out, and files over 2 MB skipped. Counts already made stay as they are until counted again.
+
 ## CC-01.61.00 — 2026-11-11
 
 Two things shown wrongly in the calculator, put right. No figure, filter or saved setting changes.

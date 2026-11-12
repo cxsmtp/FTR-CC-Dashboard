@@ -693,16 +693,22 @@ export async function startHosted() {
     const trSource = cu?.tr?.totals?.meta?.source ?? (cu?.hasTr ? 'data' : undefined);
     const fusionCx = cu?.fusion?.projects?.length ?? cu?.fusionProjects ?? 0;
     const fusionNew = cu?.fusionNew?.projects?.length ?? 0;
+    // A new customer (Fusion only): code from Git or cloc-fusion, no Checkmarx One key, no backlog read or uploaded.
+    // Triage & remediation is not part of the conversation, so it is not on the page.
+    const src = document.documentElement.dataset.src;
+    const fusionOnly = Boolean(account) && (src === 'git' || src === 'cloc') && !cxState.connected && !trSource && !fusionCx;
+    document.documentElement.toggleAttribute('data-fusion-only', fusionOnly);
+    if (fusionOnly && document.querySelector('[data-ptabs="calculator"] [data-pt="tr"].active')) document.querySelector(`[data-ptabs="calculator"] [data-pt="fusion-${src}"]`)?.click();
     const parts = [
       '<span class="hc-label">Status</span>',
       account ? `<span class="hc-st cust"><i></i><b>${esc(account.name)}</b></span>` : '',
-      cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
+      fusionOnly ? chip('ok', 'New customer · Fusion only') : cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
     ];
     if (account) {
-      parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : trSource ? chip('ok', 'T&R: worked out') : chip('off', 'T&R: no data yet'));
+      if (!fusionOnly) parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : trSource ? chip('ok', 'T&R: worked out') : chip('off', 'T&R: no data yet'));
       parts.push(fusionCx || fusionNew ? chip('ok', `Fusion: ${[fusionCx ? `${fusionCx} Checkmarx One projects` : '', fusionNew ? `${fusionNew} repositories (git / cloc-fusion)` : ''].filter(Boolean).join(' + ')}`) : chip('off', 'Fusion: none yet'));
       parts.push(account.salesforceUrl ? chip('ok', 'Salesforce: linked') : chip('bad', 'Salesforce: link missing'));
-      parts.push(account.impactEnabled ? chip('ok', `Impact (beta): on · ${account.impactCurrency}`) : chip('off', 'Impact (beta): off'));
+      if (!fusionOnly) parts.push(account.impactEnabled ? chip('ok', `Impact (beta): on · ${account.impactCurrency}`) : chip('off', 'Impact (beta): off'));
       parts.push(`<span class="hc-ready">${account.salesforceUrl ? (trSource || fusionCx || fusionNew ? 'Ready to generate' : 'Bring in data to generate') : 'Add the Salesforce link to generate'}</span>`);
     } else parts.push(chip('off', 'No account open'));
     $('hc-status').innerHTML = parts.join('');
@@ -1158,6 +1164,7 @@ export async function startHosted() {
     $('hc-account').classList.toggle('impact-on', $('hc-impact').checked);
     // In a meeting the account panel is hidden: the page itself says which Fusion tab belongs to the source.
     document.documentElement.dataset.src = src;
+    renderStatus();
     if (meeting && src !== 'cxone') document.querySelector(`[data-ptabs="calculator"] [data-pt="fusion-${src}"]`)?.click();
   };
   $('hc-impact').addEventListener('change', () => $('hc-account').classList.toggle('impact-on', $('hc-impact').checked));

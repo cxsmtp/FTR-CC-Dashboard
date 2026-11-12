@@ -182,7 +182,27 @@ export function aheadSettings(value = {}) {
     fusionUpliftPercent: pct(v.fusionUpliftPercent, DEFAULT_TR.fusionUpliftPercent, 300),
     aiDeclinePercent: pct(v.aiDeclinePercent, DEFAULT_TR.aiDeclinePercent, 90),
     newPacePercent: pct(v.newPacePercent, DEFAULT_TR.newPacePercent, 300),
+    // Only the projects scanned often enough are counted (off unless ticked): how often at least, and how many
+    // of the projects that left in (kept for the report to say).
+    activeOnly: v.activeOnly === true,
+    activeAtLeast: ACTIVE_LEVELS.includes(v.activeAtLeast) ? v.activeAtLeast : DEFAULT_ACTIVE_LEVEL,
+    activeCount: wholeNumber(v.activeCount),
+    activeOf: wholeNumber(v.activeOf),
   };
+}
+
+/**
+ * "Active" for triage & remediation: scanned at least this often in the last year (the same buckets as Fusion's
+ * scan frequency). The backlog of a project nobody scans is rarely the one a team triages first.
+ */
+export const ACTIVE_LEVELS = ['1-5-week', '2-weeks', 'month', '3-months', '6-months', 'year'];
+export const DEFAULT_ACTIVE_LEVEL = 'month';
+/** Is a project scanned at least as often as `atLeast` (a frequency id)? One never scanned in the year is not. */
+export function activeEnough(frequencyId, atLeast = DEFAULT_ACTIVE_LEVEL) {
+  const order = FREQUENCIES.map((f) => f.id);
+  const have = order.indexOf(frequencyId);
+  const need = order.indexOf(ACTIVE_LEVELS.includes(atLeast) ? atLeast : DEFAULT_ACTIVE_LEVEL);
+  return have !== -1 && have <= need;
 }
 
 /**
@@ -633,8 +653,15 @@ export function newCustomerSettings(value = {}) {
     basis: v.basis === 'git' || v.basis === 'cloc' ? v.basis : null,
     // Picked by hand (Use this instead, Leave Fusion out): kept. Otherwise the estimate with the most credits is used.
     basisByHand: v.basisByHand === true,
+    // On top of Checkmarx One: only the repositories that are not projects there count (by name), added to its
+    // estimate. `onTopSkip`: the names that are there already, left out so no code is counted twice.
+    onTop: v.onTop === true,
+    onTopSkip: v.onTop === true && Array.isArray(v.onTopSkip) ? [...new Set(v.onTopSkip.map(repoKey).filter(Boolean))].slice(0, MAX_PROJECTS) : [],
   };
 }
+
+/** A repository or project by its short name, however it is written: "org/Payments-API" and "payments-api" are one. */
+export const repoKey = (name) => String(name ?? '').toLowerCase().split('/').pop().trim().slice(0, 200);
 
 /** Where a new customer's project was counted: 'cloc' for a cloc-fusion report or cloc results, else 'git' (git, or typed by hand). */
 export const fusionSourceOf = (p) => (p?.activity?.engine === 'report' || (!p?.git && p?.file) ? 'cloc' : 'git');
@@ -665,6 +692,7 @@ export function newCustomerEstimate(value = {}, fusionValue = {}) {
   const rules = { ...fusion, defaultScans: own.defaultScans, defaultModel };
   const projects = Array.isArray(value?.projects) ? value.projects : [];
   const out = new Set(own.leftOut);
+  const skip = own.onTop ? new Set(own.onTopSkip) : null;
   const rows = projects.map((p) => {
     const lines = clocLines(p, own.leftOut);
     const included = p.included !== false;
@@ -680,7 +708,7 @@ export function newCustomerEstimate(value = {}, fusionValue = {}) {
     const devs90 = wholeNumber(p.activity?.devs90);
     const commits = wholeNumber(p.activity?.commits);
     const source = fusionSourceOf(p);
-    return { ...p, source, inBasis: !own.basis || own.basis === source, lines, included, units, frequency, criticality, commits, devs90, scans, scansFrom: from, model, rate, credits, languages, unknownLines: lines === null, unknownRate: included && units > 0 && scans > 0 && rate === null };
+    return { ...p, source, inBasis: (!own.basis || own.basis === source) && !(skip && skip.has(repoKey(p.name))), inCxone: Boolean(skip && skip.has(repoKey(p.name))), lines, included, units, frequency, criticality, commits, devs90, scans, scansFrom: from, model, rate, credits, languages, unknownLines: lines === null, unknownRate: included && units > 0 && scans > 0 && rate === null };
   });
   // Only the counted code the basis names is in the credits (the Git tab's or the cloc-fusion tab's).
   const counted = rows.filter((r) => r.inBasis && r.included && r.units);

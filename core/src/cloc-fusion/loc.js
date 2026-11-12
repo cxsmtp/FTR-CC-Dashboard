@@ -1,4 +1,4 @@
-// Vendored from cloc-fusion 1.3.2 (commit 1a320621d0f5), MIT licence: src/cloc-fusion/LICENSE. Do not edit here: scripts/sync-cloc-fusion.mjs copies it again.
+// From cloc-fusion 1.3.2 (commit 1a320621d0f5), MIT licence; this product's own copy now (the long-line rule below is added here).
 // Counting lines like cloc: per file, code / comment / blank lines by the language's comment syntax.
 // Quoted strings are skipped within a line (so a route like '/*' does not open a comment); strings
 // spanning lines are not tracked, the usual approximation, which moves totals by well under 1%.
@@ -20,6 +20,11 @@ function scannerOf(lang) {
 }
 
 const MAX_PATH = 4096;
+/**
+ * Minified and generated code puts a whole file on a few lines. A line of code longer than this many characters
+ * counts as several: one for every 512 characters (rounded up), so such a file weighs what its content does.
+ */
+export const LONG_LINE = 512;
 
 const isSpace = (ch) => ch <= 32 || ch === 0xa0 || ch === 0xfeff;
 
@@ -50,6 +55,7 @@ export function countText(text, lang) {
       blank++;
       continue;
     }
+    const first = i;
     let hasCode = false;
     let hasComment = false;
     outer: while (i < e) {
@@ -98,7 +104,7 @@ export function countText(text, lang) {
       }
       i = nextAt === -1 || nextAt > e ? e : nextAt;
     }
-    if (hasCode) code++;
+    if (hasCode) code += Math.max(1, Math.ceil((e - first) / LONG_LINE));
     else if (hasComment) comment++;
     else blank++;
   }

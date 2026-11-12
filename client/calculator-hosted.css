@@ -742,3 +742,17 @@ html[data-cc] [data-ptabs="calculator"] [data-pt] { white-space: nowrap; }
 
 /* Lines of code show whole: six and seven digits fit (they were cut to their first five). */
 html[data-cc] input.calc-num[data-p="loc"], html[data-cc] input.calc-num[data-n="loc"] { width: 13ch !important; min-width: 13ch; text-align: end; font-variant-numeric: tabular-nums; }
+
+/* Rates are the Admin's (Settings → Engines & rates): the calculator shows no pricing table of its own. */
+html[data-cc] #calc-fusion-pricing { display: none !important; }
+/* Triage & remediation: only the active projects (one checkbox, how often at least, and what that leaves in). */
+.calc-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 10px; }
+.calc-active .check { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.calc-active-at { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.calc-active-at select { width: auto; min-width: 150px; }
+/* Counted code on top of Checkmarx One. */
+.calc-fh-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+
+/* A new customer, Fusion only: no triage & remediation on the page (its tab, its half of the summary, Impact). */
+html[data-fusion-only] [data-ptabs="calculator"] [data-pt="tr"], html[data-fusion-only] [data-ptabs="calculator"] [data-pt="fusion"],
+html[data-fusion-only] [data-ptabs="calculator"] [data-pt="impact"], html[data-fusion-only] #calc-mix-tr { display: none !important; }

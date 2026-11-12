@@ -10,7 +10,7 @@
 import { FREQUENCIES, HOURS_A_YEAR, SEVERITIES, aheadMonths, creditSummary, fusionTotal } from './model.js';
 import { allSections, moneyText } from './explain.js';
 import { forecastChart } from './charts.js';
-import { assumptionItems, countedFusion, reportFileName, scopeLines, trFigures, wording } from './report.js';
+import { assumptionItems, countedFusion, newLabel, reportFileName, scopeLines, trFigures, wording } from './report.js';
 import { NEXTGEN_ACCENTS, lookPalette, reportLook } from '../look.js';
 
 /** The page size in PDF points (16:9, as a presentation) and the drawing size in pixels. */
@@ -155,7 +155,7 @@ export function slideContent(raw, { t, lang = 'en', calculations = false } = {})
     f && { label: w('Backlog today'), value: f.backlogCredits, colour: C.backlog ?? C.ink },
     f && f.aheadCredits > 0 && { label: w('Findings ahead'), value: f.aheadCredits, colour: C.ahead ?? C.accent },
     fu && { label: fn ? w('Fusion — existing customer') : w('Fusion scans'), value: fu.totals?.credits ?? 0, colour: C.fusion },
-    fn && { label: w('Fusion — new customer'), value: fn.totals?.credits ?? 0, colour: '#b7791f' },
+    fn && { label: newLabel(fn, w), value: fn.totals?.credits ?? 0, colour: '#b7791f' },
     sum.extra > 0 && { label: w('Extra credits'), value: sum.extra, colour: '#9aa1ab' },
   ].filter((p) => p && p.value > 0).map((p) => ({ ...p, text: num(p.value) }));
   pages.push({
@@ -243,7 +243,7 @@ export function slideContent(raw, { t, lang = 'en', calculations = false } = {})
     calc.push({ label: w('Triage & remediation credits'), formula: `${num(T.triageCredits)} + ${num(T.remediationCredits)} = ${num(T.credits)}` });
   }
   if (fu) calc.push({ label: fn ? w('Fusion — existing customer') : w('Fusion credits'), formula: `Σ ${w('10K-LOC blocks × scans')} × ${w('Credits per 10K LOC')} = ${num(fu.totals?.credits)}` });
-  if (fn) calc.push({ label: w('Fusion — new customer'), formula: `Σ ${w('10K-LOC blocks × scans')} × ${w('Credits per 10K LOC')} = ${num(fn.totals?.credits)}` });
+  if (fn) calc.push({ label: newLabel(fn, w), formula: `Σ ${w('10K-LOC blocks × scans')} × ${w('Credits per 10K LOC')} = ${num(fn.totals?.credits)}` });
   calc.push({ label: w('Total credits required'), formula: `${sum.tr !== null && sum.fusion !== null ? `${num(sum.tr)} + ${num(sum.fusion)} = ` : ''}${num(sum.base)}${sum.extra ? ` + ${num(sum.settings.extraPercent, 2)}% = ${num(sum.total)}` : ''}; ${num(sum.total)} ÷ ${num(sum.settings.bundleCredits)} = ${num(sum.exactBundles, 2)} → ${num(sum.bundles)}` });
   const an = (x) => tr?.analysis?.[x] ?? {};
   pages.push({

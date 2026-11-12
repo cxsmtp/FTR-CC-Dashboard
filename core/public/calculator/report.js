@@ -78,6 +78,9 @@ export function scopeLines(tr, L) {
   return [included && w('Included: {0}', included), excluded && w('Excluded: {0}', excluded)].filter(Boolean);
 }
 
+/** What the counted code is called: a new customer's, or (added on top) the repositories Checkmarx One does not have. */
+export const newLabel = (fusionNew, w) => (fusionNew?.onTop ? w('Fusion — repositories not in Checkmarx One') : w('Fusion — new customer'));
+
 /** The false positives the plan takes (triaged, never remediated): one % for every severity counted, or each its own. */
 export function falsePositiveLine(tr, L) {
   const { w, num } = L;
@@ -115,7 +118,7 @@ function answer(data, sum, L) {
     tr && { key: 'backlog', label: w('Backlog today'), value: tr.backlogCredits, colour: 'var(--ink)' },
     tr && tr.aheadCredits > 0 && { key: 'ahead', label: w('Findings ahead'), value: tr.aheadCredits, colour: 'var(--accent)' },
     data.fusion && { key: 'fusion', label: data.fusionNew ? w('Fusion — existing customer') : w('Fusion scans'), value: data.fusion.totals.credits ?? 0, colour: '#0d9488' },
-    data.fusionNew && { key: 'fusion-new', label: w('Fusion — new customer'), value: data.fusionNew.totals.credits ?? 0, colour: '#b7791f' },
+    data.fusionNew && { key: 'fusion-new', label: newLabel(data.fusionNew, w), value: data.fusionNew.totals.credits ?? 0, colour: '#b7791f' },
     sum.extra > 0 && { key: 'extra', label: w('Extra credits'), value: sum.extra, colour: 'var(--muted)' },
   ].filter((p) => p && p.value > 0);
   const total = parts.reduce((a, p) => a + p.value, 0) || 1;
@@ -206,7 +209,7 @@ function story(data, L) {
   if (data.fusionNew) {
     const t = data.fusionNew.totals;
     cards.push(`<div class="card">
-      <h3>${w('Fusion — new customer')}</h3>
+      <h3>${newLabel(data.fusionNew, w)}</h3>
       <table class="calc">
         <tr><td>${w('Projects')}</td><td>${num(t.projects)}</td></tr>
         <tr><td>${w('Code lines (no blank or comment lines)')}</td><td>${num(t.lines)}</td></tr>
@@ -298,6 +301,12 @@ export function assumptionItems(data, sum, L) {
     const each = (key, digits = 2) => (same(key) ? num(rows[0]?.[key], digits) : SEVERITIES.map((s) => `${w(s)} ${num(tr.rows?.[s]?.[key], digits)}`).join(', '));
     items.push(w('{0} credit(s) per triage; {1} per remediation.', each('triageCost'), each('remediationCost')));
     items.push(w('False positives expected: {0}%.', each('fp', 0)));
+    if (tr.ahead?.activeOnly) {
+      const often = L.frequency(tr.ahead.activeAtLeast);
+      items.push(Number.isFinite(tr.ahead.activeCount) && Number.isFinite(tr.ahead.activeOf)
+        ? w('Only the active projects are counted for triage & remediation: {0} of {1}, scanned at least: {2}.', num(tr.ahead.activeCount), num(tr.ahead.activeOf), often)
+        : w('Only the active projects are counted for triage & remediation, scanned at least: {0}.', often));
+    }
     if (tr.ahead) {
       if (!tr.ahead.includeFuture) items.push(w('Findings still to come are not counted.'));
       else if (Number.isFinite(tr.totals?.selected) && tr.totals.selected < tr.totals.backlog) items.push(w('New findings are counted in the same share per severity as the backlog chosen.'));
@@ -444,7 +453,7 @@ function fusionNewAppendix(f, L) {
   const activity = f.rows.some((r) => r.frequency);
   const freqCell = (r) => (r.frequency ? `${frequency(r.frequency)}${r.commits !== null && r.commits !== undefined ? ` <small>${w('({0} commits in {1} days)', num(r.commits), num(r.windowDays ?? 365))}</small>` : ''}` : '—');
   return `<section class="appendix">
-  <h2>${w('Fusion — new customer')}</h2>
+  <h2>${newLabel(f, w)}</h2>
   <p class="sub">${w('Fusion scans over {0} months.', num(f.periodMonths))} ${w('Code lines without blank and comment lines: counted from git with cloc-fusion\'s engine, read from a cloc-fusion report, or counted with cloc.')}</p>
   ${fusionNewScansNote(f, L)}
   ${f.details === false ? `<p class="lv-note">${w('Project names and details were left out of this report.')} ${w('{0} projects in all, {1} lines of code, {2} Fusion scans.', num(f.totals.projects), num(f.totals.lines), num(f.totals.scans))}</p>` : table(`<thead><tr><th>${w('Project')}</th><th>${w('Languages')}</th><th>${w('Lines of code')}</th>${activity ? `<th>${w('Change frequency')}</th><th>${w('Developers (90 days)')}</th>` : ''}<th>${w('10K-LOC blocks')}</th><th>${w('Fusion scans')}</th><th>${w('Set by')}</th><th>${w('Model')}</th><th>${w('Credits')}</th></tr></thead><tbody>
