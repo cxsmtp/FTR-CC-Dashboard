@@ -520,7 +520,9 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         : '<span>Nothing read yet: <strong>Read from Checkmarx One</strong> at the top reads the backlog and fixes, week by week.</span>'
       : t.meta?.source === 'cxone'
         ? `<b>From Checkmarx One</b> · <span>Last read <time translate="no">${esc(fmtDateTime(t.meta.readAt))}</time></span> · <span>${num(t.meta.projects)} projects, ${num(t.meta.scans)} scans</span>${range}`
-        : `<b>From the two exports</b>${range}`;
+        : t.meta?.layout === 'report'
+          ? `<b>From an uploaded report</b> · <span>${esc(t.meta.fileName || '')}</span>${range} · <span>read Checkmarx One again for the week-by-week detail</span>`
+          : `<b>From the two exports</b>${range}`;
     for (const slot of ['totals', 'fixed']) {
       const s = tr()?.[slot];
       $(`calc-slot-${slot}`).classList.toggle('ok', Boolean(s));

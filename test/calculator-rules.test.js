@@ -93,3 +93,38 @@ test('a cloc-fusion report is read in every format it is written in: JSON, HTML,
   assert.throws(() => parseClocFusionReport(fs.readFileSync(new URL('./fixtures/cloc-fusion/cloc-fusion-contributors.csv', import.meta.url), 'utf8'), 'c.csv', {}), /not a cloc-fusion report/);
   assert.throws(() => parseClocFusionReport('<html><body>hello</body></html>', 'x.html', {}), /not a cloc-fusion report/);
 });
+
+test('a report loaded into the calculator gives back the backlog, the plan and Fusion as the report had them', async () => {
+  const { analyse, seriesRows, trProjection, fusionEstimate, SEVERITIES } = await import('../core/public/calculator/model.js');
+  const { leverInputs } = await import('../core/public/calculator/levers.js');
+  const { profileFromReport } = await import('../server/customer-version.js');
+  const { cleanTr, cleanFusion } = await import('../core/public/calculator/profiles.js');
+  // Twenty weeks of a backlog that grows, with fixes along the way.
+  const weeks = Array.from({ length: 20 }, (_, i) => new Date(Date.UTC(2026, 4, 4 + i * 7)).toISOString().slice(0, 10));
+  const grow = (start, step) => weeks.map((_, i) => start + i * step);
+  const totals = { weeks, bySeverity: { Critical: grow(400, 12), High: grow(900, 25), Medium: grow(3000, 40), Low: grow(50, 1) } };
+  const fixed = { weeks, bySeverity: { Critical: weeks.map(() => 3), High: weeks.map(() => 8), Medium: weeks.map(() => 0), Low: weeks.map((_, i) => i % 3) } };
+  const { totalRows, fixedRows } = seriesRows(totals, fixed);
+  const analysis = analyse(totalRows, fixedRows, 3);
+  const plan = { selected: { Critical: null, High: 500, Medium: 0, Low: 0 }, fpPercent: { Critical: 20, High: 30, Medium: 30, Low: 30 }, includeFuture: true, aiDeclinePercent: 10, newPacePercent: 80, fusionUpliftPercent: 5 };
+  const settings = { models: [{ id: 'm1', name: 'haiku', creditsPer10k: 1 }], defaultModel: 'm1', periodMonths: 12 };
+  const projects = [{ id: 'a', name: 'payments', loc: 250000, frequency: '1-5-week' }, { id: 'b', name: 'web', loc: 42000, frequency: 'month', scansOverride: 9 }];
+  const inputs = leverInputs({ analysis, plan, months: 12, fusionOn: true, fusion: { settings, projects }, totals: { extraPercent: 10, bundleCredits: 10000 } });
+  const patch = profileFromReport({ inputs, base: { generatedAt: '2026-09-20T10:00:00.000Z' } });
+  // The backlog worked out again from what was loaded.
+  const tr = cleanTr(patch.tr);
+  const again = seriesRows(tr.totals, tr.fixed);
+  const back = analyse(again.totalRows, again.fixedRows, tr.lookbackMonths);
+  for (const s of SEVERITIES) {
+    for (const k of ['current', 'prior', 'fixed']) assert.equal(back.perSeverity[s][k], analysis.perSeverity[s][k], `${s} ${k}`);
+    assert.ok(Math.abs(back.perSeverity[s].arrivals - analysis.perSeverity[s].arrivals) < 1e-9, `${s} arrivals`);
+  }
+  const one = trProjection(analysis, plan, { months: 12, fusion: true });
+  const two = trProjection(back, tr, { months: 12, fusion: true });
+  assert.ok(Math.abs(one.totals.credits - two.totals.credits) < 1e-6);
+  // Fusion: the same projects, scans and credits.
+  const f = cleanFusion(patch.fusion);
+  assert.equal(fusionEstimate(f.projects, f).totals.credits, fusionEstimate(projects, settings).totals.credits);
+  assert.equal(f.projects.find((p) => p.name === 'web').scansOverride, 9);
+  assert.equal(patch.totals.extraPercent, 10);
+});

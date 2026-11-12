@@ -99,3 +99,104 @@ export function preferencesPatch(profile, inputs) {
   if (inputs.totals) patch.totals = { ...(profile.totals ?? {}), ...inputs.totals };
   return patch;
 }
+
+/**
+ * The calculator's own data again, from what a report with levers keeps (`inputs`: the backlog's analysis, the plan,
+ * Fusion's settings and projects; `base`: the code counted and how the report was made). Loaded into an account, the
+ * calculator shows what the report showed, and can be changed and read again from there.
+ *
+ * The backlog's series is rebuilt from its analysis: the month-end backlog before the trend's start, the backlog at
+ * the trend's start and today, and what was fixed in between. Worked out again, it gives the same open findings, new
+ * findings a month and fixes as the report (the week-by-week detail of the read is not in a report, so its charts show
+ * months). SAST's part, when the report kept it, is rebuilt the same way.
+ */
+export function profileFromReport(live, { useSent = false } = {}) {
+  const inputs = (useSent ? live.sentInputs : null) ?? live.inputs ?? {};
+  const base = live.base ?? {};
+  const patch = {};
+  const t = inputs.tr;
+  const a = t?.analysis;
+  if (a?.perSeverity && a.latestDate && a.previousDate) {
+    const latest = String(a.latestDate).slice(0, 10);
+    const prev = String(a.previousDate).slice(0, 10);
+    const spanMonths = Math.max(0.25, (Date.parse(latest) - Date.parse(prev)) / 86400000 / 30.44);
+    const monthEnd = (month) => {
+      const [y, m] = String(month).split('-').map(Number);
+      return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    };
+    const rows = (a.history ?? []).filter((h) => /^\d{4}-\d{2}$/.test(h?.month ?? '')).map((h) => ({ date: monthEnd(h.month), ...Object.fromEntries(SEV.map((s) => [s, Math.max(0, Number(h[s]) || 0)])) })).filter((r) => r.date < prev);
+    rows.push({ date: prev, ...Object.fromEntries(SEV.map((s) => [s, Math.max(0, Number(a.perSeverity[s]?.prior) || 0)])) });
+    rows.push({ date: latest, ...Object.fromEntries(SEV.map((s) => [s, Math.max(0, Number(a.perSeverity[s]?.current) || 0)])) });
+    const weeks = rows.map((r) => r.date);
+    const totals = { weeks, bySeverity: Object.fromEntries(SEV.map((s) => [s, rows.map((r) => r[s])])), meta: { source: 'upload', fileName: `Report of ${String(base.generatedAt ?? '').slice(0, 10) || 'an earlier date'}`, layout: 'report', exportedAt: base.generatedAt ?? null } };
+    const fixedAt = (n) => weeks.map((w) => (w === latest ? n : 0));
+    const fixed = { weeks, bySeverity: Object.fromEntries(SEV.map((s) => [s, fixedAt(Math.max(0, Number(a.perSeverity[s]?.fixed) || 0))])) };
+    // SAST's own part: today, and new SAST findings a month (none fixed, unless the start would fall below zero).
+    const sp = t.sast?.perSeverity;
+    if (sp) {
+      const part = (s) => {
+        const now = Math.max(0, Number(sp[s]?.current) || 0);
+        const grew = Math.max(0, Number(sp[s]?.arrivals) || 0) * spanMonths;
+        const start = Math.max(0, now - grew);
+        return { now, start, fixedNow: start - now + grew };
+      };
+      const p = Object.fromEntries(SEV.map((s) => [s, part(s)]));
+      totals.sast = Object.fromEntries(SEV.map((s) => [s, rows.map((r) => (r.date === latest ? p[s].now : r.date === prev ? p[s].start : Math.round(r[s] * (a.perSeverity[s]?.current ? p[s].now / a.perSeverity[s].current : 0))))]));
+      fixed.sast = Object.fromEntries(SEV.map((s) => [s, fixedAt(p[s].fixedNow)]));
+    }
+    const plan = t.plan ?? {};
+    patch.tr = {
+      totals,
+      fixed,
+      lookbackMonths: a.lookbackMonths,
+      selected: plan.selected ?? {},
+      fpPercent: plan.fpPercent,
+      includeFuture: plan.includeFuture,
+      aiDeclinePercent: plan.aiDeclinePercent,
+      newPacePercent: plan.newPacePercent,
+      fusionUpliftPercent: plan.fusionUpliftPercent,
+    };
+  }
+  const f = inputs.fusion;
+  if (f?.settings) {
+    const projects = (f.projects ?? []).map((p, i) => {
+      const folded = Number(p.count) > 0 && p.units !== undefined && !p.name;
+      return {
+        id: `report-${i + 1}`,
+        name: folded ? `${p.count} project${p.count === 1 ? '' : 's'} (the report kept no names)` : p.name,
+        loc: folded ? Number(p.units) * 10000 : p.loc,
+        criticality: p.criticality ?? null,
+        frequency: p.frequency ?? 'rare',
+        scansPerWeek: p.scansPerWeek ?? 0,
+        included: p.included !== false,
+        scansOverride: p.scansOverride ?? null,
+        modelOverride: p.modelOverride ?? null,
+        source: 'scan',
+      };
+    });
+    patch.fusion = { ...f.settings, periodMonths: inputs.months ?? f.settings.periodMonths, projects, optOut: false, readAt: null };
+  }
+  const n = base.fusionNew;
+  if (n?.rows?.length) {
+    patch.fusionNew = {
+      defaultScans: n.defaultScans,
+      defaultModel: n.defaultModel,
+      leftOut: n.leftOut,
+      onTop: n.onTop === true,
+      basis: 'cloc',
+      basisByHand: true,
+      projects: n.rows.map((r, i) => ({
+        id: `report-new-${i + 1}`,
+        name: r.name,
+        file: r.file || 'from a report',
+        locOverride: r.lines,
+        included: r.included !== false,
+        criticality: r.criticality ?? null,
+        scansOverride: r.scansFrom === 'project' ? r.scans : null,
+        ...(r.frequency ? { activity: { frequency: r.frequency, commits: r.commits ?? 0, windowDays: r.windowDays ?? 365, devs90: r.devs90 ?? null, engine: 'report' } } : {}),
+      })),
+    };
+  }
+  if (inputs.totals) patch.totals = inputs.totals;
+  return patch;
+}

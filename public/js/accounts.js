@@ -613,7 +613,7 @@ export async function customerVersion(a, file) {
     <div class="figure"><div><small>As sent</small><b>${num(p.sentTotal)}</b></div><div><small>Their version</small><b>${num(Math.round(p.total))}</b></div><div><small>Difference</small><b>${delta === null ? '—' : `${delta > 0 ? '+' : ''}${num(Math.round(delta))}`}</b></div></div>
     ${p.changes.length ? `<h3 class="mt">What they changed</h3><ul class="small">${p.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : '<p class="muted mt">They changed nothing.</p>'}
     <label class="check mt"><input type="checkbox" name="primary" checked /><span>Make it the primary report<small>The dashboards and "still needed" then count their numbers.</small></span></label>
-    <label class="check"><input type="checkbox" name="prefs" checked /><span>Use their numbers in the calculator from now on<small>Their plan, prices, scans and period become this account's settings.</small></span></label>
+    <label class="check"><input type="checkbox" name="prefs" checked /><span>Load their version into the calculator<small>Triage &amp; remediation, Fusion and the settings as they left them; this replaces what the calculator holds now.</small></span></label>
     <label class="f mt">Note <span class="muted">optional</span><input name="note" maxlength="300" /></label></div>
     <div class="df"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary">Record their version</button></div></form>`;
   document.body.append(dlg);

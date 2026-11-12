@@ -713,7 +713,7 @@ export async function startHosted() {
       fusionOnly ? chip('ok', 'New customer · Fusion only') : cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
     ];
     if (account) {
-      if (!fusionOnly) parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : trSource ? chip('ok', 'T&R: worked out') : chip('off', 'T&R: no data yet'));
+      if (!fusionOnly) parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' && cu?.tr?.totals?.meta?.layout === 'report' ? chip('ok', 'T&R: from an uploaded report') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : trSource ? chip('ok', 'T&R: worked out') : chip('off', 'T&R: no data yet'));
       parts.push(fusionCx || fusionNew ? chip('ok', `Fusion: ${[fusionCx ? `${fusionCx} Checkmarx One projects` : '', fusionNew ? `${fusionNew} repositories (git / cloc-fusion)` : ''].filter(Boolean).join(' + ')}`) : chip('off', 'Fusion: none yet'));
       parts.push(account.salesforceUrl ? chip('ok', 'Salesforce: linked') : chip('bad', 'Salesforce: link missing'));
       if (!fusionOnly) parts.push(account.impactEnabled ? chip('ok', `Impact (beta): on · ${account.impactCurrency}`) : chip('off', 'Impact (beta): off'));
@@ -786,16 +786,22 @@ export async function startHosted() {
     dlg.innerHTML = `<form method="dialog"><h2>A previous report for ${esc(account.name)}</h2>
       <dl class="hc-prev-facts"><dt>Made for</dt><dd>${esc(preview.customer || '—')}${preview.sameName ? '' : ' <b class="hc-req">not this account’s name</b>'}</dd><dt>Made on</dt><dd>${esc(preview.madeAt ? fmtDateTime(preview.madeAt) : 'unknown')}</dd><dt>Credits</dt><dd><b>${num(preview.total)}</b></dd></dl>
       <label class="field"><span>Shared with <small>optional: the email address(es) it was given to</small></span><input id="hc-prev-who" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="name@customer.com" /></label>
-      <p class="hint">It is kept as a <b>previous quote</b>, with its own date and figures, exactly as it was given. The account’s settings are not changed.</p>
+      <label class="check hc-prev-load"><input type="checkbox" id="hc-prev-load" checked /> <span><b>Load its figures into the calculator</b><small>Triage &amp; remediation, Fusion and the settings, as the report has them. This replaces what the calculator holds for ${esc(account.name)} now.</small></span></label>
+      <p class="hint">It is kept as a <b>previous quote</b>, with its own date and figures, exactly as it was given.</p>
       <div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary">${preview.sameName ? 'Keep it' : 'Keep it here anyway'}</button></div></form>`;
     document.body.append(dlg);
     dlg.addEventListener('close', async () => {
       const ok = dlg.returnValue === 'ok';
       const who = dlg.querySelector('#hc-prev-who').value.trim();
+      const load = dlg.querySelector('#hc-prev-load').checked;
       dlg.remove();
       if (!ok) return;
       try {
-        await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/previous-report`, { method: 'POST', body: { html, dryRun: false, confirm: true, sharedWith: who } });
+        await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/previous-report`, { method: 'POST', body: { html, dryRun: false, confirm: true, sharedWith: who, load } });
+        if (load) {
+          toast(`The previous report is kept with ${account.name}, and its figures are in the calculator.`, 'ok', 9000);
+          return void setTimeout(() => location.reload(), 900);
+        }
         toast(`The previous report (${num(preview.total)} credits${preview.madeAt ? `, ${fmtDateTime(preview.madeAt)}` : ''}) is kept with ${account.name}${who ? `, shared with ${who}` : ''}.`, 'ok', 9000);
         showAccount(account.id);
         calculator.refresh?.();
@@ -828,6 +834,7 @@ export async function startHosted() {
       try {
         await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/customer-version`, { method: 'POST', body: { html, dryRun: false, confirm: true, makePrimary: $('hc-cv-primary').checked, applyPreferences: $('hc-cv-prefs').checked, note: $('hc-cv-note').value } });
         toast(`The customer's version is recorded${$('hc-cv-primary').checked ? ' as the primary report' : ''}${$('hc-cv-prefs').checked ? ', and their numbers are now this account\u2019s' : ''}.`, 'ok', 9000);
+        if ($('hc-cv-prefs').checked) return void setTimeout(() => location.reload(), 900);
         await calculator.load();
         showAccount(account.id);
       } catch (error) {

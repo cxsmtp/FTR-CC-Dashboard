@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.81.00 — 2026-11-12
+
+- **An uploaded report fills the calculator.** Until now a report brought in (*A previous report*, or *The customer's version*) was only kept as a report: Triage & remediation, Fusion and the settings stayed as they were. Now, with *Load its figures into the calculator* ticked (the default), the calculator takes them from the report: the backlog by severity and its trend, the plan (findings chosen, false positives, findings to come, AI, pace, More found by Fusion), the projection period, Fusion's projects with their scans and models, the code counted from git or cloc-fusion, and the extra credits. The calculator then shows the report's own numbers, and everything can be changed from there.
+- The status strip says *T&R: from an uploaded report*, and Triage & remediation says which report. A report keeps the backlog month by month, not week by week: read Checkmarx One again for the weekly detail.
+- It replaces what the calculator held for that account (the dialog says so); untick it to keep the report only, as before. A customer's version, ticked *Load their version into the calculator*, loads their numbers the same way. Triage and remediation credits stay the Admin's.
+- A report made without project names loads its Fusion projects as groups (*12 projects (the report kept no names)*), with the same credits.
+
 ## CC-01.80.00 — 2026-11-12
 
 - **An account is its SE's until its first report.** While a Sales Engineer works on an account, nobody else sees it: not teammates, not leaders, not Sales or Customer Success. Only its accountable SE, whoever made it, and the Admins. The first report generated (or a previous quote or a customer's version brought in) publishes it to its team, as before. Once published it stays so, even if its reports are deleted.

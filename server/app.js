@@ -15,7 +15,7 @@ import { Accounts, DEFAULT_SALESFORCE_HOSTS, viewing } from './accounts.js';
 import { newProfile } from '../core/public/calculator/profiles.js';
 import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
-import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } from './customer-version.js';
+import { changesOf, customerFigures, profileFromReport, readCustomerVersion } from './customer-version.js';
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
@@ -2035,7 +2035,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const sent = accounts.reportsOf(ctx.scope, account.id).find((r) => r.source !== 'customer' && r.id !== rep.id && Number.isFinite(figures.sentTotal) && Math.round(r.totalCredits) === Math.round(figures.sentTotal));
     if (sent && !sent.sharedAt) accounts.markShared(sent.id, ctx.scope, { shared: true, fromCustomer: true, note: 'The customer sent back their version of it' }, ctx.user);
     if (body?.makePrimary !== false) accounts.setPrimary(account.id, rep.id, ctx.scope);
-    if (body?.applyPreferences !== false) accounts.update(account.id, ctx.scope, preferencesPatch(account, live.inputs), ctx.user);
+    // Their numbers in the calculator from now on: its backlog, plan, Fusion projects and counted code, as their report has them.
+    if (body?.applyPreferences !== false) accounts.update(account.id, ctx.scope, { ...profileFromReport(live), scope: {} }, ctx.user);
     record(ctx, req, 'report.customerVersion', account.name, { id: rep.id, total: rep.totalCredits, sentTotal: figures.sentTotal, changes: changes.length, primary: body?.makePrimary !== false, preferences: body?.applyPreferences !== false });
     return { ...preview, report: { id: rep.id, totalCredits: rep.totalCredits }, ...accountDetail(ctx, account.id) };
   });
@@ -2056,8 +2057,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     // The quote as it was given: the report's own figures, before anyone moved a lever.
     const data = live.sentInputs ? { ...leverData(live.base, live.sentInputs), levers: live.sentInputs } : figures.data;
     let rep = accounts.addPreviousReport({ customerId: account.id, data, user: ctx.user, madeAt, note: body?.note }, ctx.scope);
+    // Loaded into the calculator (unless asked not to): its backlog, plan, Fusion projects and counted code, as the quote had them.
+    const loaded = body?.load !== false;
+    if (loaded) accounts.update(account.id, ctx.scope, { ...profileFromReport(live, { useSent: true }), scope: {} }, ctx.user);
     if (String(body?.sharedWith ?? '').trim()) rep = accounts.markShared(rep.id, ctx.scope, { shared: true, sharedWith: body.sharedWith, note: 'A quote given before, brought in' }, ctx.user);
-    record(ctx, req, 'report.previous', account.name, { id: rep.id, total: rep.totalCredits, madeAt, sharedWith: rep.sharedWith ?? [] });
+    record(ctx, req, 'report.previous', account.name, { id: rep.id, total: rep.totalCredits, madeAt, sharedWith: rep.sharedWith ?? [], loaded });
     return { ...preview, report: { id: rep.id, totalCredits: rep.totalCredits }, ...accountDetail(ctx, account.id) };
   });
   r('POST', '/api/cc/cxone/disconnect', perm('calculator.use'), (req, ctx) => calc.disconnect(ctx.user.id));
