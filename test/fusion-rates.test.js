@@ -42,7 +42,8 @@ test('the calculator gets the rates: engines read take theirs, none read gives t
   // the calculator’s own list (names, no rates) takes the rates by name.
   const mz = withRates({ id: 'a', fusion: { models: [{ id: 'catalog-opus-5-5', name: 'opus-5.5', creditsPer10k: null }, { id: 'catalog-mythos', name: 'mythos-5.1', creditsPer10k: null }] } }, eff);
   assert.equal(mz.fusion.models.find((m) => m.name === 'opus-5.5').creditsPer10k, 2);
-  assert.equal(mz.fusion.models.find((m) => m.name === 'mythos-5.1').creditsPer10k, null);
+  // An engine with no rate is not offered at all (until one is set).
+  assert.equal(mz.fusion.models.some((m) => m.name === 'mythos-5.1'), false);
   const typed = withRates({ id: 'a', fusion: { models: [{ id: 'x', name: 'Opus 5.5', creditsPer10k: 9 }, { id: 'y', name: 'Haiku 4.5', creditsPer10k: null }] } }, eff);
   assert.equal(typed.fusion.models[0].creditsPer10k, 9);
   assert.equal(typed.fusion.models[1].creditsPer10k, 1.5);
@@ -309,4 +310,23 @@ test('a person reports to a manager: set, shown, no circles, handed on when the 
   // Cleared again, for the tests after this one.
   r = await admin.put(P(se2), { managerId: null });
   assert.equal(r.data.user.managerId, null);
+});
+
+test('an engine without a rate is not offered nor counted at 0: its projects go to an engine with a rate, until one is set', async () => {
+  const { withRates } = await import('../server/fusion-rates.js');
+  const eff = { defaultModel: 'haiku', models: [{ name: 'haiku', creditsPer10k: 1 }] };
+  const projection = { fusion: { defaultModel: 'm-mythos', models: [{ id: 'm-haiku', name: 'haiku', creditsPer10k: 1 }, { id: 'm-mythos', name: 'Mythos 5.1', creditsPer10k: null }, { id: 'm-opus5', name: 'opus-5.0', creditsPer10k: null }], byFrequency: { month: { scans: 6, model: 'm-opus5' } }, projects: [{ id: 'a', name: 'kotak', loc: 100000, modelOverride: 'm-mythos' }, { id: 'b', name: 'x', loc: 1000 }] } };
+  const out = withRates(projection, eff).fusion;
+  assert.deepEqual(out.models.map((m) => m.name), ['haiku']);
+  assert.equal(out.defaultModel, 'm-haiku');
+  assert.equal(out.byFrequency.month.model, null);
+  assert.equal(out.byFrequency.month.scans, 6);
+  assert.equal(out.projects[0].modelOverride, null);
+  // A rate set for Mythos: it is offered again.
+  const again = withRates(projection, { ...eff, models: [...eff.models, { name: 'Mythos 5.1', creditsPer10k: 4 }] }).fusion;
+  assert.ok(again.models.some((m) => m.name === 'Mythos 5.1' && m.creditsPer10k === 4));
+  assert.equal(again.projects[0].modelOverride, 'm-mythos');
+  // No engine rated at all: nothing is taken away.
+  const unrated = { fusion: { ...projection.fusion, models: projection.fusion.models.map((m) => ({ ...m, creditsPer10k: null })) } };
+  assert.equal(withRates(unrated, { defaultModel: null, models: [] }).fusion.models.length, 3);
 });

@@ -294,8 +294,10 @@ export class CalculatorService {
           const rated = this.rates ? { ...offer, models: this.rates.rate(userId, offer.models) } : offer;
           const unrated = rated.models.filter((m) => !(Number(m.creditsPer10k) > 0)).map((m) => m.name);
           if (this.rates && unrated.length) this.rates.detected(userId, unrated, state.connection?.tenant ?? '');
-          Object.assign(job.live ?? {}, { offer: rated });
-          return rated;
+          // Noted for the Admin above; not offered in the calculator until it has a rate (with none rated at all, all stay).
+          const offered = rated.models.some((m) => Number(m.creditsPer10k) > 0) ? { ...rated, models: rated.models.filter((m) => Number(m.creditsPer10k) > 0) } : rated;
+          Object.assign(job.live ?? {}, { offer: offered });
+          return offered;
         }),
     ])
       .then(([{ perProject, ...tenant }, offer]) => {

@@ -167,11 +167,22 @@ export function withRates(projection, eff) {
   const have = new Set(models.map((m) => engineKey(m.name)));
   const filled = models.map((m) => (Number(m.creditsPer10k) > 0 || !rates.has(engineKey(m.name)) ? m : { ...m, creditsPer10k: rates.get(engineKey(m.name)).creditsPer10k }));
   const added = [...rates.values()].filter((m) => !have.has(engineKey(m.name))).map(catalogModel);
-  const list = [...filled, ...added].slice(0, 20);
+  // An engine without a rate is not offered, nor counted at 0: projects, rules and the default set to it go to the
+  // engines with a rate, until the Admin sets one (Settings → Engines & rates). With none rated at all, all stay.
+  const rated = (m) => Number(m.creditsPer10k) > 0;
+  const all = [...filled, ...added];
+  const list = (all.some(rated) ? all.filter(rated) : all).slice(0, 20);
+  const kept = new Set(list.map((m) => m.id));
+  const dropped = all.some((m) => !kept.has(m.id));
   let defaultModel = f.defaultModel ?? null;
   // the calculator names a default by itself (its newest engine): until the account's Fusion is used, the one that applies here wins.
   const untouched = !(f.projects?.length) && !f.readAt;
   if (untouched || !defaultModel || !list.some((m) => m.id === defaultModel)) defaultModel = list.find((m) => engineKey(m.name) === engineKey(eff.defaultModel))?.id ?? defaultModel ?? null;
-  const same = added.length === 0 && filled.every((m, i) => m === models[i]) && defaultModel === (f.defaultModel ?? null);
-  return same ? projection : { ...projection, fusion: { ...f, models: list, defaultModel } };
+  if (!kept.has(defaultModel)) defaultModel = list.find((m) => engineKey(m.name) === engineKey(eff.defaultModel))?.id ?? list[0]?.id ?? null;
+  const same = !dropped && added.length === 0 && filled.every((m, i) => m === models[i]) && defaultModel === (f.defaultModel ?? null);
+  if (same) return projection;
+  const ruleOf = (r) => (r && r.model && !kept.has(r.model) ? { ...r, model: null } : r);
+  const rules = (o) => (o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).map(([k, r]) => [k, ruleOf(r)])) : o);
+  const projects = dropped && Array.isArray(f.projects) ? f.projects.map((p) => (p.modelOverride && !kept.has(p.modelOverride) ? { ...p, modelOverride: null } : p)) : f.projects;
+  return { ...projection, fusion: { ...f, models: list, defaultModel, ...(dropped ? { byFrequency: rules(f.byFrequency), byCriticality: rules(f.byCriticality), projects } : {}) } };
 }

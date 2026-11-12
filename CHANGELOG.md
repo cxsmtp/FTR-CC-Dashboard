@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.88.00 — 2026-11-12
+
+- **A Fusion engine without a rate is not used until it has one** (Mythos 5.1 and opus-5.0 for now). The calculator does not offer it, and projects, scan-frequency rules or a default set to it use the default engine with a rate instead, so they are no longer counted at 0 (test report #8: Kotak MF was understated). It is back by itself once the Admin sets its rate in Settings → Engines & rates, which still lists it under *Seen without a rate*. When no engine has a rate at all, none is taken away.
+
 ## CC-01.87.00 — 2026-11-12
 
 The last items of the 12 November test report.
