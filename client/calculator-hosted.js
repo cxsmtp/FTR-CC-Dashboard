@@ -1159,8 +1159,7 @@ export async function startHosted() {
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', String(on));
     }
-    for (const p of panes) p.hidden = p.dataset.pane !== src;
-    for (const b of document.querySelectorAll('.hc-how [data-how]')) b.classList.toggle('on', b.dataset.how === src);
+    for (const p of panes) p.hidden = p.dataset.pane !== src && p.dataset.also !== src;
     // A Fusion-only customer (Git or cloc-fusion): Impact (soft savings of triage & remediation) and the Checkmarx One
     // key's state do not apply; Impact stays in view when it is already on, to turn it off.
     $('hc-account').dataset.src = src;
@@ -1172,7 +1171,26 @@ export async function startHosted() {
   };
   $('hc-impact').addEventListener('change', () => $('hc-account').classList.toggle('impact-on', $('hc-impact').checked));
   for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.also && b.dataset.also === document.documentElement.dataset.src ? b.dataset.also : b.dataset.src));
-  for (const b of document.querySelectorAll('.hc-how [data-how]')) b.addEventListener('click', () => pick(b.dataset.how));
+  // The customer's cloc-fusion report, given here: read by the calculator's own importer (Fusion · cloc-fusion), which
+  // takes any of the files cloc-fusion writes; what it read shows under the button.
+  $('hc-cf-file').addEventListener('change', (e) => {
+    const files = e.target.files;
+    const into = document.getElementById('calc-cf-file');
+    if (!files?.length || !into) return;
+    pick('cloc');
+    into.files = files;
+    into.dispatchEvent(new Event('change', { bubbles: true }));
+    e.target.value = '';
+    document.querySelector('[data-ptabs="calculator"] [data-pt="fusion-cloc"]')?.click();
+  });
+  {
+    const said = document.getElementById('calc-cf-status');
+    if (said) new MutationObserver(() => {
+      if (!said.textContent.trim()) return;
+      $('hc-git-status').textContent = said.textContent;
+      $('hc-git-status').className = `status ${/ok/.test(said.className) ? 'ok' : 'muted'}`;
+    }).observe(said, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
   // Git and cloc-fusion are the calculator's own Fusion tabs: open the one asked for, and bring it into view.
   for (const b of document.querySelectorAll('[data-open-tab]')) b.addEventListener('click', () => {
     const tab = document.querySelector(`[data-ptabs="calculator"] [data-pt="${b.dataset.openTab}"]`);
@@ -1313,7 +1331,7 @@ export async function startHosted() {
     }
     const ok = Boolean(account?.salesforceUrl);
     $('hc-account').classList.toggle('no-sf', Boolean(account) && !ok);
-    for (const el of [$('sa-connect-go'), $('sa-key'), $('hc-git-go'), $('hc-git-token'), ...document.querySelectorAll('[data-open-tab]'), document.getElementById('calc-generate'), document.getElementById('hc-refresh')]) {
+    for (const el of [$('sa-connect-go'), $('sa-key'), $('hc-git-go'), $('hc-git-token'), $('hc-cf-file'), ...document.querySelectorAll('[data-open-tab]'), document.getElementById('calc-generate'), document.getElementById('hc-refresh')]) {
       if (!el) continue;
       el.disabled = !ok;
       el.title = ok ? '' : 'Save the account’s Salesforce link first';
@@ -1360,7 +1378,7 @@ export async function startHosted() {
     shell.classList.toggle('can-read', connected);
     $('sa-disconnect').hidden = !connected;
     $('sa-key').placeholder = connected ? 'Connected: paste another key to switch' : 'Paste the API key (not kept: in memory for your session only)';
-    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : `Not connected. A prospect not on Checkmarx One: use Code repositories (their git token, or a cloc-fusion report)${cfg.exportsEnabled ? ', or the two exports' : ''}.`, connected ? 'ok' : 'muted');
+    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : `Not connected. A prospect not on Checkmarx One: use Code repositories (their cloc-fusion report, or their git token)${cfg.exportsEnabled ? ', or the two exports' : ''}.`, connected ? 'ok' : 'muted');
     calculator.refresh();
   };
   $('sa-connect').addEventListener('submit', async (event) => {

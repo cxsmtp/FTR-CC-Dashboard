@@ -1,7 +1,8 @@
 import { test } from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 
-import { ACTIVE_LEVELS, activeEnough, aheadSettings, newCustomerEstimate, newCustomerSettings, repoKey } from '../core/public/calculator/model.js';
+import { ACTIVE_LEVELS, activeEnough, aheadSettings, newCustomerEstimate, newCustomerSettings, parseClocFusionReport, repoKey } from '../core/public/calculator/model.js';
 import { DENSE_MIN_BYTES, LocTally, adjustedLoc, countText } from '../core/src/cloc-fusion/loc.js';
 import { isExcludedPath, languageOf } from '../core/src/cloc-fusion/languages.js';
 
@@ -70,4 +71,25 @@ test('triage & remediation by how often projects are scanned: a share for each g
   assert.deepEqual(mixed.fixed.bySeverity.Critical, [1.5, 1.5]);
   assert.equal(mixed.totals.meta.projects, 14);
   assert.equal(weightedSeries([{ share: 0, series: series(1) }]), null);
+});
+
+test('a cloc-fusion report is read in every format it is written in: JSON, HTML, CSV and Markdown', () => {
+  const read = (ext) => parseClocFusionReport(fs.readFileSync(new URL(`./fixtures/cloc-fusion/cloc-fusion-report.${ext}`, import.meta.url), 'utf8'), `cloc-fusion-report.${ext}`, {});
+  const json = read('json');
+  assert.equal(json.projects.length, 3);
+  assert.equal(json.skipped, 2);
+  assert.deepEqual(json.projects[0].langs, { Python: 119800, YAML: 200 });
+  for (const ext of ['html', 'csv', 'md']) {
+    const r = read(ext);
+    assert.equal(r.skipped, 2, ext);
+    // The same repositories, lines (as one figure), commits, change frequency and developers as the JSON says.
+    assert.deepEqual(r.projects.map((p) => [p.fullName, p.locOverride, p.activity.commits, p.activity.frequency, p.activity.devs90]), [['acme/payments-api', 120000, 420, 'more-5-week', 2], ['acme/web, the "site"', 45500, 30, '2-weeks', 2], ['acme/a|b_c', 9000, 2, '6-months', 1]], ext);
+    assert.deepEqual(r.projects.map((p) => p.activity.frequency), json.projects.map((p) => p.activity.frequency), ext);
+  }
+  assert.equal(read('html').version, '1.4.1');
+  assert.equal(read('md').version, '1.4.1');
+  assert.equal(read('html').developers, 3);
+  // Its list of contributors is not a report, and neither is any other file.
+  assert.throws(() => parseClocFusionReport(fs.readFileSync(new URL('./fixtures/cloc-fusion/cloc-fusion-contributors.csv', import.meta.url), 'utf8'), 'c.csv', {}), /not a cloc-fusion report/);
+  assert.throws(() => parseClocFusionReport('<html><body>hello</body></html>', 'x.html', {}), /not a cloc-fusion report/);
 });

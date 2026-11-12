@@ -3720,10 +3720,10 @@ BITBUCKET_TOKEN_2=…  BITBUCKET_URL_2=https://bitbucket.acme.com</pre>
                   </details>
                 </div>
                 <div class="calc-fnew-way" id="calc-cf" data-fnew-way="report" hidden>
-                  <p class="calc-cmd-label">When the code must not leave the customer, or they have many organizations: they open <b>cloc-fusion</b> (the file above; no install, nothing sent anywhere but their own git hosts), add their connections with a read-only token, press <b>Run the Fusion scan</b>, and send you <b translate="no">cloc-fusion-report.json</b> (Download JSON on its report). It holds counts and names of repositories, never code or tokens; its list of contributors is not read here.</p>
+                  <p class="calc-cmd-label">When the code must not leave the customer, or they have many organizations: they open <b>cloc-fusion</b> (the file above; no install, nothing sent anywhere but their own git hosts), add their connections with a read-only token, press <b>Calculate Fusion credits</b>, and send you its report: any of the files it makes (JSON, HTML, CSV or Markdown). The JSON says the most (lines by language); the others give each repository's lines as one figure. A report holds counts and names of repositories, never code or tokens; its list of contributors is not read here.</p>
                   <div class="calc-cloc-drop" id="calc-cf-drop">
-                    <p><b>Drop cloc-fusion-report.json here</b>, or <button type="button" class="link" id="calc-cf-pick">choose the file</button>. Each repository it measured becomes a project, with its lines by language, commits, change frequency and developers; a project with the same address, or the same name, is replaced.</p>
-                    <input type="file" id="calc-cf-file" accept=".json,application/json" hidden />
+                    <p><b>Drop the cloc-fusion report here</b> (JSON, HTML, CSV or Markdown), or <button type="button" class="link" id="calc-cf-pick">choose the file</button>. Each repository it measured becomes a project, with its lines by language, commits, change frequency and developers; a project with the same address, or the same name, is replaced.</p>
+                    <input type="file" id="calc-cf-file" accept=".json,.html,.htm,.csv,.md,application/json,text/html,text/csv,text/markdown" multiple hidden />
                     <div class="calc-cloc-files" id="calc-cf-files"></div>
                     <p class="status" id="calc-cf-status" aria-live="polite"></p>
                   </div>

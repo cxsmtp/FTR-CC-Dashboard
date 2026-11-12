@@ -1,0 +1,4 @@
+﻿Name,Email,Type,Repositories,Commits (90 days),Last commit,Repository list
+Ana,ana@x.example,Developer,2,4,2026-11-01T10:00:00.000Z,"acme/payments-api; acme/web, the ""site"""
+Ben,ben@x.example,Developer,2,4,2026-11-01T10:00:00.000Z,"acme/payments-api; acme/web, the ""site"""
+Cy,cy@x.example,Developer,1,2,2026-11-01T10:00:00.000Z,acme/a|b_c

@@ -798,15 +798,127 @@ const isoOf = (v) => (typeof v === 'string' && Number.isFinite(Date.parse(v)) ? 
  * failed or not measured are left out and counted. Throws with what is wrong when it is not such a report.
  * {projects, developers, skipped, version, windowDays}.
  */
-export function parseClocFusionReport(text, fileName = '', { models = [] } = {}) {
-  const notReport = () => Object.assign(new Error(`${fileName || 'This file'} is not a cloc-fusion report: use cloc-fusion-report.json from cloc-fusion's output.`), { notReport: true });
-  if (String(text ?? '').length > MAX_CLOC_FUSION_BYTES) throw new Error(`${fileName || 'This file'} is over 64 MB.`);
-  let json;
+// cloc-fusion writes its report as JSON, HTML, CSV and Markdown: each is read as the same report. The JSON says the
+// most (lines by language); the others give each repository's lines as one figure.
+const CF_FREQUENCY = new Map([['more than 5 commits a week', 'more-5-week'], ['1 to 5 commits a week', '1-5-week'], ['about once in 2 weeks', '2-weeks'], ['about once a month', 'month'], ['about once in 2 months', '2-months'], ['about once in 3 months', '3-months'], ['about once in 6 months', '6-months'], ['about once a year', 'year'], ['not in the window', 'rare']]);
+const cfNumber = (v) => {
+  const s = String(v ?? '').replace(/[,\s]/g, '');
+  return s && Number.isFinite(Number(s)) ? Number(s) : null;
+};
+const cfRepo = ({ fullName, loc, commits, windowDays, devs90, lastCommitAt, frequency, scansOverride, branch, url, measured, problem }) => ({
+  fullName: String(fullName ?? ''),
+  name: String(fullName ?? '').split('/').pop(),
+  loc: cfNumber(loc),
+  commits: cfNumber(commits) ?? 0,
+  windowDays: cfNumber(windowDays) ?? undefined,
+  devs90: cfNumber(devs90),
+  lastCommitAt: lastCommitAt ? String(lastCommitAt) : null,
+  frequency: CF_FREQUENCY.get(String(frequency ?? '').trim().toLowerCase()) ?? (FREQUENCY_IDS.has(frequency) ? frequency : undefined),
+  scansOverride: cfNumber(scansOverride),
+  branch: branch || '',
+  cloneUrl: /^https?:\/\//i.test(url ?? '') ? url : '',
+  analyzedAt: measured ? 'in the report' : null,
+  error: measured ? null : problem || null,
+});
+/** The report's HTML page: its rows are kept in the page as data (script#data), its contributors in script#contrib. */
+function cfFromHtml(text) {
+  const data = /<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(text);
+  if (!data || !/cloc-fusion/i.test(text)) return null;
+  const rows = JSON.parse(data[1]);
+  if (!Array.isArray(rows)) return null;
+  let people = null;
   try {
-    json = JSON.parse(String(text ?? '').replace(/^﻿/, ''));
-  } catch {
-    throw notReport();
+    people = JSON.parse(/<script id="contrib" type="application\/json">([\s\S]*?)<\/script>/.exec(text)?.[1] ?? 'null');
+  } catch {}
+  return {
+    tool: 'cloc-fusion',
+    version: /cloc-fusion v([\d.]+)/.exec(text)?.[1] ?? '',
+    developers: Array.isArray(people) && people.length ? { total: people.filter((p) => !p?.b).length } : null,
+    repos: rows.map((x) => cfRepo({ fullName: x?.n, loc: x?.loc, commits: x?.cm, devs90: x?.dv, lastCommitAt: x?.lc, frequency: x?.fr, scansOverride: x?.so, url: x?.u, measured: x?.st === 'ok', problem: x?.er || x?.st })),
+  };
+}
+/** A line of CSV as its cells (quoted cells, doubled quotes; a text cell made safe for spreadsheets starts with '). */
+function csvRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') cell += '"', i++;
+      else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') row.push(cell), (cell = '');
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell);
+      if (row.some((x) => x !== '')) rows.push(row);
+      row = [];
+      cell = '';
+    } else cell += ch;
   }
+  row.push(cell);
+  if (row.some((x) => x !== '')) rows.push(row);
+  return rows;
+}
+function cfFromCsv(text) {
+  const rows = csvRows(text);
+  const head = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
+  const col = (name) => head.indexOf(name);
+  if (col('repository') < 0 || col('lines of code') < 0 || col('status') < 0) return null;
+  const at = (row, name) => (col(name) < 0 ? '' : String(row[col(name)] ?? '').replace(/^'(?=[=+\-@])/, ''));
+  return {
+    tool: 'cloc-fusion',
+    version: '',
+    repos: rows.slice(1).map((x) => cfRepo({ fullName: at(x, 'repository'), loc: at(x, 'lines of code'), commits: at(x, 'commits in window'), windowDays: at(x, 'window (days)'), devs90: at(x, 'developers (90 days)'), lastCommitAt: at(x, 'last commit'), frequency: at(x, 'change frequency'), branch: at(x, 'default branch'), url: at(x, 'url'), measured: at(x, 'status') === 'measured', problem: at(x, 'status') })),
+  };
+}
+function cfFromMarkdown(text) {
+  if (!/^# Fusion scan sizing report/m.test(text) || !/by cloc-fusion/.test(text)) return null;
+  const plain = (s) => s.trim().replace(/\\([|\\[\]*_`])/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const cells = (line) => line.replace(/^\|/, '').replace(/\|\s*$/, '').split(/(?<!\\)\|/).map(plain);
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => /^## Repositories\s*$/.test(l));
+  if (start < 0) return null;
+  const table = [];
+  for (const l of lines.slice(start + 1)) {
+    if (/^## /.test(l)) break;
+    if (/^\|/.test(l) && !/^\|[-:| ]+\|?\s*$/.test(l)) table.push(cells(l));
+  }
+  const head = (table[0] ?? []).map((h) => h.toLowerCase());
+  const col = (name) => head.indexOf(name);
+  if (col('repository') < 0 || col('loc') < 0) return null;
+  const at = (row, name) => (col(name) < 0 ? '' : row[col(name)] ?? '');
+  const windowDays = cfNumber(/Commit window: ([\d.,]+) days/.exec(text)?.[1]);
+  const developers = cfNumber(/\| Contributing developers \(90 days\) \| ([\d,]+) \|/.exec(text)?.[1]);
+  return {
+    tool: 'cloc-fusion',
+    version: /by cloc-fusion (\d[\d.]*\d)/.exec(text)?.[1] ?? '',
+    settings: { windowDays: windowDays ?? 365 },
+    developers: developers === null ? null : { total: developers },
+    repos: table.slice(1).map((x) => cfRepo({ fullName: at(x, 'repository'), loc: at(x, 'loc'), commits: at(x, 'commits'), devs90: at(x, 'devs (90 d)'), frequency: at(x, 'frequency'), measured: at(x, 'status') === 'measured', problem: at(x, 'status') })),
+  };
+}
+/** Any of cloc-fusion's report files as its report: the JSON itself, or what the HTML, CSV or Markdown say of each repository. */
+export function readClocFusionFile(text) {
+  const body = String(text ?? '').replace(/^\uFEFF/, '');
+  const first = body.trimStart()[0];
+  try {
+    if (first === '{') return JSON.parse(body);
+    if (first === '<') return cfFromHtml(body);
+    if (first === '#') return cfFromMarkdown(body);
+    return cfFromCsv(body);
+  } catch {
+    return null;
+  }
+}
+
+export function parseClocFusionReport(text, fileName = '', { models = [] } = {}) {
+  const notReport = () => Object.assign(new Error(`${fileName || 'This file'} is not a cloc-fusion report: use the report cloc-fusion made (its JSON, HTML, CSV or Markdown file).`), { notReport: true });
+  if (String(text ?? '').length > MAX_CLOC_FUSION_BYTES) throw new Error(`${fileName || 'This file'} is over 64 MB.`);
+  const json = readClocFusionFile(text);
   if (!json || typeof json !== 'object' || json.tool !== 'cloc-fusion' || !Array.isArray(json.repos)) throw notReport();
   const windowDefault = clamp(Number(json.settings?.windowDays) || 365, 1, 3660);
   // The plan's models, by id: a repository pinned to one gets this calculator's model of the same name.

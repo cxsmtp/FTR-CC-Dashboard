@@ -2,6 +2,11 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.70.00 — 2026-11-12
+
+- **Calculator, Code repositories: two things, side by side.** *Upload their cloc-fusion report* (the customer made it), or their read-only git token and *Connect to Git*. The switch between "with their token" and "cloc-fusion report" of CC-01.69.00 is gone. What the upload read shows right under it, and the calculator opens on its repositories.
+- **Any report cloc-fusion makes is read: JSON, HTML, CSV or Markdown.** Each gives the same repositories, lines of code, commits, change frequency and developers. The JSON says the most (lines by language, so languages can be left out); the others give each repository's lines as one figure. Its list of contributors (cloc-fusion-contributors.csv) is not a report and is refused, as before. Several files can be given at once.
+
 ## CC-01.69.00 — 2026-11-12
 
 - **Calculator: Git and cloc-fusion are one choice.** "Data from" offers Checkmarx One or **Code repositories**; under Code repositories, one small switch: *With their token* (counted here) or *cloc-fusion report* (the customer ran it and sent the file). The same in the meeting view. Nothing saved changes: accounts, their counted repositories and their reports are as they were.

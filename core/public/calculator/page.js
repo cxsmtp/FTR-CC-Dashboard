@@ -2214,7 +2214,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         said.push(t('{0}: {1} repositories read (cloc-fusion {2}), {3} not measured there; developers in the last 90 days across it: {4}.').replace('{0}', file.name).replace('{1}', num(found.projects.length)).replace('{2}', found.version || '—').replace('{3}', num(found.skipped)).replace('{4}', num(found.developers)));
         done.push(`<span translate="no">✓ ${esc(file.name)}</span>`);
       } catch (error) {
-        const message = error.notReport ? t('{0} is not a cloc-fusion report: use cloc-fusion-report.json from cloc-fusion\'s output.').replace('{0}', file.name) : error.message;
+        const message = error.notReport ? t('{0} is not a cloc-fusion report: use the report cloc-fusion made (its JSON, HTML, CSV or Markdown file).').replace('{0}', file.name) : error.message;
         done.push(`<span class="bad" title="${esc(message)}" translate="no">✗ ${esc(file.name)}</span>`);
         toast(message, 'bad');
       }
@@ -2263,7 +2263,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         }
         done.push(`<span translate="no">✓ ${esc(file.name)}</span>`);
       } catch (error) {
-        const message = error.notCloc ? t('{0} is not a cloc report: run cloc with --json or --csv.').replace('{0}', file.name) : error.notReport ? t('{0} is not a cloc-fusion report: use cloc-fusion-report.json from cloc-fusion\'s output.').replace('{0}', file.name) : error.message;
+        const message = error.notCloc ? t('{0} is not a cloc report: run cloc with --json or --csv.').replace('{0}', file.name) : error.notReport ? t('{0} is not a cloc-fusion report: use the report cloc-fusion made (its JSON, HTML, CSV or Markdown file).').replace('{0}', file.name) : error.message;
         done.push(`<span class="bad" title="${esc(message)}" translate="no">✗ ${esc(file.name)}</span>`);
         toast(message, 'bad');
       }

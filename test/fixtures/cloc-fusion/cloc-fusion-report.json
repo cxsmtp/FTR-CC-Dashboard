@@ -1,0 +1,544 @@
+{
+  "tool": "cloc-fusion",
+  "version": "1.4.1",
+  "generatedAt": "2026-11-12T08:45:18.486Z",
+  "partial": false,
+  "durationSeconds": 0,
+  "settings": {
+    "engine": "auto",
+    "windowDays": 365,
+    "concurrency": 8,
+    "discoveryConcurrency": 8,
+    "repoTimeoutMinutes": 30,
+    "maxArchiveBytes": 4294967296,
+    "includeArchived": false,
+    "includeForks": false,
+    "includeMerges": false,
+    "maxFileBytes": 2097152,
+    "countMinified": false,
+    "locBasis": "code",
+    "countCategories": [
+      "code",
+      "markup",
+      "iac"
+    ],
+    "exclude": [],
+    "include": [],
+    "fusion": {
+      "periodMonths": 12,
+      "defaultScans": 1,
+      "defaultModel": "m",
+      "combine": "higher",
+      "models": [
+        {
+          "id": "m",
+          "name": "M",
+          "creditsPer10k": 1
+        }
+      ],
+      "byFrequency": {
+        "more-5-week": {
+          "scans": 52,
+          "model": null
+        },
+        "1-5-week": {
+          "scans": 26,
+          "model": null
+        },
+        "2-weeks": {
+          "scans": 12,
+          "model": null
+        },
+        "month": {
+          "scans": 6,
+          "model": null
+        },
+        "2-months": {
+          "scans": 4,
+          "model": null
+        },
+        "3-months": {
+          "scans": 4,
+          "model": null
+        },
+        "6-months": {
+          "scans": 2,
+          "model": null
+        },
+        "year": {
+          "scans": 1,
+          "model": null
+        },
+        "rare": {
+          "scans": 1,
+          "model": null
+        }
+      },
+      "byCriticality": {
+        "1": {
+          "scans": null,
+          "model": null
+        },
+        "2": {
+          "scans": null,
+          "model": null
+        },
+        "3": {
+          "scans": null,
+          "model": null
+        },
+        "4": {
+          "scans": null,
+          "model": null
+        },
+        "5": {
+          "scans": null,
+          "model": null
+        }
+      }
+    },
+    "totals": {
+      "extraPercent": 0,
+      "bundleCredits": 10000
+    },
+    "overrides": {},
+    "bots": [],
+    "connections": []
+  },
+  "counts": {
+    "discovered": 5,
+    "skipped": 1,
+    "measured": 3,
+    "failed": 1,
+    "empty": 0,
+    "denseFiles": 0
+  },
+  "totals": {
+    "repos": 3,
+    "lines": 174500,
+    "units": 18,
+    "scans": 66,
+    "unitScans": 686,
+    "credits": 686,
+    "commits": 452,
+    "unknownRate": 0
+  },
+  "credits": {
+    "settings": {
+      "extraPercent": 0,
+      "bundleCredits": 10000
+    },
+    "base": 686,
+    "extra": 0,
+    "total": 686,
+    "exactBundles": 0.0686,
+    "bundles": 1,
+    "known": true
+  },
+  "byFrequency": [
+    {
+      "id": "more-5-week",
+      "label": "More than 5 commits a week",
+      "repos": 1,
+      "lines": 120000,
+      "units": 12,
+      "scans": 52,
+      "credits": 624
+    },
+    {
+      "id": "1-5-week",
+      "label": "1 to 5 commits a week",
+      "repos": 0,
+      "lines": 0,
+      "units": 0,
+      "scans": 0,
+      "credits": 0
+    },
+    {
+      "id": "2-weeks",
+      "label": "About once in 2 weeks",
+      "repos": 1,
+      "lines": 45500,
+      "units": 5,
+      "scans": 12,
+      "credits": 60
+    },
+    {
+      "id": "month",
+      "label": "About once a month",
+      "repos": 0,
+      "lines": 0,
+      "units": 0,
+      "scans": 0,
+      "credits": 0
+    },
+    {
+      "id": "2-months",
+      "label": "About once in 2 months",
+      "repos": 0,
+      "lines": 0,
+      "units": 0,
+      "scans": 0,
+      "credits": 0
+    },
+    {
+      "id": "3-months",
+      "label": "About once in 3 months",
+      "repos": 0,
+      "lines": 0,
+      "units": 0,
+      "scans": 0,
+      "credits": 0
+    },
+    {
+      "id": "6-months",
+      "label": "About once in 6 months",
+      "repos": 1,
+      "lines": 9000,
+      "units": 1,
+      "scans": 2,
+      "credits": 2
+    },
+    {
+      "id": "year",
+      "label": "About once a year",
+      "repos": 0,
+      "lines": 0,
+      "units": 0,
+      "scans": 0,
+      "credits": 0
+    },
+    {
+      "id": "rare",
+      "label": "Not in the window",
+      "repos": 0,
+      "lines": 0,
+      "units": 0,
+      "scans": 0,
+      "credits": 0
+    }
+  ],
+  "byModel": [
+    {
+      "id": "m",
+      "name": "M",
+      "rate": 1,
+      "repos": 3,
+      "unitScans": 686,
+      "credits": 686
+    }
+  ],
+  "byOrg": [
+    {
+      "connection": "gh",
+      "org": "acme",
+      "provider": "github",
+      "repos": 5,
+      "counted": 3,
+      "lines": 174500,
+      "commits": 452,
+      "scans": 66,
+      "unitScans": 686,
+      "credits": 686,
+      "devs90": 3
+    }
+  ],
+  "developers": {
+    "windowDays": 90,
+    "coveredDays": 90,
+    "total": 3,
+    "bots": 0,
+    "repos": 3
+  },
+  "contributors": [
+    {
+      "name": "Ana",
+      "email": "ana@x.example",
+      "bot": false,
+      "commits": 4,
+      "lastCommitAt": "2026-11-01T10:00:00.000Z",
+      "repos": [
+        "acme/payments-api",
+        "acme/web, the \"site\""
+      ]
+    },
+    {
+      "name": "Ben",
+      "email": "ben@x.example",
+      "bot": false,
+      "commits": 4,
+      "lastCommitAt": "2026-11-01T10:00:00.000Z",
+      "repos": [
+        "acme/payments-api",
+        "acme/web, the \"site\""
+      ]
+    },
+    {
+      "name": "Cy",
+      "email": "cy@x.example",
+      "bot": false,
+      "commits": 2,
+      "lastCommitAt": "2026-11-01T10:00:00.000Z",
+      "repos": [
+        "acme/a|b_c"
+      ]
+    }
+  ],
+  "languages": {
+    "Python": {
+      "category": "programming",
+      "repos": 3,
+      "files": 24,
+      "code": 173900,
+      "comment": 15,
+      "blank": 15
+    },
+    "YAML": {
+      "category": "data",
+      "repos": 3,
+      "files": 6,
+      "code": 600,
+      "comment": 0,
+      "blank": 0
+    }
+  },
+  "problems": [],
+  "repos": [
+    {
+      "fullName": "acme/payments-api",
+      "name": "payments-api",
+      "org": "acme",
+      "connection": "gh",
+      "provider": "github",
+      "webUrl": "https://github.com/acme/payments-api",
+      "cloneUrl": "https://github.com/acme/payments-api.git",
+      "defaultBranch": "main",
+      "branch": "main",
+      "headSha": "abc1234",
+      "analyzedAt": "2026-11-01T10:00:00.000Z",
+      "loc": 120000,
+      "code": 120000,
+      "files": 10,
+      "commits": 420,
+      "windowDays": 365,
+      "lastCommitAt": "2026-11-01T10:00:00.000Z",
+      "mainLanguage": "Python",
+      "languages": {
+        "Python": {
+          "category": "programming",
+          "files": 8,
+          "code": 119800,
+          "comment": 5,
+          "blank": 5
+        },
+        "YAML": {
+          "category": "data",
+          "files": 2,
+          "code": 200,
+          "comment": 0,
+          "blank": 0
+        }
+      },
+      "contributors90": [
+        {
+          "email": "ana@x.example",
+          "name": "Ana",
+          "commits": 2,
+          "lastCommitAt": "2026-11-01T10:00:00.000Z",
+          "bot": false
+        },
+        {
+          "email": "ben@x.example",
+          "name": "Ben",
+          "commits": 2,
+          "lastCommitAt": "2026-11-01T10:00:00.000Z",
+          "bot": false
+        }
+      ],
+      "frequency": "more-5-week",
+      "frequencyLabel": "More than 5 commits a week",
+      "commitsPerWeek": 8.05,
+      "commitsPerMonth": 35,
+      "included": true,
+      "lines": 120000,
+      "units": 12,
+      "scans": 52,
+      "scansFrom": "frequency",
+      "model": "m",
+      "rate": 1,
+      "credits": 624,
+      "unknownRate": false,
+      "devs90": 2,
+      "bots90": 0
+    },
+    {
+      "fullName": "acme/web, the \"site\"",
+      "name": "web, the \"site\"",
+      "org": "acme",
+      "connection": "gh",
+      "provider": "github",
+      "webUrl": "https://github.com/acme/web, the \"site\"",
+      "cloneUrl": "https://github.com/acme/web, the \"site\".git",
+      "defaultBranch": "main",
+      "branch": "main",
+      "headSha": "abc1234",
+      "analyzedAt": "2026-11-01T10:00:00.000Z",
+      "loc": 45500,
+      "code": 45500,
+      "files": 10,
+      "commits": 30,
+      "windowDays": 365,
+      "lastCommitAt": "2026-11-01T10:00:00.000Z",
+      "mainLanguage": "Python",
+      "languages": {
+        "Python": {
+          "category": "programming",
+          "files": 8,
+          "code": 45300,
+          "comment": 5,
+          "blank": 5
+        },
+        "YAML": {
+          "category": "data",
+          "files": 2,
+          "code": 200,
+          "comment": 0,
+          "blank": 0
+        }
+      },
+      "contributors90": [
+        {
+          "email": "ana@x.example",
+          "name": "Ana",
+          "commits": 2,
+          "lastCommitAt": "2026-11-01T10:00:00.000Z",
+          "bot": false
+        },
+        {
+          "email": "ben@x.example",
+          "name": "Ben",
+          "commits": 2,
+          "lastCommitAt": "2026-11-01T10:00:00.000Z",
+          "bot": false
+        }
+      ],
+      "frequency": "2-weeks",
+      "frequencyLabel": "About once in 2 weeks",
+      "commitsPerWeek": 0.58,
+      "commitsPerMonth": 2.5,
+      "included": true,
+      "lines": 45500,
+      "units": 5,
+      "scans": 12,
+      "scansFrom": "frequency",
+      "model": "m",
+      "rate": 1,
+      "credits": 60,
+      "unknownRate": false,
+      "devs90": 2,
+      "bots90": 0
+    },
+    {
+      "fullName": "acme/a|b_c",
+      "name": "a|b_c",
+      "org": "acme",
+      "connection": "gh",
+      "provider": "github",
+      "webUrl": "https://github.com/acme/a|b_c",
+      "cloneUrl": "https://github.com/acme/a|b_c.git",
+      "defaultBranch": "main",
+      "branch": "main",
+      "headSha": "abc1234",
+      "analyzedAt": "2026-11-01T10:00:00.000Z",
+      "loc": 9000,
+      "code": 9000,
+      "files": 10,
+      "commits": 2,
+      "windowDays": 365,
+      "lastCommitAt": "2026-11-01T10:00:00.000Z",
+      "mainLanguage": "Python",
+      "languages": {
+        "Python": {
+          "category": "programming",
+          "files": 8,
+          "code": 8800,
+          "comment": 5,
+          "blank": 5
+        },
+        "YAML": {
+          "category": "data",
+          "files": 2,
+          "code": 200,
+          "comment": 0,
+          "blank": 0
+        }
+      },
+      "contributors90": [
+        {
+          "email": "cy@x.example",
+          "name": "Cy",
+          "commits": 2,
+          "lastCommitAt": "2026-11-01T10:00:00.000Z",
+          "bot": false
+        }
+      ],
+      "frequency": "6-months",
+      "frequencyLabel": "About once in 6 months",
+      "commitsPerWeek": 0.04,
+      "commitsPerMonth": 0.2,
+      "included": true,
+      "lines": 9000,
+      "units": 1,
+      "scans": 2,
+      "scansFrom": "frequency",
+      "model": "m",
+      "rate": 1,
+      "credits": 2,
+      "unknownRate": false,
+      "devs90": 1,
+      "bots90": 0
+    },
+    {
+      "fullName": "acme/archive",
+      "name": "archive",
+      "org": "acme",
+      "connection": "gh",
+      "provider": "github",
+      "skip": "archived",
+      "frequency": null,
+      "frequencyLabel": null,
+      "commitsPerWeek": null,
+      "commitsPerMonth": null,
+      "included": true,
+      "lines": null,
+      "units": 0,
+      "scans": 1,
+      "scansFrom": "default",
+      "model": "m",
+      "rate": 1,
+      "credits": 0,
+      "unknownRate": false
+    },
+    {
+      "fullName": "acme/broken",
+      "name": "broken",
+      "org": "acme",
+      "connection": "gh",
+      "provider": "github",
+      "error": "That branch is not in the repository.",
+      "frequency": null,
+      "frequencyLabel": null,
+      "commitsPerWeek": null,
+      "commitsPerMonth": null,
+      "included": false,
+      "lines": null,
+      "units": 0,
+      "scans": 1,
+      "scansFrom": "default",
+      "model": "m",
+      "rate": 1,
+      "credits": 0,
+      "unknownRate": false
+    }
+  ]
+}

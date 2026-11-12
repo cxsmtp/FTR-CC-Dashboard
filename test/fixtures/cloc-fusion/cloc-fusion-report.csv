@@ -1,0 +1,6 @@
+﻿Provider,Connection,Organization,Repository,URL,Default branch,Main language,Lines of code,Files counted,Dense files (counted by size),Code lines,Comment lines,Blank lines,Commits in window,Window (days),Commits per week,Commits per month,Active authors,Developers (90 days),Last commit,Change frequency,Criticality,Suggested Fusion scans,Scans set by,10K units,Fusion model,Credits per 10K LOC,Fusion credits,Status
+github,gh,acme,acme/payments-api,https://github.com/acme/payments-api,main,Python,120000,10,,120000,,,420,365,8.05,35,,2,2026-11-01T10:00:00.000Z,More than 5 commits a week,,52,commit frequency,12,M,1,624,measured
+github,gh,acme,"acme/web, the ""site""","https://github.com/acme/web, the ""site""",main,Python,45500,10,,45500,,,30,365,0.58,2.5,,2,2026-11-01T10:00:00.000Z,About once in 2 weeks,,12,commit frequency,5,M,1,60,measured
+github,gh,acme,acme/a|b_c,https://github.com/acme/a|b_c,main,Python,9000,10,,9000,,,2,365,0.04,0.2,,1,2026-11-01T10:00:00.000Z,About once in 6 months,,2,commit frequency,1,M,1,2,measured
+github,gh,acme,acme/archive,,,,,,,,,,,,,,,,,,,1,default,0,M,1,0,skipped (archived)
+github,gh,acme,acme/broken,,,,,,,,,,,,,,,,,,,,,,,,,failed: That branch is not in the repository.

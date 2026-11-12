@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-accent="indigo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="generator" content="cloc-fusion 1.4.1">
+<title>Fusion Readiness Report</title>
+<script>try{var d=document.documentElement,t=localStorage.getItem('cf-theme'),a=localStorage.getItem('cf-accent');if(t==='auto')d.removeAttribute('data-theme');else if(t==='light')d.setAttribute('data-theme','light');if(/^(indigo|cyan|emerald|violet|amber)$/.test(a||''))d.setAttribute('data-accent',a)}catch(e){}</script>
+<style>
+:root{--ng-ink-light:#4f46e5;--ng-ink-dark:#a5b4fc;--ng-from:#6366f1;--ng-to:#06b6d4;--ng-glow:rgb(99 102 241/.35);
+--ng-solid:linear-gradient(135deg,var(--ng-ink-light),color-mix(in srgb,var(--ng-to) 60%,#0b1020));
+color-scheme:light;--bg:#f3f5fb;--surface:#fff;--surface-2:#f6f7fc;--surface-3:#eceff7;--border:#e2e6f0;--border-strong:#cbd2e1;--text:#0b1020;--muted:#5a6478;--accent:var(--ng-ink-light);--accent-soft:color-mix(in srgb,var(--ng-from) 9%,transparent);--danger:#e11d48;--ok:#059669;--warn:#b45309;
+--shadow:0 1px 2px rgb(15 23 42/.04),0 8px 24px -16px rgb(15 23 42/.18);--shadow-pop:0 0 0 1px rgb(15 23 42/.06),0 18px 40px -16px rgb(15 23 42/.28);
+--font:"CF Jakarta",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:"CF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+--ng-glass:rgb(255 255 255/.78);--ng-glass-line:rgb(15 23 42/.08);--ng-ambient-1:rgb(99 102 241/.12);--ng-ambient-2:rgb(6 182 212/.10);--ng-ambient-3:rgb(16 185 129/.07);--ng-head:#64748b;--ng-wordmark:linear-gradient(90deg,var(--text),var(--text));
+--ease:cubic-bezier(.22,1,.36,1)}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#06080f;--surface:#0e1422;--surface-2:#121a2b;--surface-3:#1a2335;--border:#1d2638;--border-strong:#2a3449;--text:#e2e8f0;--muted:#94a3b8;--accent:var(--ng-ink-dark);--accent-soft:color-mix(in srgb,var(--ng-from) 16%,transparent);--danger:#fb7185;--ok:#34d399;--warn:#fbbf24;--shadow:0 8px 30px rgb(0 0 0/.35);--shadow-pop:0 0 0 1px rgb(255 255 255/.08),0 20px 48px -12px rgb(0 0 0/.7);--ng-glass:rgb(13 18 30/.72);--ng-glass-line:rgb(255 255 255/.07);--ng-ambient-1:rgb(79 70 229/.16);--ng-ambient-2:rgb(8 145 178/.13);--ng-ambient-3:rgb(5 150 105/.09);--ng-head:#7c8aa5;--ng-wordmark:linear-gradient(90deg,#fff,#cbd5e1 60%,#94a3b8)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#06080f;--surface:#0e1422;--surface-2:#121a2b;--surface-3:#1a2335;--border:#1d2638;--border-strong:#2a3449;--text:#e2e8f0;--muted:#94a3b8;--accent:var(--ng-ink-dark);--accent-soft:color-mix(in srgb,var(--ng-from) 16%,transparent);--danger:#fb7185;--ok:#34d399;--warn:#fbbf24;--shadow:0 8px 30px rgb(0 0 0/.35);--shadow-pop:0 0 0 1px rgb(255 255 255/.08),0 20px 48px -12px rgb(0 0 0/.7);--ng-glass:rgb(13 18 30/.72);--ng-glass-line:rgb(255 255 255/.07);--ng-ambient-1:rgb(79 70 229/.16);--ng-ambient-2:rgb(8 145 178/.13);--ng-ambient-3:rgb(5 150 105/.09);--ng-head:#7c8aa5;--ng-wordmark:linear-gradient(90deg,#fff,#cbd5e1 60%,#94a3b8)}}
+:root[data-accent="cyan"]{--ng-ink-light:#0e7490;--ng-ink-dark:#67e8f9;--ng-from:#06b6d4;--ng-to:#6366f1;--ng-glow:rgb(6 182 212 / 0.35)}
+:root[data-accent="emerald"]{--ng-ink-light:#047857;--ng-ink-dark:#6ee7b7;--ng-from:#10b981;--ng-to:#06b6d4;--ng-glow:rgb(16 185 129 / 0.35)}
+:root[data-accent="violet"]{--ng-ink-light:#6d28d9;--ng-ink-dark:#c4b5fd;--ng-from:#8b5cf6;--ng-to:#6366f1;--ng-glow:rgb(139 92 246 / 0.35)}
+:root[data-accent="amber"]{--ng-ink-light:#b45309;--ng-ink-dark:#fcd34d;--ng-from:#f59e0b;--ng-to:#f43f5e;--ng-glow:rgb(245 158 11 / 0.35)}
+
+.tune{margin-top:18px;padding:24px 26px;position:relative;overflow:hidden;isolation:isolate}
+.tune::after{content:"";position:absolute;width:380px;height:380px;left:-140px;bottom:-200px;border-radius:50%;background:radial-gradient(circle,var(--ng-glow),transparent 65%);z-index:-1;opacity:.6}
+.tune-head{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.tune-head h2{margin:8px 0 4px}
+.tune-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tuned-chip{display:none}.tuned .tuned-chip{display:inline-flex}
+.tune-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0 4px}
+.tune-kpi{padding:12px 14px;border-radius:14px;border:1px solid var(--ng-glass-line);background:color-mix(in srgb,var(--surface) 70%,transparent)}
+.tune-kpi b{display:block;font:600 22px/1.2 var(--mono);letter-spacing:-.03em;margin-top:4px}
+.tune-kpi.gold b{color:#f5c542;text-shadow:0 0 18px rgb(245 197 66/.35)}
+.tune-kpi span{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ng-head)}
+.tune-kpi small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+.tune-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:22px;margin-top:18px;align-items:start}
+.tune-col{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;min-width:0}
+.tune-scroll{overflow-x:auto;border-radius:14px}
+.tune h3{font-size:13.5px;margin:0 0 8px;letter-spacing:-.01em;display:flex;gap:8px;align-items:center}
+.tune h3 small{font:500 11px var(--mono);color:var(--muted)}
+.tune table{border:1px solid var(--ng-glass-line);border-radius:14px;border-collapse:separate;border-spacing:0;overflow:hidden;background:color-mix(in srgb,var(--surface) 75%,transparent)}
+.tune th,.tune td{padding:7px 10px}
+.tune thead th{position:static}
+.tune input,.tune select,#repos select,#repos input{min-height:32px;padding:0 9px;border-radius:9px;font-size:12.5px}
+.tune input[type=number],#repos input[type=number]{font-family:var(--mono);width:86px}
+.tune input[type=text]{width:100%;min-width:110px}
+.tune select,#repos select{max-width:220px}
+.tune input[type=radio]{min-height:0;width:16px;height:16px;accent-color:var(--ng-from)}
+.tune .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
+.tune .fields label{display:grid;gap:5px;font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ng-head)}
+.tune .fields input,.tune .fields select{width:100%}
+.tune .how{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+.tune .muted{color:var(--muted)}
+.tune .sug{font:500 10px var(--mono);color:var(--muted);margin-left:6px}
+.tune .x{min-height:30px;width:30px;padding:0;justify-content:center}
+.tune button.sm{min-height:30px;font-size:12px;margin-top:8px}
+#repos td.pick{padding-top:5px;padding-bottom:5px}
+#repos .pinned{border-color:color-mix(in srgb,var(--ng-from) 60%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--ng-from) 14%,transparent)}
+@media (max-width:980px){.tune-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.tune{padding:18px 16px}}
+@media print{.tune .tune-actions,.tune button{display:none!important}}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;color:var(--text);font:14.5px/1.55 var(--font);font-feature-settings:"kern","liga","ss01";-webkit-font-smoothing:antialiased;background-color:var(--bg);
+background-image:radial-gradient(640px 360px at 18% -80px,var(--ng-ambient-1),transparent 70%),radial-gradient(560px 460px at 105% 24%,var(--ng-ambient-2),transparent 70%),radial-gradient(760px 400px at 40% 105%,var(--ng-ambient-3),transparent 70%);background-attachment:fixed;
+transition:background-color .45s var(--ease),color .45s var(--ease)}
+::selection{background:color-mix(in srgb,var(--ng-from) 32%,transparent)}
+*{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
+:focus-visible{outline:2px solid color-mix(in srgb,var(--ng-from) 75%,transparent);outline-offset:2px;border-radius:8px}
+.aurora{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.aurora i{position:absolute;width:56vmax;height:56vmax;border-radius:50%;opacity:.30;will-change:transform;background:radial-gradient(circle,var(--c) 0,transparent 62%)}
+.aurora i:nth-child(1){--c:var(--ng-from);top:-22vmax;left:-12vmax;animation:drift1 26s var(--ease) infinite alternate}
+.aurora i:nth-child(2){--c:var(--ng-to);top:18vh;right:-20vmax;animation:drift2 32s var(--ease) infinite alternate}
+.aurora i:nth-child(3){--c:#10b981;bottom:-30vmax;left:30vw;opacity:.12;animation:drift3 38s var(--ease) infinite alternate}
+:root[data-theme="light"] .aurora i{opacity:.09}
+@keyframes drift1{to{transform:translate(12vmax,8vmax) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-10vmax,12vmax) scale(.92)}}
+@keyframes drift3{to{transform:translate(-14vmax,-8vmax) scale(1.08)}}
+.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:0 20px 72px}
+.topbar{position:sticky;top:0;z-index:20;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);background:color-mix(in srgb,var(--bg) 70%,transparent);border-bottom:1px solid var(--ng-glass-line)}
+.topbar-in{max-width:1280px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit}
+.brand-mark{position:relative;width:34px;height:34px;border-radius:11px;background:var(--ng-solid);display:grid;place-items:center;box-shadow:0 6px 18px -6px var(--ng-glow),inset 0 1px 0 rgb(255 255 255/.2)}
+.brand-mark svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.brand-mark::after{content:"";position:absolute;right:-3px;bottom:-3px;width:10px;height:10px;border-radius:50%;background:#10b981;border:2px solid var(--bg);box-shadow:0 0 10px #10b981;animation:live 2.4s ease-in-out infinite}
+@keyframes live{50%{box-shadow:0 0 2px #10b981}}
+.brand-name{font-weight:700;letter-spacing:-.02em;font-size:16.5px;background:var(--ng-wordmark);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-name b{background:linear-gradient(90deg,var(--ng-from),var(--ng-to));-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700}
+.chip{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:3px 9px;border-radius:999px;border:1px solid var(--ng-glass-line);color:var(--muted);background:color-mix(in srgb,var(--surface) 60%,transparent);white-space:nowrap}
+.spacer{flex:1}
+button,.btn{font:600 13px/1 var(--font);color:var(--text);display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--ng-glass-line);background:color-mix(in srgb,var(--surface) 80%,transparent);cursor:pointer;
+transition:background .2s var(--ease),border-color .2s var(--ease),box-shadow .25s var(--ease),transform .12s var(--ease),filter .2s}
+button svg,.btn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+button:hover,.btn:hover{border-color:color-mix(in srgb,var(--ng-from) 45%,transparent);background:color-mix(in srgb,var(--ng-from) 9%,var(--surface));box-shadow:0 6px 18px -10px var(--ng-glow);transform:translateY(-1px)}
+button:active,.btn:active{transform:translateY(1px);transition-duration:.05s}
+button.primary{color:#fff;border-color:transparent;background:var(--ng-solid);box-shadow:0 8px 22px -10px var(--ng-glow),inset 0 1px 0 rgb(255 255 255/.18)}
+button.primary:hover{filter:brightness(1.1);background:var(--ng-solid);box-shadow:0 12px 30px -10px var(--ng-glow),inset 0 1px 0 rgb(255 255 255/.22)}
+button.golden{color:#3a2300;border-color:#c99418;background:linear-gradient(120deg,#fff1b8 0%,#f8d55c 28%,#e3a812 52%,#f8d55c 76%,#fff1b8 100%);background-size:220% 100%;
+box-shadow:0 0 0 1px rgb(255 214 92/.6),0 2px 10px rgb(227 168 18/.45),0 0 22px 6px color-mix(in srgb,var(--ng-from) 55%,transparent),0 0 46px 14px color-mix(in srgb,var(--ng-to) 28%,transparent);animation:gold 6s linear infinite}
+button.golden:hover{filter:brightness(1.05);background:linear-gradient(120deg,#fff6cf 0%,#fbdf72 28%,#ecb424 52%,#fbdf72 76%,#fff6cf 100%);background-size:220% 100%;border-color:#c99418;box-shadow:0 0 0 1px rgb(255 214 92/.7),0 4px 14px rgb(227 168 18/.5),0 0 28px 9px color-mix(in srgb,var(--ng-from) 70%,transparent),0 0 56px 18px color-mix(in srgb,var(--ng-to) 40%,transparent)}
+@keyframes gold{to{background-position:220% 0}}
+.icon{width:36px;padding:0;justify-content:center}
+.look{position:relative}
+.look>summary{list-style:none}
+.look>summary::-webkit-details-marker{display:none}
+.look[open]>summary{border-color:var(--ng-from);color:var(--accent)}
+.look-pop{position:absolute;right:0;top:calc(100% + 8px);width:min(290px,90vw);display:grid;gap:14px;padding:16px;border-radius:16px;border:1px solid var(--ng-glass-line);background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:var(--shadow-pop);transform-origin:top right;animation:pop .22s var(--ease)}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.97)}}
+.look-pop fieldset{border:0;margin:0;padding:0;display:grid;gap:8px}
+.look-pop legend{font:600 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ng-head);margin-bottom:6px;padding:0}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;padding:3px;border-radius:12px;border:1px solid var(--ng-glass-line);background:color-mix(in srgb,var(--surface-2) 80%,transparent)}
+.seg label{position:relative;display:grid;place-items:center;min-height:32px;border-radius:9px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);transition:background .2s var(--ease),color .2s,box-shadow .2s}
+.seg input,.swatches input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){color:var(--text);background:linear-gradient(135deg,color-mix(in srgb,var(--ng-from) 24%,transparent),color-mix(in srgb,var(--ng-to) 12%,transparent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ng-from) 40%,transparent)}
+.seg label:has(input:focus-visible),.swatches label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.swatches{display:flex;gap:10px}
+.swatches label{position:relative;width:30px;height:30px;border-radius:50%;cursor:pointer;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:inset 0 0 0 1px rgb(255 255 255/.25);transition:transform .2s var(--ease),box-shadow .2s}
+.swatches label:hover{transform:scale(1.1)}
+.swatches label:has(input:checked){box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--a),0 0 18px var(--a)}
+.glass{background:var(--ng-glass);border:1px solid var(--ng-glass-line);border-radius:20px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:var(--shadow)}
+.hero{position:relative;margin-top:28px;padding:34px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px;align-items:center;overflow:hidden;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,color-mix(in srgb,var(--ng-from) 70%,transparent),transparent 40%,transparent 60%,color-mix(in srgb,var(--ng-to) 60%,transparent));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.hero::after{content:"";position:absolute;width:440px;height:440px;right:-130px;top:-170px;border-radius:50%;background:radial-gradient(circle,var(--ng-glow),transparent 65%);z-index:-1;animation:breathe 7s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.15);opacity:.7}}
+.eyebrow{font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px}
+.eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 12px #10b981}
+.hero h1{font-size:clamp(28px,4.2vw,46px);line-height:1.08;letter-spacing:-.035em;margin:14px 0 12px;font-weight:700}
+.hero h1 .grad{background:linear-gradient(100deg,var(--ng-from),var(--ng-to) 55%,#10b981);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sheen 8s ease-in-out infinite alternate}
+@keyframes sheen{to{background-position:100% 0}}
+.hero p{color:var(--muted);font-size:15.5px;margin:0 0 22px;max-width:58ch}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap}
+.hero-side{display:grid;justify-items:center;text-align:center;gap:10px}
+.ring{position:relative;width:min(240px,64vw);aspect-ratio:1}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.ring .track{stroke:color-mix(in srgb,var(--text) 9%,transparent)}
+.ring .val{stroke:url(#ringGrad);stroke-linecap:round;stroke-dasharray:100 100;stroke-dashoffset:calc(100 - var(--p));filter:drop-shadow(0 0 6px var(--ng-glow));transition:stroke-dashoffset 1.6s var(--ease)}
+.ring-in{position:absolute;inset:0;display:grid;place-content:center;gap:4px;padding:0 18%}
+.hero-figure{font:600 clamp(28px,3.6vw,40px)/1 var(--mono);letter-spacing:-.04em}
+.hero-unit{font-size:12px;color:var(--muted)}
+.hero-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.pill{font:600 11.5px var(--mono);padding:5px 11px;border-radius:999px;border:1px solid var(--ng-glass-line);background:color-mix(in srgb,var(--surface) 65%,transparent);color:var(--muted);white-space:nowrap}
+.pill.glow{color:var(--accent);border-color:color-mix(in srgb,var(--ng-from) 40%,transparent);box-shadow:0 0 18px -6px var(--ng-glow)}
+.warn-pill{color:var(--warn)}
+.ready-label{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ng-head)}
+.journey{list-style:none;margin:18px 0 0;padding:18px 22px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.step{display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center}
+.step-dot{grid-row:span 2;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--ng-glass-line);background:var(--surface-2);color:var(--muted);transition:background .5s var(--ease) calc(var(--i)*.18s),box-shadow .5s var(--ease) calc(var(--i)*.18s),color .5s calc(var(--i)*.18s)}
+.step-dot svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.in .step.done .step-dot,body:not(.pre) .step.done .step-dot{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--ng-from),var(--ng-to));box-shadow:0 0 0 4px color-mix(in srgb,var(--ng-from) 16%,transparent),0 0 20px var(--ng-glow)}
+.step-title{font-weight:700;font-size:14px}
+.step-sub{font:500 12px var(--mono);color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(168px,100%),1fr));gap:12px;margin-top:18px}
+.tile{position:relative;overflow:hidden;padding:18px 18px 16px;border-radius:18px;background:var(--ng-glass);border:1px solid var(--ng-glass-line);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:var(--shadow);transition:transform .35s var(--ease),box-shadow .35s var(--ease),border-color .35s,opacity .7s var(--ease)}
+.tile::before{content:"";position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,var(--ng-from),var(--ng-to));opacity:.7}
+.tile:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--ng-from) 35%,transparent);box-shadow:var(--shadow),0 18px 40px -22px var(--ng-glow)}
+.tile-icon{position:absolute;right:14px;top:14px;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--accent);background:var(--accent-soft)}
+.tile-icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.tile-label{font:600 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ng-head);padding-right:34px}
+.tile-value{font:600 28px/1.15 var(--mono);letter-spacing:-.03em;margin-top:8px}
+.tile-note{font-size:12.5px;color:var(--muted);margin-top:4px}
+h2{font-size:19px;font-weight:700;letter-spacing:-.015em;margin:44px 0 6px;display:flex;align-items:center;gap:10px}
+.n-chip{font:600 11px var(--mono);color:var(--accent);padding:2px 8px;border-radius:999px;background:var(--accent-soft);letter-spacing:0}
+.lede{color:var(--muted);margin:0 0 14px;max-width:92ch;font-size:13.5px}
+.panel{padding:6px 0;overflow:hidden}
+.cad-row{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(120px,2fr) repeat(3,minmax(84px,.7fr));gap:14px;align-items:center;padding:12px 22px;border-bottom:1px solid var(--ng-glass-line);transition:background .2s}
+.cad-row:last-child{border-bottom:0}
+.cad-row:hover{background:color-mix(in srgb,var(--ng-from) 6%,transparent)}
+.cad-row.dim{opacity:.45}
+.cad-label{font-weight:600;display:grid}
+.cad-sub{font:500 11.5px var(--mono);color:var(--muted)}
+.cad-bar,.lang-bar{height:10px;border-radius:999px;background:color-mix(in srgb,var(--text) 7%,transparent);overflow:hidden}
+.cad-bar span,.lang-bar span{display:block;height:100%;width:var(--w);min-width:0;border-radius:inherit;background:linear-gradient(90deg,var(--ng-from),var(--ng-to));box-shadow:0 0 14px var(--ng-glow);transform-origin:left;transition:transform 1.2s var(--ease) .15s}
+.pre .reveal:not(.in) .cad-bar span,.pre .reveal:not(.in) .lang-bar span{transform:scaleX(0)}
+.cad-fig{font:500 12.5px var(--mono);color:var(--muted);text-align:right;white-space:nowrap}
+.cad-fig b{color:var(--text);font-weight:600}
+.cad-credits b{color:var(--accent)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:18px}
+.grid2>div{min-width:0}
+.lang{display:grid;grid-template-columns:minmax(120px,1fr) 2fr auto;gap:12px;align-items:center;padding:9px 20px}
+.lang-name{font-weight:600;display:flex;gap:8px;align-items:baseline;min-width:0}
+.lang-name i{font:500 10.5px var(--mono);font-style:normal;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.lang-fig{font:500 12.5px var(--mono);color:var(--muted)}
+.table-wrap{overflow:auto;border-radius:20px}
+.glass.table-wrap{backdrop-filter:none;-webkit-backdrop-filter:none;background:color-mix(in srgb,var(--surface) 88%,transparent)}
+table{border-collapse:collapse;width:100%}
+th,td{padding:10px 14px;border-bottom:1px solid var(--ng-glass-line);text-align:left;white-space:nowrap}
+thead th{position:sticky;top:0;z-index:1;background:color-mix(in srgb,var(--surface-2) 94%,transparent);color:var(--ng-head);font:600 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+td.n,th.n{text-align:right;font-family:var(--mono);font-size:13px}
+tbody tr{transition:background .18s}
+@media (hover:hover){tbody tr:hover td{background:color-mix(in srgb,var(--ng-from) 7%,transparent)}}
+tbody tr:last-child td{border-bottom:0}
+.warn{color:var(--warn)}.bad{color:var(--danger)}.ok{color:var(--ok)}
+.status{display:inline-flex;align-items:center;gap:6px;font:600 11.5px var(--mono)}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+a{color:var(--accent);text-decoration:none;transition:color .2s}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+input,select{font:500 13.5px var(--font);color:var(--text);min-height:38px;padding:0 12px;border-radius:11px;border:1px solid color-mix(in srgb,var(--text) 12%,transparent);background-color:color-mix(in srgb,var(--surface-2) 85%,transparent);transition:border-color .2s,box-shadow .25s var(--ease)}
+input:focus,select:focus{outline:none;border-color:var(--ng-from);box-shadow:0 0 0 3px color-mix(in srgb,var(--ng-from) 22%,transparent),0 0 24px -8px var(--ng-glow)}
+input[type=search]{flex:1;min-width:220px;padding-left:36px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:12px center;background-size:16px}
+#repos th{cursor:pointer;user-select:none;transition:color .2s}
+#repos th:hover{color:var(--text)}
+#repos th[aria-sort=ascending]::after{content:" ↑";color:var(--accent)}
+#repos th[aria-sort=descending]::after{content:" ↓";color:var(--accent)}
+#repos tbody tr{animation:rowin .4s var(--ease) both}
+#contribs td.repos{white-space:normal;min-width:260px;max-width:520px;color:var(--muted);font-size:12.5px}
+.kind{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--ng-glass-line);color:var(--muted)}
+.kind.bot{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+@keyframes rowin{from{opacity:0;transform:translateY(4px)}}
+.spark{display:block}
+#repos td.cd{color:var(--accent);font-weight:600}
+.more{display:flex;justify-content:center;gap:10px;margin-top:14px}
+.more button[hidden]{display:none}
+.problems td{white-space:normal}
+.next{margin-top:44px;padding:26px 28px;display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.next h3{margin:0 0 4px;font-size:18px;letter-spacing:-.015em}
+.next p{margin:0;color:var(--muted);max-width:70ch}
+footer{margin-top:28px;color:var(--muted);font-size:12px;display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.reveal{transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.pre .reveal:not(.in){opacity:0;transform:translateY(14px)}
+@media (max-width:900px){.hero{grid-template-columns:1fr;padding:24px}.journey{grid-template-columns:repeat(2,minmax(0,1fr))}.cad-row{grid-template-columns:1fr 1fr 1fr;row-gap:8px}.cad-label{grid-column:1/-1}.cad-bar{grid-column:1/-1}.cad-fig{text-align:left}}
+@media (max-width:520px){.topbar-in{padding:10px 16px;gap:8px}.wrap{padding:0 16px 56px}.chip.when{display:none}.journey{grid-template-columns:1fr}.tile-value{font-size:24px}.label-sm span{display:none}.label-sm{width:38px;padding:0;justify-content:center}input[type=search]{min-width:0;flex-basis:100%}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.aurora{display:none}.pre .reveal:not(.in){opacity:1;transform:none}.pre .reveal:not(.in) .cad-bar span,.pre .reveal:not(.in) .lang-bar span{transform:none}}
+@media print{.aurora,.look,#print,.tools,.more,.hero-actions,.next button{display:none!important}body{background:#fff;color:#000}.glass,.tile{backdrop-filter:none;box-shadow:none}.pre .reveal:not(.in){opacity:1;transform:none}.pre .reveal:not(.in) .cad-bar span,.pre .reveal:not(.in) .lang-bar span{transform:none}}
+
+:root,:root[data-accent]{--ng-from:#6c4bf4;--ng-to:#6c4bf4;--ng-ink-light:#4f2fd6;--ng-ink-dark:#b5a3ff;--ng-glow:transparent;--ng-solid:#5532e6;
+--ng-ambient-1:transparent;--ng-ambient-2:transparent;--ng-ambient-3:transparent;--ng-wordmark:linear-gradient(var(--text),var(--text));
+--font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+--mono:var(--font)}
+td,th,.hero-figure,.tile-value,.big-figure,.tune-kpi b,.tile b,.cad-fig,.lang-fig,input[type=number]{font-variant-numeric:tabular-nums}
+.log,code{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
+:root[data-theme="dark"]{--bg:#0a0b14;--surface:#12131f;--surface-2:#171827;--surface-3:#1f2032;--ng-glass:#12131f;--ng-glass-line:rgb(255 255 255/.08)}
+:root:not([data-theme="dark"]){--ng-glass:#fff}
+body{background-image:none!important}
+.aurora,.hero::before,.hero::after,.eyebrow::before,.brand-mark::after,.tune::after{display:none!important}
+.glass,.tile,.tune-kpi{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.grad,.hero h1 .grad{background:none!important;color:var(--accent)!important;-webkit-text-fill-color:currentColor;animation:none!important}
+.eyebrow{color:var(--ng-head);letter-spacing:.12em}
+body{font-size:14.5px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.hero h1{letter-spacing:-.015em}
+.hero h1{font-weight:700;letter-spacing:-.025em}
+h2,h3,.card-h h2,.conn-name,.step-title,.tune h3{font-weight:600}
+.hero-figure,.tile-value,.big-figure,.tune-kpi b,.tile b,.cad-fig b,.code{letter-spacing:-.01em;font-weight:600}
+button,.btn,.seg label,.seg button{font-weight:500}
+.eyebrow,.tile-label,th,thead th,.field>span,.ready-label,.tune-kpi span{font-weight:600;letter-spacing:.06em;font-size:11px}
+button.golden{color:#fff!important;border-color:transparent!important;background:var(--ng-solid)!important;box-shadow:none!important;animation:none!important;filter:none}
+button.golden:hover:not(:disabled){filter:brightness(1.08)}
+button.golden:disabled{background:color-mix(in srgb,var(--text) 18%,transparent)!important;color:var(--muted)!important}
+button.primary,.btn.primary{background:var(--ng-solid)!important;box-shadow:none!important}
+button:hover:not(:disabled),.btn:hover{box-shadow:none!important;transform:none!important}
+.status::before,.check.ok i,.card-h .step,.badge,.toggle input:checked,.tag,.pill.glow,.tile:hover,.method:hover,.conn.ok{box-shadow:none!important}
+.card-h .step,.card-h .step.ok,.check.ok i{background:var(--ng-solid)!important}
+.in .step.done .step-dot,body:not(.pre) .step.done .step-dot{background:var(--ng-solid)!important;box-shadow:none!important}
+.tile:hover,.method:hover{transform:none!important}
+.tile::before{opacity:1;height:2px;background:var(--ng-from)}
+.tune-kpi.gold b{color:var(--text);text-shadow:none}
+.ring .val{filter:none!important}
+.cad-bar span,.lang-bar span,.bar span{box-shadow:none!important}
+.brand{gap:12px}
+.cx-logo{display:block;height:17px;width:auto;color:var(--text)}
+.brand-sep{width:1px;height:18px;background:var(--border-strong)}
+.brand-product{font-weight:500;font-size:14px;color:var(--muted);letter-spacing:0}
+.look fieldset:has(.swatches){display:none}
+
+</style>
+</head>
+<body class="pre">
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+<header class="topbar"><div class="topbar-in">
+<a class="brand" href="#top" aria-label="Checkmarx"><svg class="cx-logo" viewBox="0 0 138.95 18" role="img" aria-label="Checkmarx" fill="currentColor"><path d="M137.44,1.18c.45.02.87.23,1.16.58.26.31.38.71.35,1.12-.03.4-.21.77-.49,1.05l-7.71,7.13c-.06.07-.1.17-.1.27s.04.2.11.28l4.21,3.63c.32.31.49.73.5,1.17,0,.46-.17.87-.49,1.17-.15.14-.32.25-.51.32-.18.07-.38.11-.57.11s-.41-.04-.6-.12c-.2-.08-.37-.2-.53-.35l-.02-.02-3.67-4.25c-.14-.13-.4-.13-.55.01l-3.66,4.25c-.16.16-.34.28-.54.36-.37.15-.8.15-1.17,0-.19-.07-.36-.18-.51-.32-.32-.3-.5-.71-.49-1.17,0-.43.18-.86.49-1.16l.02-.02,4.21-3.63c.06-.06.1-.16.1-.27s-.04-.2-.11-.28l-4.21-3.63c-.29-.29-.47-.67-.5-1.06-.03-.41.09-.81.35-1.12.29-.35.71-.56,1.16-.58.45-.02.88.15,1.2.46l.02.02,3.67,4.25c.14.13.41.13.55-.02l7.13-7.72c.31-.31.72-.48,1.14-.48h.07v.02Z"/><path d="M6.31.81c3.94,0,5.84,2.13,6,6.6h-3.25c-.12-2.47-.97-3.61-2.75-3.61-2.09,0-2.92,1.54-2.92,5.58s.78,5.58,2.92,5.58c1.83,0,2.66-1.02,2.8-3.66h3.3c-.19,4.51-2.16,6.64-6.1,6.64C1.92,17.94,0,15.33,0,9.38S1.92.81,6.31.81Z"/><path fill-rule="evenodd" d="M35.23,4.84c4.06,0,5.93,2.18,5.48,7.03h-8.31c.12,2.47,1,3.51,2.85,3.51,1.35,0,2.25-.55,2.47-1.66h2.94c-.28,2.59-2.25,4.08-5.51,4.08-3.87,0-5.91-2.11-5.91-6.48s2.07-6.48,5.98-6.48h.01ZM35.23,7.22c-1.59,0-2.47.83-2.75,2.63h5.29c-.05-1.71-.88-2.63-2.54-2.63Z"/><path fill-rule="evenodd" d="M99.62,4.84c3.42,0,5.06,1.47,5.06,4.51v8.21h-2.47l-.31-1.28h-.69l-.69.69c-.57.57-1.47.83-2.68.83-2.68,0-4.11-1.28-4.11-3.61,0-2.47,1.64-3.77,4.49-3.77h3.25v-.93c0-1.54-.69-2.18-2.11-2.18-1.21,0-2.07.48-2.16,1.64h-2.9c.09-2.59,1.9-4.1,5.32-4.1h0ZM99.03,12.27c-1.35,0-2.04.57-2.04,1.61,0,.92.55,1.52,1.92,1.52,1.64,0,2.56-.85,2.56-2.35v-.78h-2.45.01Z"/><path d="M49.51,4.84c3.56,0,5.44,1.76,5.53,5.01h-3.11c-.14-1.59-.95-2.3-2.42-2.3-1.83,0-2.64,1.09-2.64,3.77s.81,3.77,2.64,3.77c1.49,0,2.33-.71,2.45-2.45h3.16c-.09,3.37-2.02,5.15-5.6,5.15-3.9,0-5.94-2.11-5.94-6.48s2.04-6.48,5.93-6.48h0Z"/><path d="M61.61,9.47h1.45l3.28-4.39h3.66l-4.25,5.82,4.39,6.67h-3.77l-3.35-5.24h-1.4v5.25h-3.2V0h3.2v9.47h-.01Z"/><path d="M87.23,4.84c2.73,0,4.06,1.4,4.06,4.22v8.5h-3.2v-7.64c0-1.54-.67-2.23-2.09-2.23-1.51,0-2.27.75-2.28,2.21l-.03-.03v7.69h-3.2v-7.64c0-1.54-.66-2.23-2.09-2.23-1.52,0-2.28.76-2.28,2.23v7.64h-3.21V5.08h2.37l.33,1.28h.69l.69-.69c.59-.59,1.5-.83,2.63-.83,1.64,0,2.77.51,3.42,1.52h.86l.69-.69c.59-.59,1.5-.83,2.63-.83h0Z"/><path d="M18.47,4.15l-.28,2.04.66.17.69-.69c.59-.59,1.43-.83,2.54-.83,2.68,0,3.96,1.4,3.96,4.22v8.5h-3.2v-7.64c0-1.54-.67-2.23-2.09-2.23-1.52,0-2.28.76-2.28,2.23v7.64h-3.2V0h3.2s0,4.15,0,4.15Z"/><path d="M119.88,7.71h-3.16c-1.52,0-2.3.74-2.3,2.09v5.06h3.99v2.7h-10.63v-2.7h3.44v-7.1h-3.04v-2.68h5.34l.31,1.28h.71l.69-.69c.57-.59,1.47-.83,2.64-.83h2.02v2.87h0Z"/></svg></a>
+<span class="chip" title="cloc-fusion version">v1.4.1</span>
+<span class="chip when">2026-11-12 08:45 UTC</span>
+<span class="spacer"></span>
+<button type="button" class="icon" id="print" title="Print or save as PDF" aria-label="Print or save as PDF"><svg viewBox="0 0 24 24"><path d="M7 9V4h10v5M7 17H5a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2M7 14h10v6H7z"/></svg></button>
+<details class="look"><summary class="btn icon" title="Look: theme and accent" aria-label="Change the look"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor"/></svg></summary>
+<div class="look-pop">
+<fieldset><legend>Theme</legend><div class="seg">
+<label><input type="radio" name="theme" value="auto">Auto</label><label><input type="radio" name="theme" value="light">Daylight</label><label><input type="radio" name="theme" value="dark">Obsidian</label>
+</div></fieldset>
+<fieldset><legend>Accent</legend><div class="swatches">
+<label style="--a:#6366f1;--b:#06b6d4" title="Indigo"><input type="radio" name="accent" value="indigo" aria-label="Indigo"></label>
+<label style="--a:#06b6d4;--b:#6366f1" title="Cyan"><input type="radio" name="accent" value="cyan" aria-label="Cyan"></label>
+<label style="--a:#10b981;--b:#06b6d4" title="Emerald"><input type="radio" name="accent" value="emerald" aria-label="Emerald"></label>
+<label style="--a:#8b5cf6;--b:#6366f1" title="Violet"><input type="radio" name="accent" value="violet" aria-label="Violet"></label>
+<label style="--a:#f59e0b;--b:#f43f5e" title="Amber"><input type="radio" name="accent" value="amber" aria-label="Amber"></label>
+</div></fieldset>
+</div></details>
+</div></header>
+
+<main class="wrap" id="top">
+<section class="glass hero reveal" aria-labelledby="hero-title">
+<div>
+<div class="eyebrow">Fusion readiness</div>
+<h1 id="hero-title"><span class="grad">3 repositories</span> sized and ready for Fusion</h1>
+<p>174,500 lines of code, 452 commits and 3 contributing developers in the last 90 days, across 1 organization. Every repository now has a Fusion cadence matched to how fast it changes, so unknown issues surface as fast as your teams ship.</p>
+<div class="hero-actions">
+<button type="button" class="golden" id="csv-all"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg><span>Download the Fusion plan</span></button>
+<button type="button" id="to-repos"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5Z"/><path d="M4 19a2 2 0 0 1 2-2h12"/></svg><span>Explore repositories</span></button>
+</div>
+</div>
+<div class="hero-side">
+<div class="ring" style="--p:75">
+<svg viewBox="0 0 36 36" aria-hidden="true"><defs><linearGradient id="ringGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="var(--ng-from)"/><stop offset="1" stop-color="var(--ng-to)"/></linearGradient></defs>
+<circle class="track" cx="18" cy="18" r="15.9155" fill="none" stroke-width="2.2"/><circle class="val" cx="18" cy="18" r="15.9155" fill="none" stroke-width="2.2" pathLength="100"/></svg>
+<div class="ring-in" id="hero-figure"><div class="hero-figure"><span class="count" data-to="686" data-digits="0">686</span></div><div class="hero-unit">Fusion credits · 12 months</div></div>
+</div>
+<div class="hero-pills" id="hero-pills"><span class="pill glow">1 bundle of 10,000</span></div>
+<div class="ready-label">75% of repositories measured · 1 to retry</div>
+</div>
+</section>
+
+<ol class="glass journey reveal" aria-label="Progress"><li class="step done" style="--i:0"><span class="step-dot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="step-title">Discovered</span><span class="step-sub">5 repositories</span></li><li class="step done" style="--i:1"><span class="step-dot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="step-title">Measured</span><span class="step-sub">174,500 lines of code</span></li><li class="step done" style="--i:2"><span class="step-dot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="step-title">Planned</span><span class="step-sub">66 Fusion scans</span></li><li class="step done" style="--i:3"><span class="step-dot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="step-title">Ready for Fusion</span><span class="step-sub" id="step-ready">686 credits</span></li></ol>
+
+<section class="tiles">
+<div class="tile reveal"><div class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5Z"/><path d="M4 19a2 2 0 0 1 2-2h12"/></svg></div><div class="tile-label">Repositories</div><div class="tile-value"><span class="count" data-to="3" data-digits="0">3</span></div><div class="tile-note">5 found · 1 skipped · <span class="bad">1 failed</span></div></div>
+<div class="tile reveal"><div class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M13 4l-2 16"/></svg></div><div class="tile-label">Lines of code</div><div class="tile-value"><span class="count" data-to="174500" data-digits="0">174,500</span></div><div class="tile-note">18 × 10K units, each repository rounded up</div></div>
+<div class="tile reveal"><div class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><div class="tile-label">Commits in window</div><div class="tile-value"><span class="count" data-to="452" data-digits="0">452</span></div><div class="tile-note">8.7 a week across the estate</div></div>
+<div class="tile reveal" id="tile-devs"><div class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M15.5 5.2a3 3 0 0 1 0 5.6M17 13.6a5.5 5.5 0 0 1 3.5 5.4"/></svg></div><div class="tile-label">Developers · 90 days</div><div class="tile-value"><span class="count" data-to="3" data-digits="0">3</span></div><div class="tile-note">Unique across repositories · 0 bots listed separately</div></div>
+<div class="tile reveal" id="tile-scans"><div class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg></div><div class="tile-label">Fusion scans</div><div class="tile-value"><span class="count" data-to="66" data-digits="0">66</span></div><div class="tile-note">686 10K-unit scans over 12 months</div></div>
+<div class="tile reveal" id="tile-credits"><div class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg></div><div class="tile-label">Fusion credits</div><div class="tile-value"><span class="count" data-to="686" data-digits="0">686</span></div><div class="tile-note">1 bundle of 10,000</div></div>
+</section>
+
+<section class="glass tune reveal" id="tune" aria-labelledby="tune-title">
+<div class="tune-head"><div><div class="eyebrow">Tune the plan · live</div><h2 id="tune-title">Choose your Fusion models <span class="n-chip tuned-chip">tuned</span></h2>
+<p class="lede" style="margin:0">Pick the model each repository gets: by how often it changes, by how critical it is, or one by one in the table below, with a default for the rest. Every figure on this page follows as you change it.</p></div>
+<div class="tune-actions"><button type="button" id="tune-reset" title="Back to the settings this report was priced with">Reset</button><button type="button" class="primary" id="tune-save" title="Use these choices in the cloc-fusion app (Import settings) or the CLI (--config)"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg><span>Download settings</span></button></div></div>
+<div class="tune-kpis" id="tune-kpis"></div>
+<div class="tune-grid"><div class="tune-col"><div id="tune-models"></div><div id="tune-general"></div></div><div class="tune-col"><div id="tune-freq"></div></div></div>
+</section>
+
+<h2 class="reveal">Fusion cadence <span class="n-chip">by change frequency</span></h2>
+<p class="lede reveal">Every commit to the default branch runs a pipeline, so commit frequency sets the scan frequency. More than 5 commits a week means one Fusion scan a week, 1 to 5 means one every 2 weeks, and so on: the same rules as the Cx Credits Calculator. Credits = 10K units × Fusion scans × the model's credits per 10K LOC.</p>
+<div class="glass panel reveal" id="cadence"><div class="cad-row">
+<div class="cad-label">More than 5 commits a week<span class="cad-sub">52 scans each</span></div>
+<div class="cad-bar"><span style="--w:100.0%"></span></div>
+<div class="cad-fig"><b>1</b> repos</div>
+<div class="cad-fig"><b>52</b> scans</div>
+<div class="cad-fig cad-credits"><b>624</b> credits</div>
+</div><div class="cad-row dim">
+<div class="cad-label">1 to 5 commits a week<span class="cad-sub">26 scans each</span></div>
+<div class="cad-bar"><span style="--w:0.0%"></span></div>
+<div class="cad-fig"><b>0</b> repos</div>
+<div class="cad-fig"><b>0</b> scans</div>
+<div class="cad-fig cad-credits"><b>0</b> credits</div>
+</div><div class="cad-row">
+<div class="cad-label">About once in 2 weeks<span class="cad-sub">12 scans each</span></div>
+<div class="cad-bar"><span style="--w:23.1%"></span></div>
+<div class="cad-fig"><b>1</b> repos</div>
+<div class="cad-fig"><b>12</b> scans</div>
+<div class="cad-fig cad-credits"><b>60</b> credits</div>
+</div><div class="cad-row dim">
+<div class="cad-label">About once a month<span class="cad-sub">6 scans each</span></div>
+<div class="cad-bar"><span style="--w:0.0%"></span></div>
+<div class="cad-fig"><b>0</b> repos</div>
+<div class="cad-fig"><b>0</b> scans</div>
+<div class="cad-fig cad-credits"><b>0</b> credits</div>
+</div><div class="cad-row dim">
+<div class="cad-label">About once in 2 months<span class="cad-sub">4 scans each</span></div>
+<div class="cad-bar"><span style="--w:0.0%"></span></div>
+<div class="cad-fig"><b>0</b> repos</div>
+<div class="cad-fig"><b>0</b> scans</div>
+<div class="cad-fig cad-credits"><b>0</b> credits</div>
+</div><div class="cad-row dim">
+<div class="cad-label">About once in 3 months<span class="cad-sub">4 scans each</span></div>
+<div class="cad-bar"><span style="--w:0.0%"></span></div>
+<div class="cad-fig"><b>0</b> repos</div>
+<div class="cad-fig"><b>0</b> scans</div>
+<div class="cad-fig cad-credits"><b>0</b> credits</div>
+</div><div class="cad-row">
+<div class="cad-label">About once in 6 months<span class="cad-sub">2 scans each</span></div>
+<div class="cad-bar"><span style="--w:3.8%"></span></div>
+<div class="cad-fig"><b>1</b> repos</div>
+<div class="cad-fig"><b>2</b> scans</div>
+<div class="cad-fig cad-credits"><b>2</b> credits</div>
+</div><div class="cad-row dim">
+<div class="cad-label">About once a year<span class="cad-sub">1 scan each</span></div>
+<div class="cad-bar"><span style="--w:0.0%"></span></div>
+<div class="cad-fig"><b>0</b> repos</div>
+<div class="cad-fig"><b>0</b> scans</div>
+<div class="cad-fig cad-credits"><b>0</b> credits</div>
+</div><div class="cad-row dim">
+<div class="cad-label">Not in the window<span class="cad-sub">1 scan each</span></div>
+<div class="cad-bar"><span style="--w:0.0%"></span></div>
+<div class="cad-fig"><b>0</b> repos</div>
+<div class="cad-fig"><b>0</b> scans</div>
+<div class="cad-fig cad-credits"><b>0</b> credits</div>
+</div></div>
+
+<div class="grid2">
+<div><h2 class="reveal">Organizations</h2><div class="glass table-wrap reveal"><table>
+<thead><tr><th>Connection</th><th>Organization</th><th class="n">Repos</th><th class="n">Measured</th><th class="n">LOC</th><th class="n">Commits</th><th class="n" title="Contributing developers in the last 90 days, unique in the organization">Devs (90 d)</th><th class="n">Scans</th><th class="n">Credits</th></tr></thead>
+<tbody id="org-body"><tr><td>gh</td><td>acme</td><td class="n">5</td><td class="n">3</td><td class="n">174,500</td><td class="n">452</td><td class="n">3</td><td class="n">66</td><td class="n">686</td></tr></tbody></table></div>
+<h2 class="reveal">Fusion models</h2><div class="glass table-wrap reveal"><table>
+<thead><tr><th>Model</th><th class="n">Credits / 10K LOC</th><th class="n">Repos</th><th class="n">10K-unit scans</th><th class="n">Credits</th></tr></thead>
+<tbody id="model-body"><tr><td>M</td><td class="n">1</td><td class="n">3</td><td class="n">686</td><td class="n">686</td></tr></tbody></table></div></div>
+<div><h2 class="reveal">Languages <span class="n-chip">2</span></h2><div class="glass panel reveal" id="langs"><div class="lang"><span class="lang-name">Python<i>programming</i></span><span class="lang-bar"><span style="--w:100.0%"></span></span><span class="lang-fig">173,900</span></div><div class="lang"><span class="lang-name">YAML<i>data</i></span><span class="lang-bar"><span style="--w:0.3%"></span></span><span class="lang-fig">600</span></div></div></div>
+</div>
+
+<h2 class="reveal" id="repositories">Repositories <span class="n-chip">5</span></h2>
+<div class="tools reveal">
+<input type="search" id="q" placeholder="Filter by name, organization, language…" aria-label="Filter repositories">
+<select id="fq" aria-label="Change frequency"><option value="">All frequencies</option><option value="more-5-week">More than 5 commits a week</option><option value="1-5-week">1 to 5 commits a week</option><option value="2-weeks">About once in 2 weeks</option><option value="month">About once a month</option><option value="2-months">About once in 2 months</option><option value="3-months">About once in 3 months</option><option value="6-months">About once in 6 months</option><option value="year">About once a year</option><option value="rare">Not in the window</option></select>
+<select id="st" aria-label="Status"><option value="">All statuses</option><option value="ok">Measured</option><option value="failed">Failed</option><option value="skip">Skipped</option><option value="empty">Empty</option></select>
+<span id="count" class="pill"></span>
+<button type="button" id="csv" class="label-sm" title="Download this view as CSV"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg><span>CSV of this view</span></button>
+</div>
+<div class="glass table-wrap reveal" style="max-height:78vh"><table id="repos">
+<thead><tr>
+<th data-k="n">Repository</th><th data-k="o">Organization</th><th data-k="fr">Change frequency</th><th class="n" data-k="sc">Fusion scans</th><th data-k="md">Model</th><th class="n" data-k="cd">Credits</th><th class="n" data-k="loc">LOC</th><th class="n" data-k="un">10K units</th><th class="n" data-k="cm">Commits</th><th class="n" data-k="dv" title="Contributing developers in the last 90 days">Devs (90 d)</th><th class="n" data-k="cw">Per week</th><th data-k="w">Last 52 weeks</th><th class="n" data-k="au">Authors</th><th data-k="lc">Last commit</th><th data-k="lg">Language</th><th data-k="st">Status</th>
+</tr></thead><tbody></tbody></table></div>
+<div class="more"><button type="button" id="more" hidden>Show more</button><button type="button" id="all" hidden>Show all</button></div>
+
+<h2 class="reveal" id="contributors">Contributors · last 90 days <span class="n-chip">3 developers · 0 bots</span></h2>
+<p class="lede reveal">Everyone who committed to a default branch in the last 90 days, from the commit history, with the repositories they contributed to. Each person is listed once, by email. Bots (automation accounts) are listed as bots and not counted as developers.</p>
+<div class="tools reveal">
+<input type="search" id="cq" placeholder="Filter by name, email or repository…" aria-label="Filter contributors">
+<select id="ct" aria-label="Type"><option value="">Developers and bots</option><option value="d">Developers</option><option value="b">Bots</option></select>
+<span id="ccount" class="pill"></span>
+<button type="button" id="ccsv" class="label-sm" title="Download the contributors as CSV"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg><span>Contributors CSV</span></button>
+</div>
+<div class="glass table-wrap reveal" style="max-height:70vh"><table id="contribs">
+<thead><tr><th>Name</th><th>Email</th><th>Type</th><th class="n">Repositories</th><th class="n">Commits (90 d)</th><th>Last commit</th><th>Contributed to</th></tr></thead><tbody></tbody></table></div>
+<div class="more"><button type="button" id="cmore" hidden>Show more</button></div>
+
+
+
+<section class="glass next reveal">
+<div><h3>Fusion is the next step</h3><p>The estate is mapped and the plan is priced. Start with the busiest repositories: they change the most, so Fusion finds what was hiding there first.</p></div>
+<button type="button" class="primary" id="csv-plan"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg><span>Download the plan</span></button>
+</section>
+
+<footer><span>cloc-fusion v1.4.1 · lines of code are code lines (no blanks or comments) in code, markup, iac files, excluding dependencies, build output, minified and generated files. A file of 64 KB or more with over 512 bytes per line (minified or generated code) counts as its size ÷ 40, rounded up.</span><span>Commit window 365 days · measured in 0 s</span></footer>
+</main>
+<script id="data" type="application/json">[{"p":"github","c":"gh","o":"acme","n":"acme/payments-api","u":"https://github.com/acme/payments-api","lg":"Python","loc":120000,"es":0,"cm":420,"cw":8.05,"au":null,"dv":2,"bt":0,"lc":"2026-11-01","fq":"More than 5 commits a week","fr":"more-5-week","cr":null,"so":null,"mo":null,"mi":"m","inc":1,"sc":52,"un":12,"md":"M","cd":624,"w":[],"st":"ok","er":""},{"p":"github","c":"gh","o":"acme","n":"acme/web, the \"site\"","u":"https://github.com/acme/web, the \"site\"","lg":"Python","loc":45500,"es":0,"cm":30,"cw":0.58,"au":null,"dv":2,"bt":0,"lc":"2026-11-01","fq":"About once in 2 weeks","fr":"2-weeks","cr":null,"so":null,"mo":null,"mi":"m","inc":1,"sc":12,"un":5,"md":"M","cd":60,"w":[],"st":"ok","er":""},{"p":"github","c":"gh","o":"acme","n":"acme/a|b_c","u":"https://github.com/acme/a|b_c","lg":"Python","loc":9000,"es":0,"cm":2,"cw":0.04,"au":null,"dv":1,"bt":0,"lc":"2026-11-01","fq":"About once in 6 months","fr":"6-months","cr":null,"so":null,"mo":null,"mi":"m","inc":1,"sc":2,"un":1,"md":"M","cd":2,"w":[],"st":"ok","er":""},{"p":"github","c":"gh","o":"acme","n":"acme/archive","u":null,"lg":"","loc":null,"es":0,"cm":null,"cw":null,"au":null,"dv":null,"bt":null,"lc":"","fq":"","fr":"","cr":null,"so":null,"mo":null,"mi":"m","inc":0,"sc":1,"un":0,"md":"M","cd":0,"w":[],"st":"archived","er":""},{"p":"github","c":"gh","o":"acme","n":"acme/broken","u":null,"lg":"","loc":null,"es":0,"cm":null,"cw":null,"au":null,"dv":null,"bt":null,"lc":"","fq":"","fr":"","cr":null,"so":null,"mo":null,"mi":null,"inc":0,"sc":null,"un":null,"md":"","cd":null,"w":[],"st":"failed","er":"That branch is not in the repository."}]</script>
+<script id="contrib" type="application/json">[{"n":"Ana","e":"ana@x.example","b":0,"c":4,"l":"2026-11-01","r":[0,1]},{"n":"Ben","e":"ben@x.example","b":0,"c":4,"l":"2026-11-01","r":[0,1]},{"n":"Cy","e":"cy@x.example","b":0,"c":2,"l":"2026-11-01","r":[2]}]</script>
+<script id="app">
+(function(){
+var W=typeof window!=='undefined'?window:{},D=document,root=D.documentElement||{dataset:{},setAttribute:function(){},removeAttribute:function(){}};
+var rows=JSON.parse(D.getElementById('data').textContent);
+var FQ=["more-5-week","1-5-week","2-weeks","month","2-months","3-months","6-months","year","rare"];
+var BASE={"key":"2026-11-12T08:45:18.486Z|5","orgDevs":{"gh\u0000acme":3},"periodMonths":12,"defaultScans":1,"defaultModel":"m","combine":"higher","models":[{"id":"m","name":"M","rate":1}],"byFrequency":{"more-5-week":{"scans":52,"model":null},"1-5-week":{"scans":26,"model":null},"2-weeks":{"scans":12,"model":null},"month":{"scans":6,"model":null},"2-months":{"scans":4,"model":null},"3-months":{"scans":4,"model":null},"6-months":{"scans":2,"model":null},"year":{"scans":1,"model":null},"rare":{"scans":1,"model":null}},"byCriticality":{"1":{"scans":null,"model":null},"2":{"scans":null,"model":null},"3":{"scans":null,"model":null},"4":{"scans":null,"model":null},"5":{"scans":null,"model":null}},"extraPercent":0,"bundleCredits":10000,"freqs":[{"id":"more-5-week","label":"More than 5 commits a week","perYear":52},{"id":"1-5-week","label":"1 to 5 commits a week","perYear":26},{"id":"2-weeks","label":"About once in 2 weeks","perYear":12},{"id":"month","label":"About once a month","perYear":6},{"id":"2-months","label":"About once in 2 months","perYear":4},{"id":"3-months","label":"About once in 3 months","perYear":4},{"id":"6-months","label":"About once in 6 months","perYear":2},{"id":"year","label":"About once a year","perYear":1},{"id":"rare","label":"Not in the window","perYear":1}],"crits":[5,4,3,2,1]},T=null;
+var still=!!(W.matchMedia&&W.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var raf=W.requestAnimationFrame?W.requestAnimationFrame.bind(W):function(f){return setTimeout(function(){f(Date.now())},16)};
+var store={get:function(k){try{return W.localStorage.getItem(k)}catch(e){return null}},set:function(k,v){try{W.localStorage.setItem(k,v)}catch(e){}}};
+function fmt(n,d){return n===null||n===undefined||n===''?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d||0})}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function all$(sel){return Array.prototype.slice.call(D.querySelectorAll(sel)||[])}
+
+/* Look: theme and accent, remembered on this device */
+function setLook(name,v){if(name==='theme'){if(v==='auto')root.removeAttribute('data-theme');else root.setAttribute('data-theme',v);store.set('cf-theme',v)}else{root.setAttribute('data-accent',v);store.set('cf-accent',v)}}
+all$('.look input').forEach(function(i){var cur=i.name==='theme'?(store.get('cf-theme')||'dark'):(store.get('cf-accent')||'indigo');if(i.value===cur)i.checked=true;i.addEventListener('change',function(){setLook(i.name,i.value)})});
+
+/* Motion: count-ups, bars, the ring and sections ease in as they come into view */
+function countUp(el){var to=+el.getAttribute('data-to'),d=+el.getAttribute('data-digits')||0;if(still||!isFinite(to))return;var t0=null,dur=1500;function step(t){if(t0===null)t0=t;var p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,4);el.textContent=fmt(to*e,p<1?0:d);if(p<1)raf(step)}el.textContent='0';raf(step)}
+function show(el){el.classList.add('in');Array.prototype.forEach.call(el.querySelectorAll('.count'),countUp)}
+var revs=all$('.reveal');
+if(!still&&typeof IntersectionObserver!=='undefined'){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){show(e.target);io.unobserve(e.target)}})},{threshold:.1,rootMargin:'0px 0px -5% 0px'});revs.forEach(function(el,i){el.style.transitionDelay=(i%5)*70+'ms';io.observe(el)});
+var ring=D.querySelector('.ring .val');if(ring&&ring.style){ring.style.strokeDashoffset='100';setTimeout(function(){ring.style.strokeDashoffset=''},250)}}
+else{if(D.body)D.body.classList.remove('pre');revs.forEach(function(el){el.classList&&el.classList.add('in')})}
+
+/* Repository table */
+var tbody=D.querySelector('#repos tbody'),q=D.getElementById('q'),fq=D.getElementById('fq'),st=D.getElementById('st'),count=D.getElementById('count');
+var cmp=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'}).compare,sortKey='cd',dir=-1,PAGE=250,limit=PAGE,more=D.getElementById('more'),every=D.getElementById('all'),view=rows;
+function spark(w){if(!w||!w.length)return'';var m=Math.max.apply(null,w.concat([1])),SW=104,H=20,d='';for(var i=0;i<w.length;i++){var h=w[i]?Math.max(2,Math.round(w[i]/m*H)):0;if(h)d+='M'+(i*2+0.75)+' '+H+'v-'+h}return d?'<svg class="spark" width="'+SW+'" height="'+H+'" viewBox="0 0 '+SW+' '+H+'" aria-label="weekly commits"><path d="'+d+'" stroke="url(#ringGrad)" stroke-width="1.5"/></svg>':''}
+function val(r,k){if(k==='fr')return FQ.indexOf(r.fr)<0?99:FQ.indexOf(r.fr);if(k==='w')return r.cm;return r[k]}
+function filtered(){var text=q.value.trim().toLowerCase(),f=fq.value,s=st.value;
+var list=rows.filter(function(r){
+if(text&&(r.n+' '+r.o+' '+r.c+' '+r.lg+' '+r.md).toLowerCase().indexOf(text)<0)return false;
+if(f&&r.fr!==f)return false;
+if(s==='skip'&&['ok','failed','empty','pending'].indexOf(r.st)>=0)return false;
+if(s&&s!=='skip'&&r.st!==s)return false;return true});
+list.sort(function(a,b){var x=val(a,sortKey),y=val(b,sortKey);if(x===y)return cmp(a.n,b.n);if(x===null||x===undefined||x==='')return 1;if(y===null||y===undefined||y==='')return -1;return(typeof x==='number'?x-y:cmp(String(x),String(y)))*dir});
+return list}
+function render(){view=filtered();
+count.textContent=view.length+' of '+rows.length;
+var shown=view.slice(0,limit);more.hidden=every.hidden=shown.length>=view.length;more.textContent='Show '+Math.min(PAGE,view.length-shown.length)+' more';every.textContent='Show all '+view.length;
+tbody.innerHTML=shown.map(function(r,i){
+var name=r.u&&/^https?:/i.test(r.u)?'<a href="'+esc(r.u)+'" target="_blank" rel="noopener">'+esc(r.n)+'</a>':esc(r.n);
+var status=r.st==='ok'?'<span class="status ok">measured</span>':r.st==='failed'?'<span class="status bad" title="'+esc(r.er)+'">failed</span>':'<span class="status warn">'+esc(r.st)+'</span>';
+return '<tr'+(i<24?' style="animation-delay:'+(i*14)+'ms"':'')+'><td>'+name+'</td><td>'+esc(r.o)+'</td><td>'+esc(r.fq)+'</td><td class="n'+(T?' pick':'')+'">'+(T?T.scans(r):fmt(r.sc))+'</td><td'+(T?' class="pick"':'')+'>'+(T?T.model(r):esc(r.md))+'</td><td class="n cd">'+fmt(r.cd,1)+'</td><td class="n"'+(r.es?' title="Estimated from the platform&#39;s language statistics"':'')+'>'+(r.es?'≈ ':'')+fmt(r.loc)+'</td><td class="n">'+fmt(r.un)+'</td><td class="n">'+fmt(r.cm)+'</td><td class="n"'+(r.bt?' title="'+r.bt+' bot'+(r.bt===1?'':'s')+' too"':'')+'>'+fmt(r.dv)+'</td><td class="n">'+fmt(r.cw,1)+'</td><td>'+spark(r.w)+'</td><td class="n">'+fmt(r.au)+'</td><td>'+esc(r.lc)+'</td><td>'+esc(r.lg)+'</td><td>'+status+'</td></tr>'}).join('');
+all$('#repos th').forEach(function(th){th.setAttribute('aria-sort',th.getAttribute('data-k')===sortKey?(dir>0?'ascending':'descending'):'none')});
+}
+all$('#repos th').forEach(function(th){th.addEventListener('click',function(){var k=th.getAttribute('data-k');if(k===sortKey)dir=-dir;else{sortKey=k;dir=['n','o','lg','md','st','fr','lc'].indexOf(k)>=0?1:-1}render()})});
+var timer;[q,fq,st].forEach(function(el){el.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(function(){limit=PAGE;render()},120)})});
+more.addEventListener('click',function(){limit+=PAGE;render()});every.addEventListener('click',function(){limit=Infinity;render()});
+
+/* Downloads: the plan as CSV, all of it or this view (spreadsheet formulas defused) */
+function cell(v){if(v===null||v===undefined)return'';var s=String(v);if(/^[=+\-@\t\r]/.test(s)&&!/^-?\d+(\.\d+)?$/.test(s))s="'"+s;return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function csv(list,name){var head=['Repository','Organization','Connection','Language','Lines of code','Commits','Commits per week','Authors','Developers (90 days)','Last commit','Change frequency','Criticality','Fusion scans','10K units','Model','Credits','Status'];
+var lines=[head.join(',')].concat(list.map(function(r){return[r.n,r.o,r.c,r.lg,r.loc,r.cm,r.cw,r.au,r.dv,r.lc,r.fq,r.cr,r.sc,r.un,r.md,r.cd,r.st].map(cell).join(',')}));
+if(typeof Blob==='undefined'||!W.URL)return;var url=W.URL.createObjectURL(new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv'}));var a=D.createElement('a');a.href=url;a.download=name;D.body.appendChild(a);a.click();a.remove();setTimeout(function(){W.URL.revokeObjectURL(url)},1000)}
+function plan(){return rows.slice().sort(function(a,b){return(b.cd||0)-(a.cd||0)||cmp(a.n,b.n)})}
+function on(id,f){var el=D.getElementById(id);if(el)el.addEventListener('click',f)}
+on('csv',function(){csv(view,'fusion-plan-view.csv')});
+on('csv-all',function(){csv(plan(),'fusion-plan.csv')});on('csv-plan',function(){csv(plan(),'fusion-plan.csv')});
+on('to-repos',function(){var t=D.getElementById('repositories');if(t&&t.scrollIntoView)t.scrollIntoView({behavior:still?'auto':'smooth'})});
+on('print',function(){if(W.print)W.print()});
+/* Contributors in the last 90 days */
+var ctb=D.querySelector('#contribs tbody'),cq=D.getElementById('cq'),ct=D.getElementById('ct'),ccount=D.getElementById('ccount'),cmore=D.getElementById('cmore'),climit=PAGE,cview=[];
+var people=[];try{var cel=D.getElementById('contrib');people=cel?JSON.parse(cel.textContent):[]}catch(e){people=[]}
+function cfilter(){var text=(cq.value||'').trim().toLowerCase(),k=ct.value;return people.filter(function(p){if(k==='d'&&p.b)return false;if(k==='b'&&!p.b)return false;if(!text)return true;if((p.n+' '+p.e).toLowerCase().indexOf(text)>=0)return true;for(var i=0;i<p.r.length;i++){var r=rows[p.r[i]];if(r&&r.n.toLowerCase().indexOf(text)>=0)return true}return false})}
+function crender(){if(!ctb)return;cview=cfilter();ccount.textContent=cview.length+' of '+people.length;var shown=cview.slice(0,climit);cmore.hidden=shown.length>=cview.length;
+ctb.innerHTML=shown.map(function(p){var names=p.r.map(function(i){return rows[i]?rows[i].n:''}).filter(Boolean);var list=names.slice(0,4).map(esc).join(', ')+(names.length>4?' <span title="'+esc(names.join(', '))+'">+'+(names.length-4)+' more</span>':'');
+return '<tr><td>'+esc(p.n)+'</td><td>'+esc(p.e)+'</td><td><span class="kind'+(p.b?' bot':'')+'">'+(p.b?'Bot':'Developer')+'</span></td><td class="n">'+fmt(p.r.length)+'</td><td class="n">'+fmt(p.c)+'</td><td>'+esc(p.l)+'</td><td class="repos">'+list+'</td></tr>'}).join('')}
+if(ctb){var ctimer;[cq,ct].forEach(function(el){el.addEventListener('input',function(){clearTimeout(ctimer);ctimer=setTimeout(function(){climit=PAGE;crender()},120)})});cmore.addEventListener('click',function(){climit+=PAGE;crender()});
+on('ccsv',function(){var head=['Name','Email','Type','Repositories','Commits (90 days)','Last commit','Repository list'];var lines=[head.join(',')].concat(cview.map(function(p){return[p.n,p.e,p.b?'Bot':'Developer',p.r.length,p.c,p.l,p.r.map(function(i){return rows[i]?rows[i].n:''}).join('; ')].map(cell).join(',')}));
+if(typeof Blob==='undefined'||!W.URL)return;var url=W.URL.createObjectURL(new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv'}));var a=D.createElement('a');a.href=url;a.download='cloc-fusion-contributors.csv';D.body.appendChild(a);a.click();a.remove();setTimeout(function(){W.URL.revokeObjectURL(url)},1000)});crender()}
+/* Tune the plan: models, scans and pricing chosen on the page (src/report/tune.js) */
+try{T=(function tuner(ctx) {
+  var D = ctx.D, W = ctx.W, rows = ctx.rows, base = ctx.base, fmt = ctx.fmt, esc = ctx.esc, store = ctx.store;
+  var box = D.getElementById('tune');
+  if (!box || !box.querySelector) return null;
+  var KEY = 'cf-tune:' + base.key;
+  var FREQS = base.freqs, CRITS = base.crits;
+  var num = function (v, dec) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = Number(String(v).replace(/[,_\s]/g, ''));
+    return isFinite(n) && n >= 0 ? (dec ? n : Math.floor(n)) : null;
+  };
+  var suggested = function (id, months) {
+    var f = FREQS.filter(function (x) { return x.id === id; })[0] || FREQS[FREQS.length - 1];
+    return Math.max(1, Math.ceil((f.perYear * Math.min(60, Math.max(1, months || 12))) / 12));
+  };
+  var rule = function (r) { return { s: r && r.scans !== undefined ? r.scans : null, m: (r && r.model) || null }; };
+  function fresh() {
+    var s = { period: base.periodMonths, combine: base.combine, def: base.defaultModel, defScans: base.defaultScans, extra: base.extraPercent, bundle: base.bundleCredits, models: base.models.map(function (m) { return { id: m.id, name: m.name, rate: m.rate }; }), freq: {}, crit: {}, repo: {} };
+    FREQS.forEach(function (f) { s.freq[f.id] = rule(base.byFrequency[f.id]); });
+    CRITS.forEach(function (c) { s.crit[c] = rule(base.byCriticality[c]); });
+    return s;
+  }
+  var S = fresh();
+  try {
+    var saved = JSON.parse(store.get(KEY) || 'null');
+    if (saved && Array.isArray(saved.models) && saved.freq && saved.crit && saved.repo) S = saved;
+  } catch (e) {}
+  rows.forEach(function (r, i) { r.i = i; r.cr0 = r.cr; r.so0 = r.so; r.mo0 = r.mo; });
+
+  var modelById = function (id) { return S.models.filter(function (m) { return m.id === id; })[0] || null; };
+  var nameOf = function (m) { return m ? m.name || 'Unnamed model' : ''; };
+  var rateText = function (m) { return m && m.rate !== null && m.rate !== undefined && m.rate !== '' ? ' · ' + fmt(m.rate, 2) : ''; };
+  var defaultModel = function () { return modelById(S.def) || S.models[0] || null; };
+  var repoSet = function (r) { return Object.prototype.hasOwnProperty.call(S.repo, r.n) ? S.repo[r.n] : {}; };
+  var critOf = function (r) { var o = repoSet(r); return o.c !== undefined ? o.c : r.cr0; };
+
+  /* src/fusion.js allocate(): Fusion scans and model for one repository. */
+  function allocate(r) {
+    var o = repoSet(r);
+    var crit = critOf(r);
+    crit = CRITS.indexOf(Number(crit)) >= 0 ? Number(crit) : null;
+    var fr = S.freq[r.fr] || { s: null, m: null };
+    var cr = crit ? S.crit[crit] : { s: null, m: null };
+    var f = num(fr.s), c = num(cr.s);
+    if (f === null) f = suggested(r.fr, S.period);
+    var scans = num(S.defScans) === null ? 1 : num(S.defScans), from = 'default';
+    if (f !== null || c !== null) {
+      if (S.combine === 'frequency') { scans = f !== null ? f : c; from = f !== null ? 'frequency' : 'criticality'; }
+      else if (S.combine === 'criticality') { scans = c !== null ? c : f; from = c !== null ? 'criticality' : 'frequency'; }
+      else if ((f === null ? -1 : f) >= (c === null ? -1 : c)) { scans = f; from = 'frequency'; }
+      else { scans = c; from = 'criticality'; }
+    }
+    var so = o.s !== undefined ? o.s : r.so0;
+    if (num(so) !== null) { scans = num(so); from = 'repository'; }
+    var order = S.combine === 'criticality' ? [cr.m, fr.m] : [fr.m, cr.m];
+    var pin = o.m !== undefined ? o.m : r.mo0;
+    var auto = (order[0] && modelById(order[0]) ? order[0] : null) || (order[1] && modelById(order[1]) ? order[1] : null) || (defaultModel() ? defaultModel().id : null);
+    var pinned = Boolean(pin && modelById(pin));
+    return { scans: scans, from: from, model: pinned ? pin : auto, auto: auto, pinned: pinned };
+  }
+
+  var est = null;
+  function recompute() {
+    var sum = { credits: 0, scans: 0, unitScans: 0, repos: 0, unknown: 0 };
+    var byF = {}, byM = {}, byO = {}, orgOrder = [];
+    FREQS.forEach(function (f) { byF[f.id] = { repos: 0, scans: 0, credits: 0 }; });
+    S.models.forEach(function (m) { byM[m.id] = { repos: 0, unitScans: 0, credits: 0 }; });
+    rows.forEach(function (r) {
+      var k = r.c + '\u0000' + r.o;
+      if (!byO[k]) { byO[k] = { c: r.c, o: r.o, repos: 0, counted: 0, lines: 0, commits: 0, scans: 0, credits: 0 }; orgOrder.push(k); }
+      var g = byO[k];
+      g.repos++;
+      if (!r.inc) { r.cr = critOf(r); r.sc = null; r.cd = null; r.md = ''; r.mi = null; return; }
+      var a = allocate(r);
+      var m = modelById(a.model);
+      var rate = m ? num(m.rate, true) : null;
+      r.sc = a.scans; r.mi = a.model; r.md = nameOf(m); r.from = a.from; r.pin = a.pinned; r.auto = a.auto; r.cr = critOf(r);
+      r.cd = rate === null ? (a.scans ? null : 0) : r.un * a.scans * rate;
+      if (r.cd === null) sum.unknown++;
+      sum.repos++; sum.scans += a.scans; sum.unitScans += r.un * a.scans; sum.credits += r.cd || 0;
+      var b = byF[r.fr]; if (b) { b.repos++; b.scans += a.scans; b.credits += r.cd || 0; }
+      var bm = byM[a.model]; if (bm) { bm.repos++; bm.unitScans += r.un * a.scans; bm.credits += r.cd || 0; }
+      g.counted++; g.lines += r.loc || 0; g.commits += r.cm || 0; g.scans += a.scans; g.credits += r.cd || 0;
+    });
+    var extra = Math.min(500, num(S.extra, true) || 0), bundle = num(S.bundle) || 10000;
+    var total = sum.credits * (1 + extra / 100);
+    var priced = S.models.some(function (m) { return num(m.rate, true) !== null; });
+    est = { sum: sum, byF: byF, byM: byM, byO: byO, orgOrder: orgOrder, total: total, extra: extra, bundle: bundle, bundles: total > 0 ? Math.ceil(total / bundle - 1e-9) : 0, priced: priced };
+    return est;
+  }
+
+  var digits = function (v) { return v < 100 ? 1 : 0; };
+  var setHtml = function (id, html) { var el = D.getElementById(id); if (el) el.innerHTML = html; };
+  function paintReport() {
+    var e = est, s = e.sum;
+    setHtml('hero-figure', e.priced
+      ? '<div class="hero-figure">' + fmt(e.total, digits(e.total)) + '</div><div class="hero-unit">Fusion credits · ' + fmt(S.period) + ' months</div>'
+      : '<div class="hero-figure">' + fmt(s.unitScans) + '</div><div class="hero-unit">10K-unit Fusion scans · ' + fmt(S.period) + ' months</div>');
+    setHtml('hero-pills', e.priced
+      ? '<span class="pill glow">' + fmt(e.bundles) + ' bundle' + (e.bundles === 1 ? '' : 's') + ' of ' + fmt(e.bundle) + '</span>' + (e.extra ? '<span class="pill">incl. ' + fmt(e.extra, 2) + '% headroom</span>' : '')
+      : '<span class="pill warn-pill">Set credits per 10K LOC to price the plan</span>');
+    setHtml('tile-scans', '<div class="tile-label">Fusion scans</div><div class="tile-value">' + fmt(s.scans) + '</div><div class="tile-note">' + fmt(s.unitScans) + ' 10K-unit scans over ' + fmt(S.period) + ' months</div>');
+    setHtml('tile-credits', '<div class="tile-label">Fusion credits</div><div class="tile-value">' + (e.priced ? fmt(e.total, digits(e.total)) : '—') + '</div><div class="tile-note">' + (e.priced ? fmt(e.bundles) + ' bundle' + (e.bundles === 1 ? '' : 's') + ' of ' + fmt(e.bundle) : '<span class="warn">Set credits per 10K LOC</span>') + '</div>');
+    var step = D.getElementById('step-ready');
+    if (step) step.textContent = e.priced ? fmt(e.total, digits(e.total)) + ' credits' : 'awaiting pricing';
+    var max = 1;
+    FREQS.forEach(function (f) { max = Math.max(max, e.byF[f.id].scans); });
+    setHtml('cadence', FREQS.map(function (f) {
+      var b = e.byF[f.id], each = num(S.freq[f.id].s); if (each === null) each = suggested(f.id, S.period);
+      return '<div class="cad-row' + (b.repos ? '' : ' dim') + '"><div class="cad-label">' + esc(f.label) + '<span class="cad-sub">' + fmt(each) + ' scan' + (each === 1 ? '' : 's') + ' each' + (S.freq[f.id].m && modelById(S.freq[f.id].m) ? ' · ' + esc(nameOf(modelById(S.freq[f.id].m))) : '') + '</span></div>' +
+        '<div class="cad-bar"><span style="--w:' + ((b.scans / max) * 100).toFixed(1) + '%"></span></div><div class="cad-fig"><b>' + fmt(b.repos) + '</b> repos</div><div class="cad-fig"><b>' + fmt(b.scans) + '</b> scans</div><div class="cad-fig cad-credits">' + (e.priced ? '<b>' + fmt(b.credits, 1) + '</b> credits' : '—') + '</div></div>';
+    }).join(''));
+    setHtml('model-body', S.models.length ? S.models.map(function (m) {
+      var b = e.byM[m.id];
+      return '<tr><td>' + esc(nameOf(m)) + (defaultModel() === m ? ' <span class="n-chip">default</span>' : '') + '</td><td class="n">' + (num(m.rate, true) === null ? '<span class="warn">not set</span>' : fmt(m.rate, 2)) + '</td><td class="n">' + fmt(b.repos) + '</td><td class="n">' + fmt(b.unitScans) + '</td><td class="n">' + fmt(b.credits, 1) + '</td></tr>';
+    }).join('') : '<tr><td colspan="5"><span class="warn">No Fusion model yet: add one above with its credits per 10K LOC.</span></td></tr>');
+    setHtml('org-body', e.orgOrder.map(function (k) {
+      var g = e.byO[k];
+      return '<tr><td>' + esc(g.c) + '</td><td>' + esc(g.o) + '</td><td class="n">' + fmt(g.repos) + '</td><td class="n">' + fmt(g.counted) + '</td><td class="n">' + fmt(g.lines) + '</td><td class="n">' + fmt(g.commits) + '</td><td class="n">' + fmt(base.orgDevs ? base.orgDevs[k] : null) + '</td><td class="n">' + fmt(g.scans) + '</td><td class="n">' + (e.priced ? fmt(g.credits, 1) : '—') + '</td></tr>';
+    }).join('') || '<tr><td colspan="9">None</td></tr>');
+    setHtml('tune-kpis',
+      '<div class="tune-kpi gold"><span>Fusion credits</span><b>' + (e.priced ? fmt(e.total, digits(e.total)) : '—') + '</b><small>' + (e.extra ? fmt(e.sum.credits, 1) + ' + ' + fmt(e.extra, 2) + '% on top' : 'over ' + fmt(S.period) + ' months') + '</small></div>' +
+      '<div class="tune-kpi"><span>Bundles</span><b>' + fmt(e.bundles) + '</b><small>of ' + fmt(e.bundle) + ' credits</small></div>' +
+      '<div class="tune-kpi"><span>Fusion scans</span><b>' + fmt(s.scans) + '</b><small>' + fmt(s.repos) + ' repositories</small></div>' +
+      '<div class="tune-kpi"><span>10K-unit scans</span><b>' + fmt(s.unitScans) + '</b><small>' + (s.unknown ? '<span class="warn">' + fmt(s.unknown) + ' on a model without credits</span>' : 'every repository priced') + '</small></div>');
+    box.classList.toggle('tuned', JSON.stringify(S) !== JSON.stringify(fresh()));
+  }
+
+  /* The controls */
+  var opt = function (value, label, on) { return '<option value="' + esc(value) + '"' + (on ? ' selected' : '') + '>' + esc(label) + '</option>'; };
+  var modelSelect = function (attr, selected, blank) {
+    return '<select ' + attr + '>' + opt('', blank, !selected) + S.models.map(function (m) { return opt(m.id, nameOf(m) + rateText(m), m.id === selected); }).join('') + '</select>';
+  };
+  var defLabel = function () { var m = defaultModel(); return m ? 'Default: ' + nameOf(m) + rateText(m) : 'Default model'; };
+  var count = function (pred) { var n = 0; rows.forEach(function (r) { if (r.inc && pred(r)) n++; }); return n; };
+  function paintControls() {
+    setHtml('tune-models', '<h3>Fusion models <small>credits per 10K LOC</small></h3><div class="tune-scroll"><table><thead><tr><th>Model</th><th class="n">Credits / 10K</th><th class="n">Default</th><th></th></tr></thead><tbody>' +
+      S.models.map(function (m, i) {
+        return '<tr><td><input type="text" maxlength="80" data-model="' + i + '" data-f="name" value="' + esc(m.name) + '" placeholder="Model name, as Checkmarx One shows it" aria-label="Model name"></td>' +
+          '<td class="n"><input type="number" min="0" step="0.01" data-model="' + i + '" data-f="rate" value="' + esc(m.rate === null || m.rate === undefined ? '' : m.rate) + '" placeholder="credits" aria-label="Credits per 10K LOC"></td>' +
+          '<td class="n"><input type="radio" name="tune-def" data-model="' + i + '" data-f="def"' + (defaultModel() === m ? ' checked' : '') + ' aria-label="Default model"></td>' +
+          '<td class="n"><button type="button" class="x" data-model="' + i + '" data-f="remove" title="Remove this model" aria-label="Remove this model">×</button></td></tr>';
+      }).join('') + (S.models.length ? '' : '<tr><td colspan="4" class="muted">No model yet: add one to price the plan.</td></tr>') +
+      '</tbody></table></div><button type="button" class="sm" data-f="add-model">+ Add a model</button>');
+    setHtml('tune-freq', '<h3>By change frequency <small>commits on the default branch</small></h3><div class="tune-scroll"><table><thead><tr><th>How often it changes</th><th class="n">Repos</th><th class="n">Scans / ' + fmt(S.period) + ' mo</th><th>Model</th></tr></thead><tbody>' +
+      FREQS.map(function (f) {
+        var r = S.freq[f.id], sug = suggested(f.id, S.period);
+        return '<tr><td>' + esc(f.label) + (num(r.s) === null || num(r.s) === sug ? '<span class="sug">suggested</span>' : '') + '</td><td class="n muted">' + fmt(count(function (x) { return x.fr === f.id; })) + '</td>' +
+          '<td class="n"><input type="number" min="0" data-freq="' + f.id + '" data-f="s" value="' + esc(num(r.s) === null ? sug : r.s) + '" aria-label="Fusion scans for ' + esc(f.label) + '"></td>' +
+          '<td>' + modelSelect('data-freq="' + f.id + '" data-f="m" aria-label="Model for ' + esc(f.label) + '"', r.m, defLabel()) + '</td></tr>';
+      }).join('') + '</tbody></table></div>');
+    setHtml('tune-general', '<h3>Plan</h3><div class="fields" style="margin-top:0">' +
+      '<label>Projection (months)<input type="number" min="1" max="60" data-f="period" value="' + esc(S.period) + '"></label>' +
+      '<label>Extra on top (%)<input type="number" min="0" max="500" step="0.5" data-f="extra" value="' + esc(S.extra) + '"></label>' +
+      '<label>Credits per bundle<input type="number" min="1" data-f="bundle" value="' + esc(S.bundle) + '"></label></div>' +
+      '<p class="how">Which model a repository gets: the one picked for it in the table below, else its change frequency’s, else the default model. Credits = 10K units × Fusion scans × the model’s credits per 10K LOC.</p>');
+  }
+
+  function changed(repaint) {
+    store.set(KEY, JSON.stringify(S));
+    recompute();
+    if (repaint) paintControls();
+    paintReport();
+    ctx.render();
+  }
+  var data = function (el, k) { return el.getAttribute ? el.getAttribute('data-' + k) : null; };
+  function onEdit(ev, final) {
+    var el = ev.target, f = data(el, 'f');
+    if (!f) return;
+    var mi = data(el, 'model'), fr = data(el, 'freq'), cr = data(el, 'crit');
+    if (mi !== null) {
+      var m = S.models[Number(mi)];
+      if (f === 'name') m.name = el.value.slice(0, 80);
+      else if (f === 'rate') m.rate = num(el.value, true);
+      else if (f === 'def') S.def = m.id;
+      return changed(final || f === 'def');
+    }
+    if (fr) { S.freq[fr][f] = f === 's' ? num(el.value) : el.value || null; return changed(final && f === 's'); }
+    if (cr) { S.crit[cr][f] = f === 's' ? num(el.value) : el.value || null; return changed(false); }
+    if (f === 'period') {
+      var p = Math.min(60, Math.max(1, num(el.value) || 12));
+      FREQS.forEach(function (x) { if (num(S.freq[x.id].s) === suggested(x.id, S.period)) S.freq[x.id].s = null; });
+      S.period = p;
+      return changed(final);
+    }
+    if (f === 'combine') S.combine = el.value;
+    else if (f === 'extra') S.extra = num(el.value, true) || 0;
+    else if (f === 'bundle') S.bundle = num(el.value) || 10000;
+    changed(false);
+  }
+  box.addEventListener('input', function (ev) { if (ev.target.tagName === 'INPUT' && ev.target.type !== 'radio') onEdit(ev, false); });
+  box.addEventListener('change', function (ev) { onEdit(ev, true); });
+  box.addEventListener('click', function (ev) {
+    var el = ev.target.closest ? ev.target.closest('button') : null, f = el && data(el, 'f');
+    if (f === 'add-model') { S.models.push({ id: 'model-' + Date.now().toString(36), name: '', rate: null }); changed(true); }
+    else if (f === 'remove') {
+      var gone = S.models.splice(Number(data(el, 'model')), 1)[0];
+      if (gone && S.def === gone.id) S.def = S.models[0] ? S.models[0].id : null;
+      changed(true);
+    }
+  });
+  var reset = D.getElementById('tune-reset');
+  if (reset) reset.addEventListener('click', function () { S = fresh(); try { W.localStorage.removeItem(KEY); } catch (e) {} changed(true); });
+  var save = D.getElementById('tune-save');
+  if (save) save.addEventListener('click', function () {
+    var out = { fusion: { periodMonths: S.period, combine: S.combine, defaultScans: num(S.defScans) === null ? 1 : num(S.defScans), defaultModel: defaultModel() ? defaultModel().id : null, models: S.models.map(function (m) { return { id: m.id, name: m.name, creditsPer10k: num(m.rate, true) }; }), byFrequency: {}, byCriticality: {} }, totals: { extraPercent: num(S.extra, true) || 0, bundleCredits: num(S.bundle) || 10000 }, overrides: {} };
+    FREQS.forEach(function (f) { var r = S.freq[f.id]; out.fusion.byFrequency[f.id] = { scans: num(r.s) === null ? suggested(f.id, S.period) : num(r.s), model: r.m || null }; });
+    CRITS.forEach(function (c) { var r = S.crit[c]; if (num(r.s) !== null || r.m) out.fusion.byCriticality[c] = { scans: num(r.s), model: r.m || null }; });
+    Object.keys(S.repo).forEach(function (n) {
+      var o = S.repo[n], v = {};
+      if (o.c !== undefined && o.c !== null) v.criticality = o.c;
+      if (o.s !== undefined && o.s !== null) v.scans = o.s;
+      if (o.m) v.model = o.m;
+      if (Object.keys(v).length) out.overrides[n] = v;
+    });
+    if (typeof Blob === 'undefined' || !W.URL) return;
+    var url = W.URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
+    var a = D.createElement('a'); a.href = url; a.download = 'cloc-fusion-settings.json'; D.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { W.URL.revokeObjectURL(url); }, 1000);
+  });
+
+  /* Per repository, in the table: criticality, Fusion scans and model. */
+  var setRepo = function (n, k, v) {
+    var o = Object.prototype.hasOwnProperty.call(S.repo, n) ? S.repo[n] : (S.repo[n] = {});
+    o[k] = v;
+  };
+  ctx.tbody.addEventListener('change', function (ev) {
+    var el = ev.target, i = data(el, 'row'), k = data(el, 'pick');
+    if (i === null || !k) return;
+    var r = rows[Number(i)];
+    if (!r) return;
+    if (k === 'm') setRepo(r.n, 'm', el.value || null);
+    else if (k === 's') setRepo(r.n, 's', num(el.value));
+    else if (k === 'c') setRepo(r.n, 'c', el.value ? Number(el.value) : null);
+    changed(k === 'c');
+  });
+  recompute();
+  paintControls();
+  paintReport();
+  return {
+    model: function (r) {
+      if (!r.inc) return '';
+      return '<select data-row="' + r.i + '" data-pick="m" class="' + (r.pin ? 'pinned' : '') + '" aria-label="Model for ' + esc(r.n) + '">' + opt('', 'Auto: ' + (nameOf(modelById(r.auto)) || 'none') + rateText(modelById(r.auto)), !r.pin) +
+        S.models.map(function (m) { return opt(m.id, nameOf(m) + rateText(m), r.pin && m.id === r.mi); }).join('') + '</select>';
+    },
+    scans: function (r) {
+      if (!r.inc) return fmt(r.sc);
+      var o = repoSet(r), own = o.s !== undefined ? o.s : r.so0;
+      return '<input type="number" min="0" data-row="' + r.i + '" data-pick="s" value="' + esc(num(own) === null ? '' : own) + '" placeholder="' + esc(fmt(r.sc)) + '" title="' + esc(r.from === 'repository' ? 'Set for this repository' : 'From its ' + r.from + ' (type to change)') + '" aria-label="Fusion scans for ' + esc(r.n) + '">';
+    },
+    crit: function (r) {
+      if (!r.inc) return '';
+      var c = critOf(r);
+      return '<select data-row="' + r.i + '" data-pick="c" aria-label="Criticality of ' + esc(r.n) + '">' + opt('', '—', !c) + CRITS.map(function (x) { return opt(x, String(x), Number(c) === x); }).join('') + '</select>';
+    },
+  };
+})({rows:rows,base:BASE,D:D,W:W,store:store,fmt:fmt,esc:esc,tbody:tbody,render:function(){render()}})}catch(e){T=null}
+render();
+})();
+</script>
+</body>
+</html>
