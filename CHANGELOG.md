@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.90.00 — 2026-11-12
+
+- **No more empty start screen while an account opens.** Opening the calculator on an account (from Accounts, a link, or the one open last), the page showed for a moment the start screen for a new account, as if the account were gone. It now says *Opening the account…* (with its name as soon as it is known) until the account is there.
+
 ## CC-01.89.00 — 2026-11-12
 
 - **A report file with nothing to load says so.** A copy saved from the Command Center after an earlier report was brought in keeps only its totals. Uploaded under *A previous report* or *The customer's version*, it used to be kept and "loaded" with nothing happening. Now the dialog says *Nothing in it to load*, explains why, and asks for the original report file; the calculator is left as it is. When such a copy still shows its tables on its page, they are read and loaded.

@@ -822,3 +822,9 @@ html[data-cc] [data-ptabs="calculator"] { width: 100% !important; max-width: 100
 #hc-clear-cx { border: 1px solid color-mix(in srgb, #b42318 45%, transparent) !important; color: #b42318 !important; background: color-mix(in srgb, #b42318 6%, transparent) !important; font-weight: 600 !important; }
 #hc-clear-cx:hover { background: color-mix(in srgb, #b42318 12%, transparent) !important; }
 .hc-warn-box { margin: 8px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, #b45309 45%, transparent); background: color-mix(in srgb, #b45309 8%, transparent); font-size: 13px; line-height: 1.45; }
+/* Opening the account named at start: said, instead of the empty start screen flashing by. */
+html[data-opening] .hc-row1, html[data-opening] .hc-start { visibility: hidden; }
+.hc-opening { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--text); }
+.hc-opening-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--brand, #0e6b7c); animation: hc-opening 1s ease-in-out infinite alternate; }
+@keyframes hc-opening { from { opacity: .3; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .hc-opening-dot { animation: none; } }

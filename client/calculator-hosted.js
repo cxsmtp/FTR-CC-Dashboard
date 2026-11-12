@@ -95,6 +95,14 @@ export async function startHosted() {
   let cfg = {};
   // Asked for at once, in parallel, as soon as the team is known: what the calculator asks for first anyway.
   const early = new Map();
+  // The account named at start is being opened: the start screen waits for it.
+  let opening = false;
+  const openingDone = () => {
+    if (!opening) return;
+    opening = false;
+    document.documentElement.removeAttribute('data-opening');
+    document.getElementById('hc-opening')?.remove();
+  };
   try {
     const res = await fetch('/api/cc/calc-config', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
     if (res.status === 401) {
@@ -173,6 +181,21 @@ export async function startHosted() {
       early.set(path, p);
     };
     for (const path of ['/api/projections', '/api/status', '/api/cc/cxone/status', ...(openId ? [`/api/projections/${encodeURIComponent(openId)}`, `/api/cc/accounts/${encodeURIComponent(openId)}`] : [])]) ask(path);
+    // While that account is on its way, the page says it is opening it, instead of the empty "new account" start.
+    if (openId) {
+      opening = true;
+      document.documentElement.setAttribute('data-opening', '');
+      const note = document.createElement('p');
+      note.id = 'hc-opening';
+      note.className = 'hc-opening';
+      note.setAttribute('role', 'status');
+      note.innerHTML = '<span class="hc-opening-dot"></span><span>Opening the account…</span>';
+      document.getElementById('hc-account')?.prepend(note);
+      early.get(`/api/cc/accounts/${encodeURIComponent(openId)}`)?.then((d) => {
+        if (opening && d?.account?.name) note.lastElementChild.textContent = `Opening ${d.account.name}…`;
+      }, () => openingDone());
+      setTimeout(openingDone, 15000);
+    }
   }
   // The organisation's branding (Settings → Branding): the name, the logo, the accent, the menu, and whether people
   // may choose their own look.
@@ -608,6 +631,7 @@ export async function startHosted() {
     const bar = $('hc-account');
     // No account open: nothing of a projection on the page (it waits for a name).
     document.documentElement.toggleAttribute('data-no-account', !id);
+    if (id) openingDone();
     if (!id) {
       account = null;
       bar.classList.remove('missing-sf');
