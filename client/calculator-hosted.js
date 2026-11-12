@@ -696,6 +696,8 @@ export async function startHosted() {
     const trSource = cu?.tr?.totals?.meta?.source ?? (cu?.hasTr ? 'data' : undefined);
     const fusionCx = cu?.fusion?.projects?.length ?? cu?.fusionProjects ?? 0;
     const fusionNew = cu?.fusionNew?.projects?.length ?? 0;
+    // What was read from Checkmarx One can be taken out again (an account that holds a read that was not its own).
+    if ($('hc-clear-cx')) $('hc-clear-cx').hidden = !account || !(trSource === 'cxone' || (cu?.fusion?.projects ?? []).some((p) => p.source !== 'manual'));
     // A new customer (Fusion only): code from Git or cloc-fusion, no Checkmarx One key, no backlog read or uploaded.
     // Triage & remediation is not part of the conversation, so it is not on the page.
     const src = document.documentElement.dataset.src;
@@ -745,6 +747,16 @@ export async function startHosted() {
     }
   }
   $('hc-refresh').addEventListener('click', refreshFromKept);
+  $('hc-clear-cx').addEventListener('click', async () => {
+    if (!account || !confirm(`Take everything read from Checkmarx One out of ${account.name}? Its backlog, its trend and the projects read go; reports already made, projects typed by hand and code counted from git or cloc-fusion stay. This cannot be undone.`)) return;
+    try {
+      const done = await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/cxone/clear`, { method: 'POST', body: {} });
+      toast(`${num(done.projects)} projects and ${done.backlog ? 'the backlog' : 'no backlog'} read from Checkmarx One are out of ${account.name}.`, 'ok');
+      setTimeout(() => location.reload(), 900);
+    } catch (error) {
+      toast(error.message, 'bad', 9000);
+    }
+  });
   $('hc-forget').addEventListener('click', async () => {
     if (!account || !confirm(`Forget the Checkmarx One key kept for ${account.name}? Refreshing then needs it pasted again.`)) return;
     try {

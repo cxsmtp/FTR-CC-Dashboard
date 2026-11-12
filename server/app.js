@@ -1968,6 +1968,23 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'cxone.key.used', accounts.accounts.meta(params.id)?.name ?? '', { tenant: state.tenant });
     return { ...state, account: calc.status(ctx.user.id).account };
   });
+  /**
+   * Take what was read from Checkmarx One out of an account: the backlog and its trend, and the projects read (those
+   * typed by hand stay, with the plan's settings, the code counted from git or cloc-fusion, and every report made).
+   * For an account that holds a read that was never its own.
+   */
+  r('POST', '/api/cc/accounts/:id/cxone/clear', perm('calculator.use'), (req, ctx, body, res, url, params) => {
+    const a = accounts.get(params.id, ctx.scope);
+    const projects = a.fusion?.projects ?? [];
+    const kept = projects.filter((p) => p.source === 'manual');
+    const { totals, fixed, activeCount, activeOf, excluded, selected, ...plan } = a.tr ?? {};
+    void activeCount, activeOf, excluded, selected;
+    const hadBacklog = Boolean(totals || fixed);
+    if (!hadBacklog && kept.length === projects.length) throw fail(409, 'Nothing read from Checkmarx One is kept in this account.');
+    accounts.update(a.id, ctx.scope, { tr: a.tr ? plan : null, ...(a.fusion ? { fusion: { ...a.fusion, projects: kept, readAt: null } } : {}), scope: {} }, ctx.user);
+    record(ctx, req, 'account.cxone.cleared', a.name, { id: a.id, projects: projects.length - kept.length, backlog: hadBacklog });
+    return { ok: true, projects: projects.length - kept.length, backlog: hadBacklog };
+  });
   r('DELETE', '/api/cc/accounts/:id/cxone', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const a = accounts.forgetCxone(params.id, ctx.scope);
     record(ctx, req, 'cxone.key.forgotten', a.name);

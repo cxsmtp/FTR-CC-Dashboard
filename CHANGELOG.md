@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.79.00 — 2026-11-12
+
+- **Calculator: Clear Checkmarx One data.** For an account that holds a read that was never its own (see CC-01.78.00), and has no tenant of its own to read again: the button, next to the account's tools at the top, takes out everything read from Checkmarx One: the backlog, its trend and the projects read. It asks first. Reports already made, projects typed by hand, the plan's settings and code counted from git or cloc-fusion stay. Shown only when the account holds such data; recorded in the audit log (account.cxone.cleared).
+
 ## CC-01.78.00 — 2026-11-12
 
 One customer's Checkmarx One data can no longer end up in another customer's account.

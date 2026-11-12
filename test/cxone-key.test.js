@@ -105,3 +105,29 @@ test('a Checkmarx One connection is for one account: never read into another, an
   assert.match(fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8'), /cxone\.read\.refused/);
   calc.forget(env.users.se1.id);
 });
+
+test('what was read from Checkmarx One can be taken out of an account: its backlog and read projects go, the rest stays', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const id = (await se1.post('/api/projections', { name: 'Wrong Data Corp' }, h)).data.customer.id;
+  const weeks = ['2026-09-01', '2026-10-01'];
+  const sev = { Critical: [5, 6], High: [7, 8], Medium: [1, 1], Low: [0, 0] };
+  const put = await se1.put(`/api/projections/${id}`, {
+    tr: { fpPercent: { Critical: 25, High: 25, Medium: 25, Low: 25 }, totals: { weeks, bySeverity: sev, meta: { source: 'cxone' } }, fixed: { weeks, bySeverity: sev } },
+    fusion: { projects: [{ id: 'p1', name: 'someone-elses/project', loc: 120000, frequency: 'month', source: 'scan' }, { id: 'm1', name: 'typed by hand', loc: 5000, source: 'manual' }] },
+  }, h);
+  assert.equal(put.status, 200);
+  let got = (await se1.get(`/api/projections/${id}`, h)).data.customer;
+  assert.ok(got.tr.totals);
+  assert.equal(got.fusion.projects.length, 2);
+  const r = await se1.post(`/api/cc/accounts/${id}/cxone/clear`, {});
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.data.projects, r.data.backlog], [1, true]);
+  got = (await se1.get(`/api/projections/${id}`, h)).data.customer;
+  assert.ok(!got.tr?.totals && !got.tr?.fixed);
+  assert.equal(got.tr.fpPercent.Critical, 25);
+  assert.deepEqual(got.fusion.projects.map((p) => p.name), ['typed by hand']);
+  // Nothing left to clear: said so. And it is in the audit log.
+  assert.equal((await se1.post(`/api/cc/accounts/${id}/cxone/clear`, {})).status, 409);
+  assert.match(fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8'), /account\.cxone\.cleared/);
+});
