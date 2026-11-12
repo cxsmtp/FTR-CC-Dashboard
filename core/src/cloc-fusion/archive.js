@@ -1,4 +1,4 @@
-// Vendored from cloc-fusion 1.3.2 (commit 1a320621d0f5), MIT licence: src/cloc-fusion/LICENSE. Do not edit here: scripts/sync-cloc-fusion.mjs copies it again.
+// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
 // Reading repository archives without any external tool: a streaming .tar.gz reader (GitHub,
 // GitLab, Bitbucket) and a .zip reader (Azure DevOps), both on Node's built-in zlib.
 //
@@ -104,7 +104,7 @@ export async function readZipFile(path, { onEntry, onFile, maxFileBytes = 2 * 10
       if (name.endsWith('/')) continue;
       entries++;
       const e = { path: name, size: usize };
-      if (usize > maxFileBytes || !onEntry(e)) continue;
+      if (!onEntry(e) || usize > maxFileBytes) continue;
       if (method !== 0 && method !== 8) continue;
       if (csize > maxFileBytes * 2 + 1024) continue;
       if (offsets.has(local)) continue;

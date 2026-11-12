@@ -1,4 +1,4 @@
-// Vendored from cloc-fusion 1.3.2 (commit 1a320621d0f5), MIT licence: src/cloc-fusion/LICENSE. Do not edit here: scripts/sync-cloc-fusion.mjs copies it again.
+// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
 // Commit statistics from a platform's commit list. Pure, shared by the API engine and the
 // standalone HTML page.
 

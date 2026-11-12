@@ -2,6 +2,15 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.69.00 — 2026-11-12
+
+- **Calculator: Git and cloc-fusion are one choice.** "Data from" offers Checkmarx One or **Code repositories**; under Code repositories, one small switch: *With their token* (counted here) or *cloc-fusion report* (the customer ran it and sent the file). The same in the meeting view. Nothing saved changes: accounts, their counted repositories and their reports are as they were.
+- **cloc-fusion 1.4.1** (was 1.3.2): the page handed out by "Download cloc-fusion", and the engine that counts from git here. With it:
+  - Minified and generated code is sized as Checkmarx sizes it: a file of 64 KB or more with over 512 bytes a line of code counts as its bytes divided by 40 (a 300 KB one-line bundle is 7,680 lines, not 1). This replaces the rule of CC-01.62.00 (one line for every 512 characters).
+  - No file is dropped for its size: one over 1 MB is counted from its size instead of being skipped.
+  - The customer's page says Calculate Fusion credits, has a Count minified files option (off, as before), and no longer shows criticality.
+  - Repositories already counted keep their figures; the rule applies to what is counted from now on.
+
 ## CC-01.68.00 — 2026-11-12
 
 - **Calculator: the count from git no longer makes the page long.** While repositories are counted, a small card at the right says how far the run is (4 of 23, and what it is on) and goes by itself when it ends. The list repository by repository, and how it is measured, are folded into one line at the bottom of the section ("Repository by repository: 22 counted, 1 not · how it is measured"): open it for any repository's detail, or with Details on the card.

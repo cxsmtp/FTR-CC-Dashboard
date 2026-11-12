@@ -1,6 +1,6 @@
 /**
  * Fusion — new customer, Count from git (public/calculator/page.js), with cloc-fusion's engine (src/cloc-fusion/,
- * vendored from cloc-fusion 1.3.2): a customer's repositories discovered across connections and organizations,
+ * from cloc-fusion 1.4.1): a customer's repositories discovered across connections and organizations,
  * then measured where they are kept. For each repository: its code lines by language, counted the way cloc counts
  * them; the commits on its default branch in the last 365 days (merges left out) and so its change frequency; the
  * date of its last commit; and how many people committed to it in the last 90 days (bots left out). Two engines:
@@ -661,7 +661,8 @@ async function measureWithGit(repo, address, { source, tmpRoot, limits, onProgre
     let said = 0;
     onProgress({ state: 'counting', done, total: oids.length });
     await readBlobs(bare, oids, (oid, body) => {
-      if (body.length <= limits.fileBytes) for (const lang of langOf.get(oid) ?? []) tally.add(lang, body);
+      // Too big to read whole: counted from its size, as a dense (minified or generated) file is.
+      for (const lang of langOf.get(oid) ?? []) body.length <= limits.fileBytes ? tally.add(lang, body) : tally.addBySize(lang, body.length);
       done += 1;
       if (Date.now() - said > 250) {
         said = Date.now();

@@ -2,20 +2,28 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ACTIVE_LEVELS, activeEnough, aheadSettings, newCustomerEstimate, newCustomerSettings, repoKey } from '../core/public/calculator/model.js';
-import { LONG_LINE, countText } from '../core/src/cloc-fusion/loc.js';
+import { DENSE_MIN_BYTES, LocTally, adjustedLoc, countText } from '../core/src/cloc-fusion/loc.js';
+import { isExcludedPath, languageOf } from '../core/src/cloc-fusion/languages.js';
 
 const JS = { line: ['//'], block: [['/*', '*/']] };
 
-test('a line of code longer than 512 characters counts as several (minified code weighs what it holds)', () => {
-  assert.equal(LONG_LINE, 512);
+test('dense files (minified or generated code) are sized as cloc-fusion sizes them: 64 KB or more, over 512 bytes a line', () => {
   assert.deepEqual(countText('a = 1;\n// note\n\nb = 2;\n', JS), { code: 2, comment: 1, blank: 1 });
-  assert.equal(countText(`${'x'.repeat(512)}\n`, JS).code, 1);
-  assert.equal(countText(`${'x'.repeat(513)}\n`, JS).code, 2);
-  // One 120,005-character line: 235 lines of 512, not 1.
-  assert.equal(countText(`var a=${'1+'.repeat(60000)}1;\n`, JS).code, 235);
-  // Leading spaces do not count towards its length; a long comment stays one comment line.
-  assert.equal(countText(`${' '.repeat(600)}x = 1;\n`, JS).code, 1);
-  assert.deepEqual(countText(`/* ${'c'.repeat(5000)} */\n`, JS), { code: 0, comment: 1, blank: 0 });
+  assert.equal(adjustedLoc(DENSE_MIN_BYTES - 1, 1), 1);
+  assert.equal(adjustedLoc(DENSE_MIN_BYTES, DENSE_MIN_BYTES / 512), DENSE_MIN_BYTES / 512);
+  // A 300 KB bundle on one line: 7,680 lines, not 1.
+  assert.equal(adjustedLoc(300 * 1024, 1), 7680);
+  const js = languageOf('app.js');
+  const tally = new LocTally();
+  tally.add(js, `var a=${'1+'.repeat(60000)}1;\n`);
+  tally.add(js, 'a = 1;\nb = 2;\n');
+  tally.addBySize(js, 4 * 1024 * 1024);
+  const sum = tally.summary({});
+  assert.equal(sum.languages[js.name].code, Math.ceil(120008 / 40) + 2 + Math.ceil((4 * 1024 * 1024) / 40));
+  assert.equal(sum.denseFiles, 2);
+  // Files named as minified stay out unless asked for.
+  assert.equal(isExcludedPath('dist-free/app.min.js'), true);
+  assert.equal(isExcludedPath('web/app.min.js', { countMinified: true }), false);
 });
 
 test('triage & remediation: only the active projects, when ticked', () => {

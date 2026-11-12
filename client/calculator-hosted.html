@@ -54,7 +54,7 @@
         <p class="hc-start" id="hc-start">Type the customer’s name as it is in Salesforce and press <kbd>Enter</kbd>. A name you worked on before opens that account; a new one starts a new calculation in the team chosen.</p>
         <div class="hc-src">
           <span class="hc-src-l">Data from</span>
-          <div class="hc-seg" role="tablist" aria-label="Where the data comes from"><button type="button" role="tab" data-src="cxone" class="on">Checkmarx One</button><button type="button" role="tab" data-src="git">Git</button><button type="button" role="tab" data-src="cloc">cloc-fusion</button></div>
+          <div class="hc-seg" role="tablist" aria-label="Where the data comes from"><button type="button" role="tab" data-src="cxone" class="on">Checkmarx One</button><button type="button" role="tab" data-src="git" data-also="cloc" title="The customer's code, counted here with their read-only token, or by them with cloc-fusion">Code repositories</button></div>
           <div class="hc-pane" data-pane="cxone">
             <form class="sa-connect" id="sa-connect" autocomplete="off">
               <input type="password" id="sa-key" spellcheck="false" placeholder="The customer's API key (in memory for your session only)" autocomplete="off" aria-label="The customer's Checkmarx One API key" />
@@ -73,6 +73,7 @@
           </div>
           <div class="hc-pane" data-pane="git" hidden>
             <form class="sa-connect hc-git" id="hc-git" autocomplete="off">
+              <div class="hc-how" role="group" aria-label="How the code is counted"><button type="button" data-how="git" title="Counted here, with the customer's read-only git token" class="on">With their token</button><button type="button" data-how="cloc" title="The customer runs cloc-fusion where their code is and sends its report">cloc-fusion report</button></div>
               <input type="password" id="hc-git-token" spellcheck="false" placeholder="The customer's read-only git token: GitHub, GitLab, Bitbucket or Azure DevOps (in memory only)" autocomplete="off" aria-label="The customer's git token" />
               <span class="hc-git-kind" id="hc-git-kind" aria-live="polite"></span>
               <select id="hc-git-provider" aria-label="Git host" hidden><option value="">Which git host?</option><option value="github">GitHub</option><option value="gitlab">GitLab</option><option value="bitbucket">Bitbucket</option><option value="azure">Azure DevOps</option></select>
@@ -84,7 +85,7 @@
               <div class="hc-git-list" id="hc-git-list" hidden></div>
             </form>
           </div>
-          <div class="hc-pane" data-pane="cloc" hidden><span>The customer runs cloc-fusion where their code is and sends you its report; their code never leaves them.</span><button type="button" class="primary sm" data-open-tab="fusion-cloc">Import a cloc-fusion report →</button></div>
+          <div class="hc-pane" data-pane="cloc" hidden><div class="hc-how" role="group" aria-label="How the code is counted"><button type="button" data-how="git" title="Counted here, with the customer's read-only git token">With their token</button><button type="button" data-how="cloc" title="The customer runs cloc-fusion where their code is and sends its report" class="on">cloc-fusion report</button></div><span>They run it where their code is and send you its report: code and token never leave them.</span><button type="button" class="primary sm" data-open-tab="fusion-cloc">Import a cloc-fusion report →</button></div>
         </div>
         <div class="hc-meta">
           <div class="hc-impact"><label class="hc-switch" title="Soft savings in the report, from triage and remediation of the existing vulnerabilities"><input type="checkbox" id="hc-impact" /><span><b>Impact</b> <i class="hc-beta">beta</i></span></label><button type="button" class="ghost sm" id="hc-currency" hidden></button></div>

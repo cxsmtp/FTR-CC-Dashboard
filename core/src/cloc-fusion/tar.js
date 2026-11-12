@@ -1,4 +1,4 @@
-// Vendored from cloc-fusion 1.3.2 (commit 1a320621d0f5), MIT licence: src/cloc-fusion/LICENSE. Do not edit here: scripts/sync-cloc-fusion.mjs copies it again.
+// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
 // A tar parser on plain byte arrays (Uint8Array), with no Node APIs, so the CLI (src/archive.js)
 // and the standalone HTML page share it. Entry names are only text: nothing is ever written to
 // disk. Wanted files are handed over whole, up to `maxFileBytes`; metadata entries are capped.
@@ -103,7 +103,7 @@ export class TarParser {
         } else if (type === '0' || type === '\0' || type === '7') {
           this.entries++;
           const e = { path: name, size };
-          const want = size <= this.maxFileBytes && this.onEntry(e);
+          const want = this.onEntry(e) && size <= this.maxFileBytes;
           this.entry = want ? e : null;
           this.chunks = want ? [] : null;
         } else {

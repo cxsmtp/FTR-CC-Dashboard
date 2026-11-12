@@ -1,4 +1,4 @@
-// Vendored from cloc-fusion 1.3.2 (commit 1a320621d0f5), MIT licence: src/cloc-fusion/LICENSE. Do not edit here: scripts/sync-cloc-fusion.mjs copies it again.
+// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
 // Any other Git server (Gitea, Gerrit, AWS CodeCommit over HTTPS, a plain git host…): a list of
 // clone URLs, with an optional username + token for HTTPS basic auth.
 import { basic } from '../http.js';

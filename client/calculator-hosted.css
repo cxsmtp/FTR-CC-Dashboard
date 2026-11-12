@@ -789,3 +789,9 @@ html[data-cc] .calc-byproject-table th, html[data-cc] .calc-byproject-table td {
 .calc-plan-f { color: var(--muted); white-space: nowrap; }
 tr.calc-plan-out td:not(.calc-plan-c) { opacity: .5; }
 .calc-plan-part small { color: var(--muted); font-size: 11px; font-weight: 400; }
+/* Code repositories: one source, counted here with the customer's token or by the customer with cloc-fusion. */
+.hc-how { flex: none; display: inline-flex; gap: 2px; padding: 2px; height: var(--hc-h, 34px); box-sizing: border-box; border: 1px solid var(--line); border-radius: 9px; }
+html[data-cc][data-ui] .hc-how button { --btn-sheen: none; --btn-drop: 0 0 transparent; --btn-hi: transparent; --btn-lo: transparent; box-shadow: none !important; border: 0 !important; background: transparent; min-height: 0 !important; height: 100% !important; }
+html[data-cc] .hc-how button, .hc-how button { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 7px; cursor: pointer; white-space: nowrap; font-size: calc(var(--hc-fs, 13px) - 1px); color: var(--muted); }
+html[data-cc][data-ui] .hc-how button.on, html[data-cc] .hc-how button.on, .hc-how button.on { background: color-mix(in srgb, var(--brand, var(--cyan, #0e6b7c)) 14%, transparent); color: var(--text); font-weight: 600; }
+.hc-how button:focus-visible { outline: 2px solid var(--brand, var(--cyan, #0e6b7c)); outline-offset: 1px; }

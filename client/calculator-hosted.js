@@ -1154,10 +1154,13 @@ export async function startHosted() {
   const panes = [...document.querySelectorAll('.hc-pane')];
   const pick = (src) => {
     for (const b of document.querySelectorAll('.hc-seg [data-src]')) {
-      b.classList.toggle('on', b.dataset.src === src);
-      b.setAttribute('aria-selected', String(b.dataset.src === src));
+      // Code repositories is one choice, counted here with a token (git) or by the customer (cloc-fusion).
+      const on = b.dataset.src === src || b.dataset.also === src;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
     }
     for (const p of panes) p.hidden = p.dataset.pane !== src;
+    for (const b of document.querySelectorAll('.hc-how [data-how]')) b.classList.toggle('on', b.dataset.how === src);
     // A Fusion-only customer (Git or cloc-fusion): Impact (soft savings of triage & remediation) and the Checkmarx One
     // key's state do not apply; Impact stays in view when it is already on, to turn it off.
     $('hc-account').dataset.src = src;
@@ -1168,7 +1171,8 @@ export async function startHosted() {
     if (meeting && src !== 'cxone') document.querySelector(`[data-ptabs="calculator"] [data-pt="fusion-${src}"]`)?.click();
   };
   $('hc-impact').addEventListener('change', () => $('hc-account').classList.toggle('impact-on', $('hc-impact').checked));
-  for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.src));
+  for (const b of document.querySelectorAll('.hc-seg [data-src]')) b.addEventListener('click', () => pick(b.dataset.also && b.dataset.also === document.documentElement.dataset.src ? b.dataset.also : b.dataset.src));
+  for (const b of document.querySelectorAll('.hc-how [data-how]')) b.addEventListener('click', () => pick(b.dataset.how));
   // Git and cloc-fusion are the calculator's own Fusion tabs: open the one asked for, and bring it into view.
   for (const b of document.querySelectorAll('[data-open-tab]')) b.addEventListener('click', () => {
     const tab = document.querySelector(`[data-ptabs="calculator"] [data-pt="${b.dataset.openTab}"]`);
@@ -1356,7 +1360,7 @@ export async function startHosted() {
     shell.classList.toggle('can-read', connected);
     $('sa-disconnect').hidden = !connected;
     $('sa-key').placeholder = connected ? 'Connected: paste another key to switch' : 'Paste the API key (not kept: in memory for your session only)';
-    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : `Not connected. A prospect not on Checkmarx One: use Fusion · from Git or Fusion · cloc-fusion${cfg.exportsEnabled ? ', or the two exports' : ''}.`, connected ? 'ok' : 'muted');
+    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : `Not connected. A prospect not on Checkmarx One: use Code repositories (their git token, or a cloc-fusion report)${cfg.exportsEnabled ? ', or the two exports' : ''}.`, connected ? 'ok' : 'muted');
     calculator.refresh();
   };
   $('sa-connect').addEventListener('submit', async (event) => {
