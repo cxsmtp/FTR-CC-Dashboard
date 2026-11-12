@@ -1124,7 +1124,7 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 /* An account's reports: the cells wrap instead of pushing the table past the page. */
 .rep-table td { white-space: normal; vertical-align: middle; }
 .rep-table td.num, .rep-table td:nth-child(2) { white-space: nowrap; }
-.rep-table td.actions { white-space: normal !important; text-align: right; width: 232px; }
+.rep-table td.actions { white-space: normal !important; text-align: right; width: 200px; }
 .rep-table td.actions > * { display: inline-flex; }
 .rep-table td.actions > * { margin: 2px 0 2px 4px; }
 .rep-table .sub { white-space: normal; }
@@ -1180,3 +1180,7 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 .acc-split { white-space: normal; max-width: 15ch; margin-left: auto; line-height: 1.3; }
 @media (max-width: 1200px) { #main[data-page="accounts"] .acc-last-h, #main[data-page="accounts"] td.acc-last { display: none; } }
 @media (max-width: 1200px) { #main[data-page="accounts"] .acc-cust-h, #main[data-page="accounts"] td.acc-cust { display: none; } }
+/* No sideways scrolling: the account's reports fit the side panel; dates and numbers wrap only when space runs out. */
+.rep-table { table-layout: auto; width: 100%; }
+.rep-table td.num, .rep-table td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; }
+.rep-table td.actions { width: 180px; }

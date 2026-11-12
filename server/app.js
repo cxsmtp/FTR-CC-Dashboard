@@ -20,7 +20,7 @@ import { suggestCurrency } from './currency.js';
 import { changesOf, customerFigures, profileFromData, profileFromReport, readCustomerVersion } from './customer-version.js';
 import { isOldReport, readOldReport } from './old-report.js';
 import { Sso, mergeSso } from './sso.js';
-import { UpdateService, VersionStore, compareVersions } from './updates.js';
+import { UpdateService, VersionStore } from './updates.js';
 import { ActivityLog } from './activity.js';
 import { CallMemory, explainCall } from './resilience.js';
 import { DEFAULT_SUPPORT_EMAIL, KINDS as SUPPORT_KINDS, STATUSES as SUPPORT_STATUSES, SupportDesk, supportEmail } from './support.js';
@@ -1813,8 +1813,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('GET', '/api/status', ready2, (req, ctx) => {
     const cx = calc.status(ctx.user.id);
     const work = calc.work(ctx.user.id).read;
-    const u = ctx.permissions.has('system.update') ? updates.status() : null;
-    const newer = u?.releases?.find((r) => !r.prerelease && r.installable && !r.tampered && compareVersions(r.version, VERSION) > 0);
+    // Asked on every page: what the last check found, never the installed versions' files.
+    const newer = ctx.permissions.has('system.update') ? updates.newer?.() : null;
     return {
       cxone: { on: cx.connected, tenant: cx.tenant, reading: work?.state === 'running' },
       email: { on: mailReady(), configured: Boolean(smtpNow().host) },

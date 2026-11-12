@@ -2,6 +2,20 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.95.00 — 2026-11-12
+
+- **No more server freezes of several seconds.** The check that the installed versions' files are unchanged read and
+  hashed every file of every version kept, holding up the whole server while it ran: on each page an Admin opened (the
+  status lights) and on each update check. It now runs in the background, one file at a time, and remembers each
+  version's answer (an installed version never changes); the status lights no longer touch it.
+- **The calculator opens without a false start.** From the menu it starts fresh, as meant, without first saying it is
+  opening the last account and asking for it. An account opened from the Accounts list is remembered with its team, so
+  it is never asked for in another team (where it is not found) and then loaded again; an address naming an account
+  of another team goes to that team at once.
+- **No sideways scrolling.** The calculator's tables (repositories counted, Checkmarx One's projects, generated reports)
+  and an account's reports fit their panel at any width from 1024 pixels: names, tags and labels wrap, number boxes and
+  model pickers fit their column, Remove sits under the name.
+
 ## CC-01.94.00 — 2026-11-12
 
 - **Faster page clicks on a far network.**

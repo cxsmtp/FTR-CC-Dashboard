@@ -159,6 +159,11 @@ export async function startHosted() {
     }
   })();
   if (!teams.some((t) => t.id === team)) team = teams.some((t) => t.id === cfg.ownTeamId) ? cfg.ownTeamId : teams[0]?.id ?? '';
+  // Remembered with the account opened in it (OPEN_KEY): the next visit opens that account in its own team at once,
+  // not in another team first (where it is not found) and then again.
+  try {
+    if (team) localStorage.setItem(TEAM_KEY, team);
+  } catch {}
   $('hc-team').innerHTML = teams.map((t) => `<option value="${esc(t.id)}" title="${esc(t.path)}"${t.id === team ? ' selected' : ''}>${esc(t.path.split(' › ').pop())}</option>`).join('');
   $('hc-team').disabled = teams.length < 2;
   if (params.get('account')) {
@@ -166,15 +171,12 @@ export async function startHosted() {
       localStorage.setItem(OPEN_KEY, params.get('account'));
     } catch {}
   }
-  // The account to open is known already (the address, or the one open last): its figures and its details are asked
-  // for now, with the list and the connection's state, instead of one after another as the calculator gets to them.
+  // The account to open is known already (the address names it): its figures and its details are asked for now, with
+  // the list and the connection's state, instead of one after another as the calculator gets to them. Without one in
+  // the address the calculator starts fresh (the menu's Calculator), so nothing of the last account is asked for or
+  // said to be opening.
   {
-    let openId = params.get('account') || '';
-    if (!openId) {
-      try {
-        openId = localStorage.getItem(OPEN_KEY) || '';
-      } catch {}
-    }
+    const openId = params.get('account') || '';
     const ask = (path) => {
       const p = server(path);
       p.catch(() => {});
@@ -193,6 +195,14 @@ export async function startHosted() {
       document.getElementById('hc-account')?.prepend(note);
       early.get(`/api/cc/accounts/${encodeURIComponent(openId)}`)?.then((d) => {
         if (opening && d?.account?.name) note.lastElementChild.textContent = `Opening ${d.account.name}…`;
+        // Remembered from another team (saved before the team was remembered with it): opened in its own team at once.
+        const own = d?.account?.teamId;
+        if (own && own !== team && !params.get('team') && teams.some((t) => t.id === own)) {
+          try {
+            localStorage.setItem(TEAM_KEY, own);
+          } catch {}
+          location.replace(`/calculator?team=${encodeURIComponent(own)}&account=${encodeURIComponent(openId)}`);
+        }
       }, () => openingDone());
       setTimeout(openingDone, 15000);
     }

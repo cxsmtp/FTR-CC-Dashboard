@@ -77,6 +77,36 @@ export function verifyFolder(dir) {
   return { ok: true, version: manifest.version, files: Object.keys(listed).length };
 }
 
+/**
+ * verifyFolder without holding up the server: files are read and hashed one at a time, asynchronously, so pages are
+ * answered meanwhile. Gives the same answer.
+ */
+export async function verifyFolderAsync(dir) {
+  let manifest;
+  try {
+    manifest = JSON.parse(await fs.promises.readFile(path.join(dir, 'MANIFEST.json'), 'utf8'));
+  } catch {
+    return { ok: false, reason: 'it has no readable MANIFEST.json' };
+  }
+  const listed = manifest?.files && typeof manifest.files === 'object' ? manifest.files : null;
+  if (!listed || !VERSION.test(String(manifest.version ?? ''))) return { ok: false, reason: 'its MANIFEST.json is not a release manifest' };
+  for (const [rel, hash] of Object.entries(listed)) {
+    const safe = safeRelative(rel);
+    if (!safe) return { ok: false, reason: `its manifest names a path outside the folder (${rel})` };
+    let buf;
+    try {
+      buf = await fs.promises.readFile(path.join(dir, safe));
+    } catch {
+      return { ok: false, reason: `${rel} is missing` };
+    }
+    if (sha256(buf) !== hash) return { ok: false, reason: `${rel} changed since it was released` };
+  }
+  const walk = async (d, base = '') => (await Promise.all((await fs.promises.readdir(d, { withFileTypes: true })).map((e) => (e.isDirectory() ? walk(path.join(d, e.name), `${base}${e.name}/`) : [`${base}${e.name}`])))).flat();
+  const extra = (await walk(dir)).filter((f) => f !== 'MANIFEST.json' && !(f in listed));
+  if (extra.length) return { ok: false, reason: `it holds files the release did not (${extra.slice(0, 3).join(', ')})` };
+  return { ok: true, version: manifest.version, files: Object.keys(listed).length };
+}
+
 /** The versions kept, what runs, what failed, the events, and the auto-update choice: DATA_DIR/app/state.json. */
 export class VersionStore {
   constructor({ dataDir, builtInDir, builtInVersion }) {
@@ -238,21 +268,35 @@ export class UpdateService {
     return expected;
   }
 
-  /** Installed versions whose files changed on disk: recorded once each. */
+  /**
+   * Installed versions whose files changed on disk: recorded once each. Checked in the background, one version after
+   * another (never all at once on the server's own time), and remembered: `status()` shows the last answer.
+   */
+  #verified = new Map(); // version -> { ok, at }
+  #verifying = null;
   #verifyInstalled() {
-    const s = this.store.state;
-    s.changedOnDisk ??= [];
-    for (const v of this.store.installed()) {
-      const check = verifyFolder(this.store.dirOf(v));
-      if (!check.ok && !s.changedOnDisk.includes(v)) {
-        s.changedOnDisk.push(v);
-        this.store.record({ type: 'changed-on-disk', version: v, why: check.reason });
+    if (this.#verifying) return this.#verifying;
+    this.#verifying = (async () => {
+      const s = this.store.state;
+      s.changedOnDisk ??= [];
+      for (const v of this.store.installed()) {
+        const check = await verifyFolderAsync(this.store.dirOf(v)).catch((error) => ({ ok: false, reason: error.message }));
+        this.#verified.set(v, { ok: check.ok, at: Date.now() });
+        if (!check.ok && !s.changedOnDisk.includes(v)) {
+          s.changedOnDisk.push(v);
+          this.store.record({ type: 'changed-on-disk', version: v, why: check.reason });
+        }
       }
-    }
+    })().finally(() => (this.#verifying = null));
+    return this.#verifying;
   }
-
+  /** The newest release that would be offered (from the last check): no files read. */
+  newer() {
+    return (this.cache ?? []).find((r) => !r.prerelease && r.installable && !r.tampered && compareVersions(r.version, this.running) > 0) ?? null;
+  }
   status() {
     const s = this.store.state;
+    if (this.store.installed().some((v) => !this.#verified.has(v))) this.#verifyInstalled().catch(() => {});
     const installed = this.store.installed();
     return {
       running: this.running,
@@ -260,7 +304,8 @@ export class UpdateService {
       source: s.current?.source ?? 'built-in',
       supervised: this.supervised,
       repo: this.repo,
-      installed: installed.map((v) => ({ version: v, verified: verifyFolder(this.store.dirOf(v)).ok })),
+      // As last checked in the background (null until the first check of that version has finished).
+      installed: installed.map((v) => ({ version: v, verified: this.#verified.get(v)?.ok ?? null })),
       failed: s.failed ?? [],
       previous: s.previous,
       auto: s.auto,
@@ -395,7 +440,7 @@ export class UpdateService {
       this.store.save();
       throw error;
     }
-    this.#verifyInstalled();
+    this.#verifyInstalled().catch(() => {});
     const { failed = [], heldUpTo = null } = this.store.state;
     const newest = releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.pinError && !failed.includes(r.version));
     if (!newest || compareVersions(newest.version, this.running) <= 0) return null;
