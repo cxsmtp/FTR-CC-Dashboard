@@ -35,7 +35,7 @@ import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed }
 import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
 import { HSTS_AGES, HttpsManager } from '../core/src/https-manager.js';
 import { AcmeService, CHALLENGE_PREFIX, RENEW_DAYS, cleanNames, validName } from '../core/src/acme.js';
-import { CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, calculatorPage, impactSettings, summary } from './calculator.js';
+import { CALC_FONTS, CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, calculatorPage, impactSettings, summary } from './calculator.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 /** The version as people see it, the calculator’s way: CC-01.01.00. */
@@ -2324,7 +2324,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       return send(res, 200, fs.readFileSync(path.join(config.root, LEGAL[pathname]), 'utf8'), { 'Content-Type': 'text/plain; charset=utf-8' });
     }
     // the calculator’s .xlsx reader (from the calculator), for reading sheets people upload in the dashboard.
+    // Also at this version's own address (/v/<version>/xlsx-lite.js), kept by the browser until the next version.
+    if (method === 'GET' && pathname === `/v/${VERSION}/xlsx-lite.js`) return serveStatic(path.join(config.root, 'core', 'public', 'calculator', 'vendor'), req, res, 'xlsx-lite.js', { cache: 'public, max-age=31536000, immutable' }) || send(res, 404, 'Not found');
     if (method === 'GET' && pathname === '/xlsx-lite.js') return serveStatic(path.join(config.root, 'core', 'public', 'calculator', 'vendor'), req, res, 'xlsx-lite.js') || send(res, 404, 'Not found');
+    // The calculator's fonts: public, named by their content (?h=), kept by the browser for a year.
+    if (method === 'GET' && /^\/calc-fonts\/[a-z0-9-]+\.woff2$/.test(pathname)) return serveStatic(CALC_FONTS, req, res, pathname.slice('/calc-fonts/'.length), { cache: 'public, max-age=31536000, immutable' }) || send(res, 404, 'Not found');
     if (method === 'GET' && pathname.startsWith('/calc-assets/samples/')) {
       const ctx = context(req);
       if (!ctx) return send(res, 401, { error: 'Sign in first.' });

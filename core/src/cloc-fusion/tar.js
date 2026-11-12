@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // A tar parser on plain byte arrays (Uint8Array), with no Node APIs, so the CLI (src/archive.js)
 // and the standalone HTML page share it. Entry names are only text: nothing is ever written to
 // disk. Wanted files are handed over whole, up to `maxFileBytes`; metadata entries are capped.

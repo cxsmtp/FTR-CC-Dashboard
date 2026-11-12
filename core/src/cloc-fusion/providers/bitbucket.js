@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Bitbucket Cloud (bitbucket.org). Organizations are workspaces.
 import { ApiClient, basic } from '../http.js';
 

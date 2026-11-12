@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Everything done with git: a bare, blob-less, shallow clone of each repository's default branch
 // (commits and trees of the window only, no file contents), its commit history in the window,
 // then the contents of the files worth counting at HEAD, fetched in one go and read with

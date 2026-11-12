@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // A small JSON-over-HTTPS client for the providers' REST APIs: retries on rate limits and server
 // errors, follows pagination, and never puts the token anywhere but the Authorization header.
 

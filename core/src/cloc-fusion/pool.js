@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 /** Run `fn(item, index)` over `items` with at most `n` running at a time. */
 export async function pool(items, n, fn) {
   let next = 0;

@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Reading repository archives without any external tool: a streaming .tar.gz reader (GitHub,
 // GitLab, Bitbucket) and a .zip reader (Azure DevOps), both on Node's built-in zlib.
 //

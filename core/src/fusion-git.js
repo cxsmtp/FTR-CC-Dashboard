@@ -1,6 +1,6 @@
 /**
  * Fusion — new customer, Count from git (public/calculator/page.js), with cloc-fusion's engine (src/cloc-fusion/,
- * from cloc-fusion 1.4.1): a customer's repositories discovered across connections and organizations,
+ * from cloc-fusion 1.4.2): a customer's repositories discovered across connections and organizations,
  * then measured where they are kept. For each repository: its code lines by language, counted the way cloc counts
  * them; the commits on its default branch in the last 365 days (merges left out) and so its change frequency; the
  * date of its last commit; and how many people committed to it in the last 90 days (bots left out). Two engines:

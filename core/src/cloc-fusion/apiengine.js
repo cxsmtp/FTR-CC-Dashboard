@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // The git-free engine: measures a repository through its platform's API alone. Lines of code come
 // from the default branch's archive, streamed and counted in memory (nothing is written to disk
 // except Azure DevOps' zip, held in a temporary file while it is read); commits come from the

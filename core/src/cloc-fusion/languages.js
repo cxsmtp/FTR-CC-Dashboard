@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Languages by file extension or name: their category (what counts toward Fusion lines of code by
 // default) and comment syntax, for counting code, comment and blank lines like cloc does.
 //

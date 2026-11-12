@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Fusion credits: the same arithmetic as the Cx Credits Calculator (CxDetectionDateBaseReminder,
 // public/calculator/model.js), fed from the source-control side instead of Checkmarx One.
 //
@@ -19,15 +19,15 @@ export const MAX_EXTRA_PERCENT = 500;
  * the Fusion scans a year suggested for it: weekly for the busiest, never more often than it changes.
  */
 export const FREQUENCIES = [
-  { id: 'more-5-week', label: 'More than 5 commits a week', days: 7 / 5.0001, perYear: 52 },
-  { id: '1-5-week', label: '1 to 5 commits a week', days: 7.5, perYear: 26 },
-  { id: '2-weeks', label: 'About once in 2 weeks', days: 15.5, perYear: 12 },
-  { id: 'month', label: 'About once a month', days: 31.5, perYear: 6 },
-  { id: '2-months', label: 'About once in 2 months', days: 63, perYear: 4 },
-  { id: '3-months', label: 'About once in 3 months', days: 95, perYear: 4 },
-  { id: '6-months', label: 'About once in 6 months', days: 190, perYear: 2 },
-  { id: 'year', label: 'About once a year', days: 366, perYear: 1 },
-  { id: 'rare', label: 'Not in the window', days: Infinity, perYear: 1 },
+  { id: 'more-5-week', short: '5+ a week', label: 'More than 5 commits a week', days: 7 / 5.0001, perYear: 52 },
+  { id: '1-5-week', short: '1–5 a week', label: '1 to 5 commits a week', days: 7.5, perYear: 26 },
+  { id: '2-weeks', short: '2 weeks', label: 'About once in 2 weeks', days: 15.5, perYear: 12 },
+  { id: 'month', short: 'Monthly', label: 'About once a month', days: 31.5, perYear: 6 },
+  { id: '2-months', short: '2 months', label: 'About once in 2 months', days: 63, perYear: 4 },
+  { id: '3-months', short: '3 months', label: 'About once in 3 months', days: 95, perYear: 4 },
+  { id: '6-months', short: '6 months', label: 'About once in 6 months', days: 190, perYear: 2 },
+  { id: 'year', short: 'Yearly', label: 'About once a year', days: 366, perYear: 1 },
+  { id: 'rare', short: 'Dormant', label: 'Not in the window', days: Infinity, perYear: 1 },
 ];
 export const CRITICALITIES = [5, 4, 3, 2, 1];
 export const COMBINE = ['higher', 'frequency', 'criticality'];

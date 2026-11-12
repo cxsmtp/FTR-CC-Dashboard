@@ -2,6 +2,16 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.96.00 — 2026-11-12
+
+- **The calculator page is half the size.** Its fonts were written into the page (509 KB of it, which barely
+  compresses), so every visit downloaded them before anything showed. They are now their own files, named by their
+  content: the browser fetches only the few the page uses (about 100 KB), after the page is drawn, and keeps them. The
+  page goes from 789 KB to 411 KB. Reports keep their fonts inside, so they still open anywhere.
+- **cloc-fusion 1.4.2.** The download hands out 1.4.2 (default GitHub connection named "github", the change-frequency
+  scans as one compact strip); the change-frequency groups have their short names. Its reports are read as before.
+- The dashboard's spreadsheet reader loads from this version's own address again (it was not found there).
+
 ## CC-01.95.00 — 2026-11-12
 
 - **No more server freezes of several seconds.** The check that the installed versions' files are unchanged read and

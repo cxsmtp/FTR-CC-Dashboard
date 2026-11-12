@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Which discovered repositories are measured, and the same repository reached twice counted once.
 // Pure, shared by the CLI scan and the standalone HTML page.
 import { globToRegExp } from './languages.js';

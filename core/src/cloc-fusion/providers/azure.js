@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Azure DevOps Services (dev.azure.com) and Azure DevOps Server. Organizations are Azure DevOps
 // organizations (Server: collections); every project's Git repositories are included.
 import { ApiClient, basic } from '../http.js';

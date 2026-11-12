@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // GitLab (gitlab.com and self-managed). Organizations are top-level groups; subgroups are included.
 import { ApiClient, basic } from '../http.js';
 

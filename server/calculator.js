@@ -77,13 +77,21 @@ export async function checkHost(hostname, list, what) {
 // ---- The page ------------------------------------------------------------------------------------
 
 const MIME = { '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png' };
+/**
+ * The page's own pictures, written into it. Its fonts are not (they were half of the page, and barely compress): each
+ * is its own file at /calc-fonts/, named by its content, so the browser fetches only the few the page uses, after the
+ * page is drawn, and keeps them.
+ */
 const inlined = (css, root) =>
   css.replace(/url\(([^)'"]+)\)/g, (whole, ref) => {
     const mime = MIME[path.extname(ref)];
     const file = path.join(root, ref);
     if (!mime || ref.includes('..') || !fs.existsSync(file)) return whole;
+    if (mime === 'font/woff2' && /^fonts\/[a-z0-9-]+\.woff2$/.test(ref)) return `url(/calc-fonts/${path.basename(ref)}?h=${createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 12)})`;
     return `url(data:${mime};base64,${fs.readFileSync(file).toString('base64')})`;
   });
+/** Where the calculator's fonts are served from (GET /calc-fonts/<name>.woff2). */
+export const CALC_FONTS = path.join(MZ_PUBLIC, 'fonts');
 const scriptText = (s) => s.replace(/\r\n?/g, '\n').replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 const contentHash = (t) => `'sha256-${createHash('sha256').update(t, 'utf8').digest('base64')}'`;
 /** the calculator’s own bundle order (src/standalone-calculator.js), with this server's entry in place of its standalone.js. */
@@ -115,7 +123,7 @@ export function calculatorPage({ productCode = '' } = {}) {
   const main = `\n${scriptText(`const __m = [];\n${bundle}\nlet __started = false;\nwindow.__mzStart = () => {\n  if (__started) return;\n  __started = true;\n  __m[${index.get('calculator/hosted.js')}].startHosted();\n};\nif (!window.__mzBlocked) window.__mzStart();`)}\n`;
   const css = `\n${`${inlined(read('styles.css'), MZ_PUBLIC)}\n${inlined(read('nextgen.css'), MZ_PUBLIC)}\n${fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.css'), 'utf8')}\n${fs.readFileSync(path.join(ROOT, 'public', 'standard.css'), 'utf8')}`.replace(/\r\n?/g, '\n')}\n`;
   const scripts = [...(seed ? [seed] : []), gate, ...vendorScripts, main];
-  const csp = `default-src 'none'; script-src ${scripts.map(contentHash).join(' ')}; script-src-attr 'none'; style-src 'unsafe-inline'; style-src-elem ${contentHash(css)}; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'self'; worker-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+  const csp = `default-src 'none'; script-src ${scripts.map(contentHash).join(' ')}; script-src-attr 'none'; style-src 'unsafe-inline'; style-src-elem ${contentHash(css)}; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
   const markup = standaloneMarkup(calculatorMarkup(read('index.html')), { launcher: true });
   const head = fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.html'), 'utf8');
   const html = head

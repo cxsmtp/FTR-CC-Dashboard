@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Any other Git server (Gitea, Gerrit, AWS CodeCommit over HTTPS, a plain git host…): a list of
 // clone URLs, with an optional username + token for HTTPS basic auth.
 import { basic } from '../http.js';

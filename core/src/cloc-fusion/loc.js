@@ -1,4 +1,4 @@
-// From cloc-fusion 1.4.1 (commit 6a7fbb96f50b), MIT licence; this product's own copy.
+// From cloc-fusion 1.4.2 (commit f51db42fc68c), MIT licence; this product's own copy.
 // Counting lines like cloc: per file, code / comment / blank lines by the language's comment syntax.
 // Quoted strings are skipped within a line (so a route like '/*' does not open a comment); strings
 // spanning lines are not tracked, the usual approximation, which moves totals by well under 1%.
