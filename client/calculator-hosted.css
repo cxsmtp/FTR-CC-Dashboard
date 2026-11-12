@@ -834,3 +834,14 @@ html[data-opening] .hc-row1, html[data-opening] .hc-start { visibility: hidden; 
 .hc-cloc .hc-cf-how { flex: 1 1 220px; min-width: 0; color: var(--muted); font-size: calc(var(--hc-fs, 13px) - 1px); }
 .hc-cloc #hc-cf-dl { flex: none; white-space: nowrap; }
 html[data-cc] .calc-freq-git table.calc-rules td:nth-child(2)::after { content: " repositories"; }
+/* Both are buttons: Browse (the main action, filled) and Download (outlined), small, the height of the bar's others. */
+html[data-cc] .hc-cloc .hc-cf-up, html[data-cc] .hc-cloc #hc-cf-dl {
+  height: var(--hc-h, 34px) !important; min-height: 0 !important; padding: 0 14px !important; border-radius: 10px !important;
+  display: inline-flex !important; align-items: center; gap: 6px; font-size: var(--hc-fs, 13px) !important; font-weight: 600;
+  cursor: pointer; white-space: nowrap; box-shadow: none !important; text-decoration: none;
+}
+html[data-cc] .hc-cloc .hc-cf-up { background: var(--brand, var(--accent, #0b6b7f)) !important; color: var(--on-brand, #fff) !important; border: 1px solid var(--brand, var(--accent, #0b6b7f)) !important; }
+html[data-cc] .hc-cloc .hc-cf-up:hover { background: color-mix(in srgb, var(--brand, #0b6b7f) 88%, #000) !important; }
+html[data-cc] .hc-cloc .hc-cf-up:focus-within { outline: 2px solid var(--brand, #0b6b7f); outline-offset: 2px; }
+html[data-cc] .hc-cloc #hc-cf-dl { background: var(--surface, #fff) !important; color: var(--brand, var(--text)) !important; border: 1px solid var(--brand, var(--border)) !important; }
+html[data-cc] .hc-cloc #hc-cf-dl:hover { background: color-mix(in srgb, var(--brand, #0b6b7f) 8%, var(--surface, #fff)) !important; }

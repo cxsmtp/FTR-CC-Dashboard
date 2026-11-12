@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.93.00 — 2026-11-12
+
+- **cloc-fusion report: two real buttons.** With cloc-fusion report picked as the source, **Browse their report** (filled)
+  loads the customer's report, and **Download cloc-fusion** (outlined) gives the utility to send them; both small, on one
+  line with the source picker.
+
 ## CC-01.92.00 — 2026-11-12
 
 - **Three sources in the calculator: Checkmarx One, Git, cloc-fusion report.** Git takes the customer's read-only token.
