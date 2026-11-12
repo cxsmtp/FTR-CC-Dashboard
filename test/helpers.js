@@ -65,3 +65,7 @@ export async function client(base, email, password = PASSWORD) {
 }
 
 export const reportData = (tr = 1000, fusion = 500) => ({ tr: { totals: { credits: tr } }, fusion: { totals: { credits: fusion } }, summary: { settings: { extraPercent: 10, bundleCredits: 10000 } } });
+
+/** A Salesforce opportunity link of its own: each account has its own (one account per opportunity or account). */
+let sfCount = 0;
+export const sfLink = () => `https://acme.lightning.force.com/lightning/r/Opportunity/006AB${String(++sfCount).padStart(10, '0')}/view`;

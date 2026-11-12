@@ -138,13 +138,16 @@ export function readOldReport(html, { force = false } = {}) {
       const latestYear = Number(latestDate.slice(0, 4));
       const wk = new Map();
       for (const t of titles) {
-        const m = /^(Debt added|Fixed) · (\d+) ([A-Za-z]+): ([\d.,]+)%$/.exec(t);
-        if (!m || !MON[m[3]]) continue;
-        const month = MON[m[3]];
-        const year = month > latestMonth || (month === latestMonth && Number(m[2]) > latestDay) ? latestYear - 1 : latestYear;
-        const date = `${year}-${String(month).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+        // The week is written "3 Jun" or "Jun 3", whichever the report's locale gave.
+        const m = /^(Debt added|Fixed) · (?:(\d+) ([A-Za-z]+)|([A-Za-z]+) (\d+)): ([\d.,]+)%$/.exec(t);
+        const monName = m?.[3] ?? m?.[4];
+        if (!m || !MON[monName]) continue;
+        const month = MON[monName];
+        const day = Number(m[2] ?? m[5]);
+        const year = month > latestMonth || (month === latestMonth && day > latestDay) ? latestYear - 1 : latestYear;
+        const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const w = wk.get(date) ?? { date };
-        w[m[1] === 'Fixed' ? 'fixedRate4' : 'addedRate4'] = n(m[4]) / 4.345;
+        w[m[1] === 'Fixed' ? 'fixedRate4' : 'addedRate4'] = n(m[6]) / 4.345;
         wk.set(date, w);
       }
       weekly = wk.size ? [...wk.values()].sort((a, b) => a.date.localeCompare(b.date)) : null;

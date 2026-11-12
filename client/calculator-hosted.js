@@ -917,6 +917,10 @@ export async function startHosted() {
       naming = true;
       return $('hc-name').dispatchEvent(new Event('change'));
     }
+    if (await linkTaken($('hc-sf').value, account.id)) {
+      $('hc-sf').value = account.salesforceUrl ?? '';
+      return;
+    }
     try {
       await server(`/api/cc/accounts/${encodeURIComponent(account.id)}`, { method: 'PUT', body: { salesforceUrl: $('hc-sf').value } });
       toast('Salesforce link saved.', 'ok');
@@ -1054,6 +1058,51 @@ export async function startHosted() {
   });
   showAccount(null);
 
+  /**
+   * Each Salesforce opportunity or account link belongs to one account. When `url` is already another account's
+   * (other than `exceptId`), says which and offers to open it, or its projection here; true when it was taken.
+   */
+  let askingLink = null; // the link being asked about: asked once, however many ways it was saved
+  async function linkTaken(url, exceptId = '') {
+    const key = String(url ?? '').trim();
+    if (askingLink === key) return true;
+    askingLink = key;
+    try {
+      return await askLinkTaken(key, exceptId);
+    } finally {
+      // Kept a moment, so the save that came with the same keystroke does not ask again.
+      setTimeout(() => {
+        if (askingLink === key && !document.querySelector('dialog.hc-link-taken[open]')) askingLink = null;
+      }, 400);
+    }
+  }
+  async function askLinkTaken(url, exceptId) {
+    let taken = null;
+    try {
+      ({ taken } = await server(`/api/cc/salesforce-taken?url=${encodeURIComponent(String(url ?? '').trim())}&except=${encodeURIComponent(exceptId)}`));
+    } catch {
+      return false; // the server refuses it again on saving, and says why
+    }
+    if (!taken) return false;
+    const dlg = document.createElement('dialog');
+    dlg.className = 'hc-dialog hc-link-taken';
+    const who = `${esc(taken.owner)}${taken.team ? ` · ${esc(taken.team)}` : ''}`;
+    dlg.innerHTML = `<form method="dialog"><h2>This account already exists</h2>
+      <p><b>${esc(taken.name)}</b> (${who}) already has this Salesforce link${taken.salesforceId ? ` <span class="hc-pill">${esc(taken.salesforceId)}</span>` : ''}. Each opportunity or account belongs to one account, so another is not made.</p>
+      ${taken.canOpen ? '<p>Do you want to open that account, or its projection in the calculator?</p>' : `<p class="hint">${taken.starting ? 'It is being started by its Sales Engineer' : 'It is not in a team you work in, or is still a draft of its Sales Engineer'}: ask ${esc(taken.owner)} to share it, or to change its link if this is a different opportunity.</p>`}
+      <div class="hc-dialog-actions"><button value="cancel" class="ghost">${taken.canOpen ? 'Cancel' : 'Close'}</button>${taken.canOpen ? `<button value="account" class="ghost">Open the account</button>${taken.calculator ? '<button value="calc" class="primary">Open its projection</button>' : ''}` : ''}</div></form>`;
+    document.body.append(dlg);
+    dlg.addEventListener('close', () => {
+      const v = dlg.returnValue;
+      dlg.remove();
+      askingLink = null;
+      if (v === 'account') location.href = `/#/accounts/${encodeURIComponent(taken.id)}`;
+      else if (v === 'calc') location.href = `/calculator?team=${encodeURIComponent(taken.teamId)}&account=${encodeURIComponent(taken.id)}`;
+    });
+    dlg.showModal();
+    return true;
+  }
+
   // ---- The customer's name, as in Salesforce: names, opens and starts accounts (the calculator’s Customer ▾ menu is hidden) -------
   const picker = $('calc-customer');
   const names = () => [...picker.options].map((o) => ({ id: o.value, name: o.textContent.trim() }));
@@ -1103,6 +1152,8 @@ export async function startHosted() {
         $('hc-sf').focus();
         return;
       }
+      // One account per Salesforce opportunity or account: when the link is already an account's, that one is offered.
+      if (await linkTaken(sf)) return;
       // The same customer already has an account (in any team, however its name is written): said, and asked.
       try {
         const { similar } = await server(`/api/cc/accounts-similar?name=${encodeURIComponent(typed)}`);

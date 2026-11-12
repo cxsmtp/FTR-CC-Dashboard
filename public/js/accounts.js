@@ -412,6 +412,7 @@ export async function viewAccount(id) {
     const f = new FormData(form);
     const body = { ownerId: f.get('owner'), teamId: f.get('team') };
     if (String(f.get('sf') ?? '').trim() !== a.salesforceUrl) body.salesforceUrl = f.get('sf');
+    if (body.salesforceUrl !== undefined && (await linkTaken(body.salesforceUrl, a.id))) return;
     try {
       await api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'PUT', body });
       toast('Saved.', 'ok');
@@ -730,6 +731,37 @@ export function countUp(el, to, suffix = '') {
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+}
+
+/**
+ * Each Salesforce opportunity or account link belongs to one account. When `url` is already another account's (other
+ * than `exceptId`), says which and offers to open it, or its projection in the calculator; true when it was taken.
+ */
+export async function linkTaken(url, exceptId = '') {
+  let taken = null;
+  try {
+    ({ taken } = await api(`/api/cc/salesforce-taken?url=${encodeURIComponent(String(url ?? '').trim())}&except=${encodeURIComponent(exceptId)}`));
+  } catch {
+    return false; // refused again on saving, with the reason
+  }
+  if (!taken) return false;
+  const choice = await new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    const who = `${esc(taken.owner)}${taken.team ? ` · ${esc(taken.team)}` : ''}`;
+    dlg.innerHTML = `<form method="dialog"><div class="dh"><h2>This account already exists</h2></div><div class="db">
+      <p><b>${esc(taken.name)}</b> (${who}) already has this Salesforce link${taken.salesforceId ? ` <span class="mono">${esc(taken.salesforceId)}</span>` : ''}. Each opportunity or account belongs to one account.</p>
+      ${taken.canOpen ? '<p>Do you want to open that account, or its projection in the calculator?</p>' : `<p class="hint">${taken.starting ? 'It is being started by its Sales Engineer' : 'It is not in a team you work in, or is still a draft of its Sales Engineer'}: ask ${esc(taken.owner)} to share it, or to change its link if this is a different opportunity.</p>`}
+      </div><div class="df"><button value="cancel" class="ghost">${taken.canOpen ? 'Cancel' : 'Close'}</button>${taken.canOpen ? `<button value="account" class="ghost">Open the account</button>${taken.calculator ? '<button value="calc" class="primary">Open its projection</button>' : ''}` : ''}</div></form>`;
+    document.body.append(dlg);
+    dlg.addEventListener('close', () => {
+      resolve(dlg.returnValue);
+      dlg.remove();
+    });
+    dlg.showModal();
+  });
+  if (choice === 'account') viewAccount(taken.id);
+  else if (choice === 'calc') location.href = `/calculator?team=${encodeURIComponent(taken.teamId)}&account=${encodeURIComponent(taken.id)}`;
+  return true;
 }
 
 export function ask(title, hint, value = '') {

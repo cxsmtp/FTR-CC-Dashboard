@@ -210,8 +210,24 @@ export class Accounts {
     if (this.hiddenFrom(meta)) throw fail(404, meta.pendingSince ? 'That account is not made yet: it is kept once it has its Salesforce link and a projection.' : 'That account is still being prepared by its Sales Engineer: it shows here once a report is generated for it.');
     return migrate(this.accounts.get(id));
   }
+  /**
+   * The account already on this Salesforce opportunity or account, other than `exceptId`, or null: one account per
+   * record. Ids are compared by their first 15 characters (the 18-character form adds only a checksum). Every team's
+   * accounts are looked at, drafts and those being started included.
+   */
+  usingSalesforce(recordId, exceptId = '') {
+    const key = String(recordId ?? '').slice(0, 15);
+    if (key.length < 15) return null;
+    return this.accounts.list().find((m) => m.id !== exceptId && String(m.salesforceId ?? '').slice(0, 15) === key) ?? null;
+  }
+  /** Refused when another account already has this Salesforce record; the error carries that account (`taken`). */
+  needUnusedSalesforce(salesforce, exceptId = '') {
+    const other = this.usingSalesforce(salesforce?.recordId, exceptId);
+    if (other) throw Object.assign(fail(409, `${other.name} already has this Salesforce ${salesforce.kind === 'opportunity' ? 'opportunity' : 'account'} (${salesforce.recordId}): each opportunity or account link belongs to one account. Open that account instead.`), { taken: other });
+  }
   /** Started, with its Salesforce link: kept for its maker alone until it has a projection (then it is made). */
   start({ name, teamId, user, impact = {}, salesforce }) {
+    this.needUnusedSalesforce(salesforce);
     const a = this.create({ name: tidyName(name), teamId, user, impact });
     return this.accounts.put({ ...this.accounts.get(a.id), salesforceUrl: salesforce.url, salesforceKind: salesforce.kind, salesforceId: salesforce.recordId, pendingSince: new Date().toISOString() });
   }
@@ -260,6 +276,8 @@ export class Accounts {
     }
     if (salesforceUrl !== undefined) {
       const sf = checkSalesforceUrl(salesforceUrl, hosts);
+      // A link already this account's stays (even if another account had it before uniqueness was asked for).
+      if (String(sf.recordId).slice(0, 15) !== String(account.salesforceId ?? '').slice(0, 15)) this.needUnusedSalesforce(sf, id);
       Object.assign(account, { salesforceUrl: sf.url, salesforceKind: sf.kind, salesforceId: sf.recordId });
     }
     if (contacts !== undefined) account.contacts = cleanContacts(contacts);

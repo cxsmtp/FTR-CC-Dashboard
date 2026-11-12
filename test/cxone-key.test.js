@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { CalculatorService } from '../server/calculator.js';
-import { SF, client, reportData, start } from './helpers.js';
+import { sfLink, client, reportData, start } from './helpers.js';
 
 const calls = [];
 const calc = new CalculatorService({ cxoneHosts: ['checkmarx.net'], gitHosts: ['github.com'], log: () => {} });
@@ -28,9 +28,9 @@ after(async () => {
 test('a key kept for an account: sealed, never sent to a browser, used by the team in one click', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const { data } = await se1.post('/api/projections', { name: 'Kept Key Corp', salesforceUrl: SF }, h);
+  const { data } = await se1.post('/api/projections', { name: 'Kept Key Corp', salesforceUrl: sfLink() }, h);
   const id = data.customer.id;
-  await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+  await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: sfLink() });
   // Made up for this run (never a real key, and none kept in the source).
   const secret = `eu-key-${randomBytes(12).toString('hex')}`;
   const r = await se1.post('/api/cc/cxone/connect', { apiKey: secret, remember: true, accountId: id });
@@ -79,15 +79,15 @@ test('sales roles: dashboards, accounts and recording sales; not the calculator'
   const acct = (await ae.get('/api/accounts')).data.accounts.find((x) => x.name === 'Kept Key Corp');
   assert.ok(acct);
   assert.equal((await ae.post(`/api/cc/accounts/${acct.id}/sales`, { credits: 1000 })).status, 200);
-  assert.equal((await ae.put(`/api/cc/accounts/${acct.id}`, { salesforceUrl: SF })).status, 403);
+  assert.equal((await ae.put(`/api/cc/accounts/${acct.id}`, { salesforceUrl: sfLink() })).status, 403);
 });
 
 test('a Checkmarx One connection is for one account: never read into another, and what was read never serves another', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
   const make = async (name) => {
-    const id = (await se1.post('/api/projections', { name, salesforceUrl: SF }, h)).data.customer.id;
-    await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+    const id = (await se1.post('/api/projections', { name, salesforceUrl: sfLink() }, h)).data.customer.id;
+    await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: sfLink() });
     return { id, name, teamId: env.teams.emea.id };
   };
   const [first, second] = [await make('First Customer'), await make('Second Customer')];
@@ -113,7 +113,7 @@ test('a Checkmarx One connection is for one account: never read into another, an
 test('what was read from Checkmarx One can be taken out of an account: its backlog and read projects go, the rest stays', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const id = (await se1.post('/api/projections', { name: 'Wrong Data Corp', salesforceUrl: SF }, h)).data.customer.id;
+  const id = (await se1.post('/api/projections', { name: 'Wrong Data Corp', salesforceUrl: sfLink() }, h)).data.customer.id;
   const weeks = ['2026-09-01', '2026-10-01'];
   const sev = { Critical: [5, 6], High: [7, 8], Medium: [1, 1], Low: [0, 0] };
   const put = await se1.put(`/api/projections/${id}`, {
@@ -139,8 +139,8 @@ test('what was read from Checkmarx One can be taken out of an account: its backl
 test('a read made for one account is refused when saved into another, whatever the page sends', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const a = (await se1.post('/api/projections', { name: 'Reader One', salesforceUrl: SF }, h)).data.customer.id;
-  const b = (await se1.post('/api/projections', { name: 'Reader Two', salesforceUrl: SF }, h)).data.customer.id;
+  const a = (await se1.post('/api/projections', { name: 'Reader One', salesforceUrl: sfLink() }, h)).data.customer.id;
+  const b = (await se1.post('/api/projections', { name: 'Reader Two', salesforceUrl: sfLink() }, h)).data.customer.id;
   const readAt = '2026-11-12T09:00:00.123Z';
   calc.readsFor.set(readAt, { id: a, name: 'Reader One' });
   const weeks = ['2026-10-01', '2026-11-01'];

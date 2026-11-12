@@ -1730,6 +1730,23 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { events: events.slice(0, limit), more: events.length > limit, people, actions };
   });
 
+  // ---- Salesforce links are unique: one account per opportunity or account ------------------------------------
+  /** The account a link is already on, as the one asking may see it: opened only when it is theirs to open. */
+  function takenView(meta, ctx) {
+    if (!meta || !ctx?.user) return null;
+    const canOpen = Boolean(ctx.scope?.has(meta.teamId)) && !viewing.run({ id: ctx.user.id, admin: ctx.user.role === 'admin', calc: false }, () => accounts.hiddenFrom(meta));
+    return { id: meta.id, name: meta.name, team: teams.get(meta.teamId)?.name ?? '', owner: userName(meta.ownerId), salesforceId: meta.salesforceId ?? '', canOpen, teamId: canOpen ? meta.teamId : null, calculator: canOpen && ctx.permissions.has('calculator.use'), starting: Boolean(meta.pendingSince) };
+  }
+  r('GET', '/api/cc/salesforce-taken', signedIn, (req, ctx, body, res, url) => {
+    let sf;
+    try {
+      sf = checkSalesforceUrl(url.searchParams.get('url') ?? '', hosts().salesforce);
+    } catch (error) {
+      return { taken: null, error: error.message };
+    }
+    return { taken: takenView(accounts.usingSalesforce(sf.recordId, String(url.searchParams.get('except') ?? '')), ctx), kind: sf.kind, recordId: sf.recordId };
+  });
+
   // ---- The calculator's API (/api/projections…), per team -----------------------------------------------------
   r('GET', '/api/projections', calcTeam, (req, ctx) => ({ customers: accounts.list(ctx.teamSet).map((a) => ({ ...a })).sort((a, b) => String(a.name).localeCompare(String(b.name))), organisationName: settings.value.organisationName, impactDefaults: impactSettings({}) }));
   r('POST', '/api/projections', calcTeam, (req, ctx, body) => {
@@ -2366,7 +2383,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
           auditRequest(req, ctx, method, pathname, match, { status: error.status, error: error.message });
         } catch {}
       }
-      if (error.status) return send(res, error.status, { error: error.message });
+      if (error.status) return send(res, error.status, { error: error.message, ...(error.taken ? { taken: takenView(error.taken, ctx) } : {}) });
       log(`[error] ${req.method} ${pathname}: ${error.stack ?? error.message}`);
       return send(res, 500, { error: 'Something went wrong on the server: an Admin can find it in the server log.' });
     }

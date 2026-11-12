@@ -61,8 +61,17 @@ function series(value) {
       // The scan origins whose scans were counted ([] = every one), and whether the read could tell them apart.
       origins: cleanOrigins(meta.origins) ?? [],
       originSplit: meta.originSplit !== false,
+      // Loaded from a report: the report's own week-by-week rates, as its chart drew them (a rebuilt series has none).
+      ...(meta.layout === 'report' ? { weekly: reportWeekly(meta.weekly) } : {}),
     },
   };
+}
+
+/** A report's weekly rates: dates and percentages only, at most 120 weeks. */
+function reportWeekly(value) {
+  if (!Array.isArray(value)) return [];
+  const rate = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-1e4, Math.min(1e4, v)) : null);
+  return value.slice(-120).map((w) => ({ date: isoDay(w?.date) ?? '', addedRate4: rate(w?.addedRate4), fixedRate4: rate(w?.fixedRate4) })).filter((w) => w.date && (w.addedRate4 !== null || w.fixedRate4 !== null));
 }
 
 const perSeverity = (value, fallback, lo, hi) => Object.fromEntries(PLAN.map((s) => [s, Math.min(hi, Math.max(lo, finite(value?.[s], fallback[s])))]));

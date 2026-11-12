@@ -7,7 +7,7 @@ import path from 'node:path';
 import { recoverDataDir } from '../server/recover.js';
 import { writeBackupTo } from '../server/backup.js';
 import { createApp } from '../server/app.js';
-import { ROOT, SF, client, reportData, start } from './helpers.js';
+import { ROOT, sfLink, client, reportData, start } from './helpers.js';
 import { CalculatorService } from '../server/calculator.js';
 
 const fresh = () => fs.mkdtempSync(path.join(os.tmpdir(), 'cc-rec-'));
@@ -45,8 +45,8 @@ test('the server starts on damaged data and says so in the audit log; backups ca
   const env = await start();
   const admin = await client(env.base, 'admin@t.example');
   const se1 = await client(env.base, 'se1@t.example');
-  const { data } = await se1.post('/api/projections', { name: 'Survivor', salesforceUrl: SF }, { 'X-Team': env.teams.emea.id });
-  await se1.put(`/api/cc/accounts/${data.customer.id}`, { salesforceUrl: SF });
+  const { data } = await se1.post('/api/projections', { name: 'Survivor', salesforceUrl: sfLink() }, { 'X-Team': env.teams.emea.id });
+  await se1.put(`/api/cc/accounts/${data.customer.id}`, { salesforceUrl: sfLink() });
   await se1.post('/api/projections/reports', { customerId: data.customer.id, data: reportData() }, { 'X-Team': env.teams.emea.id });
   assert.equal((await admin.post('/api/backups')).status, 200);
   await env.close();
@@ -72,9 +72,9 @@ test('a read cut off by a restart starts again with the account’s kept key', a
   const env = await start({ calculatorService: calc });
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const { data } = await se1.post('/api/projections', { name: 'Resume Co', salesforceUrl: SF }, h);
+  const { data } = await se1.post('/api/projections', { name: 'Resume Co', salesforceUrl: sfLink() }, h);
   // Nothing is read for an account until it is tied to Salesforce.
-  await se1.put(`/api/cc/accounts/${data.customer.id}`, { salesforceUrl: SF }, h);
+  await se1.put(`/api/cc/accounts/${data.customer.id}`, { salesforceUrl: sfLink() }, h);
   await se1.post('/api/cc/cxone/connect', { apiKey: 'eu-key-x', remember: true, accountId: data.customer.id });
   await se1.post('/api/projections/read', {}, { ...h, 'X-Account': data.customer.id });
   const pending = JSON.parse(fs.readFileSync(path.join(env.dataDir, 'reads.json'), 'utf8')).reads;

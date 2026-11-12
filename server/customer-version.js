@@ -110,6 +110,12 @@ export function preferencesPatch(profile, inputs) {
  * findings a month and fixes as the report (the week-by-week detail of the read is not in a report, so its charts show
  * months). SAST's part, when the report kept it, is rebuilt the same way.
  */
+/** The weekly rates a report drew its "Debt added against fixes" chart from, when it kept them. */
+function reportWeekly(weekly) {
+  const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  return (Array.isArray(weekly) ? weekly : []).map((w) => ({ date: String(w?.date ?? '').slice(0, 10), addedRate4: n(w?.addedRate4 ?? w?.addedRate), fixedRate4: n(w?.fixedRate4 ?? w?.fixedRate) })).filter((w) => /^\d{4}-\d{2}-\d{2}$/.test(w.date));
+}
+
 export function profileFromReport(live, { useSent = false } = {}) {
   const inputs = (useSent ? live.sentInputs : null) ?? live.inputs ?? {};
   const base = live.base ?? {};
@@ -128,7 +134,7 @@ export function profileFromReport(live, { useSent = false } = {}) {
     rows.push({ date: prev, ...Object.fromEntries(SEV.map((s) => [s, Math.max(0, Number(a.perSeverity[s]?.prior) || 0)])) });
     rows.push({ date: latest, ...Object.fromEntries(SEV.map((s) => [s, Math.max(0, Number(a.perSeverity[s]?.current) || 0)])) });
     const weeks = rows.map((r) => r.date);
-    const totals = { weeks, bySeverity: Object.fromEntries(SEV.map((s) => [s, rows.map((r) => r[s])])), meta: { source: 'upload', fileName: `Report of ${String(base.generatedAt ?? '').slice(0, 10) || 'an earlier date'}`, layout: 'report', exportedAt: base.generatedAt ?? null } };
+    const totals = { weeks, bySeverity: Object.fromEntries(SEV.map((s) => [s, rows.map((r) => r[s])])), meta: { source: 'upload', fileName: `Report of ${String(base.generatedAt ?? '').slice(0, 10) || 'an earlier date'}`, layout: 'report', exportedAt: base.generatedAt ?? null, weekly: reportWeekly(t.weekly) } };
     const fixedAt = (n) => weeks.map((w) => (w === latest ? n : 0));
     const fixed = { weeks, bySeverity: Object.fromEntries(SEV.map((s) => [s, fixedAt(Math.max(0, Number(a.perSeverity[s]?.fixed) || 0))])) };
     // SAST's own part: today, and new SAST findings a month (none fixed, unless the start would fall below zero).

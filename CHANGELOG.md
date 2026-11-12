@@ -2,6 +2,19 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.91.00 — 2026-11-12
+
+- **One account per Salesforce link.** An opportunity or account link already on an account cannot be given to another
+  one. In the calculator (a new account's link, or a link saved on an account) and on an account's details, the link is
+  checked first: "This account already exists", with the account, its SE and team, and the choice to open the account
+  or its projection in the calculator. Someone who may not open it is told whose it is. The 15- and 18-character forms
+  of a record id count as the same record. Accounts that already share a link keep it as it is; only a new use is
+  refused.
+- **Debt added against fixes, after loading a report.** The chart drew a single spike on a backward axis, from the
+  months a report keeps. It now draws the report's own weekly rates over the months the figures cover, as the table
+  under it. A report without weekly rates says so in place of the chart. Old reports' weeks are read whichever way
+  their dates were written ("Jun 3" or "3 Jun").
+
 ## CC-01.90.00 — 2026-11-12
 
 - **No more empty start screen while an account opens.** Opening the calculator on an account (from Accounts, a link, or the one open last), the page showed for a moment the start screen for a new account, as if the account were gone. It now says *Opening the account…* (with its name as soon as it is known) until the account is there.

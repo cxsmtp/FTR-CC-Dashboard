@@ -425,7 +425,8 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       recent: analyse(totalRows, fixedRows, 6),
       projection,
       // Week by week over the months the trend is averaged over, at least 6 (as far back as the data goes).
-      weekly: weeklyTrend(totalRows, fixedRows, Math.round(Math.max(6, tr().lookbackMonths) * 4.345)),
+      // Loaded from a report, the series is rebuilt from months, so the report's own weekly rates are drawn instead.
+      weekly: fromReport() ? reportWeeks(analysis) : weeklyTrend(totalRows, fixedRows, Math.round(Math.max(6, tr().lookbackMonths) * 4.345)),
       forecast: planForecast(analysis, projection),
       bySeverity: severityPlan(analysis, projection),
     };
@@ -723,6 +724,22 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
    * Debt added against fixes: one sentence, the timeline, and by severity what new findings add
    * and fixes take away a month (each also as a share of the backlog), and the difference.
    */
+  /**
+   * A loaded report's weekly rates over the months its figures are worked out over (from the trend's start), as the
+   * table under the chart has them; all of them when that leaves too few weeks to draw.
+   */
+  function reportWeeks(analysis) {
+    const all = tr().totals.meta?.weekly ?? [];
+    const from = String(analysis?.previousDate ?? '').slice(0, 10);
+    const recent = from ? all.filter((w) => w.date >= from) : all;
+    return recent.length >= 4 ? recent : all;
+  }
+
+  /** Whether the backlog's series was loaded from an uploaded report (rebuilt from months, not read week by week). */
+  function fromReport() {
+    return tr()?.totals?.meta?.layout === 'report';
+  }
+
   function debtFixSection(analysis, weekly) {
     const T = analysis.total;
     const share = (v) => (v === null || v === undefined || !Number.isFinite(v) ? '' : ` <small>${num(v, 1)}%</small>`);
@@ -737,7 +754,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     return `<section class="panel calc-debtfix">
         <h2>Debt added against fixes</h2>
         <p class="calc-verdict"><span>Each month, new findings add ${num(T.addedPct, 1)}% to the backlog and fixes take away ${num(T.fixedPct, 1)}%.</span> <span>${verdict}</span></p>
-        ${weekly?.length ? debtFixChart(weekly) : ''}
+        ${weekly?.length ? debtFixChart(weekly) : fromReport() ? '<p class="hint">The report this was loaded from kept the month\'s figures, not the weeks, so there is no weekly chart. Read Checkmarx One again to see it.</p>' : ''}
         <div class="table-wrap"><table class="data-table calc-debt-table">
           <thead><tr><th>Severity</th><th class="num">Open now</th><th class="num">Added a month</th><th class="num">Fixed a month</th><th class="num">Change a month</th></tr></thead>
           <tbody>
