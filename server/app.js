@@ -2074,6 +2074,22 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
    * account's calculator rebuilt from that report's own figures, as an upload does (CC-01.81.00). For accounts whose
    * live figures cannot be trusted. Listed first (GET), then reloaded for the ones ticked (POST).
    */
+  /**
+   * A report file brought in: its "Try other numbers" figures, else (an earlier version, or a copy whose figures are
+   * empty) what its page shows. `loadable`: whether anything in it can fill the calculator.
+   */
+  const readReportFile = (html) => {
+    const text = String(html ?? '');
+    const hasFigures = (l) => Boolean(l?.inputs?.tr || l?.inputs?.fusion || l?.sentInputs?.tr || l?.sentInputs?.fusion);
+    if (isOldReport(text)) return { live: readOldReport(text), old: true, loadable: true };
+    const live = readCustomerVersion(text);
+    if (hasFigures(live)) return { live, old: false, loadable: true };
+    try {
+      const fromPage = readOldReport(text, { force: true });
+      if (hasFigures(fromPage)) return { live: { ...fromPage, base: { ...fromPage.base, generatedAt: live.base?.generatedAt ?? fromPage.base.generatedAt } }, old: true, loadable: true };
+    } catch {}
+    return { live, old: false, loadable: false };
+  };
   const uploadedReportOf = (a) => {
     const own = accounts.reports.list().filter((x) => x.customerId === a.id && (x.source === 'previous' || x.source === 'customer'));
     if (!own.length) return null;
@@ -2169,11 +2185,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/cc/accounts/:id/customer-version', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const account = accounts.get(params.id, ctx.scope);
     // A customer's version made from an earlier report (figures on its page only): read from its page, in full.
-    const live = isOldReport(String(body?.html ?? '')) ? readOldReport(body.html) : readCustomerVersion(body?.html);
+    const { live, loadable: cvLoadable } = readReportFile(body?.html);
     const figures = customerFigures(live);
     const changes = changesOf(live.sentInputs ?? {}, live.inputs);
     const sameName = figures.customer.trim().toLowerCase() === account.name.trim().toLowerCase();
-    const preview = { customer: figures.customer, sameName, sentTotal: figures.sentTotal, total: figures.total, changes };
+    const preview = { customer: figures.customer, sameName, sentTotal: figures.sentTotal, total: figures.total, changes, loadable: cvLoadable };
     if (body?.dryRun !== false) return { dryRun: true, ...preview };
     if (!sameName && body?.confirm !== true) throw fail(409, `This report was made for "${figures.customer}", not ${account.name}. Confirm to record it here anyway.`);
     const rep = accounts.addCustomerReport({ customerId: account.id, data: figures.data, user: ctx.user, note: body?.note, sentTotal: figures.sentTotal, changes }, ctx.scope);
@@ -2183,7 +2199,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (sent && !sent.sharedAt) accounts.markShared(sent.id, ctx.scope, { shared: true, fromCustomer: true, note: 'The customer sent back their version of it' }, ctx.user);
     if (body?.makePrimary !== false) accounts.setPrimary(account.id, rep.id, ctx.scope);
     // Their numbers in the calculator from now on: its backlog, plan, Fusion projects and counted code, as their report has them.
-    if (body?.applyPreferences !== false) {
+    if (body?.applyPreferences !== false && cvLoadable) {
       const after = accounts.update(account.id, ctx.scope, { ...profileFromReport(live), scope: {} }, ctx.user);
       accounts.markLoaded(account.id, rep.id, after.updatedAt);
     }
@@ -2198,19 +2214,18 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const account = accounts.get(params.id, ctx.scope);
     if (!account.salesforceUrl) throw fail(409, 'Save the account\u2019s Salesforce opportunity or account link first.');
     // A report from an earlier version (figures on the page only): read from its page and made again with today's model.
-    const old = isOldReport(String(body?.html ?? ''));
-    const live = old ? readOldReport(body.html) : readCustomerVersion(body?.html);
+    const { live, old, loadable } = readReportFile(body?.html);
     const figures = customerFigures(live);
     const madeAt = live.base?.generatedAt ?? null;
     const sameName = figures.customer.trim().toLowerCase() === account.name.trim().toLowerCase();
-    const preview = { customer: figures.customer, sameName, total: figures.sentTotal ?? figures.total, madeAt, old, worked: Math.round(figures.total) };
+    const preview = { customer: figures.customer, sameName, total: figures.sentTotal ?? figures.total, madeAt, old, loadable, worked: Math.round(figures.total) };
     if (body?.dryRun !== false) return { dryRun: true, ...preview };
     if (!sameName && body?.confirm !== true) throw fail(409, `This report was made for "${figures.customer}", not ${account.name}. Confirm to keep it here anyway.`);
     // The quote as it was given: the report's own figures, before anyone moved a lever.
     const data = live.sentInputs ? { ...leverData(live.base, live.sentInputs), levers: live.sentInputs } : figures.data;
     let rep = accounts.addPreviousReport({ customerId: account.id, data, user: ctx.user, madeAt, note: body?.note }, ctx.scope);
     // Loaded into the calculator (unless asked not to): its backlog, plan, Fusion projects and counted code, as the quote had them.
-    const loaded = body?.load !== false;
+    const loaded = body?.load !== false && loadable;
     if (loaded) {
       const after = accounts.update(account.id, ctx.scope, { ...profileFromReport(live, { useSent: true }), scope: {} }, ctx.user);
       accounts.markLoaded(account.id, rep.id, after.updatedAt);

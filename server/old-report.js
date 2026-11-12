@@ -26,9 +26,9 @@ const isoDay = (s) => {
 export const isOldReport = (html) => /credits projection/i.test(html) && !/id="cx-live"/.test(html) && /How we got there|Total credits required/.test(html);
 
 /** `{ inputs, sentInputs, base, sentTotal }`, as a report with levers keeps them, from an earlier report's page. */
-export function readOldReport(html) {
+export function readOldReport(html, { force = false } = {}) {
   const page = String(html ?? '');
-  if (!isOldReport(page)) throw fail(400, 'That is not a projection report: use the report file the calculator made.');
+  if (!force && !isOldReport(page)) throw fail(400, 'That is not a projection report: use the report file the calculator made.');
   const tables = [...page.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/g)].map((m) => [...m[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((r) => [...r[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((c) => un(c[1]))));
   const table = (firstCell) => tables.find((t) => t.some((r) => r[0] === firstCell));
   const body = page.slice(page.indexOf('<body'));

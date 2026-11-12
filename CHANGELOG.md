@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.89.00 — 2026-11-12
+
+- **A report file with nothing to load says so.** A copy saved from the Command Center after an earlier report was brought in keeps only its totals. Uploaded under *A previous report* or *The customer's version*, it used to be kept and "loaded" with nothing happening. Now the dialog says *Nothing in it to load*, explains why, and asks for the original report file; the calculator is left as it is. When such a copy still shows its tables on its page, they are read and loaded.
+
 ## CC-01.88.00 — 2026-11-12
 
 - **A Fusion engine without a rate is not used until it has one** (Mythos 5.1 and opus-5.0 for now). The calculator does not offer it, and projects, scan-frequency rules or a default set to it use the default engine with a rate instead, so they are no longer counted at 0 (test report #8: Kotak MF was understated). It is back by itself once the Admin sets its rate in Settings → Engines & rates, which still lists it under *Seen without a rate*. When no engine has a rate at all, none is taken away.
