@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.72.00 — 2026-11-12
+
+- **Accounts: Delete the account, in the row's menu, for the Admin.** It asks first, naming the account, how many reports it has and the sales recorded on it; the account goes with its reports and sales, and the deletion is in the audit log. Only the Admin sees it in the list.
+
 ## CC-01.71.00 — 2026-11-12
 
 - **Calculator: Projection settings without the white space.** The projects, Search options, "Every setting is applied" and Apply are on one line; the empty band above them and the explanation under them are gone while nothing waits to be applied. With changes waiting, the list of changes, Undo, Apply and the explanation show as before.

@@ -1,4 +1,4 @@
-import { $, $$, ago, api, can, date, dateTime, esc, go, icon, initials, num, toast } from './core.js';
+import { $, $$, ago, api, can, date, dateTime, esc, go, icon, initials, num, state, toast } from './core.js';
 import { paint, teamSelect } from './overview.js';
 import { peopleList } from './people.js';
 import { loading, shell } from './shell.js';
@@ -127,6 +127,8 @@ export async function viewAccounts(params) {
           ['sold', 'Record a sale', can('sales.record') && Boolean(a.primary)],
           ['shared', a.primary?.sharedAt ? 'No longer shared with the customer' : 'Shared with the customer…', can('reports.share') && Boolean(a.primary)],
           ['mute', a.muted ? 'Bring back into the forecast' : 'Mute from the forecast', can('forecast.mute')],
+          // Deleting an account from the list is the Admin's: it takes every report and sale of the account with it.
+          ['delete', 'Delete the account…', state.me?.role?.id === 'admin' && can('accounts.delete')],
         ].filter((x) => x[2]);
         return `<tr class="click${a.muted ? ' muted-row' : ''}" data-account="${esc(a.id)}">
         <td data-edit="name" class="acc-name"><span class="cell-line"><b title="${esc(a.name)}">${esc(a.name)}</b>${a.salesforceUrl ? `<a class="sf-link" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open the ${a.salesforceKind === 'opportunity' ? 'opportunity' : 'account'} in Salesforce (new tab)" aria-label="Open in Salesforce">${icon('ext')}</a>` : '<span class="chip bad" title="No Salesforce link yet: nothing is generated until one is saved">No link</span>'}${a.muted ? `<span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}${pen('name', 'Rename')}</span></td>
@@ -136,7 +138,7 @@ export async function viewAccounts(params) {
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td data-edit="shared"><span class="cell-line">${shared}${can('reports.share') && a.primary ? pen('shared', 'Shared with the customer, or not') : ''}</span></td>
         <td class="acc-last" data-sort="${esc(a.lastReportAt ?? '')}">${esc(ago(a.lastReportAt))}</td>
-        <td class="actions">${can('calculator.use') ? `<a class="btn sm icon-btn calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator" aria-label="Open in the calculator">${icon('calc')}</a>` : ''}<details class="menu row-menu"><summary class="btn sm icon-btn" aria-label="More for ${esc(a.name)}">⋯</summary><div class="menu-list">${menu.map(([id, label]) => `<button type="button" data-row="${id}">${label}</button>`).join('')}</div></details></td></tr>`;
+        <td class="actions">${can('calculator.use') ? `<a class="btn sm icon-btn calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator" aria-label="Open in the calculator">${icon('calc')}</a>` : ''}<details class="menu row-menu"><summary class="btn sm icon-btn" aria-label="More for ${esc(a.name)}">⋯</summary><div class="menu-list">${menu.map(([id, label]) => `<button type="button" data-row="${id}"${id === 'delete' ? ' class="danger"' : ''}>${label}</button>`).join('')}</div></details></td></tr>`;
       }).join('')
       : `<tr><td colspan="8"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>`;
     const mute = async (a) => {
@@ -144,6 +146,18 @@ export async function viewAccounts(params) {
       try {
         await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/mute`, { method: 'POST', body: { muted: on } });
         toast(on ? `${a.name} is muted from the forecast: the dashboards leave it out.` : `${a.name} is back in the forecast.`, 'ok');
+        await reload();
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    };
+    const removeAccount = async (a) => {
+      const reports = a.reportCount ? `its ${num(a.reportCount)} report${a.reportCount === 1 ? '' : 's'}` : 'no reports';
+      const sales = a.sold ? ` and ${num(Math.round(a.sold))} credits of recorded sales` : '';
+      if (!confirm(`Delete ${a.name}, with ${reports}${sales}? This cannot be undone.`)) return;
+      try {
+        await api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'DELETE' });
+        toast(`${a.name} is deleted.`, 'ok');
         await reload();
       } catch (error) {
         toast(error.message, 'bad');
@@ -166,6 +180,7 @@ export async function viewAccounts(params) {
           if (act === 'open') return go(`/accounts/${encodeURIComponent(a.id)}`);
           if (act === 'calc') return void (location.href = `/calculator?team=${encodeURIComponent(a.teamId ?? '')}&account=${encodeURIComponent(a.id)}`);
           if (act === 'mute') return mute(a);
+          if (act === 'delete') return removeAccount(a);
           if (act === 'contacts') {
             focusNext = 'contacts';
             return go(`/accounts/${encodeURIComponent(a.id)}`);
