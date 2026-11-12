@@ -1151,3 +1151,21 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 @media (max-width: 720px) { .contact-add { grid-template-columns: 1fr 1fr; } }
 .contact-add .err:empty { display: none; }
 .drawer .acct-strip .credits.big { font-size: clamp(24px, 2.6vw, 32px); }
+/* A menu opened from a table row: over the page (placed by widgets.js), so the table never cuts it off. */
+.menu-list.menu-float { position: fixed; right: auto; overflow-y: auto; z-index: 45; }
+/* A person, managed beside the list: half the page, from the right. */
+.drawer.half { width: min(760px, max(50vw, 440px)); max-width: 100vw; }
+.drawer.half > .drawer-close { right: calc(min(760px, max(50vw, 440px)) + 10px); }
+@media (max-width: 720px) { .drawer.half { width: 100vw; padding-top: 46px; } .drawer.half > .drawer-close { right: 8px; } }
+.person-head { display: flex; gap: 14px; align-items: flex-start; }
+.person-head h1 { margin: 0; font-size: 22px; }
+.person-head p { margin: 2px 0 0; }
+.person-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px !important; font-size: 13px; }
+.person-acts { display: grid; gap: 8px; }
+.person-act { display: grid; gap: 2px; justify-items: start; text-align: left; width: 100%; height: auto; min-height: 0; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; white-space: normal; }
+.person-act b { font-size: 14px; }
+.person-act span { font-size: 12.5px; font-weight: 400; color: var(--muted); }
+.person-act:hover { border-color: var(--brand, var(--cyan)); }
+.person-act.danger b { color: var(--red); }
+.person-act.danger:hover { border-color: var(--red); }
+#person-form p { margin: 0; }

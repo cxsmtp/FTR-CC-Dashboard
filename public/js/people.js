@@ -74,14 +74,7 @@ export function peopleTable(d) {
     $('#next').disabled = page >= pages - 1;
     $('#rows').innerHTML = all.slice(page * PAGE, page * PAGE + PAGE).map((u) => {
       const [kind, label] = STATUS[u.status] ?? STATUS.active;
-      const acts = u.manageable ? `<details class="menu"><summary class="btn sm">Manage</summary><div class="menu-list">
-        <button type="button" data-act="edit">Edit role, team, name</button>
-        ${can('users.impersonate') && !state.me.impersonating && u.id !== state.me.user.id && u.active ? `<button type="button" data-act="impersonate">Sign in as ${esc(u.name)}</button>` : ''}
-        <button type="button" data-act="reset">Reset password</button>
-        ${u.status === 'locked' ? '<button type="button" data-act="unlock">Unlock now</button>' : ''}
-        ${u.sessions ? `<button type="button" data-act="signout">Sign out everywhere (${num(u.sessions)})</button>` : ''}
-        <button type="button" data-act="toggle">${u.active ? 'Turn access off' : 'Turn access on'}</button>
-        <button type="button" data-act="remove" class="danger">Remove</button></div></details>` : '';
+      const acts = u.manageable ? `<button type="button" class="btn sm" data-manage aria-label="Manage ${esc(u.name)}">Manage</button>` : '';
       const self = u.id === state.me.user.id;
       const roleCell = u.manageable && !self ? `<select class="inline-sel" data-inline="role" title="Change ${esc(u.name)}’s role">${roles.some((r) => r.id === u.role) ? '' : `<option value="${esc(u.role)}" selected>${esc(u.roleName)}</option>`}${roles.map((r) => `<option value="${esc(r.id)}"${r.id === u.role ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>` : `<span class="chip role">${esc(u.roleName)}</span>`;
       const teamCell = u.manageable ? `<select class="inline-sel" data-inline="team" title="Move ${esc(u.name)} to another team">${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select>` : esc(u.team || '—');
@@ -90,7 +83,7 @@ export function peopleTable(d) {
         <td title="Signs in with ${u.signIn === 'sso' ? 'single sign-on' : 'a password'}"><span class="chip ${kind}"><i></i>${label}</span>${u.lockedUntil ? `<span class="sub">until ${esc(new Date(u.lockedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>` : ''}</td>
         <td class="small">${esc(ago(u.lastSignInAt))}</td><td class="actions">${acts}</td></tr>`;
     }).join('') || `<tr><td colspan="${manage ? 8 : 7}"><div class="empty"><b>Nobody matches</b></div></td></tr>`;
-    for (const b of $$('[data-act]')) b.onclick = () => personAction(d, d.people.find((u) => u.id === b.closest('tr').dataset.id), b.dataset.act);
+    for (const b of $$('#rows [data-manage]')) b.onclick = () => openPerson(d, d.people.find((u) => u.id === b.closest('tr').dataset.id));
     // Role and team, changed right in the row.
     for (const sel of $$('#rows [data-inline]')) {
       sel.onchange = async () => {
@@ -314,6 +307,60 @@ export function importPeople(d) {
       $('#go', dlg).textContent = 'Create';
     }
   };
+}
+
+/** A person, beside the list: who they are, their name, role and team to change, and everything that can be done for them. */
+export function openPerson(d, u) {
+  document.getElementById('person-drawer')?.remove();
+  const self = u.id === state.me.user.id;
+  const roles = d.roles.filter((x) => x.grantable || x.id === u.role);
+  const teams = [...d.teams].sort((a, b) => a.path.localeCompare(b.path));
+  const [kind, label] = STATUS[u.status] ?? STATUS.active;
+  const action = (act, title, what, cls = '') => `<button type="button" class="person-act ${cls}" data-person-act="${act}"><b>${title}</b><span>${what}</span></button>`;
+  const wrap = document.createElement('div');
+  wrap.id = 'person-drawer';
+  wrap.className = 'drawer-wrap';
+  wrap.innerHTML = `<div class="drawer-shade" data-close></div><aside class="drawer half" role="dialog" aria-modal="true" aria-label="Manage ${esc(u.name)}">
+    <button type="button" class="drawer-close" data-close title="Close (Esc)" aria-label="Close">✕</button>
+    <div class="person-head">${avatar(u.name, u.picture)}<div><h1 class="serif">${esc(u.name)}${self ? ' <span class="chip">You</span>' : ''}</h1><p class="muted">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</p>
+      <p class="person-meta"><span class="chip ${kind}"><i></i>${label}</span><span class="chip role">${esc(u.roleName)}</span><span>${esc(u.teamPath || u.team || 'No team')}</span><span class="muted">Last sign-in ${esc(ago(u.lastSignInAt))} · ${u.signIn === 'sso' ? 'single sign-on' : 'password'}</span></p></div></div>
+    <div class="panel mt"><h2>Name, role and team</h2>
+      <form class="form" id="person-form" data-nodraft>
+        <div class="row"><label class="f">Name<input name="name" required maxlength="120" value="${esc(u.name)}" /></label><label class="f">Title<input name="title" maxlength="120" value="${esc(u.title ?? '')}" placeholder="Sales Engineer" /></label></div>
+        <div class="row"><label class="f">Role<select name="role"${self ? ' disabled title="Your own role is changed by someone else"' : ''}>${roles.map((x) => `<option value="${esc(x.id)}"${x.id === u.role ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+        <label class="f">Team<select name="team" required>${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label></div>
+        <p class="muted small" id="person-role-says">${esc(roles.find((x) => x.id === u.role)?.description ?? '')}</p>
+        <p class="muted small">Their accounts follow them to the new team.</p>
+        <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="person-err"></span></div>
+      </form></div>
+    <div class="panel mt"><h2>Sign-in and access</h2><div class="person-acts">
+      ${can('users.impersonate') && !state.me.impersonating && !self && u.active ? action('impersonate', `Sign in as ${esc(u.name)}`, 'See and work as they do for up to an hour. Everything is recorded as you acting as them.') : ''}
+      ${action('reset', 'Reset password', 'A new temporary password, shown once. Their current one stops working and they are signed out everywhere.')}
+      ${u.status === 'locked' ? action('unlock', 'Unlock now', 'Locked after too many wrong passwords: let them try again at once.') : ''}
+      ${u.sessions ? action('signout', `Sign out everywhere (${num(u.sessions)})`, 'End every session they have open, on every device.') : ''}
+      ${self ? '' : action('toggle', u.active ? 'Turn access off' : 'Turn access on', u.active ? 'They are signed out at once and cannot sign in. Their accounts and reports stay with their team.' : 'They can sign in again, with the role and team above.')}
+      ${self ? '' : action('remove', 'Remove', 'Delete this person. Their accounts and reports stay with their team. This cannot be undone.', 'danger')}
+    </div></div></aside>`;
+  const close = () => wrap.remove();
+  wrap.addEventListener('click', (e) => e.target.matches('[data-close]') && close());
+  wrap.addEventListener('keydown', (e) => e.key === 'Escape' && close());
+  $('#app').append(wrap);
+  wrap.querySelector('.drawer-close').focus();
+  const form = wrap.querySelector('#person-form');
+  form.elements.role.onchange = () => (wrap.querySelector('#person-role-says').textContent = roles.find((x) => x.id === form.elements.role.value)?.description ?? '');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(form);
+    try {
+      const res = await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body: { name: f.get('name'), title: f.get('title'), role: self ? u.role : f.get('role'), teamId: f.get('team') } });
+      close();
+      toast(res.accountsMoved ? `Saved. Their ${num(res.accountsMoved)} account${res.accountsMoved === 1 ? '' : 's'} moved with them to the new team.` : 'Saved.', 'ok');
+      viewPeople('people');
+    } catch (error) {
+      wrap.querySelector('#person-err').textContent = error.message;
+    }
+  };
+  for (const b of wrap.querySelectorAll('[data-person-act]')) b.onclick = () => personAction(d, u, b.dataset.personAct);
 }
 
 export async function personAction(d, u, act) {

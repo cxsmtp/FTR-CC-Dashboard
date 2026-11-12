@@ -246,3 +246,41 @@ new MutationObserver(() => {
   restoreDrafts(document.getElementById('app') ?? document.body);
 }).observe(document.getElementById('app') ?? document.body, { childList: true, subtree: true });
 window.addEventListener('hashchange', () => document.querySelector('.tx-pop')?.remove());
+
+// ---- Menus inside a table: opened over the page, not inside the table's own scrolling -------------------------------
+// A table scrolls in its box, which would cut a row's menu off (or give it a scroller of its own). An open menu in a
+// table is placed against the window instead: under its button, or above it when there is no room below, and it
+// closes when the table or the page scrolls, on a click outside, and on Esc.
+function placeMenu(details) {
+  const list = details.querySelector(':scope > .menu-list');
+  const btn = details.querySelector(':scope > summary');
+  if (!list || !btn) return;
+  list.classList.add('menu-float');
+  const b = btn.getBoundingClientRect();
+  const h = list.offsetHeight;
+  const w = list.offsetWidth;
+  const below = window.innerHeight - b.bottom - 8;
+  const top = h <= below || below >= b.top ? b.bottom + 6 : Math.max(8, b.top - 6 - h);
+  list.style.top = `${Math.round(top)}px`;
+  list.style.left = `${Math.round(Math.min(window.innerWidth - w - 8, Math.max(8, b.right - w)))}px`;
+  list.style.maxHeight = `${Math.round(window.innerHeight - top - 8)}px`;
+}
+const closeMenus = (but = null) => {
+  for (const d of document.querySelectorAll('.tw details.menu[open]')) if (d !== but) d.open = false;
+};
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!(d instanceof HTMLDetailsElement) || !d.matches('.tw details.menu')) return;
+  if (!d.open) return;
+  closeMenus(d);
+  placeMenu(d);
+}, true);
+document.addEventListener('scroll', (e) => {
+  if (e.target instanceof Element && e.target.closest('.menu-list')) return;
+  closeMenus();
+}, true);
+window.addEventListener('resize', () => closeMenus());
+document.addEventListener('click', (e) => {
+  if (!e.target.closest?.('.tw details.menu')) closeMenus();
+});
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closeMenus());
