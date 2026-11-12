@@ -41,13 +41,28 @@ test('changes need the CSRF token', async () => {
   assert.equal(r.status, 403);
 });
 
-test('team members share their team’s accounts; other teams cannot see them', async () => {
+test('an account is its SE’s until its first report; then the team shares it, and other teams never see it', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const se2 = await client(env.base, 'se2@t.example');
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const admin = await client(env.base, 'admin@t.example');
   const apac = await client(env.base, 'apac@t.example');
   const made = await se1.post('/api/projections', { name: 'Shared Corp' }, team(env.teams.emea.id));
   assert.equal(made.status, 200);
   const id = made.data.customer.id;
+  // A draft: its SE and the Admin see it; a teammate and the leader do not, anywhere.
+  assert.equal((await se2.get(`/api/projections/${id}`, team(env.teams.emea.id))).status, 404);
+  assert.ok(!(await se2.get('/api/projections', team(env.teams.emea.id))).data.customers.some((c) => c.id === id));
+  assert.equal((await lead.get(`/api/cc/accounts/${id}`)).status, 404);
+  assert.ok(!(await lead.get('/api/accounts')).data.accounts.some((a) => a.id === id));
+  assert.equal((await lead.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se2.id })).status, 404);
+  const own = (await se1.get('/api/accounts')).data.accounts.find((a) => a.id === id);
+  assert.equal(own.draft, true);
+  assert.equal((await admin.get(`/api/cc/accounts/${id}`)).data.draft, true);
+  // Published by its first report: the team sees it.
+  await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+  assert.equal((await se1.post('/api/projections/reports', { customerId: id, data: reportData() }, team(env.teams.emea.id))).status, 200);
+  assert.equal((await se1.get(`/api/cc/accounts/${id}`)).data.draft, false);
   // A teammate opens it, changes it and lists it.
   assert.equal((await se2.get(`/api/projections/${id}`, team(env.teams.emea.id))).status, 200);
   assert.ok((await se2.get('/api/projections', team(env.teams.emea.id))).data.customers.some((c) => c.id === id));
@@ -99,7 +114,7 @@ test('deleting reports: your own unshared ones, or with the permission', async (
   assert.equal((await se1.del(`/api/cc/reports/${other}`)).status, 403);
   assert.equal((await se1.del(`/api/cc/reports/${mine}`)).status, 200);
   assert.equal((await lead.del(`/api/cc/reports/${other}`)).status, 200);
-  // An SE cannot delete an account; the leader can.
+  // Published once, it stays so with its reports deleted. An SE cannot delete an account; the leader can.
   assert.equal((await se1.del(`/api/cc/accounts/${data.customer.id}`)).status, 403);
   assert.equal((await lead.del(`/api/cc/accounts/${data.customer.id}`)).status, 200);
 });
@@ -162,7 +177,9 @@ test('there is always an active Admin', async () => {
 
 test('CSV exports cannot carry spreadsheet formulas', async () => {
   const se1 = await client(env.base, 'se1@t.example');
-  await se1.post('/api/projections', { name: '=HYPERLINK("http://evil.example")' }, team(env.teams.emea.id));
+  const made = await se1.post('/api/projections', { name: '=HYPERLINK("http://evil.example")' }, team(env.teams.emea.id));
+  await se1.put(`/api/cc/accounts/${made.data.customer.id}`, { salesforceUrl: SF });
+  await se1.post('/api/projections/reports', { customerId: made.data.customer.id, data: reportData() }, team(env.teams.emea.id));
   const vp = await client(env.base, 'vp@t.example');
   const csv = (await vp.get('/api/export/accounts.csv')).data;
   assert.match(csv, /'=HYPERLINK/);
@@ -479,4 +496,37 @@ test('nothing is read without the Salesforce link; a sale needs an opportunity l
   const ok = await se.post(`/api/cc/accounts/${id}/sales`, { credits: 1000, date: '2026-11-01', opportunityUrl: 'https://checkmarx.lightning.force.com/lightning/r/Opportunity/006Tl00000aAXPOIA4/view' }, h);
   assert.equal(ok.status, 200, JSON.stringify(ok.data));
   assert.equal(ok.data.sales.at(-1).opportunityId, '006Tl00000aAXPOIA4');
+});
+
+test('the Admin removes every calculation from an account; with its reports, it is a draft again', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const admin = await client(env.base, 'admin@t.example');
+  const lead = await client(env.base, 'emea.lead@t.example');
+  const h = team(env.teams.emea.id);
+  const id = (await se1.post('/api/projections', { name: 'Cleanse Co' }, h)).data.customer.id;
+  await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF, contacts: [{ email: 'ciso@cleanse.example' }] });
+  const weeks = ['2026-09-01', '2026-10-01'];
+  const sev = { Critical: [5, 6], High: [1, 1], Medium: [0, 0], Low: [0, 0] };
+  await se1.put(`/api/projections/${id}`, { tr: { totals: { weeks, bySeverity: sev, meta: { source: 'cxone' } }, fixed: { weeks, bySeverity: sev } }, fusion: { projects: [{ id: 'p', name: 'x', loc: 50000, frequency: 'month', source: 'scan' }] } }, h);
+  await se1.post('/api/projections/reports', { customerId: id, data: reportData() }, h);
+  // Only an Admin.
+  assert.equal((await se1.post(`/api/cc/accounts/${id}/reset`, { reports: true })).status, 403);
+  assert.equal((await lead.post(`/api/cc/accounts/${id}/reset`, { reports: true })).status, 403);
+  // Calculations only: reports stay, still published.
+  let r = await admin.post(`/api/cc/accounts/${id}/reset`, {});
+  assert.equal(r.status, 200);
+  let c = (await se1.get(`/api/projections/${id}`, h)).data.customer;
+  assert.ok(!c.tr?.totals);
+  assert.equal(c.fusion.projects.length, 0);
+  assert.equal((await lead.get(`/api/cc/accounts/${id}`)).status, 200);
+  // With its reports: gone, and a draft again. The account, its link and contacts stay.
+  r = await admin.post(`/api/cc/accounts/${id}/reset`, { reports: true });
+  assert.equal(r.data.reportsRemoved, 1);
+  const d = (await admin.get(`/api/cc/accounts/${id}`)).data;
+  assert.equal(d.reports.length, 0);
+  assert.equal(d.draft, true);
+  assert.equal(d.account.salesforceUrl, SF);
+  assert.equal(d.contacts[0].email, 'ciso@cleanse.example');
+  assert.equal((await lead.get(`/api/cc/accounts/${id}`)).status, 404);
+  assert.match(fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8'), /account\.reset/);
 });

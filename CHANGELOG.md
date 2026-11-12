@@ -2,6 +2,17 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.80.00 — 2026-11-12
+
+- **An account is its SE's until its first report.** While a Sales Engineer works on an account, nobody else sees it: not teammates, not leaders, not Sales or Customer Success. Only its accountable SE, whoever made it, and the Admins. The first report generated (or a previous quote or a customer's version brought in) publishes it to its team, as before. Once published it stays so, even if its reports are deleted.
+- The server enforces it everywhere: Accounts, the account's page, the calculator's list, Overview and its figures, exports and the Jump to search. Someone opening a link to a draft is told it is still being prepared by its SE.
+- Those who can see a draft see it marked: *Draft* next to its name in Accounts, a note on the account's page, and *Draft: only you and Admins see it* in the calculator's status strip.
+- A leader cannot reassign the SE of a draft (they do not see it); an Admin can.
+- **Applies to accounts already there:** an account with no report yet is now visible only to its SE, whoever made it, and the Admins, until one is generated. Nothing is changed in any account.
+- **The Admin removes all calculations from an account.** *Remove all calculations…* in the account's ⋯ menu in Accounts and on its page (Admin only): the backlog read or uploaded, its trend, Fusion's projects, the code counted, the scope and the totals go; with *Also delete its reports* ticked, its reports too, and it is a draft again. The account, its Salesforce link, SE, team, contacts and sales stay. Recorded in the audit log (account.reset).
+- **Calculator: Clear Checkmarx One data is easier to see**: a red-outlined button, no longer a faint link.
+- The reading overlay (terms, licence, guide) closes when you go to another page, instead of staying over it.
+
 ## CC-01.79.00 — 2026-11-12
 
 - **Calculator: Clear Checkmarx One data.** For an account that holds a read that was never its own (see CC-01.78.00), and has no tenant of its own to read again: the button, next to the account's tools at the top, takes out everything read from Checkmarx One: the backlog, its trend and the projects read. It asks first. Reports already made, projects typed by hand, the plan's settings and code counted from git or cloc-fusion stay. Shown only when the account holds such data; recorded in the audit log (account.cxone.cleared).

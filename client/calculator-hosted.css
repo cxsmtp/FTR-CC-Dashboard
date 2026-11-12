@@ -815,3 +815,9 @@ html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt].active, html[data-cc]
 html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt].active *, html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt][aria-selected="true"] * { color: inherit !important; }
 html[data-cc] [data-ptabs="calculator"] { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
 @media (min-width: 1000px) { html[data-cc] [data-ptabs="calculator"] { flex-wrap: nowrap; } html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt] { flex: 1 1 0; min-width: 0; padding-left: 8px !important; padding-right: 8px !important; } }
+/* A draft account, in the status strip. */
+.hc-st.draft { border-color: color-mix(in srgb, #b45309 45%, transparent) !important; color: #b45309 !important; background: color-mix(in srgb, #b45309 9%, transparent) !important; }
+.hc-st.draft i { background: #b45309 !important; }
+/* Clear Checkmarx One data: an action that must be seen, not a faint link. */
+#hc-clear-cx { border: 1px solid color-mix(in srgb, #b42318 45%, transparent) !important; color: #b42318 !important; background: color-mix(in srgb, #b42318 6%, transparent) !important; font-weight: 600 !important; }
+#hc-clear-cx:hover { background: color-mix(in srgb, #b42318 12%, transparent) !important; }

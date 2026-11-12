@@ -14,6 +14,7 @@
  */
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { impactSettings } from '../core/public/calculator/model.js';
 import { MAX_PROFILES, migrate, newProfile, newReport, patchProfile, reportMeta, summary } from '../core/public/calculator/profiles.js';
@@ -106,6 +107,7 @@ const accountMeta = (a) => ({
   salesCount: (a.sales ?? []).length,
   lastSaleAt: (a.sales ?? []).map((x) => x.date).sort().at(-1) ?? null,
   impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed),
+  publishedAt: a.publishedAt ?? null,
 });
 
 const reportIndex = (r) => ({
@@ -125,6 +127,12 @@ const reportIndex = (r) => ({
   customerNote: r.customerNote ?? '',
 });
 
+/**
+ * Who is looking, for the request being answered ({ id, admin }; nothing for the server's own work). An account is a
+ * draft until its first report: then only its accountable SE, whoever made it, and Admins see it.
+ */
+export const viewing = new AsyncLocalStorage();
+
 export class Accounts {
   constructor(dataDir) {
     this.accounts = new Collection(path.join(dataDir, 'accounts'), accountMeta);
@@ -133,13 +141,35 @@ export class Accounts {
 
   // ---- Accounts ---------------------------------------------------------------------------------
 
-  list(teamIds) {
-    return this.accounts.list().filter((a) => teamIds.has(a.teamId));
+  /** Published: an account that has had a report (it stays so if its reports are deleted). The others are drafts. */
+  published() {
+    const out = new Set(this.reports.list().map((r) => r.customerId));
+    for (const a of this.accounts.list()) if (a.publishedAt) out.add(a.id);
+    return out;
   }
-  /** An account in one of the teams given, or 404 (another team's account is not said to exist). */
+  /** A draft, and the person looking is neither its SE, nor who made it, nor an Admin. */
+  hiddenFrom(meta, published = this.published()) {
+    const v = viewing.getStore();
+    if (!v || v.admin || published.has(meta.id)) return false;
+    return meta.ownerId !== v.id && meta.createdById !== v.id;
+  }
+  isDraft(id) {
+    return !this.accounts.meta(id)?.publishedAt && !this.reports.list().some((r) => r.customerId === id);
+  }
+  /** Back to a draft (the Admin's cleanse with its reports): its SE's and the Admins' again. */
+  unpublish(id) {
+    const account = this.accounts.get(id);
+    if (account) this.accounts.put({ ...account, publishedAt: null });
+  }
+  list(teamIds) {
+    const published = this.published();
+    return this.accounts.list().filter((a) => teamIds.has(a.teamId) && !this.hiddenFrom(a, published)).map((a) => (published.has(a.id) ? a : { ...a, draft: true }));
+  }
+  /** An account in one of the teams given, or 404 (another team's account is not said to exist; a draft is its SE's). */
   get(id, teamIds) {
     const meta = this.accounts.meta(id);
     if (!meta || !teamIds.has(meta.teamId)) throw fail(404, 'That account no longer exists, or is not in a team you work in.');
+    if (this.hiddenFrom(meta)) throw fail(404, 'That account is still being prepared by its Sales Engineer: it shows here once a report is generated for it.');
     return migrate(this.accounts.get(id));
   }
   create({ name, teamId, user, impact = {} }) {
@@ -279,6 +309,7 @@ export class Accounts {
     const account = this.get(customerId, teamIds);
     if (!account.salesforceUrl) throw fail(409, 'Add the Salesforce opportunity or account link for this account first (at the top of the page): every report must be tied to one.');
     const report = newReport({ customerId: account.id, customer: account.name, by: user.name, data });
+    if (!account.publishedAt) this.accounts.put({ ...this.accounts.get(account.id), publishedAt: new Date().toISOString() });
     Object.assign(report, { teamId: account.teamId, createdById: user.id, ownerId: account.ownerId, salesforceUrl: account.salesforceUrl, salesforceKind: account.salesforceKind, sharedAt: null, sharedById: null, sharedNote: '' });
     return this.reports.put(report);
   }

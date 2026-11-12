@@ -128,17 +128,18 @@ export async function viewAccounts(params) {
           ['shared', a.primary?.sharedAt ? 'No longer shared with the customer' : 'Shared with the customer…', can('reports.share') && Boolean(a.primary)],
           ['mute', a.muted ? 'Bring back into the forecast' : 'Mute from the forecast', can('forecast.mute')],
           // Deleting an account from the list is the Admin's: it takes every report and sale of the account with it.
+          ['reset', 'Remove all calculations…', state.me?.role?.id === 'admin'],
           ['delete', 'Delete the account…', state.me?.role?.id === 'admin' && can('accounts.delete')],
         ].filter((x) => x[2]);
         return `<tr class="click${a.muted ? ' muted-row' : ''}" data-account="${esc(a.id)}">
-        <td data-edit="name" class="acc-name"><span class="cell-line"><b title="${esc(a.name)}">${esc(a.name)}</b>${a.salesforceUrl ? `<a class="sf-link" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open the ${a.salesforceKind === 'opportunity' ? 'opportunity' : 'account'} in Salesforce (new tab)" aria-label="Open in Salesforce">${icon('ext')}</a>` : '<span class="chip bad" title="No Salesforce link yet: nothing is generated until one is saved">No link</span>'}${a.muted ? `<span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}${pen('name', 'Rename')}</span></td>
+        <td data-edit="name" class="acc-name" data-v="${esc(a.name)}"><span class="cell-line"><b title="${esc(a.name)}">${esc(a.name)}</b>${a.draft ? '<span class="chip draft" title="A draft: only its SE and the Admins see it until a report is generated for it">Draft</span>' : ''}${a.salesforceUrl ? `<a class="sf-link" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open the ${a.salesforceKind === 'opportunity' ? 'opportunity' : 'account'} in Salesforce (new tab)" aria-label="Open in Salesforce">${icon('ext')}</a>` : '<span class="chip bad" title="No Salesforce link yet: nothing is generated until one is saved">No link</span>'}${a.muted ? `<span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}${pen('name', 'Rename')}</span></td>
         <td data-edit="owner" class="acc-owner"><span class="cell-line"><span class="avatar sm">${esc(initials(a.owner))}</span><span class="clip" title="${esc(`${a.owner} · ${a.teamPath}`)}">${esc(a.owner)}</span>${pen('owner', 'Change the accountable SE')}</span></td>
         <td class="num" data-sort="${a.primary ? Math.round(a.primary.totalCredits) : -1}" data-v="${a.primary ? num(Math.round(a.primary.totalCredits)) : 'No report'}" title="${esc(`${split}${a.reportCount ? ` · ${a.reportCount} report${a.reportCount === 1 ? '' : 's'}` : ''}`)}">${a.primary ? `<span class="credits">${num(Math.round(a.primary.totalCredits))}</span><span class="acc-split">T&amp;R ${short(a.primary.trCredits)} · Fusion ${short(a.primary.fusionCredits)}</span>` : '<span class="muted">No report</span>'}</td>
         <td class="num" data-edit="sold" title="${esc(soldNote)}"><span class="cell-line end">${a.sold ? num(Math.round(a.sold)) : '<span class="muted">—</span>'}${can('sales.record') && a.primary ? pen('sold', 'Record a sale') : ''}</span></td>
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td data-edit="shared"><span class="cell-line">${shared}${can('reports.share') && a.primary ? pen('shared', 'Shared with the customer, or not') : ''}</span></td>
         <td class="acc-last" data-sort="${esc(a.lastReportAt ?? '')}">${esc(ago(a.lastReportAt))}</td>
-        <td class="actions">${can('calculator.use') ? `<a class="btn sm icon-btn calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator" aria-label="Open in the calculator">${icon('calc')}</a>` : ''}<details class="menu row-menu"><summary class="btn sm icon-btn" aria-label="More for ${esc(a.name)}">⋯</summary><div class="menu-list">${menu.map(([id, label]) => `<button type="button" data-row="${id}"${id === 'delete' ? ' class="danger"' : ''}>${label}</button>`).join('')}</div></details></td></tr>`;
+        <td class="actions">${can('calculator.use') ? `<a class="btn sm icon-btn calc-open" href="/calculator?team=${encodeURIComponent(a.teamId ?? '')}&amp;account=${encodeURIComponent(a.id)}" title="Open ${esc(a.name)} in the calculator" aria-label="Open in the calculator">${icon('calc')}</a>` : ''}<details class="menu row-menu"><summary class="btn sm icon-btn" aria-label="More for ${esc(a.name)}">⋯</summary><div class="menu-list">${menu.map(([id, label]) => `<button type="button" data-row="${id}"${id === 'delete' || id === 'reset' ? ' class="danger"' : ''}>${label}</button>`).join('')}</div></details></td></tr>`;
       }).join('')
       : `<tr><td colspan="8"><div class="empty"><b>No accounts match</b>Change the filters, or add one in the calculator.</div></td></tr>`;
     const mute = async (a) => {
@@ -181,6 +182,7 @@ export async function viewAccounts(params) {
           if (act === 'calc') return void (location.href = `/calculator?team=${encodeURIComponent(a.teamId ?? '')}&account=${encodeURIComponent(a.id)}`);
           if (act === 'mute') return mute(a);
           if (act === 'delete') return removeAccount(a);
+          if (act === 'reset') return resetAccount(a, reload);
           if (act === 'contacts') {
             focusNext = 'contacts';
             return go(`/accounts/${encodeURIComponent(a.id)}`);
@@ -342,6 +344,7 @@ export async function viewAccount(id) {
     <div class="crumbs">${esc(a.teamPath)}</div>
     <div class="head compact"><div><h1 class="serif">${esc(a.name)}</h1><p class="acct-meta">${a.salesforceUrl ? `<a class="chip sf" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer">${esc(a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account')} <span class="mono">${esc(a.salesforceId)}</span> ↗</a>` : '<span class="chip warn"><i></i>No Salesforce link</span>'}<span>SE <b>${esc(a.owner)}</b></span>${a.cxone ? `<span class="chip ok" title="Last read ${esc(a.cxone.lastReadAt ? ago(a.cxone.lastReadAt) : 'never')}"><i></i>Checkmarx One key kept · ${esc(a.cxone.tenant)}</span>` : ''}${a.impactEnabled ? `<span class="chip">Impact ${esc(a.impactCurrency)}</span>` : ''}</p></div>
       <div class="tools">${d.can.edit ? `<a class="btn primary" href="${esc(calcHref)}">${icon('calc')}Open in calculator</a>` : ''}</div></div>
+    ${d.draft ? '<div class="callout draft-note"><b>Draft.</b> Only its Sales Engineer and the Admins see this account until a report is generated for it; then its team does.</div>' : ''}
     ${a.salesforceUrl ? '' : `<div class="callout warn">This account has no Salesforce opportunity or account link: no report can be generated until it is given.${d.can.edit ? ' Add it under Account details.' : ''}</div>`}
     <div class="acct-strip mt">
       <div class="as-main"><small>Primary report · ${p ? (p.how === 'marked' ? 'marked' : 'the latest (none marked)') : 'none yet'}</small>${p ? `<span class="credits big serif" id="bigc"></span><span class="sub">T&amp;R ${num(Math.round(p.trCredits ?? 0))} · Fusion ${num(Math.round(p.fusionCredits ?? 0))}${p.extraPercent ? ` · +${num(p.extraPercent, 1)}%` : ''}${p.bundles ? ` · ${num(p.bundles)} bundle${p.bundles === 1 ? '' : 's'}` : ''} · ${esc(date(p.createdAt))} by ${esc(p.createdBy)}</span>` : `<b>—</b><span class="sub">Open the account in the calculator and generate one.</span>`}</div>
@@ -360,7 +363,7 @@ export async function viewAccount(id) {
           ${d.can.edit ? '<div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="err"></span></div>' : ''}
         </form>
         ${a.salesforceUrl ? `<dl class="kv mt"><dt>Created</dt><dd>${esc(dateTime(a.createdAt))} by ${esc(a.createdBy)}</dd><dt>Updated</dt><dd>${esc(dateTime(a.updatedAt))}</dd><dt>Checkmarx One</dt><dd>${a.cxone ? `Key kept for <b>${esc(a.cxone.tenant)}</b> by ${esc(a.cxone.savedBy)} · ${a.cxone.lastReadAt ? `last read ${esc(ago(a.cxone.lastReadAt))}` : 'not read since'}${d.can.edit ? ` · <a href="${esc(calcHref)}&amp;refresh=1">↻ Refresh in the calculator</a> · <a href="#" id="forget-key">Forget the key</a>` : ''}` : 'No key kept: tick "Remember this key" when connecting in the calculator, to refresh in one click later.'}</dd><dt>Impact <span class="chip star">beta</span></dt><dd>${a.impactEnabled ? `On · soft savings in ${esc(a.impactCurrency)} go into its reports` : 'Off: turn it on in the calculator for soft savings in the reports'}</dd></dl>` : ''}
-        ${d.can.deleteAccount ? '<div class="mt"><button class="danger sm" id="del-acct">Delete account and its reports</button></div>' : ''}
+        ${d.can.deleteAccount || state.me?.role?.id === 'admin' ? `<div class="mt flex">${state.me?.role?.id === 'admin' ? '<button class="danger sm" id="reset-acct">Remove all calculations…</button>' : ''}${d.can.deleteAccount ? '<button class="danger sm" id="del-acct">Delete account and its reports</button>' : ''}</div>` : ''}
     </details>
     ${contactsPanel(d)}
     ${salesPanel(a, d)}
@@ -412,6 +415,7 @@ export async function viewAccount(id) {
       $('#err').textContent = error.message;
     }
   };
+  if ($('#reset-acct')) $('#reset-acct').onclick = () => resetAccount({ id: a.id, name: a.name, reportCount: d.reports.length }, () => viewAccount(a.id));
   if ($('#del-acct')) $('#del-acct').onclick = async () => {
     if (!confirm(`Delete ${a.name} and its ${a.reportCount} report(s)? This cannot be undone.`)) return;
     try {
@@ -449,6 +453,34 @@ export async function viewAccount(id) {
       viewAccount(a.id);
     } catch (error) {
       toast(error.message, 'bad');
+    }
+  };
+}
+
+// ---- The Admin cleanses an account: every calculation, and its reports when asked -----------------------------------
+export function resetAccount(a, done) {
+  document.getElementById('reset-dlg')?.remove();
+  const dlg = document.createElement('dialog');
+  dlg.id = 'reset-dlg';
+  const n = a.reportCount ?? 0;
+  dlg.innerHTML = `<form method="dialog" class="form"><div class="dh"><h2>Remove all calculations from ${esc(a.name)}</h2></div><div class="db">
+    <p>The backlog read or uploaded, its trend, Fusion's projects, the code counted from git or cloc-fusion, the scope and the totals go. The account, its Salesforce link, its SE, team, contacts and sales stay.</p>
+    <label class="check"><input type="checkbox" name="reports" ${n ? 'checked' : 'disabled'} /><span>Also delete its ${n ? `${num(n)} report${n === 1 ? '' : 's'}` : 'reports (it has none)'}<small>Then it is a draft again: only its SE and the Admins see it until a new report is generated.</small></span></label>
+    <p class="muted small">This cannot be undone. It is recorded in the audit log.</p><div class="err" id="reset-err"></div></div>
+    <div class="df"><button type="button" class="ghost" value="cancel" id="reset-cancel">Cancel</button><button type="button" class="danger" id="reset-go">Remove all calculations</button></div></form>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  dlg.querySelector('#reset-cancel').onclick = () => (dlg.close(), dlg.remove());
+  dlg.querySelector('#reset-go').onclick = async () => {
+    const reports = dlg.querySelector('[name=reports]').checked;
+    try {
+      const r = await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/reset`, { method: 'POST', body: { reports } });
+      dlg.close();
+      dlg.remove();
+      toast(`Every calculation is out of ${a.name}${r.reportsRemoved ? `, with its ${num(r.reportsRemoved)} report${r.reportsRemoved === 1 ? '' : 's'}` : ''}.`, 'ok');
+      done?.();
+    } catch (error) {
+      dlg.querySelector('#reset-err').textContent = error.message;
     }
   };
 }

@@ -11,7 +11,8 @@ import { AuditLog, Doc, fail } from './store.js';
 import { Iam, clean, publicUser } from './iam.js';
 import { PERMISSIONS, need, needTeam, peopleInScope, scopeOf, subtree, teamPath, homeOf } from './rbac.js';
 import { Teams } from './teams.js';
-import { Accounts, DEFAULT_SALESFORCE_HOSTS } from './accounts.js';
+import { Accounts, DEFAULT_SALESFORCE_HOSTS, viewing } from './accounts.js';
+import { newProfile } from '../core/public/calculator/profiles.js';
 import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
 import { changesOf, customerFigures, preferencesPatch, readCustomerVersion } from './customer-version.js';
@@ -698,6 +699,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         mutedAt: a.mutedAt ?? null,
         mutedBy: a.mutedById ? userName(a.mutedById) : '',
         sharedCount: own.filter((x) => x.sharedAt).length,
+        draft: Boolean(a.draft),
         lastReportAt: own[0]?.createdAt ?? null,
         sold: a.soldCredits ?? 0,
         salesCount: a.salesCount ?? 0,
@@ -808,6 +810,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       reports: reps,
       // The account's team and contacts as kept, and the addresses its reports were shared with (read from the reports).
       contacts: a.contacts ?? [],
+      draft: accounts.isDraft(a.id),
       usedEmails: [...reps.reduce((m, x) => {
         for (const e of x.sharedWith ?? []) if (!m.has(e) || String(x.sharedAt) > m.get(e)) m.set(e, x.sharedAt ?? '');
         return m;
@@ -1985,6 +1988,28 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'account.cxone.cleared', a.name, { id: a.id, projects: projects.length - kept.length, backlog: hadBacklog });
     return { ok: true, projects: projects.length - kept.length, backlog: hadBacklog };
   });
+  /**
+   * The Admin cleanses an account: every calculation goes (the backlog read or uploaded, Fusion's projects, the code
+   * counted, the scope, the totals), and its reports too when asked. The account, its Salesforce link, SE, team,
+   * contacts and sales stay. Admin only.
+   */
+  r('POST', '/api/cc/accounts/:id/reset', signedIn, (req, ctx, body, res, url, params) => {
+    if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin can remove every calculation from an account.');
+    const a = accounts.get(params.id, ctx.scope);
+    const fresh = newProfile({ name: a.name, by: ctx.user.name });
+    accounts.update(a.id, ctx.scope, { tr: fresh.tr, fusion: fresh.fusion, fusionNew: fresh.fusionNew, totals: fresh.totals, scope: fresh.scope }, ctx.user);
+    let removed = 0;
+    if (body?.reports === true) {
+      for (const rep of accounts.reportsOf(ctx.scope, a.id)) {
+        accounts.removeReport(rep.id, ctx.scope);
+        removed += 1;
+      }
+      // Nothing of it left: a draft again, its SE's and the Admins' until a new report.
+      accounts.unpublish(a.id);
+    }
+    record(ctx, req, 'account.reset', a.name, { id: a.id, reportsRemoved: removed });
+    return { ok: true, reportsRemoved: removed };
+  });
   r('DELETE', '/api/cc/accounts/:id/cxone', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const a = accounts.forgetCxone(params.id, ctx.scope);
     record(ctx, req, 'cxone.key.forgotten', a.name);
@@ -2113,8 +2138,13 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         if (origin && !sameSite(origin, req)) throw fail(403, 'That request came from another site.');
         body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') || pathname.endsWith('/previous-report') ? CALC_LIMIT : pathname === '/api/settings/branding' || pathname === '/api/me/profile' ? 512 * 1024 : BODY_LIMIT);
       }
-      let result;
-      for (const h of match.handlers) result = await h(req, ctx, body, res, url, match.params);
+      // Who is looking goes with the request: a draft account is its SE's (and an Admin's) until its first report.
+      const handle = async () => {
+        let out;
+        for (const h of match.handlers) out = await h(req, ctx, body, res, url, match.params);
+        return out;
+      };
+      const result = ctx?.user ? await viewing.run({ id: ctx.user.id, admin: ctx.user.role === 'admin' }, handle) : await handle();
       const exported = result?.download !== undefined || result?.csv !== undefined;
       if (method !== 'GET' || exported || READS.has(match.pattern)) auditRequest(req, ctx, method, pathname, match, { status: 200 });
       if (result?.download !== undefined) return send(res, 200, result.download, { 'Content-Type': `${result.type ?? 'application/octet-stream'}`, 'Content-Disposition': `attachment; filename="${result.name}"` });

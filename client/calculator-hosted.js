@@ -565,6 +565,7 @@ export async function startHosted() {
   // ---- The account bar ------------------------------------------------------------------------------
   let account = null;
   let reshowCx = null;
+  let accountDraft = false;
   let refreshTimer = null;
   const refreshAccountSoon = () => {
     clearTimeout(refreshTimer);
@@ -592,7 +593,8 @@ export async function startHosted() {
       return;
     }
     try {
-      const { account: a, members } = await server(`/api/cc/accounts/${encodeURIComponent(id)}`);
+      const { account: a, members, draft } = await server(`/api/cc/accounts/${encodeURIComponent(id)}`);
+      accountDraft = Boolean(draft);
       const switched = account?.id !== a.id;
       account = a;
       if (switched && lastCx && typeof reshowCx === 'function') reshowCx();
@@ -707,6 +709,7 @@ export async function startHosted() {
     const parts = [
       '<span class="hc-label">Status</span>',
       account ? `<span class="hc-st cust"><i></i><b>${esc(account.name)}</b></span>` : '',
+      account && accountDraft ? '<span class="hc-st draft" title="Only you (its SE) and the Admins see this account until a report is generated for it; then its team does."><i></i>Draft: only you and Admins see it</span>' : '',
       fusionOnly ? chip('ok', 'New customer · Fusion only') : cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
     ];
     if (account) {

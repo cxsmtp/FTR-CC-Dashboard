@@ -140,6 +140,9 @@ test('a leader changes the accountable SE of a projection someone else made; tha
   const made = await se1.post('/api/projections', { name: 'Handover Co' }, h);
   const id = made.data.customer.id;
   await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+  // A draft is its SE's: the leader does not see it yet, so cannot hand it over.
+  assert.equal((await lead.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se2.id })).status, 404);
+  await se1.post('/api/projections/reports', { customerId: id, data: reportData() }, h);
   assert.equal((await viewer.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se2.id })).status, 403);
   assert.equal((await lead.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se2.id })).status, 200);
   const detail = await se2.get(`/api/cc/accounts/${id}`);

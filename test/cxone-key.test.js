@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { CalculatorService } from '../server/calculator.js';
-import { SF, client, start } from './helpers.js';
+import { SF, client, reportData, start } from './helpers.js';
 
 const calls = [];
 const calc = new CalculatorService({ cxoneHosts: ['checkmarx.net'], gitHosts: ['github.com'], log: () => {} });
@@ -44,6 +44,10 @@ test('a key kept for an account: sealed, never sent to a browser, used by the te
     assert.ok(!JSON.stringify(a.data).includes('sealedKey'));
   }
   assert.equal((await se1.get(`/api/cc/accounts/${id}`)).data.account.cxone.tenant, 'acme');
+  // A draft is its SE's: a teammate cannot use its key until it is published by a report.
+  const se2early = await client(env.base, 'se2@t.example');
+  assert.equal((await se2early.post(`/api/cc/accounts/${id}/cxone/connect`)).status, 404);
+  await se1.post('/api/projections/reports', { customerId: id, data: reportData() }, h);
   // A teammate refreshes with it, without ever seeing it.
   const se2 = await client(env.base, 'se2@t.example');
   calls.length = 0;

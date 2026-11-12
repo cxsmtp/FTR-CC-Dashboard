@@ -36,6 +36,9 @@ async function show() {
   const params = new URLSearchParams(query);
   // An account's side panel belongs to the Accounts list: leaving for another page takes it away.
   if (!path.startsWith('/accounts')) document.getElementById('acct-drawer')?.remove();
+  // The reading overlay (terms, licence, guide) and a person's panel belong to the page they were opened on.
+  if (path !== '/legal' && path !== '/about') document.getElementById('docd')?.close?.();
+  document.getElementById('person-drawer')?.remove();
   if (path === '/forgot') return viewForgot(params);
   if (path === '/reset') return viewReset(params);
   if (!state.me) {
