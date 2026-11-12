@@ -763,6 +763,31 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { totals, teams: teamRows, people, months, recent, top, focus };
   });
 
+  // ---- Accounts follow their accountable SE: an account is in the team its SE is in ---------------------------------
+  const everyTeam = () => new Set(teams.list().map((t) => t.id));
+  const teamName = (id) => teams.get(id)?.name ?? id;
+  /** The accounts whose accountable SE is in another team than the account (the SE still has access). */
+  const outOfStep = () => accounts.accounts.list().map((a) => ({ a, owner: iam.byId(a.ownerId) })).filter(({ a, owner }) => owner && owner.active !== false && teams.get(owner.teamId) && owner.teamId !== a.teamId);
+  /** Move these accounts (and their reports) to their SE's team; recorded one by one. */
+  const followOwner = (ctx, req, list, why) => {
+    const all = everyTeam();
+    const moved = [];
+    for (const { a, owner } of list) {
+      accounts.setDetails(a.id, all, { teamId: owner.teamId }, hosts().salesforce);
+      record(ctx, req, 'account.follow', a.name, { id: a.id, owner: owner.email, fromTeam: teamName(a.teamId), toTeam: teamName(owner.teamId), why });
+      moved.push({ id: a.id, name: a.name, from: teamName(a.teamId), to: teamName(owner.teamId) });
+    }
+    return moved;
+  };
+  /** Accounts in the teams this person works in that are not in their SE's team: to look at, and to move. */
+  const outOfStepFor = (ctx) => outOfStep().filter(({ a, owner }) => ctx.scope.has(a.teamId) && (ctx.permissions.has('scope.all') || ctx.scope.has(owner.teamId)));
+  r('GET', '/api/cc/accounts-out-of-step', perm('users.manage'), (req, ctx) => ({ accounts: outOfStepFor(ctx).map(({ a, owner }) => ({ id: a.id, name: a.name, owner: owner.name, from: teamName(a.teamId), to: teamName(owner.teamId) })) }));
+  r('POST', '/api/cc/accounts-follow', perm('users.manage'), (req, ctx, body) => {
+    const wanted = Array.isArray(body?.ids) ? new Set(body.ids.map(String)) : null;
+    const moved = followOwner(ctx, req, outOfStepFor(ctx).filter(({ a }) => !wanted || wanted.has(a.id)), 'moved to the SE’s team from the Accounts page');
+    return { moved };
+  });
+
   r('GET', '/api/accounts', perm('dashboard.view'), (req, ctx, body, res, url) => {
     const focus = url.searchParams.get('team') || '';
     if (focus) needTeam(ctx.scope, focus);
@@ -803,6 +828,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       const owner = iam.byId(String(body.ownerId));
       if (!owner || owner.active === false || !ctx.scope.has(owner.teamId)) throw fail(400, 'Choose someone in a team you work in.');
       patch.ownerId = owner.id;
+      // The account follows its accountable SE: it goes to their team.
+      if (body?.teamId === undefined && owner.teamId !== before.teamId && teams.get(owner.teamId)) patch.teamId = owner.teamId;
     }
     if (body?.teamId !== undefined) {
       needTeam(ctx.scope, String(body.teamId));
@@ -811,6 +838,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (body?.impactCurrency !== undefined) patch.impactCurrency = body.impactCurrency;
     if (body?.impactEnabled !== undefined) patch.impactEnabled = body.impactEnabled === true;
     const after = accounts.setDetails(params.id, ctx.scope, patch, hosts().salesforce, { impactBase: ctx.user.prefs?.impact ?? null });
+    // Moved with its SE to a team this person does not work in: said, as the account is no longer theirs to see.
+    if (!ctx.scope.has(after.teamId)) {
+      record(ctx, req, 'account.update', after.name, { id: after.id, changed: Object.keys(patch), fromTeam: before.teamId, toTeam: after.teamId });
+      return { moved: true, account: { id: after.id, name: after.name }, team: teamName(after.teamId) };
+    }
     record(ctx, req, 'account.update', after.name, { id: after.id, changed: Object.keys(patch), ...(patch.teamId && patch.teamId !== before.teamId ? { fromTeam: before.teamId, toTeam: patch.teamId } : {}) });
     return accountDetail(ctx, params.id);
   });
@@ -926,13 +958,16 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (!teams.get(String(body.teamId))) throw fail(400, 'Choose their team.');
       if (!ctx.permissions.has('scope.all')) needTeam(ctx.scope, String(body.teamId));
     }
+    const teamBefore = target.teamId;
     const user = iam.update(target.id, { name: body?.name, title: body?.title, role: body?.role, teamId: body?.teamId, active: body?.active });
+    // Accounts follow their accountable SE: moved to another team, theirs go with them.
+    const followed = user.teamId !== teamBefore && user.active !== false ? followOwner(ctx, req, outOfStep().filter(({ owner }) => owner.id === user.id), 'their accountable SE changed team') : [];
     if (user.active === false) {
       calc.forget(user.id);
       passwordResets.revokeUser(user.id);
     }
-    record(ctx, req, 'user.update', user.email, { changed: Object.keys(body ?? {}) });
-    return { user: publicUser(user) };
+    record(ctx, req, 'user.update', user.email, { changed: Object.keys(body ?? {}), ...(followed.length ? { accountsMoved: followed.length } : {}) });
+    return { user: publicUser(user), accountsMoved: followed.length };
   });
   r('POST', '/api/people/:id/reset', perm('users.manage'), async (req, ctx, body, res, url, params) => {
     const target = iam.byId(params.id);

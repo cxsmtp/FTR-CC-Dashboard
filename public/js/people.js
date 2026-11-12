@@ -97,8 +97,8 @@ export function peopleTable(d) {
         const u = d.people.find((x) => x.id === sel.closest('tr').dataset.id);
         const body = sel.dataset.inline === 'role' ? { role: sel.value } : { teamId: sel.value };
         try {
-          await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body });
-          toast(`${u.name}: ${sel.dataset.inline === 'role' ? 'role' : 'team'} changed to ${sel.selectedOptions[0].textContent}.`, 'ok');
+          const r = await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body });
+          toast(`${u.name}: ${sel.dataset.inline === 'role' ? 'role' : 'team'} changed to ${sel.selectedOptions[0].textContent}.${r.accountsMoved ? ` Their ${num(r.accountsMoved)} account${r.accountsMoved === 1 ? '' : 's'} moved with them.` : ''}`, 'ok');
           d.people = (await peopleList()).people;
           render();
         } catch (error) {
@@ -489,9 +489,9 @@ export function editPerson(d, u) {
     const f = new FormData(e.target);
     try {
       if (u) {
-        await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body: { name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team') } });
+        const r = await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body: { name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team') } });
         done();
-        toast('Saved.', 'ok');
+        toast(r.accountsMoved ? `Saved. Their ${num(r.accountsMoved)} account${r.accountsMoved === 1 ? '' : 's'} moved with them to the new team.` : 'Saved.', 'ok');
       } else {
         const r = await api('/api/people', { method: 'POST', body: { email: f.get('email'), name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team'), sendWelcome: f.get('welcome') === 'on' } });
         showSecret(r.temporary, r.user.email);

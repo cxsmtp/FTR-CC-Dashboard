@@ -1115,3 +1115,4 @@ td.actions { white-space: nowrap; text-align: right; }
 .auth .card h2 { font-size: 16px; margin-bottom: 14px; }
 .auth .card .form button.primary { width: 100%; justify-content: center; }
 .auth .foot { margin-top: 16px; text-align: center; }
+.follow-panel { margin-bottom: 14px; border-color: var(--amber, #b45309) !important; }

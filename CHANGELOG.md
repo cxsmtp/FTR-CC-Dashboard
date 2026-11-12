@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.65.00 — 2026-11-12
+
+- **Accounts follow their accountable SE.** An account is in the team of its accountable SE. Move a person to another team (People, in the list or in Edit) and their accounts move with them; the message says how many. Give an account a new accountable SE and it moves to that SE's team.
+- **Accounts left behind earlier are caught up in one click.** When accounts are still in another team than their SE (from team changes made before this version), Accounts shows how many, lists them with where they are and where they go, and moves one or all of them with a click. For Admins and leaders who manage people, each for the teams they see.
+- Every move is in the audit log (account.follow: the account, its SE, from which team to which, and why). The update itself moves nothing: accounts change team only when someone changes a person's team, an account's SE, or clicks Move.
+
 ## CC-01.64.00 — 2026-11-12
 
 - **The plan by project: the projects scanned most often first.** The list is in order of how often each project is scanned (5+ a week at the top), then by open findings. When only part of a severity is in the plan (Customize per severity: say 2,000 of the High findings), that part is taken from the projects scanned most often first, in this order, until the number is reached: each cell shows what is counted of what is open ("214 of 225"), the Counted column the project's share, and the total row what the plan holds. The credits do not change with it: the plan's numbers are the same, now shown project by project.

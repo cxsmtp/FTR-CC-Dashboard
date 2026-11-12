@@ -232,3 +232,35 @@ test('roles are changed only by their own id; teams are managed only within the 
   // Back as it was.
   assert.equal((await admin.put(`/api/people/${lead.id}`, { role: 'leader' })).status, 200);
 });
+
+test('accounts follow their accountable SE: moved with them, with a new SE, and caught up in one click', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const se = await client(env.base, 'se2@t.example');
+  const made = await se.post('/api/projections', { name: 'Follower Co' }, { 'X-Team': env.teams.emea.id });
+  const id = made.data.customer.id;
+  const teamOf = async () => (await admin.get('/api/accounts')).data.accounts.find((a) => a.id === id).teamId;
+  assert.equal(await teamOf(), env.teams.emea.id);
+  // The SE moves to APAC: the account goes with them.
+  let r = await admin.put(`/api/people/${env.users.se2.id}`, { teamId: env.teams.apac.id });
+  assert.equal(r.status, 200);
+  assert.ok(r.data.accountsMoved >= 1);
+  assert.equal(await teamOf(), env.teams.apac.id);
+  // A new accountable SE in another team: the account goes to their team.
+  r = await admin.put(`/api/cc/accounts/${id}`, { ownerId: env.users.se1.id });
+  assert.equal(r.status, 200);
+  assert.equal(await teamOf(), env.teams.emea.id);
+  // One left behind before this was the rule (the SE's team changed without the account): listed, then moved.
+  Object.assign(env.app.iam.byId(env.users.se1.id), { teamId: env.teams.apac.id });
+  env.app.iam.save();
+  const list = (await admin.get('/api/cc/accounts-out-of-step')).data.accounts;
+  assert.ok(list.some((a) => a.id === id && a.to === 'APAC'));
+  assert.equal((await se.get('/api/cc/accounts-out-of-step')).status, 403);
+  const moved = (await admin.post('/api/cc/accounts-follow', { ids: [id] })).data.moved;
+  assert.equal(moved.length, 1);
+  assert.equal(await teamOf(), env.teams.apac.id);
+  assert.ok(!(await admin.get('/api/cc/accounts-out-of-step')).data.accounts.some((a) => a.id === id));
+  const { events } = (await admin.get('/api/audit?limit=200')).data;
+  assert.ok(events.filter((e) => e.action === 'account.follow' && e.target === 'Follower Co').length >= 2);
+  // Back as it was, for the tests after this one.
+  for (const [u, t] of [[env.users.se1, env.teams.emea], [env.users.se2, env.teams.emea]]) assert.equal((await admin.put(`/api/people/${u.id}`, { teamId: t.id })).status, 200);
+});

@@ -58,6 +58,7 @@ export async function viewAccounts(params) {
   $('#main').innerHTML = `
     <div class="head"><div><h1 class="serif">Accounts</h1><p>Every account in your teams with its primary report. Click an account to open it; the pencil in a cell, or the row’s menu, changes it right here.</p></div>
       <div class="tools">${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('plus')}New in calculator</a>` : ''}</div></div>
+    <div id="out-of-step"></div>
     <div class="panel">
       <div class="flex">
         <div class="search">${icon('search')}<input id="q" placeholder="Search accounts, SEs, Salesforce ids" /></div>
@@ -150,6 +151,36 @@ export async function viewAccounts(params) {
     ({ accounts } = await api(listUrl));
     render();
   };
+  // Accounts follow their accountable SE. Any that are still in another team than their SE (from before that was the
+  // rule) are listed here, to move in one click.
+  const outOfStep = async () => {
+    const box = $('#out-of-step');
+    if (!box || !can('users.manage')) return;
+    let list = [];
+    try {
+      ({ accounts: list } = await api('/api/cc/accounts-out-of-step'));
+    } catch {}
+    if (!list.length) return void (box.innerHTML = '');
+    const one = list.length === 1;
+    box.innerHTML = `<div class="panel follow-panel"><div class="flex"><div><b>${num(list.length)} account${one ? ' is' : 's are'} in another team than ${one ? 'its' : 'their'} accountable SE.</b>
+      <span class="muted small">Accounts follow their SE; ${one ? 'this one was' : 'these were'} left behind when the SE changed team.</span></div><span class="spacer"></span>
+      <button type="button" class="ghost sm" id="follow-show">Show ${one ? 'it' : 'them'}</button><button type="button" class="primary sm" id="follow-all">Move ${one ? 'it' : `all ${num(list.length)}`} to the SE’s team</button></div>
+      <div class="tw mt" id="follow-list" hidden><table><thead><tr><th>Account</th><th>Accountable SE</th><th>Now in</th><th>Goes to</th><th></th></tr></thead><tbody>${list.map((x) => `<tr data-id="${esc(x.id)}"><td><b>${esc(x.name)}</b></td><td>${esc(x.owner)}</td><td>${esc(x.from)}</td><td>${esc(x.to)}</td><td class="actions"><button type="button" class="sm" data-follow="${esc(x.id)}">Move</button></td></tr>`).join('')}</tbody></table></div></div>`;
+    const move = async (ids) => {
+      try {
+        const r = await api('/api/cc/accounts-follow', { method: 'POST', body: ids ? { ids } : {} });
+        toast(`${num(r.moved.length)} account${r.moved.length === 1 ? '' : 's'} moved to ${r.moved.length === 1 ? 'its' : 'their'} SE’s team.`, 'ok');
+        await reload();
+        await outOfStep();
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    };
+    $('#follow-show').onclick = () => ($('#follow-list').hidden = !$('#follow-list').hidden);
+    $('#follow-all').onclick = () => move(null);
+    for (const b of $$('#follow-list [data-follow]')) b.onclick = () => move([b.dataset.follow]);
+  };
+  outOfStep();
   /** A cell edited in place: Enter or leaving it saves, Esc puts it back. */
   async function editCell(a, cell) {
     const kind = cell.dataset.edit;
