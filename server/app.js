@@ -941,10 +941,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // ---- People, teams, roles, settings, audit ---------------------------------------------------------------
   const visiblePeople = (ctx) => (ctx.permissions.has('scope.all') ? iam.users() : peopleInScope(ctx.user, ctx.scope, iam.users()));
   r('GET', '/api/people', ready2, (req, ctx) => ({
-    people: visiblePeople(ctx).map((u) => ({ ...publicUser(u), picture: u.picture ? `/api/people/${u.id}/picture?v=${encodeURIComponent(u.picture.at)}` : null, roleName: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, u.teamId).map((t) => t.name).join(' › '), leads: ctx.teams.filter((t) => t.leaderIds?.includes(u.id)).map((t) => t.name), manageable: canManage(ctx, u) && u.id !== ctx.user.id, sessions: canManage(ctx, u) ? iam.sessionsOf(u.id) : undefined })),
+    people: visiblePeople(ctx).map((u) => ({ ...publicUser(u), picture: u.picture ? `/api/people/${u.id}/picture?v=${encodeURIComponent(u.picture.at)}` : null, roleName: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, u.teamId).map((t) => t.name).join(' › '), leads: ctx.teams.filter((t) => t.leaderIds?.includes(u.id)).map((t) => t.name), manager: u.managerId ? userName(u.managerId) : '', reports: iam.users().filter((x) => x.managerId === u.id).map((x) => ({ id: x.id, name: x.name })), manageable: canManage(ctx, u) && u.id !== ctx.user.id, sessions: canManage(ctx, u) ? iam.sessionsOf(u.id) : undefined })),
     roles: Object.entries(iam.roles()).map(([id, role]) => ({ id, ...role, home: homeOf(id, role), grantable: iam.canGrant(id, ctx.permissions), holders: iam.users().filter((u) => u.role === id).length })),
     teams: ctx.teams.filter((t) => ctx.scope.has(t.id) || ctx.permissions.has('teams.manage')).map((t) => ({ ...t, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaders: (t.leaderIds ?? []).map((id) => ({ id, name: userName(id) })), members: iam.users().filter((u) => u.teamId === t.id).length })),
     permissions: PERMISSIONS,
+    // Who someone can report to: anyone with access, whatever their team (for those who manage people).
+    managers: ctx.permissions.has('users.manage') ? iam.users().filter((u) => u.active !== false).map((u) => ({ id: u.id, name: u.name, title: u.title ?? '' })).sort((a, b) => a.name.localeCompare(b.name)) : [],
     mail: resetReady().ready,
   }));
   /** May this person change `target`: in their scope, and holding the role they hold. */
@@ -981,14 +983,19 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (!ctx.permissions.has('scope.all')) needTeam(ctx.scope, String(body.teamId));
     }
     const teamBefore = target.teamId;
-    const user = iam.update(target.id, { name: body?.name, title: body?.title, role: body?.role, teamId: body?.teamId, active: body?.active });
+    const managerBefore = target.managerId ?? null;
+    if (body?.managerId) {
+      const boss = iam.byId(String(body.managerId));
+      if (!boss || boss.active === false) throw fail(400, 'Choose someone who has access as the one they report to.');
+    }
+    const user = iam.update(target.id, { name: body?.name, title: body?.title, role: body?.role, teamId: body?.teamId, active: body?.active, managerId: body?.managerId });
     // Accounts follow their accountable SE: moved to another team, theirs go with them.
     const followed = user.teamId !== teamBefore && user.active !== false ? followOwner(ctx, req, outOfStep().filter(({ owner }) => owner.id === user.id), 'their accountable SE changed team') : [];
     if (user.active === false) {
       calc.forget(user.id);
       passwordResets.revokeUser(user.id);
     }
-    record(ctx, req, 'user.update', user.email, { changed: Object.keys(body ?? {}), ...(followed.length ? { accountsMoved: followed.length } : {}) });
+    record(ctx, req, 'user.update', user.email, { changed: Object.keys(body ?? {}), ...(followed.length ? { accountsMoved: followed.length } : {}), ...((user.managerId ?? null) !== managerBefore ? { reportsTo: iam.byId(user.managerId)?.email ?? null, reportedTo: iam.byId(managerBefore)?.email ?? null } : {}) });
     return { user: publicUser(user), accountsMoved: followed.length };
   });
   r('POST', '/api/people/:id/reset', perm('users.manage'), async (req, ctx, body, res, url, params) => {

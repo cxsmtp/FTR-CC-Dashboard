@@ -192,6 +192,20 @@ export class Iam {
       user.role = patch.role;
     }
     if (patch.teamId !== undefined) user.teamId = patch.teamId || null;
+    // Who they report to: anyone but themselves and the people under them (no circle).
+    if (patch.managerId !== undefined) {
+      const managerId = patch.managerId ? String(patch.managerId) : null;
+      if (managerId) {
+        if (managerId === user.id) throw fail(400, 'Nobody reports to themselves.');
+        if (!this.byId(managerId)) throw fail(400, 'Choose who they report to.');
+        const seen = new Set();
+        for (let up = this.byId(managerId); up && !seen.has(up.id); up = up.managerId ? this.byId(up.managerId) : null) {
+          if (up.id === user.id) throw fail(400, `${this.byId(managerId).name} already reports to ${user.name}, directly or through others: that would make a circle.`);
+          seen.add(up.id);
+        }
+      }
+      user.managerId = managerId;
+    }
     if (patch.active !== undefined) {
       if (patch.active === false && user.role === 'admin' && this.activeAdmins().length <= 1) throw fail(409, 'There must always be at least one active Admin.');
       user.active = Boolean(patch.active);
@@ -259,6 +273,8 @@ export class Iam {
     if (!user) throw fail(404, 'That person no longer has access.');
     if (user.role === 'admin' && this.activeAdmins().length <= 1) throw fail(409, 'There must always be at least one active Admin.');
     this.doc.value.users = this.users().filter((u) => u.id !== id);
+    // Those who reported to them report to whom they reported to (or to nobody).
+    for (const u of this.users()) if (u.managerId === id) u.managerId = user.managerId ?? null;
     this.save();
     this.endSessionsOf(id);
   }
@@ -348,4 +364,4 @@ export class Iam {
 /** What the browser may see of a person: never the password hash or lock state. */
 /** How a person stands, as the calculator shows it: active, locked (too many wrong passwords), off, or still to set their password. */
 export const statusOf = (u, now = Date.now()) => (u.active === false ? 'disabled' : u.lockedUntil > now ? 'locked' : u.mustChangePassword ? 'pending' : 'active');
-export const publicUser = (u) => (u ? { id: u.id, email: u.email, name: u.name, title: u.title ?? '', role: u.role, teamId: u.teamId ?? null, active: u.active !== false, mustChangePassword: Boolean(u.mustChangePassword), status: statusOf(u), lockedUntil: u.lockedUntil > Date.now() ? new Date(u.lockedUntil).toISOString() : null, signIn: u.lastSignInMethod ?? (u.ssoCreated ? 'sso' : 'password'), createdAt: u.createdAt, lastSignInAt: u.lastSignInAt ?? null } : null);
+export const publicUser = (u) => (u ? { id: u.id, email: u.email, name: u.name, title: u.title ?? '', role: u.role, teamId: u.teamId ?? null, managerId: u.managerId ?? null, active: u.active !== false, mustChangePassword: Boolean(u.mustChangePassword), status: statusOf(u), lockedUntil: u.lockedUntil > Date.now() ? new Date(u.lockedUntil).toISOString() : null, signIn: u.lastSignInMethod ?? (u.ssoCreated ? 'sso' : 'password'), createdAt: u.createdAt, lastSignInAt: u.lastSignInAt ?? null } : null);

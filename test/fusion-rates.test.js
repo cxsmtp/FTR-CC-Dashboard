@@ -280,3 +280,29 @@ test('an account keeps its team and contacts: added, cleaned, refused when wrong
   const { events } = (await admin.get('/api/audit?limit=50')).data;
   assert.ok(events.some((e) => e.action === 'account.update' && e.target === 'Contacts Co' && e.details?.contactsAdded?.length === 2));
 });
+
+test('a person reports to a manager: set, shown, no circles, handed on when the manager is removed, and audited', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const P = (u) => `/api/people/${u.id}`;
+  const { se1, se2 } = env.users;
+  const people = async () => (await admin.get('/api/people')).data;
+  assert.ok((await people()).managers.some((m) => m.id === se1.id));
+  let r = await admin.put(P(se2), { managerId: se1.id });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.user.managerId, se1.id);
+  let d = await people();
+  assert.equal(d.people.find((u) => u.id === se2.id).manager, d.people.find((u) => u.id === se1.id).name);
+  assert.deepEqual(d.people.find((u) => u.id === se1.id).reports.map((x) => x.id), [se2.id]);
+  // Nobody reports to themselves, and no circle.
+  assert.equal((await admin.put(P(se1), { managerId: se1.id })).status, 400);
+  assert.equal((await admin.put(P(se1), { managerId: se2.id })).status, 400);
+  assert.equal((await admin.put(P(se2), { managerId: 'nobody-with-this-id' })).status, 400);
+  // Someone who does not manage people gets no list of managers.
+  const se = await client(env.base, 'se2@t.example');
+  assert.deepEqual((await se.get('/api/people')).data.managers, []);
+  const { events } = (await admin.get('/api/audit?limit=50')).data;
+  assert.ok(events.some((e) => e.action === 'user.update' && e.details?.reportsTo === 'se1@t.example'));
+  // Cleared again, for the tests after this one.
+  r = await admin.put(P(se2), { managerId: null });
+  assert.equal(r.data.user.managerId, null);
+});

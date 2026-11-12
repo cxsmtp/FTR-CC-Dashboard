@@ -44,11 +44,13 @@ export function peopleTable(d) {
     <div class="flex mt"><div class="search">${icon('search')}<input id="q" placeholder="Search people, emails, titles" /></div>
       <select id="f-role"><option value="">All roles</option>${d.roles.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select>
       <select id="f-team"><option value="">All teams</option>${teams.map((t) => `<option value="${esc(t.id)}">${esc(t.path)}</option>`).join('')}</select>
+      <select id="f-manager" title="Everyone under this person, at every level"><option value="">Reports to: anyone</option><option value="-">Reports to nobody</option>${d.people.filter((u) => u.reports?.length).sort((a, b) => a.name.localeCompare(b.name)).map((u) => `<option value="${esc(u.id)}">Under ${esc(u.name)}</option>`).join('')}</select>
       <select id="f-status"><option value="">Any status</option>${Object.entries(STATUS).map(([k, [, l]]) => `<option value="${k}">${l}</option>`).join('')}</select>
       <span class="spacer"></span><span class="muted small" id="count"></span></div>
     ${manage ? `<div class="bulk" id="bulk" hidden><b id="bulk-n"></b>
       <label class="bulk-f">Role<select id="bulk-role"><option value="">—</option>${roles.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select></label>
       <label class="bulk-f">Team<select id="bulk-team"><option value="">—</option>${teams.map((t) => `<option value="${esc(t.id)}">${esc(t.path)}</option>`).join('')}</select></label>
+      <label class="bulk-f">Reports to<select id="bulk-manager"><option value="">—</option><option value="-">Nobody</option>${(d.managers ?? []).map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('')}</select></label>
       <button type="button" class="sm" data-bulk="on">Access on</button><button type="button" class="sm" data-bulk="off">Access off</button>
       ${d.mail ? '<button type="button" class="sm" data-bulk="welcome">Send welcome</button>' : ''}
       <button type="button" class="sm" data-bulk="reset">Reset passwords</button><button type="button" class="sm" data-bulk="signout">Sign out everywhere</button><button type="button" class="sm" data-bulk="unlock">Unlock</button>
@@ -57,8 +59,17 @@ export function peopleTable(d) {
     <div class="flex pager" id="pager"><span class="muted small" id="pinfo"></span><span class="spacer"></span><button class="sm" id="prev">Previous</button><button class="sm" id="next">Next</button></div></div>`;
   const list = () => {
     const q = $('#q').value.trim().toLowerCase();
-    const [role, team, status] = [$('#f-role').value, $('#f-team').value, $('#f-status').value];
+    const [role, team, status, boss] = [$('#f-role').value, $('#f-team').value, $('#f-status').value, $('#f-manager').value];
+    // Under someone: everyone who reports to them, directly or through others.
+    const under = new Set();
+    if (boss && boss !== '-') {
+      const add = (id) => {
+        for (const u of d.people) if (u.managerId === id && !under.has(u.id)) (under.add(u.id), add(u.id));
+      };
+      add(boss);
+    }
     return d.people
+      .filter((u) => !boss || (boss === '-' ? !u.managerId : under.has(u.id)))
       .filter((u) => !q || [u.name, u.email, u.title, u.team].some((s) => String(s ?? '').toLowerCase().includes(q)))
       .filter((u) => (!role || u.role === role) && (!team || u.teamId === team) && (!status || u.status === status))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -79,7 +90,7 @@ export function peopleTable(d) {
       const roleCell = u.manageable && !self ? `<select class="inline-sel" data-inline="role" title="Change ${esc(u.name)}’s role">${roles.some((r) => r.id === u.role) ? '' : `<option value="${esc(u.role)}" selected>${esc(u.roleName)}</option>`}${roles.map((r) => `<option value="${esc(r.id)}"${r.id === u.role ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>` : `<span class="chip role">${esc(u.roleName)}</span>`;
       const teamCell = u.manageable ? `<select class="inline-sel" data-inline="team" title="Move ${esc(u.name)} to another team">${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select>` : esc(u.team || '—');
       return `<tr data-id="${esc(u.id)}" class="${selected.has(u.id) ? 'picked' : ''}">${manage ? `<td class="sel">${u.manageable && !self ? `<input type="checkbox" data-sel ${selected.has(u.id) ? 'checked' : ''} aria-label="Select ${esc(u.name)}" />` : ''}</td>` : ''}<td><div class="flex nowrap">${avatar(u.name, u.picture)}<div><b>${esc(u.name)}</b>${u.id === state.me.user.id ? ' <span class="chip">You</span>' : ''}<span class="sub">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</span></div></div></td>
-        <td data-v="${esc(u.roleName)}">${roleCell}${u.leads.length ? `<span class="sub">Leads ${esc(u.leads.join(', '))}</span>` : ''}</td><td title="${esc(u.teamPath)}" data-v="${esc(u.team || '—')}">${teamCell}</td>
+        <td data-v="${esc(u.roleName)}">${roleCell}${u.leads.length ? `<span class="sub">Leads ${esc(u.leads.join(', '))}</span>` : ''}</td><td title="${esc(u.teamPath)}" data-v="${esc(u.team || '—')}">${teamCell}${u.manager ? `<span class="sub">Reports to ${esc(u.manager)}</span>` : ''}</td>
         <td title="Signs in with ${u.signIn === 'sso' ? 'single sign-on' : 'a password'}"><span class="chip ${kind}"><i></i>${label}</span>${u.lockedUntil ? `<span class="sub">until ${esc(new Date(u.lockedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>` : ''}</td>
         <td class="small">${esc(ago(u.lastSignInAt))}</td><td class="actions">${acts}</td></tr>`;
     }).join('') || `<tr><td colspan="${manage ? 8 : 7}"><div class="empty"><b>Nobody matches</b></div></td></tr>`;
@@ -163,6 +174,13 @@ export function peopleTable(d) {
       if (confirm(`Move ${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'} to ${name}?`)) await runBulk(`Team → ${name}`, (u) => api(P(u), { method: 'PUT', body: { teamId: e.target.value } }));
       e.target.value = '';
     };
+    $('#bulk-manager').onchange = async (e) => {
+      if (!e.target.value) return;
+      const name = e.target.selectedOptions[0].textContent;
+      const managerId = e.target.value === '-' ? null : e.target.value;
+      if (confirm(`${num(selected.size)} ${selected.size === 1 ? 'person reports' : 'people report'} to ${managerId ? name : 'nobody'}?`)) await runBulk(`Reports to → ${name}`, (u) => api(P(u), { method: 'PUT', body: { managerId } }));
+      e.target.value = '';
+    };
     $('#bulk-clear').onclick = () => (selected.clear(), render());
     $('#bulk').addEventListener('click', async (e) => {
       const act = e.target.closest('[data-bulk]')?.dataset.bulk;
@@ -188,7 +206,7 @@ export function peopleTable(d) {
       }
     });
   }
-  for (const id of ['#q', '#f-role', '#f-team', '#f-status']) $(id)[id === '#q' ? 'oninput' : 'onchange'] = () => ((page = 0), render());
+  for (const id of ['#q', '#f-role', '#f-team', '#f-manager', '#f-status']) $(id)[id === '#q' ? 'oninput' : 'onchange'] = () => ((page = 0), render());
   $('#prev').onclick = () => (page--, render());
   $('#next').onclick = () => (page++, render());
   if (manage) {
@@ -323,12 +341,14 @@ export function openPerson(d, u) {
   wrap.innerHTML = `<div class="drawer-shade" data-close></div><aside class="drawer half" role="dialog" aria-modal="true" aria-label="Manage ${esc(u.name)}">
     <button type="button" class="drawer-close" data-close title="Close (Esc)" aria-label="Close">✕</button>
     <div class="person-head">${avatar(u.name, u.picture)}<div><h1 class="serif">${esc(u.name)}${self ? ' <span class="chip">You</span>' : ''}</h1><p class="muted">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''}</p>
-      <p class="person-meta"><span class="chip ${kind}"><i></i>${label}</span><span class="chip role">${esc(u.roleName)}</span><span>${esc(u.teamPath || u.team || 'No team')}</span><span class="muted">Last sign-in ${esc(ago(u.lastSignInAt))} · ${u.signIn === 'sso' ? 'single sign-on' : 'password'}</span></p></div></div>
-    <div class="panel mt"><h2>Name, role and team</h2>
+      <p class="person-meta"><span class="chip ${kind}"><i></i>${label}</span><span class="chip role">${esc(u.roleName)}</span><span>${esc(u.teamPath || u.team || 'No team')}</span><span class="muted">Last sign-in ${esc(ago(u.lastSignInAt))} · ${u.signIn === 'sso' ? 'single sign-on' : 'password'}</span></p>
+      <p class="person-meta">${u.manager ? `<span>Reports to <b>${esc(u.manager)}</b></span>` : '<span class="muted">Reports to nobody yet</span>'}${u.reports?.length ? `<span class="muted">· ${num(u.reports.length)} ${u.reports.length === 1 ? 'person reports' : 'people report'} to them: ${esc(u.reports.slice(0, 6).map((x) => x.name).join(', '))}${u.reports.length > 6 ? '…' : ''}</span>` : ''}</p></div></div>
+    <div class="panel mt"><h2>Name, role, team and manager</h2>
       <form class="form" id="person-form" data-nodraft>
         <div class="row"><label class="f">Name<input name="name" required maxlength="120" value="${esc(u.name)}" /></label><label class="f">Title<input name="title" maxlength="120" value="${esc(u.title ?? '')}" placeholder="Sales Engineer" /></label></div>
         <div class="row"><label class="f">Role<select name="role"${self ? ' disabled title="Your own role is changed by someone else"' : ''}>${roles.map((x) => `<option value="${esc(x.id)}"${x.id === u.role ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
         <label class="f">Team<select name="team" required>${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label></div>
+        <label class="f">Reports to <span class="muted">their manager: sets the hierarchy of sales, SE and CSM leadership</span><select name="manager"><option value="">Nobody</option>${(d.managers ?? []).filter((m) => m.id !== u.id).map((m) => `<option value="${esc(m.id)}"${m.id === u.managerId ? ' selected' : ''}>${esc(m.name)}${m.title ? ` · ${esc(m.title)}` : ''}</option>`).join('')}${u.managerId && !(d.managers ?? []).some((m) => m.id === u.managerId) ? `<option value="${esc(u.managerId)}" selected>${esc(u.manager)}</option>` : ''}</select></label>
         <p class="muted small" id="person-role-says">${esc(roles.find((x) => x.id === u.role)?.description ?? '')}</p>
         <p class="muted small">Their accounts follow them to the new team.</p>
         <div class="flex"><button class="primary" type="submit">Save</button><span class="err" id="person-err"></span></div>
@@ -352,7 +372,7 @@ export function openPerson(d, u) {
     e.preventDefault();
     const f = new FormData(form);
     try {
-      const res = await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body: { name: f.get('name'), title: f.get('title'), role: self ? u.role : f.get('role'), teamId: f.get('team') } });
+      const res = await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body: { name: f.get('name'), title: f.get('title'), role: self ? u.role : f.get('role'), teamId: f.get('team'), ...((f.get('manager') || null) !== (u.managerId ?? null) ? { managerId: f.get('manager') || null } : {}) } });
       close();
       toast(res.accountsMoved ? `Saved. Their ${num(res.accountsMoved)} account${res.accountsMoved === 1 ? '' : 's'} moved with them to the new team.` : 'Saved.', 'ok');
       viewPeople('people');

@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.77.00 — 2026-11-12
+
+- **People: a reporting manager for everyone.** In a person's Manage panel, *Reports to* sets their manager: anyone with access, in any team, so the hierarchy of sales, SE and CSM leadership can be recorded as it is. The panel says whom they report to and who reports to them; the list shows "Reports to …" under the team.
+- **Find and set it for many.** The People list has a *Reports to* filter: everyone under a person, at every level, or those who report to nobody. Select several people and set *Reports to* for all of them in the bar that appears.
+- Nobody reports to themselves and no circle can be made (the message says why). When a manager is removed, their people report to that manager's own manager. Every change is in the audit log with the old and the new manager.
+- Nobody has a manager until one is set, and it changes nothing else: what each person may see and do still comes from their role and their team.
+
 ## CC-01.76.00 — 2026-11-12
 
 - **Calculator, from Git: no empty "How it is measured" bar.** The folded line shows only when repositories were counted in this session ("Repository by repository: 22 counted, 1 not · how it is measured"); with nothing counted it is not there.
