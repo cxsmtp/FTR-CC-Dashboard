@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.82.00 — 2026-11-12
+
+- **No account without its Salesforce link and a projection.** In the calculator, a new customer's name is not enough any more: the Salesforce link field sits next to it from the start, and Enter asks for the link when it is missing or not Salesforce's. The server refuses an account without a valid link too.
+- **Kept for its maker alone until it has a projection.** With its name and link, the account is held only in the calculator of the person who started it, marked *Not saved yet: bring in data to keep it*. It is nowhere else, not in Accounts, Overview, dashboards or exports, and not for Admins. Its first projection (Checkmarx One read, the two exports or a report uploaded, code counted, or a project added) makes it an account: a draft, its SE's and the Admins' until its first report (CC-01.80.00).
+- **Started and left with nothing for a day: discarded,** and recorded in the audit log (account.discarded). Accounts that exist already are not touched.
+
 ## CC-01.81.00 — 2026-11-12
 
 - **An uploaded report fills the calculator.** Until now a report brought in (*A previous report*, or *The customer's version*) was only kept as a report: Triage & remediation, Fusion and the settings stayed as they were. Now, with *Load its figures into the calculator* ticked (the default), the calculator takes them from the report: the backlog by severity and its trend, the plan (findings chosen, false positives, findings to come, AI, pace, More found by Fusion), the projection period, Fusion's projects with their scans and models, the code counted from git or cloc-fusion, and the extra credits. The calculator then shows the report's own numbers, and everything can be changed from there.

@@ -11,7 +11,7 @@ import { AuditLog, Doc, fail } from './store.js';
 import { Iam, clean, publicUser } from './iam.js';
 import { PERMISSIONS, need, needTeam, peopleInScope, scopeOf, subtree, teamPath, homeOf } from './rbac.js';
 import { Teams } from './teams.js';
-import { Accounts, DEFAULT_SALESFORCE_HOSTS, viewing } from './accounts.js';
+import { Accounts, DEFAULT_SALESFORCE_HOSTS, checkSalesforceUrl, viewing } from './accounts.js';
 import { newProfile } from '../core/public/calculator/profiles.js';
 import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
@@ -782,7 +782,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return moved;
   };
   /** Accounts in the teams this person works in that are not in their SE's team: to look at, and to move. */
-  const outOfStepFor = (ctx) => outOfStep().filter(({ a, owner }) => ctx.scope.has(a.teamId) && (ctx.permissions.has('scope.all') || ctx.scope.has(owner.teamId)));
+  const outOfStepFor = (ctx) => outOfStep().filter(({ a, owner }) => !a.pendingSince && ctx.scope.has(a.teamId) && (ctx.permissions.has('scope.all') || ctx.scope.has(owner.teamId)));
   r('GET', '/api/cc/accounts-out-of-step', perm('users.manage'), (req, ctx) => ({ accounts: outOfStepFor(ctx).map(({ a, owner }) => ({ id: a.id, name: a.name, owner: owner.name, from: teamName(a.teamId), to: teamName(owner.teamId) })) }));
   r('POST', '/api/cc/accounts-follow', perm('users.manage'), (req, ctx, body) => {
     const wanted = Array.isArray(body?.ids) ? new Set(body.ids.map(String)) : null;
@@ -811,6 +811,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       // The account's team and contacts as kept, and the addresses its reports were shared with (read from the reports).
       contacts: a.contacts ?? [],
       draft: accounts.isDraft(a.id),
+      pending: Boolean(accounts.accounts.meta(a.id)?.pendingSince),
       usedEmails: [...reps.reduce((m, x) => {
         for (const e of x.sharedWith ?? []) if (!m.has(e) || String(x.sharedAt) > m.get(e)) m.set(e, x.sharedAt ?? '');
         return m;
@@ -1459,6 +1460,24 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
     return { restored: describeBackup(bundle), before, restarting: supervised };
   });
+  // Accounts started (name and Salesforce link) and left with nothing to calculate for a day: discarded, and said so.
+  const sweepStarted = () => {
+    try {
+      for (const a of accounts.discardStale()) {
+        try {
+          audit.record({ actor: { id: 'system', name: 'Command Center', email: '' }, action: 'account.discarded', target: a.name, details: { id: a.id, startedAt: a.since, by: userName(a.ownerId), reason: 'no projection within a day' } });
+        } catch {}
+      }
+    } catch (error) {
+      log(`[accounts] ${error.message}`);
+    }
+  };
+  startJobs.push(() => {
+    sweepStarted();
+    const t = setInterval(sweepStarted, 60 * 60 * 1000);
+    t.unref?.();
+    stopJobs.push(() => clearInterval(t));
+  });
   startJobs.push(() => {
     // Nightly: an hour after the last one is a day old.
     const t = setInterval(() => {
@@ -1691,8 +1710,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // ---- The calculator's API (/api/projections…), per team -----------------------------------------------------
   r('GET', '/api/projections', calcTeam, (req, ctx) => ({ customers: accounts.list(ctx.teamSet).map((a) => ({ ...a })).sort((a, b) => String(a.name).localeCompare(String(b.name))), organisationName: settings.value.organisationName, impactDefaults: impactSettings({}) }));
   r('POST', '/api/projections', calcTeam, (req, ctx, body) => {
-    const a = accounts.create({ name: body?.name, teamId: ctx.team, user: ctx.user });
-    record(ctx, req, 'account.create', a.name, { id: a.id, team: teams.get(ctx.team)?.name });
+    // An account is made only with its Salesforce link, and kept for its maker alone until it has a projection.
+    if (!String(body?.salesforceUrl ?? '').trim()) throw fail(409, 'Give the account\u2019s Salesforce opportunity or account link with its name: an account is made only with both.');
+    const salesforce = checkSalesforceUrl(body.salesforceUrl, hosts().salesforce);
+    const a = accounts.start({ name: body?.name, teamId: ctx.team, user: ctx.user, salesforce });
+    record(ctx, req, 'account.start', a.name, { id: a.id, team: teams.get(ctx.team)?.name, salesforce: salesforce.recordId });
     return { customer: withTrRates(withRates(a, ratesFor(ctx.user.id))) };
   });
   r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../core/src/standalone-calculator.js')).reportRuntime());
@@ -2148,7 +2170,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         for (const h of match.handlers) out = await h(req, ctx, body, res, url, match.params);
         return out;
       };
-      const result = ctx?.user ? await viewing.run({ id: ctx.user.id, admin: ctx.user.role === 'admin' }, handle) : await handle();
+      const result = ctx?.user ? await viewing.run({ id: ctx.user.id, admin: ctx.user.role === 'admin', calc: pathname.startsWith('/api/projections') }, handle) : await handle();
       const exported = result?.download !== undefined || result?.csv !== undefined;
       if (method !== 'GET' || exported || READS.has(match.pattern)) auditRequest(req, ctx, method, pathname, match, { status: 200 });
       if (result?.download !== undefined) return send(res, 200, result.download, { 'Content-Type': `${result.type ?? 'application/octet-stream'}`, 'Content-Disposition': `attachment; filename="${result.name}"` });

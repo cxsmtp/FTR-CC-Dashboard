@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import { DEFAULT_FUSION_RATES, engineKey, rateModels, withRates } from '../server/fusion-rates.js';
-import { client, start } from './helpers.js';
+import { SF, client, start } from './helpers.js';
 
 let env;
 before(async () => {
@@ -67,7 +67,7 @@ test('the Admin sets the rates, for everyone; no team has its own', async () => 
   assert.equal(r.data.canTeams, false);
   assert.equal(r.data.effective.models.find((m) => m.name === 'Opus 5.5').creditsPer10k, 2);
   // A new account in the calculator starts with the Admin's rated engines and default engine.
-  const created = await se.post('/api/projections', { name: 'Rated Co' }, { 'X-Team': env.teams.emea.id });
+  const created = await se.post('/api/projections', { name: 'Rated Co', salesforceUrl: SF }, { 'X-Team': env.teams.emea.id });
   const f = created.data.customer.fusion;
   assert.equal(engineKey(f.models.find((m) => m.id === f.defaultModel).name), engineKey('Opus 5.5'));
   assert.equal(f.models.find((m) => engineKey(m.name) === engineKey('Opus 5.5')).creditsPer10k, 2);
@@ -83,7 +83,7 @@ test('the Admin sets the rates, for everyone; no team has its own', async () => 
 });
 
 test('Customer Success works out projections for an SE they choose: no report until one is accountable', async () => {
-  const { reportData, SF } = await import('./helpers.js');
+  const { reportData } = await import('./helpers.js');
   const csUser = (await env.app.iam.create({ email: 'cs@t.example', name: 'Casey Success', role: 'cs', teamId: env.teams.emea.id })).user;
   const { hashPassword } = await import('../server/iam.js');
   Object.assign(csUser, { passwordHash: await hashPassword('Test-Password-For-Tests-1'), mustChangePassword: false, guideSeenAt: new Date().toISOString() });
@@ -91,7 +91,7 @@ test('Customer Success works out projections for an SE they choose: no report un
   env.app.terms.accept(csUser.id);
   const cs = await client(env.base, 'cs@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const made = await cs.post('/api/projections', { name: 'CS Account' }, h);
+  const made = await cs.post('/api/projections', { name: 'CS Account', salesforceUrl: SF }, h);
   assert.equal(made.status, 200);
   const id = made.data.customer.id;
   assert.equal((await cs.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF })).status, 200);
@@ -116,7 +116,7 @@ test('triage and remediation credits: the Admin’s, in every projection, whatev
   assert.equal(r.status, 200);
   assert.equal(r.data.trRates.triageCost.Critical, 2);
   assert.equal(r.data.trRates.triageCost.High, 1);
-  const made = await se.post('/api/projections', { name: 'Fixed Rates Co' }, h);
+  const made = await se.post('/api/projections', { name: 'Fixed Rates Co', salesforceUrl: SF }, h);
   const id = made.data.customer.id;
   assert.equal(made.data.customer.tr.triageCost.Critical, 2);
   assert.equal(made.data.customer.tr.remediationCost.Low, 4);
@@ -131,13 +131,13 @@ test('triage and remediation credits: the Admin’s, in every projection, whatev
 });
 
 test('a leader changes the accountable SE of a projection someone else made; that SE records what was shared', async () => {
-  const { reportData, SF } = await import('./helpers.js');
+  const { reportData } = await import('./helpers.js');
   const lead = await client(env.base, 'emea.lead@t.example');
   const se1 = await client(env.base, 'se1@t.example');
   const se2 = await client(env.base, 'se2@t.example');
   const viewer = await client(env.base, 'viewer@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const made = await se1.post('/api/projections', { name: 'Handover Co' }, h);
+  const made = await se1.post('/api/projections', { name: 'Handover Co', salesforceUrl: SF }, h);
   const id = made.data.customer.id;
   await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
   // A draft is its SE's: the leader does not see it yet, so cannot hand it over.
@@ -156,7 +156,7 @@ test('a leader changes the accountable SE of a projection someone else made; tha
 });
 
 test('an Executive mutes an account from the forecast: the dashboards leave it out, the list keeps it', async () => {
-  const { reportData, SF } = await import('./helpers.js');
+  const { reportData } = await import('./helpers.js');
   const exec = (await env.app.iam.create({ email: 'exec@t.example', name: 'Eve Exec', role: 'executive', teamId: env.teams.global.id })).user;
   const { hashPassword } = await import('../server/iam.js');
   Object.assign(exec, { passwordHash: await hashPassword('Test-Password-For-Tests-1'), mustChangePassword: false, guideSeenAt: new Date().toISOString() });
@@ -166,7 +166,7 @@ test('an Executive mutes an account from the forecast: the dashboards leave it o
   const lead = await client(env.base, 'emea.lead@t.example');
   const se = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const id = (await se.post('/api/projections', { name: 'Mute Me Co' }, h)).data.customer.id;
+  const id = (await se.post('/api/projections', { name: 'Mute Me Co', salesforceUrl: SF }, h)).data.customer.id;
   await se.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
   await se.post('/api/projections/reports', { customerId: id, data: reportData(70000, 30000) }, h);
   const before = (await ex.get('/api/dashboard')).data.totals;
@@ -239,8 +239,9 @@ test('roles are changed only by their own id; teams are managed only within the 
 test('accounts follow their accountable SE: moved with them, with a new SE, and caught up in one click', async () => {
   const admin = await client(env.base, 'admin@t.example');
   const se = await client(env.base, 'se2@t.example');
-  const made = await se.post('/api/projections', { name: 'Follower Co' }, { 'X-Team': env.teams.emea.id });
+  const made = await se.post('/api/projections', { name: 'Follower Co', salesforceUrl: SF }, { 'X-Team': env.teams.emea.id });
   const id = made.data.customer.id;
+  await se.put(`/api/projections/${id}`, { fusion: { projects: [{ id: 'p', name: 'payments', loc: 50000, frequency: 'month', source: 'scan' }] } }, { 'X-Team': env.teams.emea.id });
   const teamOf = async () => (await admin.get('/api/accounts')).data.accounts.find((a) => a.id === id).teamId;
   assert.equal(await teamOf(), env.teams.emea.id);
   // The SE moves to APAC: the account goes with them.
@@ -270,7 +271,7 @@ test('accounts follow their accountable SE: moved with them, with a new SE, and 
 
 test('an account keeps its team and contacts: added, cleaned, refused when wrong, and audited', async () => {
   const admin = await client(env.base, 'admin@t.example');
-  const made = await admin.post('/api/projections', { name: 'Contacts Co' }, { 'X-Team': env.teams.emea.id });
+  const made = await admin.post('/api/projections', { name: 'Contacts Co', salesforceUrl: SF }, { 'X-Team': env.teams.emea.id });
   const id = made.data.customer.id;
   let r = await admin.get(`/api/cc/accounts/${id}`);
   assert.deepEqual(r.data.contacts, []);

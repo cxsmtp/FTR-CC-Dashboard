@@ -680,9 +680,9 @@ html[data-no-account] .content > main::before { content: none; }
 .hc-start { display: none; margin: 0; color: var(--muted); font-size: var(--hc-fs, 14px); max-width: 70ch; }
 .hc-start kbd { font: inherit; font-size: .9em; padding: 0 5px; border: 1px solid var(--line-hi, var(--border)); border-radius: 5px; }
 html[data-no-account] .hc-start { display: block; }
-html[data-no-account] .hc-status-wrap, html[data-no-account] .hc-src, html[data-no-account] .hc-meta, html[data-no-account] .hc-row1 .hc-sf, html[data-no-account] .hc-row1 .hc-owner, html[data-no-account] #hc-reports, html[data-no-account] .hc-fold-sum { display: none !important; }
-html[data-no-account] .hc-row1 { grid-template-columns: minmax(260px, 520px) minmax(180px, 280px) !important; justify-content: start; }
-html[data-no-account] .hc-account { max-width: 900px; }
+html[data-no-account] .hc-status-wrap, html[data-no-account] .hc-src, html[data-no-account] .hc-meta, html[data-no-account] .hc-row1 .hc-owner, html[data-no-account] #hc-sf-open, html[data-no-account] #hc-reports, html[data-no-account] .hc-fold-sum { display: none !important; }
+html[data-no-account] .hc-row1 { grid-template-columns: minmax(220px, 360px) minmax(320px, 1fr) minmax(160px, 240px) !important; justify-content: start; }
+html[data-no-account] .hc-account { max-width: 1200px; }
 
 /* A previous report: beside the customer's version, the same height, quieter */
 .hc-meta #hc-prev-l { order: 6; height: var(--hc-h) !important; display: inline-flex !important; align-items: center; padding: 0 clamp(12px, 1vw, 18px) !important; border-radius: 10px; border: 1px solid var(--line-hi, var(--border)); background: var(--cc-panel, var(--surface)); font-weight: 600; font-size: var(--hc-fs); cursor: pointer; white-space: nowrap; }

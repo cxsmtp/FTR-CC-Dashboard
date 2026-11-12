@@ -108,7 +108,13 @@ const accountMeta = (a) => ({
   lastSaleAt: (a.sales ?? []).map((x) => x.date).sort().at(-1) ?? null,
   impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed),
   publishedAt: a.publishedAt ?? null,
+  pendingSince: a.pendingSince ?? null,
 });
+
+/** Something to calculate with: a backlog read or uploaded, Fusion projects, code counted, or a report. */
+export const hasProjection = (a) => Boolean(a?.tr?.totals || a?.fusion?.projects?.length || a?.fusionNew?.projects?.length);
+/** How long an account started and left with nothing to calculate is kept before it is discarded. */
+export const PENDING_MS = 24 * 60 * 60 * 1000;
 
 const reportIndex = (r) => ({
   ...reportMeta(r),
@@ -148,8 +154,10 @@ export class Accounts {
     return out;
   }
   /** A draft, and the person looking is neither its SE, nor who made it, nor an Admin. */
-  hiddenFrom(meta, published = this.published()) {
+  hiddenFrom(meta, published = this.published(), { listing = false } = {}) {
     const v = viewing.getStore();
+    // Started but not made yet (no projection): its maker's alone, and listed only in the calculator they work in.
+    if (meta.pendingSince) return !v || (meta.ownerId !== v.id && meta.createdById !== v.id && !(v.admin && !listing)) || (listing && !v.calc);
     if (!v || v.admin || published.has(meta.id)) return false;
     return meta.ownerId !== v.id && meta.createdById !== v.id;
   }
@@ -163,14 +171,33 @@ export class Accounts {
   }
   list(teamIds) {
     const published = this.published();
-    return this.accounts.list().filter((a) => teamIds.has(a.teamId) && !this.hiddenFrom(a, published)).map((a) => (published.has(a.id) ? a : { ...a, draft: true }));
+    return this.accounts.list().filter((a) => teamIds.has(a.teamId) && !this.hiddenFrom(a, published, { listing: true })).map((a) => (published.has(a.id) ? a : { ...a, draft: true }));
   }
   /** An account in one of the teams given, or 404 (another team's account is not said to exist; a draft is its SE's). */
   get(id, teamIds) {
     const meta = this.accounts.meta(id);
     if (!meta || !teamIds.has(meta.teamId)) throw fail(404, 'That account no longer exists, or is not in a team you work in.');
-    if (this.hiddenFrom(meta)) throw fail(404, 'That account is still being prepared by its Sales Engineer: it shows here once a report is generated for it.');
+    if (this.hiddenFrom(meta)) throw fail(404, meta.pendingSince ? 'That account is not made yet: it is kept once it has its Salesforce link and a projection.' : 'That account is still being prepared by its Sales Engineer: it shows here once a report is generated for it.');
     return migrate(this.accounts.get(id));
+  }
+  /** Started, with its Salesforce link: kept for its maker alone until it has a projection (then it is made). */
+  start({ name, teamId, user, impact = {}, salesforce }) {
+    const a = this.create({ name, teamId, user, impact });
+    return this.accounts.put({ ...this.accounts.get(a.id), salesforceUrl: salesforce.url, salesforceKind: salesforce.kind, salesforceId: salesforce.recordId, pendingSince: new Date().toISOString() });
+  }
+  /** Started more than a day ago and still with nothing to calculate: discarded. Returns those removed. */
+  discardStale(now = Date.now()) {
+    const out = [];
+    for (const meta of this.accounts.list()) {
+      if (!meta.pendingSince || now - Date.parse(meta.pendingSince) < PENDING_MS) continue;
+      const a = this.accounts.get(meta.id);
+      if (!a || hasProjection(a) || this.reports.list().some((x) => x.customerId === meta.id)) continue;
+      try {
+        this.accounts.remove(meta.id);
+        out.push({ id: meta.id, name: meta.name, teamId: meta.teamId, ownerId: meta.ownerId, since: meta.pendingSince });
+      } catch {}
+    }
+    return out;
   }
   create({ name, teamId, user, impact = {} }) {
     if (this.accounts.list().filter((a) => a.teamId === teamId).length >= MAX_PROFILES * 10) throw fail(409, 'This team has too many accounts: delete some first.');
@@ -181,6 +208,8 @@ export class Accounts {
   update(id, teamIds, patch, user) {
     const current = this.get(id, teamIds);
     const next = patchProfile(current, patch, user.name);
+    // Its first projection: the account is made (still a draft, its SE's, until a report).
+    if (next.pendingSince && hasProjection(next)) next.pendingSince = null;
     return this.accounts.put(next);
   }
   setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency, contacts }, hosts, { impactBase = null } = {}) {
@@ -309,7 +338,7 @@ export class Accounts {
     const account = this.get(customerId, teamIds);
     if (!account.salesforceUrl) throw fail(409, 'Add the Salesforce opportunity or account link for this account first (at the top of the page): every report must be tied to one.');
     const report = newReport({ customerId: account.id, customer: account.name, by: user.name, data });
-    if (!account.publishedAt) this.accounts.put({ ...this.accounts.get(account.id), publishedAt: new Date().toISOString() });
+    if (!account.publishedAt || account.pendingSince) this.accounts.put({ ...this.accounts.get(account.id), publishedAt: account.publishedAt ?? new Date().toISOString(), pendingSince: null });
     Object.assign(report, { teamId: account.teamId, createdById: user.id, ownerId: account.ownerId, salesforceUrl: account.salesforceUrl, salesforceKind: account.salesforceKind, sharedAt: null, sharedById: null, sharedNote: '' });
     return this.reports.put(report);
   }

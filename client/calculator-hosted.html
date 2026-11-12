@@ -51,7 +51,7 @@
           <label class="field hc-team"><span>Team (region)</span><select id="hc-team"></select></label>
           <label class="field hc-owner"><span>Accountable SE</span><select id="hc-owner"></select></label>
         </div>
-        <p class="hc-start" id="hc-start">Type the customer’s name as it is in Salesforce and press <kbd>Enter</kbd>. A name you worked on before opens that account; a new one starts a new calculation in the team chosen.</p>
+        <p class="hc-start" id="hc-start">Type the customer’s name as it is in Salesforce. A name you worked on before opens that account. A new one needs its <b>Salesforce link</b> too: paste it and press <kbd>Enter</kbd>. The account is kept once you bring in its data (read Checkmarx One, upload, or count code); started and left with nothing, it is discarded after a day.</p>
         <div class="hc-src">
           <span class="hc-src-l">Data from</span>
           <div class="hc-seg" role="tablist" aria-label="Where the data comes from"><button type="button" role="tab" data-src="cxone" class="on">Checkmarx One</button><button type="button" role="tab" data-src="git" data-also="cloc" title="The customer's code, counted here with their read-only token, or by them with cloc-fusion">Code repositories</button></div>

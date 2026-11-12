@@ -28,7 +28,7 @@ after(async () => {
 test('a key kept for an account: sealed, never sent to a browser, used by the team in one click', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const { data } = await se1.post('/api/projections', { name: 'Kept Key Corp' }, h);
+  const { data } = await se1.post('/api/projections', { name: 'Kept Key Corp', salesforceUrl: SF }, h);
   const id = data.customer.id;
   await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
   // Made up for this run (never a real key, and none kept in the source).
@@ -86,7 +86,7 @@ test('a Checkmarx One connection is for one account: never read into another, an
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
   const make = async (name) => {
-    const id = (await se1.post('/api/projections', { name }, h)).data.customer.id;
+    const id = (await se1.post('/api/projections', { name, salesforceUrl: SF }, h)).data.customer.id;
     await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
     return { id, name, teamId: env.teams.emea.id };
   };
@@ -113,7 +113,7 @@ test('a Checkmarx One connection is for one account: never read into another, an
 test('what was read from Checkmarx One can be taken out of an account: its backlog and read projects go, the rest stays', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const id = (await se1.post('/api/projections', { name: 'Wrong Data Corp' }, h)).data.customer.id;
+  const id = (await se1.post('/api/projections', { name: 'Wrong Data Corp', salesforceUrl: SF }, h)).data.customer.id;
   const weeks = ['2026-09-01', '2026-10-01'];
   const sev = { Critical: [5, 6], High: [7, 8], Medium: [1, 1], Low: [0, 0] };
   const put = await se1.put(`/api/projections/${id}`, {

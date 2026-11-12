@@ -294,6 +294,7 @@ export async function startHosted() {
 
   // The calculator's own requests (/api/projections…), with the account opened followed for the account bar.
   let newByClick = false;
+  let pendingSf = '';
   let openCustomer = null;
   let calculator = null;
   const RESERVED = new Set(['reports', 'read', 'series', 'git', 'report-runtime', 'standalone', 'fusion']);
@@ -305,6 +306,12 @@ export async function startHosted() {
       // Nothing to say: the page already asks for the customer's name.
       if (!newByClick) throw fail(409, '');
       newByClick = false;
+      // An account is made only with its Salesforce link: the one typed next to the name goes with it.
+      let made = {};
+      try {
+        made = JSON.parse(options.body || '{}');
+      } catch {}
+      options = { ...options, body: JSON.stringify({ ...made, salesforceUrl: pendingSf }) };
     }
     const work = workOf(method, url.pathname);
     if (work) busy.start(work);
@@ -330,6 +337,7 @@ export async function startHosted() {
       if (method === 'GET') showAccount(decodeURIComponent(m[1]));
       if (method === 'DELETE') showAccount(null);
       if (method === 'PUT') refreshAccountSoon();
+      if (method === 'PUT' && accountPending) setTimeout(() => account && showAccount(account.id), 1200);
     }
     if (method === 'POST' && url.pathname === '/api/projections' && answer.customer) showAccount(answer.customer.id);
     if (url.pathname === '/api/projections/reports' && method === 'POST') {
@@ -566,6 +574,7 @@ export async function startHosted() {
   let account = null;
   let reshowCx = null;
   let accountDraft = false;
+  let accountPending = false;
   let refreshTimer = null;
   const refreshAccountSoon = () => {
     clearTimeout(refreshTimer);
@@ -578,8 +587,10 @@ export async function startHosted() {
     if (!id) {
       account = null;
       bar.classList.remove('missing-sf');
-      $('hc-sf').value = '';
-      $('hc-sf').disabled = $('hc-sf-save').disabled = $('hc-owner').disabled = true;
+      // A new account: its name and its Salesforce link, together.
+      if (document.activeElement !== $('hc-sf')) $('hc-sf').value = '';
+      $('hc-sf').disabled = $('hc-sf-save').disabled = false;
+      $('hc-owner').disabled = true;
       $('hc-sf-open').hidden = true;
       $('hc-owner').innerHTML = '';
       $('hc-reports').innerHTML = '<span>Open or add an account below.</span>';
@@ -593,8 +604,9 @@ export async function startHosted() {
       return;
     }
     try {
-      const { account: a, members, draft } = await server(`/api/cc/accounts/${encodeURIComponent(id)}`);
+      const { account: a, members, draft, pending } = await server(`/api/cc/accounts/${encodeURIComponent(id)}`);
       accountDraft = Boolean(draft);
+      accountPending = Boolean(pending);
       const switched = account?.id !== a.id;
       account = a;
       if (switched && lastCx && typeof reshowCx === 'function') reshowCx();
@@ -709,7 +721,7 @@ export async function startHosted() {
     const parts = [
       '<span class="hc-label">Status</span>',
       account ? `<span class="hc-st cust"><i></i><b>${esc(account.name)}</b></span>` : '',
-      account && accountDraft ? '<span class="hc-st draft" title="Only you (its SE) and the Admins see this account until a report is generated for it; then its team does."><i></i>Draft: only you and Admins see it</span>' : '',
+      account && accountPending ? '<span class="hc-st draft" title="Kept for you alone: it becomes an account once it has a projection (read Checkmarx One, upload the two exports or a report, or count code). Left with nothing for a day, it is discarded."><i></i>Not saved yet: bring in data to keep it</span>' : account && accountDraft ? '<span class="hc-st draft" title="Only you (its SE) and the Admins see this account until a report is generated for it; then its team does."><i></i>Draft: only you and Admins see it</span>' : '',
       fusionOnly ? chip('ok', 'New customer · Fusion only') : cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
     ];
     if (account) {
@@ -844,7 +856,16 @@ export async function startHosted() {
   });
 
   $('hc-sf-save').addEventListener('click', async () => {
-    if (!account) return;
+    // No account yet: the name and this link make it.
+    if (!account) {
+      if (!$('hc-name').value.trim() && newName) $('hc-name').value = newName;
+      if (!$('hc-name').value.trim()) {
+        toast('Type the customer\u2019s name as in Salesforce, then press Enter.', 'warn');
+        return $('hc-name').focus();
+      }
+      naming = true;
+      return $('hc-name').dispatchEvent(new Event('change'));
+    }
     try {
       await server(`/api/cc/accounts/${encodeURIComponent(account.id)}`, { method: 'PUT', body: { salesforceUrl: $('hc-sf').value } });
       toast('Salesforce link saved.', 'ok');
@@ -986,9 +1007,10 @@ export async function startHosted() {
   const picker = $('calc-customer');
   const names = () => [...picker.options].map((o) => ({ id: o.value, name: o.textContent.trim() }));
   const openName = () => picker.selectedOptions[0]?.textContent.trim() ?? '';
+  let newName = ''; // a new account's name, typed and waiting for its Salesforce link
   const syncName = () => {
     $('hc-names').innerHTML = names().map((x) => `<option value="${esc(x.name)}"></option>`).join('');
-    if (document.activeElement !== $('hc-name')) $('hc-name').value = picker.value ? openName() : '';
+    if (document.activeElement !== $('hc-name')) $('hc-name').value = picker.value ? openName() : newName;
     $('hc-account').classList.toggle('missing-name', !picker.value);
   };
   new MutationObserver(syncName).observe(picker, { childList: true, subtree: true, characterData: true, attributes: true });
@@ -1020,8 +1042,20 @@ export async function startHosted() {
     }
     if (match) return;
     if (!picker.value || naming) {
+      // Made only with its Salesforce link: asked for here, before anything is saved. The name stays as typed meanwhile.
+      const sf = $('hc-sf').value.trim();
+      const check = sfRead(sf);
+      if (!sf || check.error) {
+        naming = true;
+        newName = typed;
+        toast(sf ? check.error : `Paste ${typed}\u2019s Salesforce opportunity or account link too: the account is made with both.`, 'warn', 7000);
+        $('hc-sf').focus();
+        return;
+      }
       naming = false;
+      newName = '';
       $('hc-name').placeholder = 'Type the account\u2019s name, or pick one';
+      pendingSf = sf;
       return startAccount(typed).catch((error) => toast(error.message, 'bad'));
     }
     // The open account's name, as Salesforce has it.

@@ -47,9 +47,17 @@ test('an account is its SE’s until its first report; then the team shares it, 
   const lead = await client(env.base, 'emea.lead@t.example');
   const admin = await client(env.base, 'admin@t.example');
   const apac = await client(env.base, 'apac@t.example');
-  const made = await se1.post('/api/projections', { name: 'Shared Corp' }, team(env.teams.emea.id));
+  const made = await se1.post('/api/projections', { name: 'Shared Corp', salesforceUrl: SF }, team(env.teams.emea.id));
   assert.equal(made.status, 200);
   const id = made.data.customer.id;
+  // Started (name and link) with nothing to calculate yet: only in its maker's calculator, nowhere else, not even for an Admin.
+  assert.ok((await se1.get('/api/projections', team(env.teams.emea.id))).data.customers.some((c) => c.id === id));
+  assert.ok(!(await se1.get('/api/accounts')).data.accounts.some((a) => a.id === id));
+  assert.ok(!(await admin.get('/api/accounts')).data.accounts.some((a) => a.id === id));
+  assert.equal((await se1.get(`/api/cc/accounts/${id}`)).data.pending, true);
+  // Its first projection makes it: a draft, its SE's and the Admin's.
+  assert.equal((await se1.put(`/api/projections/${id}`, { fusion: { projects: [{ id: 'p', name: 'payments', loc: 50000, frequency: 'month', source: 'scan' }] } }, team(env.teams.emea.id))).status, 200);
+  assert.equal((await se1.get(`/api/cc/accounts/${id}`)).data.pending, false);
   // A draft: its SE and the Admin see it; a teammate and the leader do not, anywhere.
   assert.equal((await se2.get(`/api/projections/${id}`, team(env.teams.emea.id))).status, 404);
   assert.ok(!(await se2.get('/api/projections', team(env.teams.emea.id))).data.customers.some((c) => c.id === id));
@@ -76,12 +84,14 @@ test('an account is its SE’s until its first report; then the team shares it, 
 test('a report needs the Salesforce link; the latest is primary until one is marked', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = team(env.teams.emea.id);
-  const { data } = await se1.post('/api/projections', { name: 'Needs SF' }, h);
-  const id = data.customer.id;
-  const refused = await se1.post('/api/projections/reports', { customerId: id, data: reportData() }, h);
+  // No account without its Salesforce link, nor with one that is not Salesforce's.
+  const refused = await se1.post('/api/projections', { name: 'Needs SF' }, h);
   assert.equal(refused.status, 409);
-  assert.equal((await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: 'https://evil.example/006AB000001xYzQYAU' })).status, 400);
-  assert.equal((await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF })).status, 200);
+  assert.match(refused.data.error, /Salesforce/);
+  assert.equal((await se1.post('/api/projections', { name: 'Needs SF', salesforceUrl: 'https://evil.example/006AB000001xYzQYAU' }, h)).status, 400);
+  const { data } = await se1.post('/api/projections', { name: 'Needs SF', salesforceUrl: SF }, h);
+  const id = data.customer.id;
+  assert.equal((await se1.get(`/api/cc/accounts/${id}`)).data.account.salesforceUrl, SF);
   const r1 = await se1.post('/api/projections/reports', { customerId: id, data: reportData(1000, 500) }, h);
   assert.equal(r1.status, 200);
   assert.equal(r1.data.report.totalCredits, 1650);
@@ -105,7 +115,7 @@ test('deleting reports: your own unshared ones, or with the permission', async (
   const se2 = await client(env.base, 'se2@t.example');
   const lead = await client(env.base, 'emea.lead@t.example');
   const h = team(env.teams.emea.id);
-  const { data } = await se1.post('/api/projections', { name: 'Delete Co' }, h);
+  const { data } = await se1.post('/api/projections', { name: 'Delete Co', salesforceUrl: SF }, h);
   await se1.put(`/api/cc/accounts/${data.customer.id}`, { salesforceUrl: SF });
   const mine = (await se1.post('/api/projections/reports', { customerId: data.customer.id, data: reportData() }, h)).data.report.id;
   const other = (await se1.post('/api/projections/reports', { customerId: data.customer.id, data: reportData() }, h)).data.report.id;
@@ -122,7 +132,7 @@ test('deleting reports: your own unshared ones, or with the permission', async (
 test('dashboards roll up: leaders see their teams below, the VP sees every team, SEs only theirs', async () => {
   const apac = await client(env.base, 'apac@t.example');
   const h = team(env.teams.apac.id);
-  const { data } = await apac.post('/api/projections', { name: 'APAC Co' }, h);
+  const { data } = await apac.post('/api/projections', { name: 'APAC Co', salesforceUrl: SF }, h);
   await apac.put(`/api/cc/accounts/${data.customer.id}`, { salesforceUrl: SF });
   await apac.post('/api/projections/reports', { customerId: data.customer.id, data: reportData(10000, 0) }, h);
   const vp = await client(env.base, 'vp@t.example');
@@ -177,7 +187,7 @@ test('there is always an active Admin', async () => {
 
 test('CSV exports cannot carry spreadsheet formulas', async () => {
   const se1 = await client(env.base, 'se1@t.example');
-  const made = await se1.post('/api/projections', { name: '=HYPERLINK("http://evil.example")' }, team(env.teams.emea.id));
+  const made = await se1.post('/api/projections', { name: '=HYPERLINK("http://evil.example")', salesforceUrl: SF }, team(env.teams.emea.id));
   await se1.put(`/api/cc/accounts/${made.data.customer.id}`, { salesforceUrl: SF });
   await se1.post('/api/projections/reports', { customerId: made.data.customer.id, data: reportData() }, team(env.teams.emea.id));
   const vp = await client(env.base, 'vp@t.example');
@@ -216,7 +226,7 @@ test('the audit log records reports and sign-ins, and nothing in data holds a se
 test('Impact (beta): off by default, on only after the SE confirms a currency, kept per account', async () => {
   const se1 = await client(env.base, 'se1@t.example');
   const h = team(env.teams.emea.id);
-  const { data } = await se1.post('/api/projections', { name: 'Helios Energie GmbH' }, h);
+  const { data } = await se1.post('/api/projections', { name: 'Helios Energie GmbH', salesforceUrl: SF }, h);
   const id = data.customer.id;
   let a = (await se1.get(`/api/cc/accounts/${id}`)).data.account;
   assert.equal(a.impactEnabled, false);
@@ -295,7 +305,7 @@ test('credits sold: one or many sales per account, against its projection, rolle
   const se1 = await client(env.base, 'se1@t.example');
   const se2 = await client(env.base, 'se2@t.example');
   const h = team(env.teams.emea.id);
-  const { data } = await se1.post('/api/projections', { name: 'Sold Corp' }, h);
+  const { data } = await se1.post('/api/projections', { name: 'Sold Corp', salesforceUrl: SF }, h);
   const id = data.customer.id;
   await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
   const rep = (await se1.post('/api/projections/reports', { customerId: id, data: reportData(80000, 20000) }, h)).data.report;
@@ -464,7 +474,7 @@ test('your profile: name, time zone, picture, Impact figures that start an accou
   assert.equal((await se.put('/api/me/profile', { picture: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64') })).status, 415);
   // Turning Impact on for an account starts from the SE's own figures.
   const h = { 'X-Team': env.teams.emea.id };
-  const { data } = await se.post('/api/projections', { name: 'Profile Impact Corp' }, h);
+  const { data } = await se.post('/api/projections', { name: 'Profile Impact Corp', salesforceUrl: SF }, h);
   const set = await se.put(`/api/cc/accounts/${data.customer.id}`, { impactCurrency: 'AED' }, h);
   assert.equal(set.status, 200, JSON.stringify(set.data));
   const acc = env.app.accounts.accounts.get(data.customer.id);
@@ -481,11 +491,12 @@ test('your profile: name, time zone, picture, Impact figures that start an accou
 test('nothing is read without the Salesforce link; a sale needs an opportunity link', async () => {
   const se = await client(env.base, 'se1@t.example');
   const h = { 'X-Team': env.teams.emea.id };
-  const { data } = await se.post('/api/projections', { name: 'No Link Yet Ltd' }, h);
-  const id = data.customer.id;
-  const refused = await se.post('/api/cc/cxone/connect', { apiKey: 'x', accountId: id });
+  // No account is made without the link, so nothing can be read for one.
+  const refused = await se.post('/api/projections', { name: 'No Link Yet Ltd' }, h);
   assert.equal(refused.status, 409);
   assert.match(refused.data.error, /Salesforce/);
+  const { data } = await se.post('/api/projections', { name: 'No Link Yet Ltd', salesforceUrl: SF }, h);
+  const id = data.customer.id;
   // An account link: a sale must say its opportunity.
   await se.put(`/api/cc/accounts/${id}`, { salesforceUrl: 'https://checkmarx.lightning.force.com/lightning/r/Account/0013z00002NbBI1AAN/view' }, h);
   const noOpp = await se.post(`/api/cc/accounts/${id}/sales`, { credits: 1000, date: '2026-11-01' }, h);
@@ -503,7 +514,7 @@ test('the Admin removes every calculation from an account; with its reports, it 
   const admin = await client(env.base, 'admin@t.example');
   const lead = await client(env.base, 'emea.lead@t.example');
   const h = team(env.teams.emea.id);
-  const id = (await se1.post('/api/projections', { name: 'Cleanse Co' }, h)).data.customer.id;
+  const id = (await se1.post('/api/projections', { name: 'Cleanse Co', salesforceUrl: SF }, h)).data.customer.id;
   await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF, contacts: [{ email: 'ciso@cleanse.example' }] });
   const weeks = ['2026-09-01', '2026-10-01'];
   const sev = { Critical: [5, 6], High: [1, 1], Medium: [0, 0], Low: [0, 0] };
@@ -529,4 +540,20 @@ test('the Admin removes every calculation from an account; with its reports, it 
   assert.equal(d.contacts[0].email, 'ciso@cleanse.example');
   assert.equal((await lead.get(`/api/cc/accounts/${id}`)).status, 404);
   assert.match(fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8'), /account\.reset/);
+});
+
+test('an account started and left with nothing to calculate is discarded after a day; one with a projection stays', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = team(env.teams.emea.id);
+  const left = (await se1.post('/api/projections', { name: 'Left Behind Ltd', salesforceUrl: SF }, h)).data.customer.id;
+  const kept = (await se1.post('/api/projections', { name: 'Worked On Ltd', salesforceUrl: SF }, h)).data.customer.id;
+  await se1.put(`/api/projections/${kept}`, { fusion: { projects: [{ id: 'p', name: 'web', loc: 20000, frequency: 'month', source: 'scan' }] } }, h);
+  // Not a day yet: both kept.
+  const { Accounts } = await import('../server/accounts.js');
+  const accounts = new Accounts(env.dataDir);
+  assert.deepEqual(accounts.discardStale(Date.now()).map((a) => a.id), []);
+  // A day and a minute later: the one with nothing goes, the other stays.
+  const gone = accounts.discardStale(Date.now() + 24 * 3600 * 1000 + 60000).map((a) => a.id);
+  assert.ok(gone.includes(left));
+  assert.ok(!gone.includes(kept));
 });
