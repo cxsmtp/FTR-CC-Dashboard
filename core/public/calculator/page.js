@@ -666,15 +666,33 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const rows = (fusion()?.projects ?? [])
       .filter((p) => p.source !== 'manual' && p.openBySeverity && counts(p))
       .map((p) => ({ id: String(p.id), name: p.name, frequency: p.frequency ?? 'rare', share: trShareOf(p, A), byHand: A.excluded.includes(String(p.id)), sev: p.openBySeverity, total: SEVERITIES.reduce((n, s) => n + (p.openBySeverity[s] ?? 0), 0) }))
-      .filter((r) => r.total > 0)
-      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+      .filter((r) => r.total > 0);
     if (!rows.length) return '';
-    const counted = (r, s) => ((r.sev[s] ?? 0) * r.share) / 100;
+    // The projects scanned most often first (then the ones with the most open findings).
+    const rank = Object.fromEntries(FREQUENCIES.map((f, i) => [f.id, i]));
+    rows.sort((a, b) => (rank[a.frequency] ?? 99) - (rank[b.frequency] ?? 99) || b.total - a.total || a.name.localeCompare(b.name));
+    // Only part of a severity in the plan (Customize per severity): it is taken from the projects scanned most often
+    // first, in this order, until the number chosen is reached.
+    const chosen = tr()?.selected ?? {};
+    const partial = [];
+    for (const s of SEVERITIES) {
+      const limit = chosen[s] === null || chosen[s] === undefined ? null : Math.max(0, Number(chosen[s]) || 0);
+      let left = limit;
+      for (const r of rows) {
+        const mine = ((r.sev[s] ?? 0) * r.share) / 100;
+        const take = left === null ? mine : Math.min(mine, left);
+        if (left !== null) left -= take;
+        (r.counted ??= {})[s] = take;
+      }
+      if (limit !== null && rows.reduce((n, r) => n + ((r.sev[s] ?? 0) * r.share) / 100, 0) > limit) partial.push(s);
+    }
+    const counted = (r, s) => r.counted[s];
     const tot = Object.fromEntries(SEVERITIES.map((s) => [s, rows.reduce((n, r) => n + counted(r, s), 0)]));
     const grand = SEVERITIES.reduce((n, s) => n + tot[s], 0);
     const open = rows.reduce((n, r) => n + r.total, 0);
-    const inFull = rows.filter((r) => r.share === 100).length;
-    const out = rows.filter((r) => r.share === 0).length;
+    const got = (r) => SEVERITIES.reduce((n, s) => n + counted(r, s), 0);
+    const inFull = rows.filter((r) => Math.round(got(r)) >= r.total).length;
+    const out = rows.filter((r) => got(r) === 0).length;
     const short = (id) => FREQUENCIES.find((f) => f.id === id)?.short ?? id;
     const head = (s) => `<th class="num"><span class="calc-sev"><i translate="no" style="background:${SEVERITY_COLOURS[s]}"></i>${s}</span></th>`;
     const q = planFind.trim().toLowerCase();
@@ -689,13 +707,13 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         </div>
         <div class="table-wrap calc-plan-wrap"><table class="data-table calc-byproject-table">
           <thead><tr><th class="calc-plan-c">Count</th><th>Project</th><th>Scanned</th><th class="num">Counted</th>${SEVERITIES.map(head).join('')}<th class="num">Total</th></tr></thead>
-          <tbody>${shown.map((r) => `<tr class="${r.share === 0 ? 'calc-plan-out' : ''}" data-plan-row="${esc(r.id)}">
+          <tbody>${shown.map((r) => `<tr class="${SEVERITIES.every((s) => counted(r, s) === 0) ? 'calc-plan-out' : ''}" data-plan-row="${esc(r.id)}">
             <td class="calc-plan-c"><input type="checkbox" data-plan-project="${esc(r.id)}"${r.byHand ? '' : ' checked'}${live ? '' : ' disabled'} aria-label="Count ${esc(r.name)}" /></td>
-            <td translate="no" class="calc-plan-name" title="${esc(r.name)}">${esc(r.name)}</td><td class="calc-plan-f">${esc(short(r.frequency))}</td><td class="num">${r.share}%</td>
-            ${SEVERITIES.map((s) => `<td class="num">${num(r.sev[s] ?? 0)}</td>`).join('')}<td class="num calc-total">${num(r.total)}</td></tr>`).join('') || `<tr><td colspan="${SEVERITIES.length + 5}" class="hint">No project matches.</td></tr>`}</tbody>
+            <td translate="no" class="calc-plan-name" title="${esc(r.name)}">${esc(r.name)}</td><td class="calc-plan-f">${esc(short(r.frequency))}</td><td class="num">${r.total ? num(Math.round((SEVERITIES.reduce((n, s) => n + counted(r, s), 0) / r.total) * 100)) : 0}%</td>
+            ${SEVERITIES.map((s) => { const c2 = Math.round(counted(r, s)); const open2 = r.sev[s] ?? 0; return `<td class="num${c2 < open2 ? ' calc-plan-part' : ''}"${c2 < open2 ? ` title="${num(c2)} of ${num(open2)} open counted"` : ''}>${c2 < open2 ? `${num(c2)}<small> of ${num(open2)}</small>` : num(open2)}</td>`; }).join('')}<td class="num calc-total">${num(Math.round(SEVERITIES.reduce((n, s) => n + counted(r, s), 0)))}</td></tr>`).join('') || `<tr><td colspan="${SEVERITIES.length + 5}" class="hint">No project matches.</td></tr>`}</tbody>
           <tfoot><tr><td></td><td>Counted</td><td></td><td class="num">${open ? num(Math.round((grand / open) * 100)) : 0}%</td>${SEVERITIES.map((s) => `<td class="num">${num(Math.round(tot[s]))}</td>`).join('')}<td class="num calc-total">${num(Math.round(grand))}</td></tr></tfoot>
         </table></div>
-        <p class="hint">Follows the projects chosen at the top (scope) and the shares by scan frequency above. ${live ? 'Untick a project to leave it out of triage &amp; remediation; Fusion keeps it.' : 'To change it, read from Checkmarx One: the two exports do not say which project a finding is in.'}</p>
+        <p class="hint">The projects scanned most often come first. Follows the projects chosen at the top (scope) and the shares by scan frequency above${partial.length ? `; only part of ${partial.join(', ')} is in the plan (Customize per severity), taken from the projects scanned most often first` : ''}. ${live ? 'Untick a project to leave it out of triage &amp; remediation; Fusion keeps it.' : 'To change it, read from Checkmarx One: the two exports do not say which project a finding is in.'}</p>
       </details>`;
   }
 

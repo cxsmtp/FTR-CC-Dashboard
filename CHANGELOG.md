@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.64.00 — 2026-11-12
+
+- **The plan by project: the projects scanned most often first.** The list is in order of how often each project is scanned (5+ a week at the top), then by open findings. When only part of a severity is in the plan (Customize per severity: say 2,000 of the High findings), that part is taken from the projects scanned most often first, in this order, until the number is reached: each cell shows what is counted of what is open ("214 of 225"), the Counted column the project's share, and the total row what the plan holds. The credits do not change with it: the plan's numbers are the same, now shown project by project.
+
 ## CC-01.63.00 — 2026-11-12
 
 Triage & remediation planned the way Fusion is: by how often projects are scanned, and project by project. Every group and every project is counted in full until someone changes it, so no saved projection moves.
