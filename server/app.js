@@ -11,7 +11,7 @@ import { AuditLog, Doc, fail } from './store.js';
 import { Iam, clean, publicUser } from './iam.js';
 import { PERMISSIONS, need, needTeam, peopleInScope, scopeOf, subtree, teamPath, homeOf } from './rbac.js';
 import { Teams } from './teams.js';
-import { Accounts, DEFAULT_SALESFORCE_HOSTS, checkSalesforceUrl, viewing } from './accounts.js';
+import { Accounts, DEFAULT_SALESFORCE_HOSTS, checkSalesforceUrl, nameKey, tidyName, viewing } from './accounts.js';
 import { newProfile } from '../core/public/calculator/profiles.js';
 import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
@@ -52,6 +52,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // Self-healing start: a data file that cannot be read is brought back from the newest backup that has it.
   const backupDir = config.backupDir || path.join(config.dataDir, 'backups');
   const backupPassphrase = String(config.env?.BACKUP_PASSPHRASE ?? '');
+  // The passphrase that seals backups now: the environment's, else the Admin's (Settings → Backups), else none.
+  const backupPassphraseOf = () => backupPassphrase || (settings?.value?.backupSeal ? secrets.open(settings.value.backupSeal) : '');
   const recovered = recoverDataDir({ dataDir: config.dataDir, backupDir, passphrase: backupPassphrase, log });
   const iam = new Iam(config.dataDir);
   const teams = new Teams(config.dataDir);
@@ -1430,8 +1432,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   let lastBackup = { ok: true, at: null, error: '' };
   const takeBackup = (reason) => {
     try {
-      const b = writeBackupTo(backupDir, { dataDir: config.dataDir, passphrase: backupPassphrase, version: VERSION, reason });
-      audit.record({ action: 'backup.written', target: b.name, details: { reason, bytes: b.bytes, sha256: b.sha256, sealed: Boolean(backupPassphrase), dir: backupDir } });
+      const b = writeBackupTo(backupDir, { dataDir: config.dataDir, passphrase: backupPassphraseOf(), version: VERSION, reason });
+      audit.record({ action: 'backup.written', target: b.name, details: { reason, bytes: b.bytes, sha256: b.sha256, sealed: Boolean(backupPassphraseOf()), dir: backupDir } });
       lastBackup = { ok: true, at: new Date().toISOString(), error: '' };
       return b.name;
     } catch (error) {
@@ -1442,7 +1444,18 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
   };
   const backupPerm = perm('backup.manage');
-  r('GET', '/api/backups', backupPerm, () => ({ backups: listBackups(backupDir), sealed: Boolean(backupPassphrase), dir: backupDir, separate: Boolean(config.backupDir), last: lastBackup, recovered: audit.recent({ limit: 20, filter: (e) => e.action.startsWith('recover.') }) }));
+  // Backups sealed with a passphrase: BACKUP_PASSPHRASE when the server starts, else the one the Admin sets here (kept
+  // sealed with this server's key, never shown again). Applies from the next backup, without a restart.
+  r('PUT', '/api/backups/seal', backupPerm, (req, ctx, body) => {
+    if (config.env?.BACKUP_PASSPHRASE) throw fail(409, 'Backups are sealed with BACKUP_PASSPHRASE, set where the server starts: change it there.');
+    const pass = String(body?.passphrase ?? '');
+    if (pass && pass.length < 12) throw fail(400, 'A passphrase of at least 12 characters.');
+    settings.value.backupSeal = pass ? secrets.seal(pass) : null;
+    settings.save();
+    record(ctx, req, pass ? 'backup.seal.set' : 'backup.seal.removed', '');
+    return { sealed: Boolean(pass) };
+  });
+  r('GET', '/api/backups', backupPerm, () => ({ backups: listBackups(backupDir), sealed: Boolean(backupPassphraseOf()), sealedBy: config.env?.BACKUP_PASSPHRASE ? 'environment' : settings.value.backupSeal ? 'settings' : '', dir: backupDir, separate: Boolean(config.backupDir), last: lastBackup, recovered: audit.recent({ limit: 20, filter: (e) => e.action.startsWith('recover.') }) }));
   r('POST', '/api/backups', backupPerm, (req, ctx) => ({ name: takeBackup(`by ${ctx.user.email}`), backups: listBackups(backupDir) }));
   r('GET', '/api/backups/:name', backupPerm, (req, ctx, body, res, url, params) => {
     const item = listBackups(backupDir).find((b) => b.name === params.name);
@@ -1584,7 +1597,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       sso: { ready: sso.ready() },
       email: { ready: mailReady(), resetReady: resetReady().ready },
       updates: { running: VERSION, supervised, auto: versionStore.state.auto, lastCheck: versionStore.state.lastCheck, failed: versionStore.state.failed, events: (versionStore.state.events ?? []).slice(0, 10) },
-      backups: { dir: backupDir, separate: Boolean(config.backupDir), count: listBackups(backupDir).length, last: listBackups(backupDir)[0] ?? null, lastAttempt: lastBackup, sealed: Boolean(backupPassphrase) },
+      backups: { dir: backupDir, separate: Boolean(config.backupDir), count: listBackups(backupDir).length, last: listBackups(backupDir)[0] ?? null, lastAttempt: lastBackup, sealed: Boolean(backupPassphraseOf()) },
       recovered: audit.recent({ limit: 20, filter: (e) => e.action.startsWith('recover.') }),
       counts: { people: iam.users().length, teams: teams.list().length, accounts: accounts.accounts.size, reports: accounts.reports.size },
       audit: audit.verify(),
@@ -2080,6 +2093,36 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       });
     }
     return { accounts: out.sort((x, y) => x.name.localeCompare(y.name)) };
+  });
+  /** Accounts of the same name, however it is typed (in any team): said before another is made. */
+  r('GET', '/api/cc/accounts-similar', perm('calculator.use'), (req, ctx, body, res, url) => {
+    const key = nameKey(url.searchParams.get('name'));
+    if (!key) return { similar: [] };
+    const similar = accounts.accounts.list().filter((m) => !m.pendingSince && nameKey(m.name) === key).map((m) => ({ name: m.name, team: teamPath(ctx.teams, m.teamId).map((x) => x.name).join(' › ') || teams.get(m.teamId)?.name || '', owner: userName(m.ownerId), salesforceId: ctx.scope.has(m.teamId) ? m.salesforceId : '' }));
+    return { similar };
+  });
+  /** The Admin's look at every account's name: those that would read better tidied, and those that look like one account twice. */
+  r('GET', '/api/cc/name-tidy', signedIn, (req, ctx) => {
+    if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin tidies account names.');
+    const all = accounts.accounts.list().filter((m) => !m.pendingSince);
+    const where = (m) => ({ id: m.id, name: m.name, team: teamPath(ctx.teams, m.teamId).map((x) => x.name).join(' › '), owner: userName(m.ownerId), salesforceId: m.salesforceId });
+    const renames = all.filter((m) => tidyName(m.name) && tidyName(m.name) !== m.name).map((m) => ({ ...where(m), tidy: tidyName(m.name) }));
+    const groups = new Map();
+    for (const m of all) groups.set(nameKey(m.name), [...(groups.get(nameKey(m.name)) ?? []), where(m)]);
+    return { renames, duplicates: [...groups.values()].filter((g) => g.length > 1) };
+  });
+  r('POST', '/api/cc/name-tidy', signedIn, (req, ctx, body) => {
+    if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin tidies account names.');
+    const ids = new Set(Array.isArray(body?.ids) ? body.ids.map(String) : []);
+    const done = [];
+    for (const m of accounts.accounts.list().filter((x) => ids.has(x.id))) {
+      const tidy = tidyName(m.name);
+      if (!tidy || tidy === m.name) continue;
+      accounts.setDetails(m.id, everyTeam(), { name: tidy }, hosts().salesforce);
+      record(ctx, req, 'account.renamed', tidy, { id: m.id, from: m.name, why: 'names tidied by the Admin' });
+      done.push({ from: m.name, to: tidy });
+    }
+    return { renamed: done };
   });
   r('POST', '/api/cc/reload-from-reports', signedIn, (req, ctx, body) => {
     if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin reloads accounts from their reports.');

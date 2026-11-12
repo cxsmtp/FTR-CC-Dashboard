@@ -1176,3 +1176,4 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 .acct-strip .as-main .as-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
 .acct-strip .as-main .as-big .credits.big { overflow: visible; text-overflow: clip; }
 .acct-strip .as-main .as-unit { font-size: 14px; color: var(--muted); }
+.dup-list { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 8px; font-size: 13px; }

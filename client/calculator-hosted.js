@@ -1052,6 +1052,11 @@ export async function startHosted() {
         $('hc-sf').focus();
         return;
       }
+      // The same customer already has an account (in any team, however its name is written): said, and asked.
+      try {
+        const { similar } = await server(`/api/cc/accounts-similar?name=${encodeURIComponent(typed)}`);
+        if (similar?.length && !confirm(`${similar.map((x) => `${x.name} · ${x.team}${x.owner ? ` · ${x.owner}` : ''}${x.salesforceId ? ` · ${x.salesforceId}` : ''}`).join('\n')}\n\n${similar.length === 1 ? 'An account of this name already exists.' : 'Accounts of this name already exist.'} Open it from the name list if it is the same opportunity. Make a new account anyway (another opportunity of the same customer)?`)) return;
+      } catch {}
       naming = false;
       newName = '';
       $('hc-name').placeholder = 'Type the account\u2019s name, or pick one';

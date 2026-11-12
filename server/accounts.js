@@ -111,6 +111,31 @@ const accountMeta = (a) => ({
   pendingSince: a.pendingSince ?? null,
 });
 
+/**
+ * An account's name, tidied as it is entered: spaces trimmed and single, and a word typed all in lower case written as a
+ * name is (tata motors → Tata Motors). A short lower-case word with no vowel is taken for an abbreviation (hdfc → HDFC).
+ * A word typed with any capital is kept as typed (ENBD, MAQTA, eBay), as are words with digits and the small joining words.
+ */
+const JOINING = new Set(['of', 'and', 'the', 'for', 'de', 'du', 'des', 'la', 'le', 'les', 'van', 'von', 'der', 'den', 'da', 'di', 'y', 'e', 'et', 'und', 'al', 'el', 'bin', 'at', 'on', 'in', 'to']);
+/** Words with a usual spelling of their own, whatever the rules below would make of them. */
+const SPELLED = { ltd: 'Ltd', pvt: 'Pvt', st: 'St', mt: 'Mt', mr: 'Mr', dr: 'Dr', inc: 'Inc', co: 'Co', corp: 'Corp', gmbh: 'GmbH', llc: 'LLC', plc: 'PLC', llp: 'LLP', bv: 'BV', nv: 'NV', sa: 'SA', ag: 'AG', spa: 'SpA', srl: 'Srl', pty: 'Pty', bhd: 'Bhd', sdn: 'Sdn', mf: 'MF', it: 'IT' };
+export function tidyName(value) {
+  const clean = String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+  let first = true;
+  return clean.replace(/[^\s\-/&()]+/g, (word) => {
+    const atStart = first;
+    first = false;
+    if (/\p{Lu}/u.test(word) || /\d/.test(word) || !/^\p{Ll}+[.'’]?\p{Ll}*\.?$/u.test(word)) return word;
+    const bare = word.replace(/\.$/, '');
+    if (SPELLED[bare]) return SPELLED[bare] + word.slice(bare.length);
+    if (!atStart && JOINING.has(word)) return word;
+    if (word.length <= 4 && !/[aeiouyàâäéèêëïîôöùûüÿæœ]/.test(word)) return word.toUpperCase();
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+}
+/** Two names that are the same account, however typed: letters and digits only, in lower case. */
+export const nameKey = (name) => String(name ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
 /** Something to calculate with: a backlog read or uploaded, Fusion projects, code counted, or a report. */
 export const hasProjection = (a) => Boolean(a?.tr?.totals || a?.fusion?.projects?.length || a?.fusionNew?.projects?.length);
 /** How long an account started and left with nothing to calculate is kept before it is discarded. */
@@ -182,7 +207,7 @@ export class Accounts {
   }
   /** Started, with its Salesforce link: kept for its maker alone until it has a projection (then it is made). */
   start({ name, teamId, user, impact = {}, salesforce }) {
-    const a = this.create({ name, teamId, user, impact });
+    const a = this.create({ name: tidyName(name), teamId, user, impact });
     return this.accounts.put({ ...this.accounts.get(a.id), salesforceUrl: salesforce.url, salesforceKind: salesforce.kind, salesforceId: salesforce.recordId, pendingSince: new Date().toISOString() });
   }
   /** Started more than a day ago and still with nothing to calculate: discarded. Returns those removed. */
@@ -207,7 +232,7 @@ export class Accounts {
   }
   update(id, teamIds, patch, user) {
     const current = this.get(id, teamIds);
-    const next = patchProfile(current, patch, user.name);
+    const next = patchProfile(current, patch.name !== undefined ? { ...patch, name: tidyName(patch.name) || current.name } : patch, user.name);
     // Its first projection: the account is made (still a draft, its SE's, until a report).
     if (next.pendingSince && hasProjection(next)) next.pendingSince = null;
     return this.accounts.put(next);
@@ -241,7 +266,7 @@ export class Accounts {
         if (full) this.reports.put({ ...full, teamId });
       }
     }
-    if (name !== undefined && String(name).trim()) account.name = String(name).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120);
+    if (name !== undefined && String(name).trim()) account.name = tidyName(name);
     account.updatedAt = new Date().toISOString();
     return this.accounts.put(account);
   }

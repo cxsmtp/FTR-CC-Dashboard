@@ -85,7 +85,7 @@ export async function viewAccounts(params) {
   const ownerFirst = params.get('owner') ?? (state.me.role?.id === 'se' && owners.some(([id]) => id === state.me.user.id) ? state.me.user.id : '');
   $('#main').innerHTML = `
     <div class="head"><div><h1 class="serif">Accounts</h1><p>Every account in your teams with its primary report. Click an account to open it; the pencil in a cell, or the row’s menu, changes it right here.</p></div>
-      <div class="tools">${state.me.role?.id === 'admin' ? `<button type="button" class="btn" id="reload-btn" title="Rebuild accounts' calculators from the reports uploaded into them">${icon('refresh')}Reload from uploaded reports</button>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('plus')}New in calculator</a>` : ''}</div></div>
+      <div class="tools">${state.me.role?.id === 'admin' ? '<button type="button" class="btn ghost" id="tidy-btn" title="Account names that read better tidied, and accounts that look like one twice">Tidy names</button>' : ''}${state.me.role?.id === 'admin' ? `<button type="button" class="btn" id="reload-btn" title="Rebuild accounts' calculators from the reports uploaded into them">${icon('refresh')}Reload from uploaded reports</button>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('plus')}New in calculator</a>` : ''}</div></div>
     <div id="out-of-step"></div>
     <div class="panel">
       <div class="flex">
@@ -316,6 +316,7 @@ export async function viewAccounts(params) {
   render();
   listState = { focus, reload: async () => { await reload(); outOfStep(); } };
   if ($('#reload-btn')) $('#reload-btn').onclick = () => reloadFromReports(() => listState.reload());
+  if ($('#tidy-btn')) $('#tidy-btn').onclick = () => tidyNames(() => listState.reload());
 }
 
 export async function viewAccount(id) {
@@ -457,6 +458,46 @@ export async function viewAccount(id) {
       viewAccount(a.id);
     } catch (error) {
       toast(error.message, 'bad');
+    }
+  };
+}
+
+// ---- The Admin tidies account names, and sees the accounts that look like one twice ---------------------------------
+export async function tidyNames(done) {
+  let d;
+  try {
+    d = await api('/api/cc/name-tidy');
+  } catch (error) {
+    return toast(error.message, 'bad');
+  }
+  document.getElementById('tidy-dlg')?.remove();
+  const dlg = document.createElement('dialog');
+  dlg.id = 'tidy-dlg';
+  dlg.className = 'wide';
+  dlg.innerHTML = `<form method="dialog" class="form"><div class="dh"><h2>Tidy account names</h2></div><div class="db">
+    <p class="muted small">New names are tidied as they are typed. These were entered before: tick the ones to rename. A name typed with capitals is kept as it is.</p>
+    ${d.renames.length ? `<div class="tw"><table><thead><tr><th><input type="checkbox" id="td-all" checked aria-label="Every name" /></th><th>Now</th><th>Tidied</th><th>Team · SE</th></tr></thead><tbody>${d.renames.map((x) => `<tr><td><input type="checkbox" name="td" value="${esc(x.id)}" checked aria-label="${esc(x.name)}" /></td><td>${esc(x.name)}</td><td><b>${esc(x.tidy)}</b></td><td class="small">${esc(x.team)} · ${esc(x.owner)}</td></tr>`).join('')}</tbody></table></div>` : '<p>Every name is tidy.</p>'}
+    <h3 class="mt">Accounts that look like one twice</h3>
+    ${d.duplicates.length ? `<p class="muted small">Same name, however written. Two opportunities of one customer are two accounts; one opportunity twice is one account too many: delete the extra one from its ⋯ menu.</p><ul class="dup-list">${d.duplicates.map((g) => `<li>${g.map((x) => `<span><b>${esc(x.name)}</b> <span class="muted small">${esc(x.team)} · ${esc(x.owner)}${x.salesforceId ? ` · ${esc(x.salesforceId)}` : ''}</span></span>`).join('<br>')}</li>`).join('')}</ul>` : '<p class="muted small">None.</p>'}
+    <div class="err" id="td-err"></div></div>
+    <div class="df"><button type="button" class="ghost" id="td-cancel">Close</button>${d.renames.length ? '<button type="button" class="primary" id="td-go">Rename the ones ticked</button>' : ''}</div></form>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  dlg.querySelector('#td-cancel').onclick = () => (dlg.close(), dlg.remove());
+  const all = dlg.querySelector('#td-all');
+  if (all) all.onchange = () => dlg.querySelectorAll('[name=td]').forEach((c) => (c.checked = all.checked));
+  const go = dlg.querySelector('#td-go');
+  if (go) go.onclick = async () => {
+    const ids = [...dlg.querySelectorAll('[name=td]:checked')].map((c) => c.value);
+    if (!ids.length) return void (dlg.querySelector('#td-err').textContent = 'Tick at least one name.');
+    try {
+      const r = await api('/api/cc/name-tidy', { method: 'POST', body: { ids } });
+      dlg.close();
+      dlg.remove();
+      toast(`${num(r.renamed.length)} account${r.renamed.length === 1 ? '' : 's'} renamed.`, 'ok');
+      done?.();
+    } catch (error) {
+      dlg.querySelector('#td-err').textContent = error.message;
     }
   };
 }

@@ -557,3 +557,20 @@ test('an account started and left with nothing to calculate is discarded after a
   assert.ok(gone.includes(left));
   assert.ok(!gone.includes(kept));
 });
+
+test('account names are tidied as they are entered, and the same name in another account is said', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = team(env.teams.emea.id);
+  const made = await se1.post('/api/projections', { name: '  tata   motors ltd ', salesforceUrl: SF }, h);
+  assert.equal(made.data.customer.name, 'Tata Motors Ltd');
+  const id = made.data.customer.id;
+  await se1.put(`/api/projections/${id}`, { name: 'hdfc bank' }, h);
+  assert.equal((await se1.get(`/api/projections/${id}`, h)).data.customer.name, 'HDFC Bank');
+  await se1.put(`/api/projections/${id}`, { name: 'ENBD', fusion: { projects: [{ id: 'p', name: 'x', loc: 1000, frequency: 'month', source: 'scan' }] } }, h);
+  assert.equal((await se1.get(`/api/projections/${id}`, h)).data.customer.name, 'ENBD');
+  const similar = (await se1.get('/api/cc/accounts-similar?name=e.n.b.d')).data.similar;
+  assert.ok(similar.some((x) => x.name === 'ENBD'));
+  const admin = await client(env.base, 'admin@t.example');
+  assert.equal((await se1.get('/api/cc/name-tidy')).status, 403);
+  assert.ok(Array.isArray((await admin.get('/api/cc/name-tidy')).data.renames));
+});

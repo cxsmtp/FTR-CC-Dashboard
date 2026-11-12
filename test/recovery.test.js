@@ -89,3 +89,23 @@ test('a read cut off by a restart starts again with the account’s kept key', a
   app.stop();
   fs.rmSync(env.dataDir, { recursive: true, force: true });
 });
+
+test('the Admin seals backups with a passphrase from Settings, at once: the next backup needs it to be read', async () => {
+  const env = await start();
+  const admin = await client(env.base, 'admin@t.example');
+  assert.equal((await admin.put('/api/backups/seal', { passphrase: 'short' })).status, 400);
+  assert.equal((await admin.put('/api/backups/seal', { passphrase: 'a-long-enough-passphrase' })).status, 200);
+  assert.equal((await admin.get('/api/backups')).data.sealed, true);
+  assert.equal((await admin.post('/api/backups', {})).status, 200);
+  const newest = (await admin.get('/api/backups')).data.backups[0];
+  const file = fs.readFileSync(path.join(env.dataDir, 'backups', newest.name));
+  const data = file.toString('base64');
+  assert.equal((await admin.post('/api/backups/inspect', { data })).status, 400);
+  assert.equal((await admin.post('/api/backups/inspect', { data, passphrase: 'a-long-enough-passphrase' })).status, 200);
+  const se = await client(env.base, 'se1@t.example');
+  assert.equal((await se.put('/api/backups/seal', { passphrase: 'a-long-enough-passphrase' })).status, 403);
+  assert.equal((await admin.put('/api/backups/seal', { passphrase: '' })).status, 200);
+  assert.equal((await admin.get('/api/backups')).data.sealed, false);
+  await env.close();
+  fs.rmSync(env.dataDir, { recursive: true, force: true });
+});

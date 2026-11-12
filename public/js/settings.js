@@ -589,10 +589,13 @@ export const ADMIN_VIEWS = {
     const [b, v] = await Promise.all([api('/api/backups'), can('audit.view') ? api('/api/audit/verify') : null]);
     $('#tab').innerHTML = `<div class="grid g2">
       <div class="panel"><h2>Backups <small>nightly, before every version switch, and by hand · the newest 14 kept</small></h2>
-        <p class="muted small">Everything: people, teams, accounts, reports, settings, certificates and the audit log. ${b.sealed ? 'Sealed with BACKUP_PASSPHRASE.' : 'Not sealed: set BACKUP_PASSPHRASE to seal them with a passphrase.'} Kept in <span class="mono">${esc(b.dir)}</span>.</p>
+        <p class="muted small">Everything: people, teams, accounts, reports, settings, certificates and the audit log. ${b.sealed ? (b.sealedBy === 'environment' ? 'Sealed with BACKUP_PASSPHRASE.' : 'Sealed with the passphrase set below.') : '<b class="warn-t">Not sealed:</b> anyone who gets a backup file can read everything in it. Set a passphrase below.'} Kept in <span class="mono">${esc(b.dir)}</span>.</p>
         ${b.separate ? '<div class="callout">Backups go to their own place (BACKUP_DIR), away from the data: losing one disk does not lose both.</div>' : '<div class="callout warn">Backups are in the data volume itself. Mount a second volume or a network share and set <b>BACKUP_DIR</b> to it, so losing one disk does not lose both.</div>'}
         ${b.last && !b.last.ok ? `<div class="callout warn mt">The last backup failed (${esc(dateTime(b.last.at))}): ${esc(b.last.error)}</div>` : ''}
         <div class="flex"><button class="primary" id="now">${icon('plus')}Back up now</button></div>
+        ${b.sealedBy === 'environment' ? '' : `<form class="form mt" id="seal" data-nodraft><label class="f">${b.sealed ? 'Replace the passphrase' : 'Seal backups with a passphrase'} <span class="muted">at least 12 characters; from the next backup on</span><input type="password" name="pass" autocomplete="new-password" minlength="12" /></label>
+          <p class="muted small">Keep it somewhere safe, away from this server: a sealed backup cannot be restored without it, and it is never shown again.${b.sealed ? ' Backups already made keep the passphrase they were sealed with.' : ''}</p>
+          <div class="flex"><button class="primary sm" type="submit">${b.sealed ? 'Replace' : 'Seal backups'}</button>${b.sealed ? '<button type="button" class="ghost sm danger" id="unseal">Stop sealing</button>' : ''}<span class="err" id="seal-err"></span></div></form>`}
         <div class="tw mt"><table><tbody>${b.backups.map((x) => `<tr><td class="small mono">${esc(x.name)}</td><td class="small">${esc(dateTime(x.at))}</td><td class="num small">${esc((x.bytes / 1024).toFixed(0))} KB</td><td class="actions"><button class="sm ghost" data-dl="${esc(x.name)}">${icon('download')}Download</button></td></tr>`).join('') || '<tr><td><div class="empty"><b>No backups yet</b></div></td></tr>'}</tbody></table></div>
         <h3 class="mt">Restore</h3>
         <form class="form" id="rs"><label class="f">A backup file<input type="file" name="file" accept=".ccbackup" /></label><label class="f">Its passphrase <span class="muted">if sealed</span><input type="password" name="pass" autocomplete="off" /></label><div class="flex"><button type="submit" class="danger">Check and restore</button></div><div class="small" id="rsres"></div></form></div>
@@ -607,6 +610,20 @@ export const ADMIN_VIEWS = {
       viewAdmin('backups');
     };
     for (const btn of $$('[data-dl]')) btn.onclick = () => download(`/api/backups/${encodeURIComponent(btn.dataset.dl)}`, btn.dataset.dl).catch((x) => toast(x.message, 'bad'));
+    if ($('#seal')) $('#seal').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api('/api/backups/seal', { method: 'PUT', body: { passphrase: e.target.pass.value } });
+        toast('Backups are sealed from the next one on. Keep the passphrase safe.', 'ok', 8000);
+        viewAdmin('backups');
+      } catch (error) {
+        $('#seal-err').textContent = error.message;
+      }
+    };
+    if ($('#unseal')) $('#unseal').onclick = async () => {
+      if (!confirm('Stop sealing backups? From the next one on, anyone who gets a backup file can read everything in it.')) return;
+      await api('/api/backups/seal', { method: 'PUT', body: { passphrase: '' } }).then(() => viewAdmin('backups'), (x) => toast(x.message, 'bad'));
+    };
     $('#diag').onclick = () => download('/api/system/diagnostics', 'cc-troubleshooting.json').catch((x) => toast(x.message, 'bad'));
     $('#rs').onsubmit = async (e) => {
       e.preventDefault();

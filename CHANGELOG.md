@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.85.00 — 2026-11-12
+
+- **Account names are tidied as they are entered** (test report #13): spaces trimmed and single, a word typed in lower case written as a name is (*tata motors ltd* → *Tata Motors Ltd*), a short word with no vowel taken for an abbreviation (*hdfc bank* → *HDFC Bank*), the usual business words spelled their way (Ltd, GmbH, LLC, MF, IT). A word typed with capitals is kept as typed (ENBD, MAQTA, eBay). Names already there are not changed by the update: **Accounts → Tidy names** (Admin) lists the ones that would read better, to tick and rename.
+- **The same customer twice is said before it happens** (#9): a new account whose name matches one already there, in any team and however written (*e.n.b.d*, *ENBD*), asks first, naming the team, the SE and the Salesforce record of the one there. It does not refuse: two opportunities of one customer are two accounts. *Tidy names* also lists the accounts that look like one twice.
+- **Backups sealed from Settings** (#4): Settings → Backups & health, *Seal backups with a passphrase* (12 characters or more). From the next backup on, a backup cannot be read or restored without it. Kept sealed with this server's key and never shown again; no restart. BACKUP_PASSPHRASE, where set, still wins.
+
 ## CC-01.84.00 — 2026-11-12
 
 - The Tejas card tells Checkmarx's growth story: *Tejas — built for speed, engineered for dominance. Every projection here is a sortie in Checkmarx's growth: one customer, one codebase, one credit at a time.*
