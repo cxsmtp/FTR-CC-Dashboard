@@ -2,6 +2,18 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.86.00 — 2026-11-12
+
+Faster everywhere, and reports from earlier versions brought in whole.
+
+- **Pages open faster, most of all over a slow link.** The dashboard's scripts and styles are kept by the browser until the next version, instead of being checked again on every page load (21 round trips fewer), and all of them are asked for at once. Who is signed in is asked for together with the page. On a link with 300 ms of latency, Accounts now shows in about 1 second instead of 2.3.
+- **Moving between pages is near instant.** The lists most pages show (accounts, people, the dashboard) are fetched in the background once a page is up, and kept in memory for 30 seconds: Accounts and People open in a few tens of milliseconds instead of a round trip each. Anything changed clears them at once; nothing is written to the device.
+- **The calculator opens faster.** The account to open is known from the start, so its figures, its details, the list and the connection's state are asked for together instead of one after another: about 1.3 seconds instead of 2 over the same link.
+- **A report from an earlier version fills the calculator in full.** A report made before "Try other numbers" existed (only figures on its page) is read from its page, both under *A previous report* and *The customer's version*: the backlog and what it adds and fixes a month for each severity, the plan, the month-end backlog, the weekly rates, Fusion's models, scans and every project. Worked out again with today's model; the dialog shows that total against the one on the page (an earlier saving such as FAE is not counted). Upload the original file of such a report again to fill an account's calculator (ENBD, AD Ports).
+- **Reload from uploaded reports no longer offers what it has done.** An account reloaded from its report shows *Up to date* and is not ticked again, until its calculator or its report changes. A report with its own figures but without "Try other numbers" is reloaded from those figures; one that keeps only its totals says so and how to fill it.
+- Accounts: the T&R and Fusion breakup wraps onto two lines instead of widening the table; below 1200 pixels wide the *Customer* and *Last* columns give way, so the list never scrolls sideways.
+- A row's ⋯ menu always opens inside the window and follows its button when the list scrolls.
+
 ## CC-01.85.00 — 2026-11-12
 
 - **Account names are tidied as they are entered** (test report #13): spaces trimmed and single, a word typed in lower case written as a name is (*tata motors ltd* → *Tata Motors Ltd*), a short word with no vowel taken for an abbreviation (*hdfc bank* → *HDFC Bank*), the usual business words spelled their way (Ltd, GmbH, LLC, MF, IT). A word typed with capitals is kept as typed (ENBD, MAQTA, eBay). Names already there are not changed by the update: **Accounts → Tidy names** (Admin) lists the ones that would read better, to tick and rename.

@@ -112,7 +112,7 @@ export class RateLimit {
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.pdf': 'application/pdf', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 
 /** A file from one folder, never outside it; GET and HEAD only. */
-export function serveStatic(root, req, res, pathname) {
+export function serveStatic(root, req, res, pathname, { cache = 'no-cache' } = {}) {
   const rel = path.normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/, '');
   const file = path.resolve(root, rel);
   if (!file.startsWith(path.resolve(root) + path.sep)) return false;
@@ -133,7 +133,7 @@ export function serveStatic(root, req, res, pathname) {
     cached = { mtime: stat.mtimeMs, raw, gz: compressible ? zlib.gzipSync(raw, { level: 9 }) : null, etag: `"${createHash('sha256').update(raw).digest('hex').slice(0, 20)}"` };
     STATIC.set(file, cached);
   }
-  const headers = { ...SECURITY_HEADERS, 'Content-Type': type, 'Cache-Control': 'no-cache', ETag: cached.etag, Vary: 'Accept-Encoding', 'Content-Security-Policy': APP_CSP };
+  const headers = { ...SECURITY_HEADERS, 'Content-Type': type, 'Cache-Control': cache, ETag: cached.etag, Vary: 'Accept-Encoding', 'Content-Security-Policy': APP_CSP };
   if (req.headers['if-none-match'] === cached.etag) return res.writeHead(304, headers).end(), true;
   const gz = cached.gz && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
   const body = gz ? cached.gz : cached.raw;

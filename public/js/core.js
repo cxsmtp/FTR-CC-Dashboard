@@ -57,7 +57,33 @@ export const LOGO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17 
 
 export const state = { me: null, people: null };
 
+/**
+ * The lists most pages show (accounts, people, the dashboard), kept in memory for 30 seconds: going from page to page
+ * shows them at once instead of waiting on the network each time. Anything changed here clears them; nothing is kept
+ * once the tab is closed (never written to the device).
+ */
+const KEPT = new Map();
+const KEPT_MS = 30_000;
+const keepable = (path) => /^\/api\/(accounts|people|dashboard)(\?|$)/.test(path);
+export const forgetKept = () => KEPT.clear();
+/** Ask for the lists in the background, so the next page has them already. */
+export function warm(paths) {
+  for (const p of paths) if (!KEPT.has(p)) api(p).catch(() => {});
+}
 export async function api(path, { method = 'GET', body } = {}) {
+  if (method === 'GET' && keepable(path)) {
+    const hit = KEPT.get(path);
+    if (hit && Date.now() - hit.at < KEPT_MS) return structuredClone(await hit.data);
+    const data = fetchApi(path, { method, body });
+    KEPT.set(path, { at: Date.now(), data });
+    data.catch(() => KEPT.delete(path));
+    return structuredClone(await data);
+  }
+  const out = await fetchApi(path, { method, body });
+  if (method !== 'GET') KEPT.clear();
+  return out;
+}
+async function fetchApi(path, { method = 'GET', body } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && state.me?.csrf) headers['X-CSRF-Token'] = state.me.csrf;

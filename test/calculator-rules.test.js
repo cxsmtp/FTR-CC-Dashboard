@@ -128,3 +128,38 @@ test('a report loaded into the calculator gives back the backlog, the plan and F
   assert.equal(f.projects.find((p) => p.name === 'web').scansOverride, 9);
   assert.equal(patch.totals.extraPercent, 10);
 });
+
+test('a report from an earlier version (figures on its page only) is read back into the calculator', async () => {
+  const { readOldReport, isOldReport } = await import('../server/old-report.js');
+  const { customerFigures, profileFromReport } = await import('../server/customer-version.js');
+  const row = (cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+  const page = `<!doctype html><html><head><title>Example Co: Checkmarx credits projection</title></head><body>
+    <h1>Example Co: credits projection</h1><p>Made 10/14/2026, 1:01:02 PM by Pat Example</p>
+    <p>Total credits required 30,000</p><p>3 bundles of 10,000 credits · over 12 months</p><h2>How we got there</h2>
+    <p>Read live from Checkmarx One on October 14, 2026: 3 projects, 40 scans, 600 open vulnerabilities.</p>
+    <p>The trend is measured over the last 3 months of that data, week by week, and carried forward.</p>
+    <p>Backlog as of October 14, 2026, against July 15, 2026.</p>
+    <table>${row(['By severity', 'Critical', 'High', 'Medium', 'Low', 'Total'])}${row(['Current backlog', '100', '200', '300', '0', '600'])}${row(['Added a month', '10', '20', '0', '0', '30'])}${row(['Fixed a month', '5', '5', '0', '0', '10'])}${row(['Backlog to triage', '100', '200', '0', '0', '300'])}${row(['Still to come', '0', '0', '0', '0', '0'])}${row(['Credits per triage', '1', '1', '1', '1', '—'])}${row(['False positives (estimated)', '30%', '30%', '30%', '30%', '—'])}${row(['Credits per remediation', '3', '3', '3', '3', '—'])}${row(['Credits', '310', '620', '0', '0', '930'])}</table>
+    <table>${row(['Model', 'Credits per 10K LOC', 'Projects', '10K units × scans', 'Credits'])}${row(['haiku', '1', '2', '29', '29'])}</table>
+    <table>${row(['Scanned today', 'Projects', 'Fusion scans per project', 'Model', '10K units', 'Credits'])}${row(['About once a month', '2', '6', 'haiku', '5', '30'])}</table>
+    <table>${row(['Project', 'Criticality', 'Scanned today', 'Lines of code', '10K units', 'Fusion scans', 'Set by', 'Model', 'Credits'])}${row(['payments', '3', 'About once a month (0.3/week)', '25,000', '3', '6', 'Scan frequency', 'haiku', '18'])}${row(['web', '—', 'About once a month (0.2/week)', '12,000', '2', '9', 'This project', 'haiku', '18'])}</table>
+  </body></html>`;
+  assert.equal(isOldReport(page), true);
+  assert.equal(isOldReport(page.replace('<body>', '<body><script type="application/json" id="cx-live">{}</script>')), false);
+  const live = readOldReport(page);
+  assert.equal(live.base.customer, 'Example Co');
+  assert.equal(live.base.preparedBy, 'Pat Example');
+  assert.equal(live.sentTotal, 30000);
+  const a = live.inputs.tr.analysis;
+  assert.deepEqual(SEV_CURRENT(a), [100, 200, 300, 0]);
+  assert.equal(live.inputs.tr.plan.selected.Medium, 0);
+  const p = live.inputs.fusion.projects;
+  assert.deepEqual(p.map((x) => [x.name, x.loc, x.frequency, x.scansOverride ?? null]), [['payments', 25000, 'month', null], ['web', 12000, 'month', 9]]);
+  const fig = customerFigures(live);
+  assert.equal(fig.data.fusion.totals.credits, 3 * 6 + 2 * 9);
+  const patch = profileFromReport(live, { useSent: true });
+  assert.ok(patch.tr.totals.weeks.length >= 2);
+  assert.equal(patch.fusion.projects.length, 2);
+  assert.throws(() => readOldReport('<html><body>hello</body></html>'), /not a projection report/);
+});
+const SEV_CURRENT = (a) => ['Critical', 'High', 'Medium', 'Low'].map((s) => a.perSeverity[s].current);

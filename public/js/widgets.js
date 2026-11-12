@@ -261,9 +261,15 @@ function placeMenu(details) {
   const w = list.offsetWidth;
   const below = window.innerHeight - b.bottom - 8;
   const top = h <= below || below >= b.top ? b.bottom + 6 : Math.max(8, b.top - 6 - h);
+  const left = Math.min(window.innerWidth - w - 8, Math.max(8, b.right - w));
   list.style.top = `${Math.round(top)}px`;
-  list.style.left = `${Math.round(Math.min(window.innerWidth - w - 8, Math.max(8, b.right - w)))}px`;
+  list.style.left = `${Math.round(left)}px`;
   list.style.maxHeight = `${Math.round(window.innerHeight - top - 8)}px`;
+  // Inside an animated or transformed part of the page, "fixed" is measured from that part, not the window: where the
+  // menu landed is read back and the difference taken off, so it sits under its button and inside the window.
+  const got = list.getBoundingClientRect();
+  if (Math.abs(got.left - left) > 0.5) list.style.left = `${Math.round(left + (left - got.left))}px`;
+  if (Math.abs(got.top - top) > 0.5) list.style.top = `${Math.round(top + (top - got.top))}px`;
 }
 const closeMenus = (but = null) => {
   for (const d of document.querySelectorAll('.tw details.menu[open]')) if (d !== but) d.open = false;
@@ -275,9 +281,15 @@ document.addEventListener('toggle', (e) => {
   closeMenus(d);
   placeMenu(d);
 }, true);
+// The page or the table scrolls: an open menu follows its button, and closes once the button is out of sight.
 document.addEventListener('scroll', (e) => {
   if (e.target instanceof Element && e.target.closest('.menu-list')) return;
-  closeMenus();
+  for (const d of document.querySelectorAll('.tw details.menu[open]')) {
+    const btn = d.querySelector(':scope > summary')?.getBoundingClientRect();
+    const box = d.closest('.tw')?.getBoundingClientRect();
+    if (!btn || !box || btn.bottom < box.top || btn.top > box.bottom || btn.bottom < 0 || btn.top > window.innerHeight) d.open = false;
+    else placeMenu(d);
+  }
 }, true);
 window.addEventListener('resize', () => closeMenus());
 document.addEventListener('click', (e) => {

@@ -189,6 +189,11 @@ export class Accounts {
   isDraft(id) {
     return !this.accounts.meta(id)?.publishedAt && !this.reports.list().some((r) => r.customerId === id);
   }
+  /** Its calculator was filled from this report: said, so it is not offered again until either changes. */
+  markLoaded(id, reportId, at) {
+    const account = this.accounts.get(id);
+    if (account) this.accounts.put({ ...account, loadedFrom: { reportId, at }, updatedAt: at });
+  }
   /** Back to a draft (the Admin's cleanse with its reports): its SE's and the Admins' again. */
   unpublish(id) {
     const account = this.accounts.get(id);

@@ -200,3 +200,39 @@ export function profileFromReport(live, { useSent = false } = {}) {
   if (inputs.totals) patch.totals = inputs.totals;
   return patch;
 }
+
+/**
+ * A report without its levers (made before them, or from an earlier report) but with its own figures: the backlog's
+ * analysis per severity, the plan's rows, what is still to come, and Fusion's rows. The calculator's data again, from
+ * those. Null when the report keeps only its totals.
+ */
+export function profileFromData(data) {
+  const t = data?.tr;
+  const SEVS = ['Critical', 'High', 'Medium', 'Low'];
+  let tr = null;
+  if (t?.analysis && t.asOf && t.previousDate && SEVS.every((s) => t.analysis[s])) {
+    const perSeverity = Object.fromEntries(SEVS.map((s) => [s, { ...t.analysis[s] }]));
+    const analysis = { latestDate: String(t.asOf).slice(0, 10), previousDate: String(t.previousDate).slice(0, 10), lookbackMonths: t.lookbackMonths ?? 3, spanMonths: t.analysis.spanMonths, perSeverity, total: t.analysis.total, history: [] };
+    const rows = t.rows ?? {};
+    const plan = {
+      selected: Object.fromEntries(SEVS.map((s) => [s, rows[s]?.selected ?? null])),
+      fpPercent: Object.fromEntries(SEVS.map((s) => [s, rows[s]?.fp ?? 30])),
+      includeFuture: t.ahead?.includeFuture,
+      aiDeclinePercent: t.ahead?.aiDeclinePercent,
+      newPacePercent: t.ahead?.newPacePercent,
+      fusionUpliftPercent: t.ahead?.fusionUpliftPercent,
+    };
+    tr = { analysis, plan, sast: null, fusion: Boolean(t.fusion) };
+  }
+  const f = data?.fusion;
+  let fusion = null;
+  if (f?.rows?.length) {
+    fusion = {
+      settings: { periodMonths: f.periodMonths ?? data.months ?? 12, defaultScans: f.defaultScans ?? 1, defaultModel: f.defaultModel ?? null, models: f.models ?? [], combine: 'frequency', byFrequency: {} },
+      // Each project's scans as the report had them, so its credits come out the same.
+      projects: f.rows.map((r) => ({ name: r.name, loc: r.lines ?? (r.units ? r.units * 10000 : null), frequency: r.frequency, criticality: r.criticality ?? null, scansPerWeek: r.scansPerWeek ?? 0, included: r.included !== false, scansOverride: r.scans ?? null, modelOverride: r.model ?? null, ...(r.count ? { count: r.count, units: r.units } : {}) })),
+    };
+  }
+  if (!tr && !fusion) return null;
+  return profileFromReport({ inputs: { months: data.months ?? 12, tr, fusion, totals: data.summary?.settings ?? data.levers?.totals }, base: data });
+}

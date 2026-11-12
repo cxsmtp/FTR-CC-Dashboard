@@ -3,7 +3,7 @@ import { viewAccount, viewAccounts } from './accounts.js';
 import { viewActivity } from './activity.js';
 import { viewAudit } from './audit.js';
 import { firstStepsDone, home, viewForgot, viewLogin, viewReset, viewWelcome } from './auth.js';
-import { $, api, applyMyTheme, esc, go, state, toast } from './core.js';
+import { $, api, applyMyTheme, can, esc, go, state, toast, warm } from './core.js';
 import { viewGuide } from './guide.js';
 import { viewHelp } from './help.js';
 import { viewOverview } from './overview.js';
@@ -22,6 +22,8 @@ export async function route() {
   routing = true;
   try {
     await show();
+    // The lists the other pages show, fetched in the background once this page is up: the next page has them already.
+    if (state.me && can('dashboard.view')) setTimeout(() => warm(['/api/accounts', '/api/people', '/api/dashboard']), 400);
   } finally {
     routing = false;
     if (again) {

@@ -93,6 +93,8 @@ export async function startHosted() {
   }
   // This person's settings (the page itself is the same for everyone, so it is cached).
   let cfg = {};
+  // Asked for at once, in parallel, as soon as the team is known: what the calculator asks for first anyway.
+  const early = new Map();
   try {
     const res = await fetch('/api/cc/calc-config', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
     if (res.status === 401) {
@@ -155,6 +157,22 @@ export async function startHosted() {
     try {
       localStorage.setItem(OPEN_KEY, params.get('account'));
     } catch {}
+  }
+  // The account to open is known already (the address, or the one open last): its figures and its details are asked
+  // for now, with the list and the connection's state, instead of one after another as the calculator gets to them.
+  {
+    let openId = params.get('account') || '';
+    if (!openId) {
+      try {
+        openId = localStorage.getItem(OPEN_KEY) || '';
+      } catch {}
+    }
+    const ask = (path) => {
+      const p = server(path);
+      p.catch(() => {});
+      early.set(path, p);
+    };
+    for (const path of ['/api/projections', '/api/status', '/api/cc/cxone/status', ...(openId ? [`/api/projections/${encodeURIComponent(openId)}`, `/api/cc/accounts/${encodeURIComponent(openId)}`] : [])]) ask(path);
   }
   // The organisation's branding (Settings → Branding): the name, the logo, the accent, the menu, and whether people
   // may choose their own look.
@@ -277,6 +295,12 @@ export async function startHosted() {
 
   // ---- Requests to the server ----------------------------------------------------------------------
   async function server(path, { method = 'GET', body, headers = {} } = {}) {
+    // Asked for early (once): that answer, not another round trip.
+    if (method === 'GET' && early.has(path)) {
+      const p = early.get(path);
+      early.delete(path);
+      return p;
+    }
     let response;
     try {
       response = await fetch(path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cfg.csrf ?? '', 'X-Team': team, ...headers }, ...(body !== undefined ? { body: typeof body === 'string' ? body : JSON.stringify(body) } : {}) });
@@ -799,6 +823,7 @@ export async function startHosted() {
       <dl class="hc-prev-facts"><dt>Made for</dt><dd>${esc(preview.customer || '—')}${preview.sameName ? '' : ' <b class="hc-req">not this account’s name</b>'}</dd><dt>Made on</dt><dd>${esc(preview.madeAt ? fmtDateTime(preview.madeAt) : 'unknown')}</dd><dt>Credits</dt><dd><b>${num(preview.total)}</b></dd></dl>
       <label class="field"><span>Shared with <small>optional: the email address(es) it was given to</small></span><input id="hc-prev-who" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="name@customer.com" /></label>
       <label class="check hc-prev-load"><input type="checkbox" id="hc-prev-load" checked /> <span><b>Load its figures into the calculator</b><small>Triage &amp; remediation, Fusion and the settings, as the report has them. This replaces what the calculator holds for ${esc(account.name)} now.</small></span></label>
+      ${preview.old ? `<p class="hint">Made with an earlier version of the calculator: its figures are read from the page and worked out again with today’s model (<b>${num(preview.worked)}</b> credits against the ${num(preview.total)} it shows; an earlier saving such as FAE is not counted).</p>` : ''}
       <p class="hint">It is kept as a <b>previous quote</b>, with its own date and figures, exactly as it was given.</p>
       <div class="hc-dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary">${preview.sameName ? 'Keep it' : 'Keep it here anyway'}</button></div></form>`;
     document.body.append(dlg);

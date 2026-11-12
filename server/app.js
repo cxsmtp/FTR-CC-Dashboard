@@ -5,6 +5,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 
 import { APP_CSP, RateLimit, Router, SECURITY_HEADERS, cookies, readBody, send, serveStatic } from './http.js';
 import { AuditLog, Doc, fail } from './store.js';
@@ -15,7 +17,8 @@ import { Accounts, DEFAULT_SALESFORCE_HOSTS, checkSalesforceUrl, nameKey, tidyNa
 import { newProfile } from '../core/public/calculator/profiles.js';
 import { Terms } from './terms.js';
 import { suggestCurrency } from './currency.js';
-import { changesOf, customerFigures, profileFromReport, readCustomerVersion } from './customer-version.js';
+import { changesOf, customerFigures, profileFromData, profileFromReport, readCustomerVersion } from './customer-version.js';
+import { isOldReport, readOldReport } from './old-report.js';
 import { Sso, mergeSso } from './sso.js';
 import { UpdateService, VersionStore, compareVersions } from './updates.js';
 import { ActivityLog } from './activity.js';
@@ -2083,12 +2086,16 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (!rep) continue;
       const a = accounts.accounts.get(meta.id);
       const full = accounts.reports.get(rep.id);
+      const loadable = Boolean(full?.data?.levers?.tr || full?.data?.levers?.fusion || profileFromData(full?.data));
+      // Reloaded from this report already, and nothing changed in the calculator since: nothing to do.
+      const upToDate = Boolean(a?.loadedFrom && a.loadedFrom.reportId === rep.id && a.loadedFrom.at === a.updatedAt);
       out.push({
+        upToDate,
         id: meta.id,
         name: meta.name,
         team: teamPath(ctx.teams, meta.teamId).map((x) => x.name).join(' › '),
         owner: userName(meta.ownerId),
-        report: { id: rep.id, source: rep.source, createdAt: rep.createdAt, total: rep.totalCredits, projects: full?.data?.fusion?.totals?.projects ?? null, loadable: Boolean(full?.data?.levers) },
+        report: { id: rep.id, source: rep.source, createdAt: rep.createdAt, total: rep.totalCredits, projects: full?.data?.fusion?.totals?.projects ?? null, loadable },
         now: { projects: a?.fusion?.projects?.filter((p) => p.source !== 'manual').length ?? 0, backlog: Boolean(a?.tr?.totals), from: a?.tr?.totals?.meta?.layout === 'report' ? 'report' : a?.tr?.totals?.meta?.source ?? null, readAt: a?.tr?.totals?.meta?.readAt ?? a?.fusion?.readAt ?? null },
       });
     }
@@ -2132,12 +2139,14 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     for (const meta of accounts.accounts.list().filter((m) => ids.has(m.id))) {
       const rep = uploadedReportOf(meta);
       const data = rep ? accounts.reports.get(rep.id)?.data : null;
-      if (!data?.levers) {
-        skipped.push({ name: meta.name, why: 'its report has no figures to load' });
+      const patch = data?.levers?.tr || data?.levers?.fusion ? profileFromReport({ inputs: data.levers, base: { ...data, generatedAt: rep.createdAt } }) : profileFromData(data);
+      if (!patch) {
+        skipped.push({ name: meta.name, why: 'its report keeps only its totals: upload the original report file again under A previous report' });
         continue;
       }
       try {
-        accounts.update(meta.id, ctx.scope, { ...profileFromReport({ inputs: data.levers, base: { ...data, generatedAt: rep.createdAt } }), scope: {} }, ctx.user);
+        const after = accounts.update(meta.id, ctx.scope, { ...patch, scope: {} }, ctx.user);
+        accounts.markLoaded(meta.id, rep.id, after.updatedAt);
         record(ctx, req, 'account.reloaded', meta.name, { id: meta.id, report: rep.id, source: rep.source, reportMadeAt: rep.createdAt, total: rep.totalCredits });
         done.push(meta.name);
       } catch (error) {
@@ -2158,7 +2167,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
    */
   r('POST', '/api/cc/accounts/:id/customer-version', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const account = accounts.get(params.id, ctx.scope);
-    const live = readCustomerVersion(body?.html);
+    // A customer's version made from an earlier report (figures on its page only): read from its page, in full.
+    const live = isOldReport(String(body?.html ?? '')) ? readOldReport(body.html) : readCustomerVersion(body?.html);
     const figures = customerFigures(live);
     const changes = changesOf(live.sentInputs ?? {}, live.inputs);
     const sameName = figures.customer.trim().toLowerCase() === account.name.trim().toLowerCase();
@@ -2172,7 +2182,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (sent && !sent.sharedAt) accounts.markShared(sent.id, ctx.scope, { shared: true, fromCustomer: true, note: 'The customer sent back their version of it' }, ctx.user);
     if (body?.makePrimary !== false) accounts.setPrimary(account.id, rep.id, ctx.scope);
     // Their numbers in the calculator from now on: its backlog, plan, Fusion projects and counted code, as their report has them.
-    if (body?.applyPreferences !== false) accounts.update(account.id, ctx.scope, { ...profileFromReport(live), scope: {} }, ctx.user);
+    if (body?.applyPreferences !== false) {
+      const after = accounts.update(account.id, ctx.scope, { ...profileFromReport(live), scope: {} }, ctx.user);
+      accounts.markLoaded(account.id, rep.id, after.updatedAt);
+    }
     record(ctx, req, 'report.customerVersion', account.name, { id: rep.id, total: rep.totalCredits, sentTotal: figures.sentTotal, changes: changes.length, primary: body?.makePrimary !== false, preferences: body?.applyPreferences !== false });
     return { ...preview, report: { id: rep.id, totalCredits: rep.totalCredits }, ...accountDetail(ctx, account.id) };
   });
@@ -2183,11 +2196,13 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   r('POST', '/api/cc/accounts/:id/previous-report', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const account = accounts.get(params.id, ctx.scope);
     if (!account.salesforceUrl) throw fail(409, 'Save the account\u2019s Salesforce opportunity or account link first.');
-    const live = readCustomerVersion(body?.html);
+    // A report from an earlier version (figures on the page only): read from its page and made again with today's model.
+    const old = isOldReport(String(body?.html ?? ''));
+    const live = old ? readOldReport(body.html) : readCustomerVersion(body?.html);
     const figures = customerFigures(live);
     const madeAt = live.base?.generatedAt ?? null;
     const sameName = figures.customer.trim().toLowerCase() === account.name.trim().toLowerCase();
-    const preview = { customer: figures.customer, sameName, total: figures.sentTotal ?? figures.total, madeAt };
+    const preview = { customer: figures.customer, sameName, total: figures.sentTotal ?? figures.total, madeAt, old, worked: Math.round(figures.total) };
     if (body?.dryRun !== false) return { dryRun: true, ...preview };
     if (!sameName && body?.confirm !== true) throw fail(409, `This report was made for "${figures.customer}", not ${account.name}. Confirm to keep it here anyway.`);
     // The quote as it was given: the report's own figures, before anyone moved a lever.
@@ -2195,7 +2210,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     let rep = accounts.addPreviousReport({ customerId: account.id, data, user: ctx.user, madeAt, note: body?.note }, ctx.scope);
     // Loaded into the calculator (unless asked not to): its backlog, plan, Fusion projects and counted code, as the quote had them.
     const loaded = body?.load !== false;
-    if (loaded) accounts.update(account.id, ctx.scope, { ...profileFromReport(live, { useSent: true }), scope: {} }, ctx.user);
+    if (loaded) {
+      const after = accounts.update(account.id, ctx.scope, { ...profileFromReport(live, { useSent: true }), scope: {} }, ctx.user);
+      accounts.markLoaded(account.id, rep.id, after.updatedAt);
+    }
     if (String(body?.sharedWith ?? '').trim()) rep = accounts.markShared(rep.id, ctx.scope, { shared: true, sharedWith: body.sharedWith, note: 'A quote given before, brought in' }, ctx.user);
     record(ctx, req, 'report.previous', account.name, { id: rep.id, total: rep.totalCredits, madeAt, sharedWith: rep.sharedWith ?? [], loaded });
     return { ...preview, report: { id: rep.id, totalCredits: rep.totalCredits }, ...accountDetail(ctx, account.id) };
@@ -2205,6 +2223,34 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
 
   // ---- The requests ---------------------------------------------------------------------------------------------
   const PUBLIC_DIR = path.join(config.root, 'public');
+  /**
+   * The dashboard's page: its styles and scripts at this version's own address (/v/<version>/…), each kept by the
+   * browser until the next version, and every module named up front so they are fetched together, not one after another.
+   * Over a slow link this is the difference between a round trip per file on every page and none.
+   */
+  let indexCache = null;
+  const sendIndex = (req, res) => {
+    const file = path.join(PUBLIC_DIR, 'index.html');
+    const stat = fs.statSync(file);
+    if (!indexCache || indexCache.mtime !== stat.mtimeMs) {
+      const v = `/v/${VERSION}`;
+      const modules = fs.readdirSync(path.join(PUBLIC_DIR, 'js')).filter((f) => f.endsWith('.js')).sort();
+      const html = fs.readFileSync(file, 'utf8')
+        // Who is signed in and the branding: asked for with the page itself, not one round trip after it.
+        .replace('<link rel="stylesheet" href="/app.css" />', `<link rel="preload" href="/api/me" as="fetch" crossorigin />\n<link rel="preload" href="/api/branding" as="fetch" crossorigin />\n<link rel="stylesheet" href="/app.css" />`)
+        .replace('href="/app.css"', `href="${v}/app.css"`)
+        .replace('href="/standard.css"', `href="${v}/standard.css"`)
+        .replace('<script src="/xlsx-lite.js"></script>', `<script src="${v}/xlsx-lite.js" defer></script>`)
+        .replace('<script type="module" src="/js/main.js"></script>', `${modules.map((m) => `<link rel="modulepreload" href="${v}/js/${m}" />`).join('\n')}\n<script type="module" src="${v}/js/main.js"></script>`);
+      const etag = `"${createHash('sha256').update(html).digest('hex').slice(0, 20)}"`;
+      indexCache = { mtime: stat.mtimeMs, html, gz: zlib.gzipSync(html), etag };
+    }
+    const headers = { ...SECURITY_HEADERS, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: indexCache.etag, Vary: 'Accept-Encoding', 'Content-Security-Policy': APP_CSP };
+    if (req.headers['if-none-match'] === indexCache.etag) return void res.writeHead(304, headers).end();
+    const gz = /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
+    res.writeHead(200, { ...headers, ...(gz ? { 'Content-Encoding': 'gzip' } : {}) });
+    res.end(gz ? indexCache.gz : indexCache.html);
+  };
   const SAMPLES = path.join(config.root, 'core', 'public', 'calculator', 'samples');
   const LEGAL = { '/legal/terms': 'TERMS.md', '/legal/license': 'LICENSE', '/legal/guide': 'docs/USER-GUIDE.md', '/legal/changelog': 'CHANGELOG.md' };
 
@@ -2262,7 +2308,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const match = router.match(method, pathname);
     if (!match) {
       if (method === 'GET' && !pathname.startsWith('/api/')) {
-        if (pathname === '/' || pathname === '/index.html') return serveStatic(PUBLIC_DIR, req, res, 'index.html') || send(res, 404, 'Not found');
+        if (pathname === '/' || pathname === '/index.html') return sendIndex(req, res);
+        // This version's own files: the browser keeps them until the next version (a new address), asking nothing meanwhile.
+        const versioned = /^\/v\/([^/]+)(\/.+)$/.exec(pathname);
+        if (versioned) return serveStatic(PUBLIC_DIR, req, res, versioned[2], { cache: versioned[1] === VERSION ? 'public, max-age=31536000, immutable' : 'no-cache' }) || send(res, 404, 'Not found');
         if (serveStatic(PUBLIC_DIR, req, res, pathname)) return;
       }
       return send(res, 404, { error: 'Not found.' });
