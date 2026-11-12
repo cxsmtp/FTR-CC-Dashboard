@@ -2,6 +2,12 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.66.00 — 2026-11-12
+
+- **Accounts: the T&R and Fusion breakup is back.** Under each account's credits, in small type: how much is triage & remediation and how much is Fusion.
+- **Download a report from the account.** Every report in an account's Reports list has a Download button: the same file the calculator makes (with its levers), without opening the calculator. Each download is in the audit log.
+- **No more "Cannot set properties of null" page.** Opening another page while the first was still loading let the first one finish late and put that error (or itself) over the page just opened. Pages now open one at a time: the one loading finishes, then the last place asked for opens.
+
 ## CC-01.65.00 — 2026-11-12
 
 - **Accounts follow their accountable SE.** An account is in the team of its accountable SE. Move a person to another team (People, in the list or in Edit) and their accounts move with them; the message says how many. Give an account a new accountable SE and it moves to that SE's team.

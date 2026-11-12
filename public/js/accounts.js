@@ -87,6 +87,8 @@ export async function viewAccounts(params) {
     $('#rows').innerHTML = list.length
       ? list.map((a) => {
         const pen = (kind, label) => `<button type="button" class="cell-pen" data-pen="${kind}" title="${label}" aria-label="${label}">${icon('edit')}</button>`;
+        // 515,661 as 516K, 1,411,873 as 1.41M: the exact figures are in the cell's tip and in the account.
+        const short = (n) => new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 }).format(Math.round(Number(n) || 0));
         const split = a.primary ? `T&R ${num(Math.round(a.primary.trCredits ?? 0))} · Fusion ${num(Math.round(a.primary.fusionCredits ?? 0))}${a.primary.how === 'latest' ? ' · the latest report (none marked primary)' : ''}` : '';
         const total = Number(a.primary?.totalCredits) || 0;
         const soldNote = a.sold ? `${total ? `${Math.min(100, Math.round((a.sold / total) * 100))}% of the projection` : ''}${a.salesCount > 1 ? ` · ${num(a.salesCount)} sales` : ''}` : 'Nothing sold yet';
@@ -103,7 +105,7 @@ export async function viewAccounts(params) {
         return `<tr class="click${a.muted ? ' muted-row' : ''}" data-account="${esc(a.id)}">
         <td data-edit="name" class="acc-name"><span class="cell-line"><b title="${esc(a.name)}">${esc(a.name)}</b>${a.salesforceUrl ? `<a class="sf-link" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open the ${a.salesforceKind === 'opportunity' ? 'opportunity' : 'account'} in Salesforce (new tab)" aria-label="Open in Salesforce">${icon('ext')}</a>` : '<span class="chip bad" title="No Salesforce link yet: nothing is generated until one is saved">No link</span>'}${a.muted ? `<span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}${pen('name', 'Rename')}</span></td>
         <td data-edit="owner" class="acc-owner"><span class="cell-line"><span class="avatar sm">${esc(initials(a.owner))}</span><span class="clip" title="${esc(`${a.owner} · ${a.teamPath}`)}">${esc(a.owner)}</span>${pen('owner', 'Change the accountable SE')}</span></td>
-        <td class="num" title="${esc(`${split}${a.reportCount ? ` · ${a.reportCount} report${a.reportCount === 1 ? '' : 's'}` : ''}`)}">${a.primary ? `<span class="credits">${num(Math.round(a.primary.totalCredits))}</span>` : '<span class="muted">No report</span>'}</td>
+        <td class="num" data-sort="${a.primary ? Math.round(a.primary.totalCredits) : -1}" data-v="${a.primary ? num(Math.round(a.primary.totalCredits)) : 'No report'}" title="${esc(`${split}${a.reportCount ? ` · ${a.reportCount} report${a.reportCount === 1 ? '' : 's'}` : ''}`)}">${a.primary ? `<span class="credits">${num(Math.round(a.primary.totalCredits))}</span><span class="acc-split">T&amp;R ${short(a.primary.trCredits)} · Fusion ${short(a.primary.fusionCredits)}</span>` : '<span class="muted">No report</span>'}</td>
         <td class="num" data-edit="sold" title="${esc(soldNote)}"><span class="cell-line end">${a.sold ? num(Math.round(a.sold)) : '<span class="muted">—</span>'}${can('sales.record') && a.primary ? pen('sold', 'Record a sale') : ''}</span></td>
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td data-edit="shared"><span class="cell-line">${shared}${can('reports.share') && a.primary ? pen('shared', 'Shared with the customer, or not') : ''}</span></td>
@@ -301,11 +303,11 @@ export async function viewAccount(id) {
         ${d.can.deleteAccount ? '<div class="mt"><button class="danger sm" id="del-acct">Delete account and its reports</button></div>' : ''}
     </details>
     ${salesPanel(a, d)}
-    <div class="panel mt"><h2>Reports <small>download them from the calculator's Saved reports list</small>${d.can.edit ? `<label class="btn sm file-btn">⇪ Upload the customer's version<input type="file" id="cv-file" accept=".html,.htm,text/html" hidden /></label>` : ''}</h2>
-      ${d.reports.length ? `<div class="tw"><table><thead><tr><th></th><th>Made</th><th>By</th><th class="num">T&amp;R</th><th class="num">Fusion</th><th class="num">Total</th><th>Shared with customer</th><th></th></tr></thead><tbody>${d.reports.map((r) => {
+    <div class="panel mt"><h2>Reports${d.can.edit ? `<label class="btn sm file-btn">⇪ Upload the customer's version<input type="file" id="cv-file" accept=".html,.htm,text/html" hidden /></label>` : ''}</h2>
+      ${d.reports.length ? `<div class="tw"><table class="rep-table"><thead><tr><th></th><th>Made</th><th>By</th><th class="num">T&amp;R</th><th class="num">Fusion</th><th class="num">Total</th><th>Shared with customer</th><th></th></tr></thead><tbody>${d.reports.map((r) => {
         const primary = a.primary?.id === r.id;
         return `<tr data-id="${esc(r.id)}"><td>${primary ? `<span class="chip star">${icon('star')}${a.primary.how === 'marked' ? 'Primary' : 'Latest'}</span>` : ''}${r.source === 'previous' ? `<span class="chip" title="A report made before, brought in${r.importedAt ? ` ${esc(date(r.importedAt))}` : ''}">Previous quote</span>` : ''}${r.source === 'customer' ? `<span class="chip sf" title="${esc(r.changes.join('\n') || 'No changes')}">Customer's version</span><span class="sub">${r.sentTotal ? `${r.totalCredits - r.sentTotal > 0 ? '+' : ''}${num(Math.round(r.totalCredits - r.sentTotal))} vs sent` : ''}${r.changes.length ? ` · ${num(r.changes.length)} change${r.changes.length === 1 ? '' : 's'}` : ''}</span>` : ''}</td><td>${esc(dateTime(r.createdAt))}</td><td>${esc(r.createdBy)}</td><td class="num">${num(Math.round(r.trCredits ?? 0))}</td><td class="num">${num(Math.round(r.fusionCredits ?? 0))}</td><td class="num credits">${num(Math.round(r.totalCredits))}</td><td class="shared-cell">${r.sharedAt ? `<span class="chip ok"><i></i>${esc(date(r.sharedAt))}</span><span class="sub">${sharedTo(r) ? `with ${esc(sharedTo(r))} · ` : ''}by ${esc(r.sharedByName)}</span>` : '<span class="muted">—</span>'}</td>
-        <td class="actions">${d.can.share ? `${a.primaryReportId === r.id ? '<button class="sm ghost" data-act="unprimary">Unmark primary</button>' : `<button class="sm" data-act="primary">${icon('star')}Make primary</button>`}${r.sharedAt ? '<button class="sm ghost" data-act="unshare">Unmark shared</button>' : `<button class="sm" data-act="share">${icon('send')}Mark shared</button>`}` : ''}${d.can.sell ? `<button class="sm ghost" data-sell="${esc(r.id)}" title="Record credits sold against this report">Sold…</button>` : ''}<button class="sm ghost icon" data-act="delete" title="Delete report">${icon('trash')}</button></td></tr>`;
+        <td class="actions">${d.can.share ? `${a.primaryReportId === r.id ? '<button class="sm ghost" data-act="unprimary">Unmark primary</button>' : `<button class="sm" data-act="primary">${icon('star')}Make primary</button>`}${r.sharedAt ? '<button class="sm ghost" data-act="unshare">Unmark shared</button>' : `<button class="sm" data-act="share">${icon('send')}Mark shared</button>`}` : ''}<button class="sm ghost icon" data-act="download" title="Download this report (the file the customer gets)" aria-label="Download this report">${icon('download')}</button>${d.can.sell ? `<button class="sm ghost" data-sell="${esc(r.id)}" title="Record credits sold against this report">Sold…</button>` : ''}<button class="sm ghost icon" data-act="delete" title="Delete report">${icon('trash')}</button></td></tr>`;
       }).join('')}</tbody></table></div>` : '<div class="empty"><b>No reports yet</b></div>'}
     </div>`;
   if (p) countUp($('#bigc'), Math.round(p.totalCredits), ' credits');
@@ -356,6 +358,18 @@ export async function viewAccount(id) {
     const rid = b.closest('tr').dataset.id;
     const act = b.dataset.act;
     try {
+      if (act === 'download') {
+        const ds = document.documentElement.dataset;
+        const file = await api(`/api/cc/reports/${encodeURIComponent(rid)}/file?accent=${encodeURIComponent(ds.accent ?? '')}&theme=${encodeURIComponent(ds.theme ?? '')}&ops=${encodeURIComponent(ds.ops ?? '')}`);
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([file.html], { type: 'text/html' }));
+        link.download = file.name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+        return toast(`Downloaded ${file.name}.`, 'ok');
+      }
       if (act === 'primary' || act === 'unprimary') await api(`/api/cc/reports/${encodeURIComponent(rid)}/primary`, { method: 'POST', body: { primary: act === 'primary' } });
       if (act === 'share') return shareInline(b.closest('tr').querySelector('.shared-cell'), rid, { onDone: () => viewAccount(a.id) });
       if (act === 'unshare') await api(`/api/cc/reports/${encodeURIComponent(rid)}/shared`, { method: 'POST', body: { shared: false } });

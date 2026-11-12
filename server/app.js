@@ -892,6 +892,15 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'report.delete', rep.customer, { id: rep.id, totalCredits: rep.totalCredits });
     return rep;
   };
+  // The report's file, as the calculator downloads it, for the account's page.
+  r('GET', '/api/cc/reports/:id/file', ready2, async (req, ctx, body, res, url, params) => {
+    const rep = accounts.report(params.id, ctx.scope);
+    if (!rep?.data) throw fail(409, 'This report has no saved figures to make a file from.');
+    const { reportFile } = await import('./report-file.js');
+    const file = await reportFile(rep, { accent: url.searchParams.get('accent') === 'command' ? 'command' : 'aurora', theme: url.searchParams.get('theme') === 'dark' ? 'dark' : 'light', ops: String(url.searchParams.get('ops') ?? 'green').replace(/[^a-z]/g, '').slice(0, 12) || 'green' });
+    record(ctx, req, 'report.download', rep.customer, { id: rep.id, totalCredits: rep.totalCredits });
+    return file;
+  });
   r('DELETE', '/api/cc/reports/:id', ready2, (req, ctx, body, res, url, params) => {
     const rep = deleteReport(req, ctx, params.id, ctx.scope);
     return accountDetail(ctx, rep.customerId);

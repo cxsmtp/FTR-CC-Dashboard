@@ -13,7 +13,24 @@ import { viewRates } from './rates.js';
 import { viewAdmin } from './settings.js';
 import { viewTeams } from './teams.js';
 // ---- Router ---------------------------------------------------------------------------------------------------
+// One page at a time: a page that is still loading finishes before the next one starts, so a slow page can never write
+// into (or over) the page opened after it. Clicks made meanwhile are not lost: the last place asked for is opened next.
+let routing = false;
+let again = false;
 export async function route() {
+  if (routing) return void (again = true);
+  routing = true;
+  try {
+    await show();
+  } finally {
+    routing = false;
+    if (again) {
+      again = false;
+      route();
+    }
+  }
+}
+async function show() {
   const [pathPart, query = ''] = location.hash.replace(/^#/, '').split('?');
   const path = pathPart || '/';
   const params = new URLSearchParams(query);

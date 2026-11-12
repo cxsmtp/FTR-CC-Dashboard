@@ -1116,3 +1116,15 @@ td.actions { white-space: nowrap; text-align: right; }
 .auth .card .form button.primary { width: 100%; justify-content: center; }
 .auth .foot { margin-top: 16px; text-align: center; }
 .follow-panel { margin-bottom: 14px; border-color: var(--amber, #b45309) !important; }
+.acc-split { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+td .cell-line .cell-pen { box-sizing: border-box; width: 22px; min-width: 0; height: 22px; padding: 0; margin: 0; border: 0; }
+/* The sort and filter marks in a table header stay as small as their glyphs, in every look. */
+th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; height: auto !important; }
+@media (max-width: 1360px) { #main[data-page="accounts"] .acc-owner .avatar { display: none; } #main[data-page="accounts"] .acc-name b { max-width: 12ch; } .acc-split { font-size: 11px; } #main[data-page="accounts"] .cell-line { gap: 3px; } }
+/* An account's reports: the cells wrap instead of pushing the table past the page. */
+.rep-table td { white-space: normal; vertical-align: middle; }
+.rep-table td.num, .rep-table td:nth-child(2) { white-space: nowrap; }
+.rep-table td.actions { white-space: normal !important; text-align: right; width: 232px; }
+.rep-table td.actions > * { display: inline-flex; }
+.rep-table td.actions > * { margin: 2px 0 2px 4px; }
+.rep-table .sub { white-space: normal; }
