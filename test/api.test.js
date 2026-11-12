@@ -574,3 +574,31 @@ test('account names are tidied as they are entered, and the same name in another
   assert.equal((await se1.get('/api/cc/name-tidy')).status, 403);
   assert.ok(Array.isArray((await admin.get('/api/cc/name-tidy')).data.renames));
 });
+
+test('a role that only looks changes nothing on an account, whatever it sends', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const viewer = await client(env.base, 'viewer@t.example');
+  const h = team(env.teams.emea.id);
+  const id = (await se1.post('/api/projections', { name: 'Look Only Co', salesforceUrl: SF }, h)).data.customer.id;
+  await se1.put(`/api/projections/${id}`, { fusion: { projects: [{ id: 'p', name: 'x', loc: 1000, frequency: 'month', source: 'scan' }] } }, h);
+  const rep = (await se1.post('/api/projections/reports', { customerId: id, data: reportData() }, h)).data.report.id;
+  const d = (await viewer.get(`/api/cc/accounts/${id}`)).data;
+  assert.equal(d.can.edit, false);
+  assert.equal(d.can.deleteReports, false);
+  for (const [m, p, b] of [
+    ['put', `/api/cc/accounts/${id}`, { salesforceUrl: SF }],
+    ['put', `/api/cc/accounts/${id}`, { contacts: [{ email: 'a@b.example' }] }],
+    ['put', `/api/cc/accounts/${id}`, { ownerId: env.users.se2.id }],
+    ['post', `/api/cc/accounts/${id}/customer-version`, { html: '<html></html>' }],
+    ['post', `/api/cc/accounts/${id}/previous-report`, { html: '<html></html>' }],
+    ['post', `/api/cc/reports/${rep}/shared`, { shared: false }],
+    ['post', `/api/cc/reports/${rep}/primary`, { primary: true }],
+    ['del', `/api/cc/reports/${rep}`],
+    ['del', `/api/cc/accounts/${id}`],
+    ['post', `/api/cc/accounts/${id}/reset`, {}],
+    ['post', `/api/cc/accounts/${id}/cxone/clear`, {}],
+  ]) {
+    const r = await viewer[m](p, b);
+    assert.ok([403, 404].includes(r.status), `${m} ${p}: ${r.status}`);
+  }
+});

@@ -44,6 +44,16 @@ export const GUIDES = {
       ['calc', 'Work alongside your SEs', 'You can open any account of your teams in the calculator once its SE has generated a first report, refresh it from Checkmarx One, and generate a projection yourself.', '/calculator', 'Calculator'],
     ],
   },
+  viewer: {
+    name: 'Viewer',
+    tagline: 'The projections, the accounts and what was sold, at a glance.',
+    steps: [
+      ['overview', 'See the picture', 'Overview: the credits projected from each account’s primary report, what was sold and what is still needed, team by team.', '/overview', 'Overview'],
+      ['flag', 'Look into accounts', 'Accounts: every account you may see, its accountable SE, its credits and sales, and whether the customer has the report. Click one to open it.', '/accounts', 'Accounts'],
+      ['tree', 'Jump to anything', 'Ctrl K finds an account, a person or a page as you type.', '/accounts', 'Accounts'],
+      ['coins', 'Sales and exports', 'Where your role allows it: record credits sold against an account, and export the accounts or reports as CSV for a forecast call.', '/accounts', 'Credits sold'],
+    ],
+  },
   admin: {
     name: 'Admin',
     tagline: 'Set the command center up once; it looks after itself.',
@@ -68,11 +78,14 @@ export const GUIDE_ORDER = ['se', 'leader', 'admin'];
 /** Whose guide this is: Admins, then those who lead or oversee (and sales, who do not use the calculator), then SEs. */
 export function personaOf(me = state.me) {
   if (me.role?.id === 'admin' || can('settings.manage')) return 'admin';
-  if ((me.leads?.length ?? 0) > 0 || can('scope.all') || can('users.manage') || !can('calculator.use')) return 'leader';
-  return 'se';
+  // Those who lead teams or look after people (#14: not every role that sees every team, nor every role without the calculator).
+  if ((me.leads?.length ?? 0) > 0 || can('users.manage')) return 'leader';
+  if (can('calculator.use')) return 'se';
+  // Everyone else looks: Viewer, Sales, Tester and roles like them.
+  return 'viewer';
 }
-/** Theirs and every guide below it. */
-export const guidesFor = (persona) => GUIDE_ORDER.slice(0, GUIDE_ORDER.indexOf(persona) + 1).reverse();
+/** Theirs and every guide below it (a viewer's alone). */
+export const guidesFor = (persona) => (persona === 'viewer' ? ['viewer'] : GUIDE_ORDER.slice(0, GUIDE_ORDER.indexOf(persona) + 1).reverse());
 export function guideHtml(persona, { first = false, tabs = [] } = {}) {
   const g = GUIDES[persona];
   const art = (k) => `<svg viewBox="0 0 64 64" aria-hidden="true">${GUIDE_ART[k] ?? ''}</svg>`;

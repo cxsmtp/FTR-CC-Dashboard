@@ -547,7 +547,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const team = teams.get(ctx.user.teamId);
     const scopeTeams = ctx.teams.filter((t) => ctx.scope.has(t.id)).map((t) => ({ id: t.id, name: t.name, region: t.region, parentId: t.parentId, path: teamPath(ctx.teams, t.id).map((x) => x.name).join(' › '), leaderIds: t.leaderIds }));
     return {
-      user: publicUser(ctx.user),
+      // Only what the page uses about the person signed in (#11): not their lock, status or record dates.
+      user: (({ id, name, email, title, role, teamId, mustChangePassword, lastSignInAt, signIn }) => ({ id, name, email, title, role, teamId, mustChangePassword, lastSignInAt, signIn }))(publicUser(ctx.user)),
       csrf: ctx.session.csrf,
       role: { id: ctx.user.role, name: iam.roles()[ctx.user.role]?.name ?? ctx.user.role, home: homeOf(ctx.user.role, iam.roles()[ctx.user.role]) },
       permissions: [...ctx.permissions],
@@ -826,7 +827,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       }, new Map())].map(([email, at]) => ({ email, at })),
       sales: [...(a.sales ?? [])].sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.at).localeCompare(String(x.at))),
       members,
-      can: { contacts: mayContacts(ctx, a), edit: ctx.permissions.has('calculator.use'), assign: ctx.permissions.has('calculator.use') || ctx.permissions.has('users.manage'), share: ctx.permissions.has('reports.share') || a.ownerId === ctx.user.id, deleteAccount: ctx.permissions.has('accounts.delete'), sell: ctx.permissions.has('sales.record'), removeAnySale: ctx.permissions.has('reports.delete'), me: ctx.user.id },
+      can: { deleteReports: ctx.permissions.has('reports.delete'), me: ctx.user.id, contacts: mayContacts(ctx, a), edit: ctx.permissions.has('calculator.use'), assign: ctx.permissions.has('calculator.use') || ctx.permissions.has('users.manage'), share: ctx.permissions.has('reports.share') || a.ownerId === ctx.user.id, deleteAccount: ctx.permissions.has('accounts.delete'), sell: ctx.permissions.has('sales.record'), removeAnySale: ctx.permissions.has('reports.delete'), me: ctx.user.id },
     };
   };
   r('GET', '/api/cc/accounts/:id', ready2, (req, ctx, body, res, url, params) => accountDetail(ctx, params.id));

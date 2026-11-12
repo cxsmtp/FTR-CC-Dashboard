@@ -2,6 +2,14 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.87.00 — 2026-11-12
+
+The last items of the 12 November test report.
+
+- **#15** An account's page offers the bin next to a report only to those who may delete it (a role with *Delete any report*, or whoever made it while it is not shared). The server refused the others already: a test now checks that a role that only looks is refused every change to an account, whatever it sends.
+- **#14** Each role gets its own quick guide: Admins the Admin's, those who lead teams or look after people the Leader's, those who use the calculator the Sales Engineer's, and every role that only looks (Viewer, Sales, Tester and the like) a new short *Viewer* guide. Before, every role without the calculator got the Leader's.
+- **#11** The page is told only what it uses about the person signed in: not their lock, status or record dates.
+
 ## CC-01.86.00 — 2026-11-12
 
 Faster everywhere, and reports from earlier versions brought in whole.
