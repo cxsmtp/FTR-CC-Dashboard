@@ -14,9 +14,9 @@ export const sharedTo = (r) => (r?.sharedWith?.length ? r.sharedWith.join(', ') 
  * Shared with the customer, typed where the click was: the email address(es) of whom it was shared with, then ✓.
  * Enter saves, Esc puts the place back. `onDone` runs once it is saved.
  */
-export function shareInline(host, reportId, { onDone, onCancel } = {}) {
+export function shareInline(host, reportId, { onDone, onCancel, suggest = [] } = {}) {
   const before = host.innerHTML;
-  host.innerHTML = `<span class="cell-edit share-inline"><input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="Shared with: name@customer.com" aria-label="Email address of whom it was shared with" /><button type="button" class="sm primary" data-ok>✓ Shared</button><button type="button" class="sm ghost" data-x title="Cancel">✕</button></span>`;
+  host.innerHTML = `<span class="cell-edit share-inline"><input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="Shared with: name@customer.com" aria-label="Email address of whom it was shared with"${suggest.length ? ' list="share-suggest"' : ''} />${suggest.length ? `<datalist id="share-suggest">${suggest.map((e) => `<option value="${esc(e)}"></option>`).join('')}</datalist>` : ''}<button type="button" class="sm primary" data-ok>✓ Shared</button><button type="button" class="sm ghost" data-x title="Cancel">✕</button></span>`;
   const input = host.querySelector('input');
   input.focus();
   input.oninput = () => input.setCustomValidity(input.value.trim() && !emailList(input.value) ? 'Type the email address(es) of whom it was shared with.' : '');
@@ -47,8 +47,33 @@ export function shareInline(host, reportId, { onDone, onCancel } = {}) {
   host.onclick = (e) => e.stopPropagation();
 }
 
+// The list as it stands (its team and how to read it again): an account opens beside it, and closes back onto it.
+let listState = null;
+let focusNext = '';
+const listUp = () => Boolean(listState && $('#main')?.dataset.page === 'accounts' && $('#rows') && $('#count'));
+/** Close the account's side panel: back on the list, read again as the account may have changed. */
+function closeAccount({ quiet = false } = {}) {
+  const wrap = $('#acct-drawer');
+  if (!wrap) return;
+  wrap.remove();
+  if (quiet || !listUp()) return;
+  history.replaceState(null, '', `#/accounts${listState.focus ? `?team=${encodeURIComponent(listState.focus)}` : ''}`);
+  listState.reload().catch(() => {});
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !$('#acct-drawer') || e.target.closest?.('.cell-edit, .share-inline')) return;
+  if (document.querySelector('.reader, dialog[open]')) return;
+  closeAccount();
+});
+
 export async function viewAccounts(params) {
   const focus = params.get('team') ?? '';
+  // Back from an account's side panel (the browser's Back): the list is still there, with its filters.
+  if ($('#acct-drawer') && listUp() && listState.focus === focus) {
+    closeAccount({ quiet: true });
+    return listState.reload();
+  }
+  closeAccount({ quiet: true });
   shell('accounts', loading());
   const listUrl = `/api/accounts${focus ? `?team=${encodeURIComponent(focus)}` : ''}`;
   let [{ accounts }, people] = await Promise.all([api(listUrl), peopleList()]);
@@ -98,6 +123,7 @@ export async function viewAccounts(params) {
           ['calc', 'Open in the calculator', can('calculator.use')],
           ['name', 'Rename', can('calculator.use')],
           ['owner', 'Change the accountable SE', can('calculator.use') || can('users.manage')],
+          ['contacts', 'Account team & emails…', true],
           ['sold', 'Record a sale', can('sales.record') && Boolean(a.primary)],
           ['shared', a.primary?.sharedAt ? 'No longer shared with the customer' : 'Shared with the customer…', can('reports.share') && Boolean(a.primary)],
           ['mute', a.muted ? 'Bring back into the forecast' : 'Mute from the forecast', can('forecast.mute')],
@@ -140,6 +166,10 @@ export async function viewAccounts(params) {
           if (act === 'open') return go(`/accounts/${encodeURIComponent(a.id)}`);
           if (act === 'calc') return void (location.href = `/calculator?team=${encodeURIComponent(a.teamId ?? '')}&account=${encodeURIComponent(a.id)}`);
           if (act === 'mute') return mute(a);
+          if (act === 'contacts') {
+            focusNext = 'contacts';
+            return go(`/accounts/${encodeURIComponent(a.id)}`);
+          }
           const cell = el.querySelector(`[data-edit="${act}"]`);
           if (cell && !cell.querySelector('.cell-edit')) editCell(a, cell);
           return;
@@ -264,22 +294,37 @@ export async function viewAccounts(params) {
   $('#status').onchange = render;
   $('#team').onchange = (e) => go(`/accounts${e.target.value ? `?team=${encodeURIComponent(e.target.value)}` : ''}`);
   render();
+  listState = { focus, reload: async () => { await reload(); outOfStep(); } };
 }
 
 export async function viewAccount(id) {
-  shell('accounts', loading());
+  // Beside the list, not instead of it: the list is drawn first when the account is opened from a link.
+  if (!listUp()) await viewAccounts(new URLSearchParams());
+  let wrap = $('#acct-drawer');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'acct-drawer';
+    wrap.className = 'drawer-wrap';
+    wrap.innerHTML = `<div class="drawer-shade" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Account"><button type="button" class="drawer-close" data-close title="Close (Esc)" aria-label="Close the account">✕</button><div id="acct-body">${loading()}</div></aside>`;
+    wrap.addEventListener('click', (e) => e.target.matches('[data-close]') && closeAccount());
+    $('#app').append(wrap);
+  }
+  const drawer = wrap.querySelector('.drawer');
+  const at = wrap.dataset.account === id ? drawer.scrollTop : 0;
+  wrap.dataset.account = id;
   let d;
   try {
     d = await api(`/api/cc/accounts/${encodeURIComponent(id)}`);
   } catch (error) {
-    $('#main').innerHTML = `<div class="panel"><div class="empty"><b>${esc(error.message)}</b><a href="#/accounts">Back to accounts</a></div></div>`;
+    if ($('#acct-body')) $('#acct-body').innerHTML = `<div class="panel"><div class="empty"><b>${esc(error.message)}</b></div></div>`;
     return;
   }
+  if (!$('#acct-body') || wrap.dataset.account !== id) return;
   const a = d.account;
   const p = a.primary;
   const calcHref = `/calculator?team=${encodeURIComponent(a.teamId)}&account=${encodeURIComponent(a.id)}`;
-  $('#main').innerHTML = `
-    <div class="crumbs"><a href="#/accounts">Accounts</a> › ${esc(a.teamPath)}</div>
+  $('#acct-body').innerHTML = `
+    <div class="crumbs">${esc(a.teamPath)}</div>
     <div class="head compact"><div><h1 class="serif">${esc(a.name)}</h1><p class="acct-meta">${a.salesforceUrl ? `<a class="chip sf" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer">${esc(a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account')} <span class="mono">${esc(a.salesforceId)}</span> ↗</a>` : '<span class="chip warn"><i></i>No Salesforce link</span>'}<span>SE <b>${esc(a.owner)}</b></span>${a.cxone ? `<span class="chip ok" title="Last read ${esc(a.cxone.lastReadAt ? ago(a.cxone.lastReadAt) : 'never')}"><i></i>Checkmarx One key kept · ${esc(a.cxone.tenant)}</span>` : ''}${a.impactEnabled ? `<span class="chip">Impact ${esc(a.impactCurrency)}</span>` : ''}</p></div>
       <div class="tools">${d.can.edit ? `<a class="btn primary" href="${esc(calcHref)}">${icon('calc')}Open in calculator</a>` : ''}</div></div>
     ${a.salesforceUrl ? '' : `<div class="callout warn">This account has no Salesforce opportunity or account link: no report can be generated until it is given.${d.can.edit ? ' Add it under Account details.' : ''}</div>`}
@@ -302,6 +347,7 @@ export async function viewAccount(id) {
         ${a.salesforceUrl ? `<dl class="kv mt"><dt>Created</dt><dd>${esc(dateTime(a.createdAt))} by ${esc(a.createdBy)}</dd><dt>Updated</dt><dd>${esc(dateTime(a.updatedAt))}</dd><dt>Checkmarx One</dt><dd>${a.cxone ? `Key kept for <b>${esc(a.cxone.tenant)}</b> by ${esc(a.cxone.savedBy)} · ${a.cxone.lastReadAt ? `last read ${esc(ago(a.cxone.lastReadAt))}` : 'not read since'}${d.can.edit ? ` · <a href="${esc(calcHref)}&amp;refresh=1">↻ Refresh in the calculator</a> · <a href="#" id="forget-key">Forget the key</a>` : ''}` : 'No key kept: tick "Remember this key" when connecting in the calculator, to refresh in one click later.'}</dd><dt>Impact <span class="chip star">beta</span></dt><dd>${a.impactEnabled ? `On · soft savings in ${esc(a.impactCurrency)} go into its reports` : 'Off: turn it on in the calculator for soft savings in the reports'}</dd></dl>` : ''}
         ${d.can.deleteAccount ? '<div class="mt"><button class="danger sm" id="del-acct">Delete account and its reports</button></div>' : ''}
     </details>
+    ${contactsPanel(d)}
     ${salesPanel(a, d)}
     <div class="panel mt"><h2>Reports${d.can.edit ? `<label class="btn sm file-btn">⇪ Upload the customer's version<input type="file" id="cv-file" accept=".html,.htm,text/html" hidden /></label>` : ''}</h2>
       ${d.reports.length ? `<div class="tw"><table class="rep-table"><thead><tr><th></th><th>Made</th><th>By</th><th class="num">T&amp;R</th><th class="num">Fusion</th><th class="num">Total</th><th>Shared with customer</th><th></th></tr></thead><tbody>${d.reports.map((r) => {
@@ -310,8 +356,15 @@ export async function viewAccount(id) {
         <td class="actions">${d.can.share ? `${a.primaryReportId === r.id ? '<button class="sm ghost" data-act="unprimary">Unmark primary</button>' : `<button class="sm" data-act="primary">${icon('star')}Make primary</button>`}${r.sharedAt ? '<button class="sm ghost" data-act="unshare">Unmark shared</button>' : `<button class="sm" data-act="share">${icon('send')}Mark shared</button>`}` : ''}<button class="sm ghost icon" data-act="download" title="Download this report (the file the customer gets)" aria-label="Download this report">${icon('download')}</button>${d.can.sell ? `<button class="sm ghost" data-sell="${esc(r.id)}" title="Record credits sold against this report">Sold…</button>` : ''}<button class="sm ghost icon" data-act="delete" title="Delete report">${icon('trash')}</button></td></tr>`;
       }).join('')}</tbody></table></div>` : '<div class="empty"><b>No reports yet</b></div>'}
     </div>`;
+  drawer.scrollTop = at;
+  wireContacts(a, d);
+  if (focusNext === 'contacts') {
+    focusNext = '';
+    $('#contacts')?.scrollIntoView({ block: 'start' });
+    $('#contact-add input[name=email]')?.focus();
+  }
   if (p) countUp($('#bigc'), Math.round(p.totalCredits), ' credits');
-  if ($('#share-primary')) $('#share-primary').onclick = () => shareInline($('#share-primary').parentElement, p.id, { onDone: () => viewAccount(a.id) });
+  if ($('#share-primary')) $('#share-primary').onclick = () => shareInline($('#share-primary').parentElement, p.id, { onDone: () => viewAccount(a.id), suggest: customerEmails(d) });
   wireSales(a, d);
   if ($('#forget-key')) $('#forget-key').onclick = async (e) => {
     e.preventDefault();
@@ -371,7 +424,7 @@ export async function viewAccount(id) {
         return toast(`Downloaded ${file.name}.`, 'ok');
       }
       if (act === 'primary' || act === 'unprimary') await api(`/api/cc/reports/${encodeURIComponent(rid)}/primary`, { method: 'POST', body: { primary: act === 'primary' } });
-      if (act === 'share') return shareInline(b.closest('tr').querySelector('.shared-cell'), rid, { onDone: () => viewAccount(a.id) });
+      if (act === 'share') return shareInline(b.closest('tr').querySelector('.shared-cell'), rid, { onDone: () => viewAccount(a.id), suggest: customerEmails(d) });
       if (act === 'unshare') await api(`/api/cc/reports/${encodeURIComponent(rid)}/shared`, { method: 'POST', body: { shared: false } });
       if (act === 'delete') {
         if (!confirm('Delete this report? This cannot be undone.')) return;
@@ -382,6 +435,59 @@ export async function viewAccount(id) {
     } catch (error) {
       toast(error.message, 'bad');
     }
+  };
+}
+
+// ---- The account's team and contacts: our people on it, the customer's, and the addresses reports were shared with -----
+const customerEmails = (d) => [...new Set([...(d.contacts ?? []).filter((c) => c.side !== 'us').map((c) => c.email), ...(d.usedEmails ?? []).map((u) => u.email)])];
+function contactsPanel(d) {
+  const list = [...(d.contacts ?? [])].sort((x, y) => (x.side === y.side ? 0 : x.side === 'us' ? -1 : 1));
+  const usedAt = new Map((d.usedEmails ?? []).map((u) => [u.email, u.at]));
+  const known = new Set(list.map((c) => c.email));
+  const loose = (d.usedEmails ?? []).filter((u) => !known.has(u.email));
+  const may = d.can.contacts;
+  return `<div class="panel mt" id="contacts"><h2>Account team &amp; emails <small>our people, the customer’s contacts, and whom reports were shared with</small></h2>
+    ${list.length ? `<div class="tw"><table class="contacts-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Side</th><th>Report shared</th><th></th></tr></thead><tbody>${list.map((c) => `<tr data-email="${esc(c.email)}"><td>${c.name ? `<b>${esc(c.name)}</b>` : '<span class="muted">—</span>'}</td><td><a href="mailto:${esc(c.email)}">${esc(c.email)}</a></td><td>${c.role ? esc(c.role) : '<span class="muted">—</span>'}</td><td>${c.side === 'us' ? '<span class="chip">Our team</span>' : '<span class="chip sf">Customer</span>'}</td><td data-sort="${esc(usedAt.get(c.email) ?? '')}">${usedAt.get(c.email) ? esc(date(usedAt.get(c.email))) : '<span class="muted">—</span>'}</td><td class="actions">${may ? `<button type="button" class="sm ghost icon" data-contact-remove title="Take ${esc(c.email)} off the list" aria-label="Remove ${esc(c.email)}">${icon('trash')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : `<p class="muted small">Nobody is listed yet.${may ? ' Add the account team and the customer’s contacts below.' : ''}</p>`}
+    ${loose.length ? `<div class="contact-used"><span class="muted small">Used when a report was shared, not on the list yet:</span>${loose.map((u) => `<span class="chip" title="Shared ${esc(date(u.at))}">${esc(u.email)}${may ? `<button type="button" class="chip-add" data-contact-use="${esc(u.email)}" title="Add ${esc(u.email)} to the list" aria-label="Add ${esc(u.email)}">+</button>` : ''}</span>`).join('')}${may && loose.length > 1 ? '<button type="button" class="sm ghost" data-contact-use-all>Add all</button>' : ''}</div>` : ''}
+    ${may ? `<form class="contact-add" id="contact-add" data-nodraft><input name="email" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="Email (several: comma between)" aria-label="Email address, or several with a comma between" required /><input name="name" type="text" placeholder="Name" aria-label="Name" maxlength="80" /><input name="role" type="text" placeholder="Role (AE, CSM, AppSec lead…)" aria-label="Role" maxlength="60" /><select name="side" aria-label="Our team or the customer"><option value="customer">Customer</option><option value="us">Our team</option></select><button type="submit" class="sm primary">${icon('plus')}Add</button><span class="err" id="contact-err"></span></form>` : ''}
+  </div>`;
+}
+function wireContacts(a, d) {
+  const box = $('#contacts');
+  if (!box || !d.can.contacts) return;
+  const save = async (contacts, said) => {
+    try {
+      await api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'PUT', body: { contacts } });
+      toast(said, 'ok');
+      focusNext = 'contacts';
+      viewAccount(a.id);
+    } catch (error) {
+      if ($('#contact-err')) $('#contact-err').textContent = error.message;
+      else toast(error.message, 'bad');
+    }
+  };
+  const now = d.contacts ?? [];
+  for (const b of box.querySelectorAll('[data-contact-remove]')) b.onclick = () => {
+    const email = b.closest('tr').dataset.email;
+    save(now.filter((c) => c.email !== email), `${email} is off the list.`);
+  };
+  for (const b of box.querySelectorAll('[data-contact-use]')) b.onclick = () => save([...now, { email: b.dataset.contactUse, side: 'customer' }], `${b.dataset.contactUse} added.`);
+  const all = box.querySelector('[data-contact-use-all]');
+  if (all) all.onclick = () => {
+    const have = new Set(now.map((c) => c.email));
+    const add = (d.usedEmails ?? []).filter((u) => !have.has(u.email)).map((u) => ({ email: u.email, side: 'customer' }));
+    save([...now, ...add], `${num(add.length)} addresses added.`);
+  };
+  const form = $('#contact-add');
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(form);
+    const emails = emailList(String(f.get('email') ?? ''));
+    if (!emails) return void ($('#contact-err').textContent = 'Type an email address (several: a comma between).');
+    const have = new Set(now.map((c) => c.email));
+    const add = emails.filter((x) => !have.has(x.toLowerCase())).map((email) => ({ email, name: emails.length === 1 ? f.get('name') : '', role: f.get('role'), side: f.get('side') }));
+    if (!add.length) return void ($('#contact-err').textContent = 'Already on the list.');
+    save([...now, ...add], add.length === 1 ? `${add[0].email} added.` : `${num(add.length)} contacts added.`);
   };
 }
 

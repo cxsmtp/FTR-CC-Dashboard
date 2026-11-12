@@ -34,6 +34,23 @@ export function sharedEmails(value) {
   return [...new Set(list)].slice(0, 10);
 }
 
+/** An account's team and contacts: who works on it on our side and whom to write to at the customer. Up to 60, one per email. */
+export function cleanContacts(value) {
+  if (!Array.isArray(value)) throw fail(400, 'Give the contacts as a list.');
+  const text = (x, max) => String(x ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
+  const seen = new Set();
+  const out = [];
+  for (const c of value) {
+    const [email] = sharedEmails(c?.email);
+    if (!email) throw fail(400, 'Every contact needs an email address.');
+    if (seen.has(email)) continue;
+    seen.add(email);
+    out.push({ email, name: text(c?.name, 80), role: text(c?.role, 60), side: c?.side === 'us' ? 'us' : 'customer' });
+  }
+  if (out.length > 60) throw fail(400, 'An account keeps up to 60 contacts.');
+  return out;
+}
+
 export function sfChecksum(id15) {
   const map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
   let out = '';
@@ -136,7 +153,7 @@ export class Accounts {
     const next = patchProfile(current, patch, user.name);
     return this.accounts.put(next);
   }
-  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency }, hosts, { impactBase = null } = {}) {
+  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency, contacts }, hosts, { impactBase = null } = {}) {
     const account = this.get(id, teamIds);
     // Impact (beta): the soft savings in the report, off until the SE turns it on and confirms the currency.
     if (impactCurrency !== undefined) {
@@ -156,6 +173,7 @@ export class Accounts {
       const sf = checkSalesforceUrl(salesforceUrl, hosts);
       Object.assign(account, { salesforceUrl: sf.url, salesforceKind: sf.kind, salesforceId: sf.recordId });
     }
+    if (contacts !== undefined) account.contacts = cleanContacts(contacts);
     if (ownerId !== undefined) account.ownerId = ownerId;
     if (teamId !== undefined) {
       account.teamId = teamId;

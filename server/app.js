@@ -794,6 +794,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { accounts: rows(ctx, focus).accounts };
   });
 
+  const mayContacts = (ctx, a) => ctx.permissions.has('calculator.use') || ctx.permissions.has('users.manage') || ctx.permissions.has('reports.share') || a.ownerId === ctx.user.id;
   const accountDetail = (ctx, id) => {
     const a = accounts.get(id, ctx.scope);
     const meta = accounts.accounts.meta(id);
@@ -805,9 +806,15 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return {
       account: { ...summary(a), teamId: a.teamId, team: teams.get(a.teamId)?.name ?? '', teamPath: teamPath(ctx.teams, a.teamId).map((x) => x.name).join(' › '), ownerId: a.ownerId, owner: userName(a.ownerId), createdById: a.createdById, salesforceUrl: a.salesforceUrl, salesforceKind: a.salesforceKind, salesforceId: a.salesforceId, primaryReportId: a.primaryReportId, cxone: a.cxone ? { tenant: a.cxone.tenant, savedBy: a.cxone.savedBy, savedAt: a.cxone.savedAt, lastReadAt: a.cxone.lastReadAt ?? null } : null, sold: (a.sales ?? []).reduce((n, x) => n + x.credits, 0), remaining: p ? Math.max(0, Math.round(p.totalCredits - (a.sales ?? []).reduce((n, x) => n + x.credits, 0))) : null, impactEnabled: Boolean(a.impactEnabled), impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed), impactCurrency: a.impact?.currency ?? 'USD', reportCount: reps.length, sharedCount: reps.filter((x) => x.sharedAt).length, primary: p ? { ...p, how } : null },
       reports: reps,
+      // The account's team and contacts as kept, and the addresses its reports were shared with (read from the reports).
+      contacts: a.contacts ?? [],
+      usedEmails: [...reps.reduce((m, x) => {
+        for (const e of x.sharedWith ?? []) if (!m.has(e) || String(x.sharedAt) > m.get(e)) m.set(e, x.sharedAt ?? '');
+        return m;
+      }, new Map())].map(([email, at]) => ({ email, at })),
       sales: [...(a.sales ?? [])].sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.at).localeCompare(String(x.at))),
       members,
-      can: { edit: ctx.permissions.has('calculator.use'), assign: ctx.permissions.has('calculator.use') || ctx.permissions.has('users.manage'), share: ctx.permissions.has('reports.share') || a.ownerId === ctx.user.id, deleteAccount: ctx.permissions.has('accounts.delete'), sell: ctx.permissions.has('sales.record'), removeAnySale: ctx.permissions.has('reports.delete'), me: ctx.user.id },
+      can: { contacts: mayContacts(ctx, a), edit: ctx.permissions.has('calculator.use'), assign: ctx.permissions.has('calculator.use') || ctx.permissions.has('users.manage'), share: ctx.permissions.has('reports.share') || a.ownerId === ctx.user.id, deleteAccount: ctx.permissions.has('accounts.delete'), sell: ctx.permissions.has('sales.record'), removeAnySale: ctx.permissions.has('reports.delete'), me: ctx.user.id },
     };
   };
   r('GET', '/api/cc/accounts/:id', ready2, (req, ctx, body, res, url, params) => accountDetail(ctx, params.id));
@@ -820,7 +827,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const before = accounts.get(params.id, ctx.scope);
     // The calculator's people change an account; leaders and above may change its accountable SE, whoever made it.
     const onlyOwner = body && Object.keys(body).every((k) => k === 'ownerId');
-    if (!ctx.permissions.has('calculator.use') && !(onlyOwner && ctx.permissions.has('users.manage'))) throw fail(403, 'You may not change this account.');
+    // The account's team and contacts: also its accountable SE, and those who share reports or manage people.
+    const onlyContacts = body && Object.keys(body).every((k) => k === 'contacts');
+    if (!ctx.permissions.has('calculator.use') && !(onlyOwner && ctx.permissions.has('users.manage')) && !(onlyContacts && mayContacts(ctx, before))) throw fail(403, 'You may not change this account.');
     const patch = {};
     if (body?.salesforceUrl !== undefined) patch.salesforceUrl = body.salesforceUrl;
     if (body?.name !== undefined) patch.name = body.name;
@@ -837,13 +846,17 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
     if (body?.impactCurrency !== undefined) patch.impactCurrency = body.impactCurrency;
     if (body?.impactEnabled !== undefined) patch.impactEnabled = body.impactEnabled === true;
+    if (body?.contacts !== undefined) patch.contacts = body.contacts;
+    const had = new Set((before.contacts ?? []).map((c) => c.email));
     const after = accounts.setDetails(params.id, ctx.scope, patch, hosts().salesforce, { impactBase: ctx.user.prefs?.impact ?? null });
     // Moved with its SE to a team this person does not work in: said, as the account is no longer theirs to see.
     if (!ctx.scope.has(after.teamId)) {
       record(ctx, req, 'account.update', after.name, { id: after.id, changed: Object.keys(patch), fromTeam: before.teamId, toTeam: after.teamId });
       return { moved: true, account: { id: after.id, name: after.name }, team: teamName(after.teamId) };
     }
-    record(ctx, req, 'account.update', after.name, { id: after.id, changed: Object.keys(patch), ...(patch.teamId && patch.teamId !== before.teamId ? { fromTeam: before.teamId, toTeam: patch.teamId } : {}) });
+    const now = new Set((after.contacts ?? []).map((c) => c.email));
+    const contactsChanged = patch.contacts !== undefined ? { contactsAdded: [...now].filter((e) => !had.has(e)), contactsRemoved: [...had].filter((e) => !now.has(e)), contacts: now.size } : {};
+    record(ctx, req, 'account.update', after.name, { id: after.id, changed: Object.keys(patch), ...contactsChanged, ...(patch.teamId && patch.teamId !== before.teamId ? { fromTeam: before.teamId, toTeam: patch.teamId } : {}) });
     return accountDetail(ctx, params.id);
   });
   r('DELETE', '/api/cc/accounts/:id', perm('accounts.delete'), (req, ctx, body, res, url, params) => {

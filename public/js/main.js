@@ -34,6 +34,8 @@ async function show() {
   const [pathPart, query = ''] = location.hash.replace(/^#/, '').split('?');
   const path = pathPart || '/';
   const params = new URLSearchParams(query);
+  // An account's side panel belongs to the Accounts list: leaving for another page takes it away.
+  if (!path.startsWith('/accounts')) document.getElementById('acct-drawer')?.remove();
   if (path === '/forgot') return viewForgot(params);
   if (path === '/reset') return viewReset(params);
   if (!state.me) {

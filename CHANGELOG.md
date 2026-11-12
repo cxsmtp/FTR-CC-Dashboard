@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.67.00 — 2026-11-12
+
+- **An account opens beside the list, not instead of it.** Click an account in Accounts and it opens as a wide side panel over the list: the same details, sales and reports, each table fitting the panel. Close it with ✕, Esc, a click outside or the browser's Back, and the list is where it was, with its search and filters. A link to an account still works: the list is drawn and the account opens on it.
+- **Account team & emails.** Each account keeps who is on it: our people (AE, CSM…) and the customer's contacts, with name, email, role and side. The addresses its reports were shared with are shown too, and added to the list with one click. Add several emails at once (a comma between); remove with the bin. From the Accounts list: the row's menu, Account team & emails. Whoever works on the account may change it: the calculator's people, its accountable SE, and those who share reports or manage people. Changes are in the audit log with the addresses added and removed.
+- When a report is marked shared from the account, the customer's contacts are offered as you type.
+- Nothing is added to any account by the update: the list starts empty, and the shared-with addresses are only read from the reports.
+
 ## CC-01.66.00 — 2026-11-12
 
 - **Accounts: the T&R and Fusion breakup is back.** Under each account's credits, in small type: how much is triage & remediation and how much is Fusion.

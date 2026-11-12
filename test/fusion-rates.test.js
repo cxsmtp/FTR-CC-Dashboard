@@ -264,3 +264,19 @@ test('accounts follow their accountable SE: moved with them, with a new SE, and 
   // Back as it was, for the tests after this one.
   for (const [u, t] of [[env.users.se1, env.teams.emea], [env.users.se2, env.teams.emea]]) assert.equal((await admin.put(`/api/people/${u.id}`, { teamId: t.id })).status, 200);
 });
+
+test('an account keeps its team and contacts: added, cleaned, refused when wrong, and audited', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const made = await admin.post('/api/projections', { name: 'Contacts Co' }, { 'X-Team': env.teams.emea.id });
+  const id = made.data.customer.id;
+  let r = await admin.get(`/api/cc/accounts/${id}`);
+  assert.deepEqual(r.data.contacts, []);
+  assert.deepEqual(r.data.usedEmails, []);
+  r = await admin.put(`/api/cc/accounts/${id}`, { contacts: [{ email: 'CISO@Customer.example', role: 'CISO' }, { email: 'ciso@customer.example' }, { email: 'ae@t.example', name: 'Ana', role: 'AE', side: 'us' }] });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.contacts, [{ email: 'ciso@customer.example', name: '', role: 'CISO', side: 'customer' }, { email: 'ae@t.example', name: 'Ana', role: 'AE', side: 'us' }]);
+  assert.equal((await admin.put(`/api/cc/accounts/${id}`, { contacts: [{ email: 'not an address' }] })).status, 400);
+  assert.equal((await admin.get(`/api/cc/accounts/${id}`)).data.contacts.length, 2);
+  const { events } = (await admin.get('/api/audit?limit=50')).data;
+  assert.ok(events.some((e) => e.action === 'account.update' && e.target === 'Contacts Co' && e.details?.contactsAdded?.length === 2));
+});
