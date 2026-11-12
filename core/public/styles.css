@@ -4535,3 +4535,4 @@ button.gv-sugg:hover:not(:disabled) { border-color: var(--accent); }
 .calc-git-flash-bad .calc-git-flash-bar i { background: var(--bad); }
 .calc-git-flash small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11.5px; }
 .calc-git-flash .link { font-size: 12px; justify-self: end; }
+.calc-git-details[data-empty] { display: none; }

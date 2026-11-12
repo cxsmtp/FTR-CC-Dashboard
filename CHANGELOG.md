@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.76.00 — 2026-11-12
+
+- **Calculator, from Git: no empty "How it is measured" bar.** The folded line shows only when repositories were counted in this session ("Repository by repository: 22 counted, 1 not · how it is measured"); with nothing counted it is not there.
+
 ## CC-01.75.00 — 2026-11-12
 
 - **People: Manage opens beside the list, on half the page.** Instead of a small menu that the table cut off (with a scroller of its own), Manage slides a panel in from the right: who the person is (status, role, team, last sign-in), their name, title, role and team to change and save, and each thing that can be done for them as a button that says what it does: Sign in as, Reset password, Unlock now, Sign out everywhere, Turn access off or on, Remove. Close with ✕, Esc or a click outside.

@@ -3714,7 +3714,7 @@ BITBUCKET_TOKEN_2=…  BITBUCKET_URL_2=https://bitbucket.acme.com</pre>
                     </div>
                   </div>
                   <div class="rp-kpis calc-git-summary" id="calc-git-summary" aria-live="polite" hidden></div>
-                  <details class="calc-git-details" id="calc-git-details"><summary><span id="calc-git-details-sum">How it is measured</span></summary>
+                  <details class="calc-git-details" id="calc-git-details" data-empty><summary><span id="calc-git-details-sum">How it is measured</span></summary>
                   <div class="calc-git-progress" id="calc-git-progress" hidden></div>
                   <p class="calc-notice calc-warn-note calc-git-how" id="calc-git-how">How it is measured, with cloc-fusion's engine: each repository's default branch is fetched from git into a temporary folder on this server, back to a year ago and without file contents but those counted (or read from the platform's API as an archive), counted, and the folder deleted at once. Lines are counted as cloc counts them: by each file's language, without blank lines or comments; dependencies, build output and generated files are left out. Commits are those on the default branch in the last 365 days, merges left out: how often a repository changes sets its Fusion scans. Developers are the people who committed in the last 90 days, bots left out, counted once across the run: only the counts are kept, never a name or an email. Up to 1,000 repositories a run, 2 GB each; files git marks as binary are skipped. Minified and generated code is sized as Checkmarx sizes it: a file of 64 KB or more with over 512 bytes a line of code, or one over 1 MB, counts as its bytes divided by 40.</p>
                   </details>

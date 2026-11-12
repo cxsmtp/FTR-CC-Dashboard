@@ -2156,6 +2156,8 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const sum = $('calc-git-details-sum');
     sum.textContent = rows.length ? `Repository by repository: ${num(done)} counted${failed ? `, ${num(failed)} not` : ''}${left ? `, ${num(left)} to go` : ''} · how it is measured` : 'How it is measured';
     sum.classList.toggle('calc-warn', failed > 0);
+    // Nothing counted in this session: the fold is not shown at all (how it is measured is told with a run's list).
+    $('calc-git-details').toggleAttribute('data-empty', !rows.length);
     gitFlash(rows, { done, failed, left });
     const out = new Set(fnew()?.leftOut ?? []);
     box.innerHTML = rows
