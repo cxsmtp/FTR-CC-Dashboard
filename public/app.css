@@ -1172,3 +1172,7 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 /* A draft account: its SE's and the Admins' until its first report. */
 .chip.draft { background: color-mix(in srgb, var(--amber, #b45309) 14%, transparent); color: var(--amber, #b45309); border-color: color-mix(in srgb, var(--amber, #b45309) 40%, transparent); font-size: 11px; padding: 1px 7px; }
 .callout.draft-note { border-color: color-mix(in srgb, var(--amber, #b45309) 45%, transparent); background: color-mix(in srgb, var(--amber, #b45309) 8%, transparent); }
+/* An account's headline: the number never cut, the word beside it. */
+.acct-strip .as-main .as-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.acct-strip .as-main .as-big .credits.big { overflow: visible; text-overflow: clip; }
+.acct-strip .as-main .as-unit { font-size: 14px; color: var(--muted); }

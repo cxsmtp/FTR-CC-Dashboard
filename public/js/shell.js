@@ -119,22 +119,28 @@ export async function jumpTo() {
   dlg.addEventListener('close', () => dlg.remove());
   const pages = [
     ['Overview', '/overview', 'overview', can('dashboard.view')], ['Accounts', '/accounts', 'accounts', can('dashboard.view')], ['Calculator', '/calculator', 'calc', can('calculator.use')],
-    ...settingsNav().flatMap(([group, items]) => items.map(([label, href]) => [`${group === 'System' ? 'Settings' : group} · ${label.replace(/&amp;/g, '&')}`, href, 'admin', true])),
-    ['Quick guide', '/guide', 'guide', true], ['Get help', '/help', 'help', true], ['About', '/about', 'guide', true],
-  ].filter((x) => x[3]).map(([t, href, ic]) => ({ t, sub: 'Page', href, ic }));
+    // Every page under Settings answers to "settings" and to its group's name, as well as to its own.
+    ...settingsNav().flatMap(([group, items]) => items.map(([label, href]) => [label.replace(/&amp;/g, '&'), href, 'admin', true, `Settings · ${group.charAt(0)}${group.slice(1).toLowerCase()}`])),
+    ['Quick guide', '/guide', 'guide', true], ['Get help', '/help', 'help', true], ['About', '/about', 'guide', true], ['Your profile', '/profile', 'people', true],
+  ].filter((x) => x[3]).map(([t, href, ic, , where]) => ({ t, sub: where ?? 'Page', href, ic }));
   let items = pages;
   const extra = [];
-  Promise.all([can('dashboard.view') ? api('/api/accounts').catch(() => ({ accounts: [] })) : { accounts: [] }, can('users.manage') ? api('/api/people').catch(() => ({ people: [] })) : { people: [] }]).then(([a, p]) => {
-    for (const x of a.accounts ?? []) extra.push({ t: x.name, sub: `Account · ${x.teamPath ?? x.team ?? ''}`, href: `/accounts/${encodeURIComponent(x.id)}`, ic: 'accounts' });
-    for (const x of p.people ?? []) extra.push({ t: x.name, sub: `Person · ${x.email}`, href: '/people', ic: 'people' });
-    draw();
+  // Accounts and the people in view (everyone signed in sees the people of their teams), loaded once; until then it says so.
+  let loading = true;
+  Promise.all([can('dashboard.view') ? api('/api/accounts').catch(() => ({ accounts: [] })) : { accounts: [] }, api('/api/people').catch(() => ({ people: [] }))]).then(([a, p]) => {
+    for (const x of a.accounts ?? []) extra.push({ t: x.name, sub: `Account · ${x.teamPath ?? x.team ?? ''}${x.salesforceId ? ` · ${x.salesforceId}` : ''}`, href: `/accounts/${encodeURIComponent(x.id)}`, ic: 'accounts' });
+    for (const x of p.people ?? []) extra.push({ t: x.name, sub: `Person · ${x.email}${x.title ? ` · ${x.title}` : ''}${x.team ? ` · ${x.team}` : ''}`, href: '/people/people', ic: 'people' });
+    loading = false;
+    if (document.getElementById('jumpd')) draw();
   });
   let sel = 0;
   const draw = () => {
     const q = $('#jq', dlg).value.trim().toLowerCase();
-    items = [...pages, ...extra].filter((x) => !q || `${x.t} ${x.sub}`.toLowerCase().includes(q)).slice(0, 40);
+    // Every word typed must appear (in any order): "kotak mf", "settings email", "abdul".
+    const words = q.split(/\s+/).filter(Boolean);
+    items = [...pages, ...extra].filter((x) => words.every((w) => `${x.t} ${x.sub}`.toLowerCase().includes(w))).slice(0, 40);
     sel = Math.min(sel, Math.max(0, items.length - 1));
-    $('#jl', dlg).innerHTML = items.map((x, i) => `<button type="button" role="option" class="${i === sel ? 'on' : ''}" data-i="${i}">${icon(x.ic)}<span><b>${esc(x.t)}</b><small>${esc(x.sub)}</small></span></button>`).join('') || '<p class="muted small">Nothing matches.</p>';
+    $('#jl', dlg).innerHTML = items.map((x, i) => `<button type="button" role="option" class="${i === sel ? 'on' : ''}" data-i="${i}">${icon(x.ic)}<span><b>${esc(x.t)}</b><small>${esc(x.sub)}</small></span></button>`).join('') || `<p class="muted small">${loading ? 'Looking through the accounts and people…' : 'Nothing matches.'}</p>`;
   };
   const open = (x) => {
     dlg.close();

@@ -24,9 +24,9 @@ export const GUIDES = {
     name: 'Sales Engineer',
     tagline: 'From a customer’s name to a projection they can trust, in six steps.',
     steps: [
-      ['calc', 'Open the Calculator', 'Pick your team (region) at the top. Every account of your team is shared with your teammates: anyone in it can open it and generate projections.', '/calculator', 'Open the calculator'],
-      ['link', 'Name it as in Salesforce', 'Type the customer’s name as Salesforce has it, then paste the opportunity or account link and Save. It is required: no report without it.', '/calculator', 'Start an account'],
-      ['data', 'Bring in the data', 'A Checkmarx One customer: paste their API key and Connect; tick Remember to refresh in one click later. A prospect: Fusion from Git, or cloc-fusion. You can leave while it reads.', '/calculator', 'Connect'],
+      ['calc', 'Open the Calculator', 'Pick your team (region) at the top. An account is yours, and the Admins’, while you work on it; your team sees it once you generate its first report.', '/calculator', 'Open the calculator'],
+      ['link', 'Name it as in Salesforce', 'Type the customer’s name as Salesforce has it, paste the opportunity or account link, and press Enter: an account needs both. It is kept once you bring in its data.', '/calculator', 'Start an account'],
+      ['data', 'Bring in the data', 'A Checkmarx One customer: paste their API key and Connect; tick Remember to refresh in one click later. A read takes every project of the tenant, up to 1,000,000. A prospect: their cloc-fusion report, or their git token. You can leave while it reads.', '/calculator', 'Connect'],
       ['report', 'Generate the report', 'Check the credits, then Generate projection report: the HTML for the customer and the PDF summary to present. Make as many as you need.', '/calculator', 'Generate'],
       ['star', 'Mark primary and shared', 'On the account page, star the report that stands for the account (else the latest counts) and mark the ones you sent to the customer.', '/accounts', 'Your accounts'],
       ['coins', 'Record credits sold', 'Each sale against the account, one or many. The dashboards then show sold so far and what is still needed.', '/accounts', 'Record a sale'],
@@ -41,7 +41,7 @@ export const GUIDES = {
       ['flag', 'Spot what needs attention', 'Accounts filters: missing Salesforce link, no report yet, not shared with the customer, no primary marked.', '/accounts', 'Accounts'],
       ['coins', 'Projection against sales', 'Each account shows what was projected, sold and still needed. Export the accounts or reports as CSV for a forecast call.', '/accounts', 'Credits sold'],
       ['people', 'Look after your people', 'Add people or import a whole region from a sheet, reset a password, unlock, or sign someone out everywhere.', '/people', 'People'],
-      ['calc', 'Work alongside your SEs', 'You can open any account of your teams in the calculator, refresh it from Checkmarx One, and generate a projection yourself.', '/calculator', 'Calculator'],
+      ['calc', 'Work alongside your SEs', 'You can open any account of your teams in the calculator once its SE has generated a first report, refresh it from Checkmarx One, and generate a projection yourself.', '/calculator', 'Calculator'],
     ],
   },
   admin: {
@@ -57,6 +57,13 @@ export const GUIDES = {
     ],
   },
 };
+/** What the calculator cannot do, said where it matters: shown under the steps of the guides that use it. */
+export const LIMITS = [
+  'A Checkmarx One read takes every project of the tenant, up to 1,000,000 (Projects to read, in Projection settings, sets fewer). A very large tenant takes longer: you can leave while it reads.',
+  'An account keeps up to 32 MB of data, roughly 100,000 projects. A tenant bigger than that cannot be saved whole: read fewer projects, or narrow the projects at the top of Projection settings.',
+  'A key connects to one account: reading another customer needs that customer’s own key.',
+  'An uploaded report brings its backlog month by month, not week by week: read Checkmarx One again for the weekly detail.',
+];
 export const GUIDE_ORDER = ['se', 'leader', 'admin'];
 /** Whose guide this is: Admins, then those who lead or oversee (and sales, who do not use the calculator), then SEs. */
 export function personaOf(me = state.me) {
@@ -77,6 +84,7 @@ export function guideHtml(persona, { first = false, tabs = [] } = {}) {
     </div>
     ${tabs.length > 1 ? `<div class="gx-tabs" role="tablist">${tabs.map((t) => `<button type="button" role="tab" data-guide="${t}" aria-selected="${t === persona}" class="${t === persona ? 'on' : ''}">${esc(GUIDES[t].name)}${t === personaOf() ? ' <small>yours</small>' : ''}</button>`).join('')}</div>` : ''}
     <ol class="gx-steps">${g.steps.map(([k, t, p, href, cta], i) => `<li class="gx-step" data-css="--i:${i}"><div class="gx-art">${art(k)}<b class="gx-n">${i + 1}</b></div><h3>${esc(t)}</h3><p>${esc(p)}</p>${first ? '' : `<a class="gx-go" href="${href.startsWith('/calculator') ? href : `#${href}`}">${esc(cta)} →</a>`}</li>`).join('')}</ol>
+    ${persona === 'admin' ? '' : `<div class="panel mt gx-limits"><h2>Limits to know</h2><ul>${LIMITS.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></div>`}
     <div class="callout mt">Figures are supporting information worked out from the customer’s data at a moment in time; Checkmarx’s own records are authoritative. Paste a customer’s key only into the Calculator, and use read-only git tokens.</div>
   </div>`;
 }

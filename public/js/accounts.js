@@ -80,15 +80,18 @@ export async function viewAccounts(params) {
   const owners = [...new Map(accounts.map((a) => [a.ownerId, a.owner])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
   void people;
   let sort = { key: 'credits', dir: -1 };
+  // An SE sees the accounts they are accountable for first (Every SE shows the rest of their team); every other role
+  // sees every account it may, as its access allows. A link that names an SE wins.
+  const ownerFirst = params.get('owner') ?? (state.me.role?.id === 'se' && owners.some(([id]) => id === state.me.user.id) ? state.me.user.id : '');
   $('#main').innerHTML = `
     <div class="head"><div><h1 class="serif">Accounts</h1><p>Every account in your teams with its primary report. Click an account to open it; the pencil in a cell, or the row’s menu, changes it right here.</p></div>
-      <div class="tools">${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('plus')}New in calculator</a>` : ''}</div></div>
+      <div class="tools">${state.me.role?.id === 'admin' ? `<button type="button" class="btn" id="reload-btn" title="Rebuild accounts' calculators from the reports uploaded into them">${icon('refresh')}Reload from uploaded reports</button>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('plus')}New in calculator</a>` : ''}</div></div>
     <div id="out-of-step"></div>
     <div class="panel">
       <div class="flex">
         <div class="search">${icon('search')}<input id="q" placeholder="Search accounts, SEs, Salesforce ids" /></div>
         <div>${teamSelect('team', focus)}</div>
-        <div><select id="owner"><option value="">Every SE</option>${owners.map(([id, name]) => `<option value="${esc(id)}"${id === params.get('owner') ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select></div>
+        <div><select id="owner"><option value="">Every SE</option>${owners.map(([id, name]) => `<option value="${esc(id)}"${id === ownerFirst ? ' selected' : ''}>${esc(id === state.me.user.id ? `${name} (you)` : name)}</option>`).join('')}</select></div>
         <div><select id="status"><option value="">Any status</option><option value="muted">Muted from the forecast</option><option value="nosf">Missing Salesforce link</option><option value="noreport">No report yet</option><option value="notshared">Report not shared</option><option value="shared">Shared with customer</option><option value="unsold">Projected, nothing sold yet</option><option value="partly">Partly sold</option><option value="sold">Fully sold</option><option value="noprimary">No primary marked</option></select></div>
         <span class="spacer"></span><span class="muted small" id="count"></span>
       </div>
@@ -134,7 +137,7 @@ export async function viewAccounts(params) {
         return `<tr class="click${a.muted ? ' muted-row' : ''}" data-account="${esc(a.id)}">
         <td data-edit="name" class="acc-name" data-v="${esc(a.name)}"><span class="cell-line"><b title="${esc(a.name)}">${esc(a.name)}</b>${a.draft ? '<span class="chip draft" title="A draft: only its SE and the Admins see it until a report is generated for it">Draft</span>' : ''}${a.salesforceUrl ? `<a class="sf-link" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open the ${a.salesforceKind === 'opportunity' ? 'opportunity' : 'account'} in Salesforce (new tab)" aria-label="Open in Salesforce">${icon('ext')}</a>` : '<span class="chip bad" title="No Salesforce link yet: nothing is generated until one is saved">No link</span>'}${a.muted ? `<span class="chip muted-chip" title="Muted from the forecast by ${esc(a.mutedBy)}${a.mutedAt ? `, ${esc(date(a.mutedAt))}` : ''}: left out of the dashboards">Muted</span>` : ''}${pen('name', 'Rename')}</span></td>
         <td data-edit="owner" class="acc-owner"><span class="cell-line"><span class="avatar sm">${esc(initials(a.owner))}</span><span class="clip" title="${esc(`${a.owner} · ${a.teamPath}`)}">${esc(a.owner)}</span>${pen('owner', 'Change the accountable SE')}</span></td>
-        <td class="num" data-sort="${a.primary ? Math.round(a.primary.totalCredits) : -1}" data-v="${a.primary ? num(Math.round(a.primary.totalCredits)) : 'No report'}" title="${esc(`${split}${a.reportCount ? ` · ${a.reportCount} report${a.reportCount === 1 ? '' : 's'}` : ''}`)}">${a.primary ? `<span class="credits">${num(Math.round(a.primary.totalCredits))}</span><span class="acc-split">T&amp;R ${short(a.primary.trCredits)} · Fusion ${short(a.primary.fusionCredits)}</span>` : '<span class="muted">No report</span>'}</td>
+        <td class="num" data-sort="${a.primary ? Math.round(a.primary.totalCredits) : -1}" data-v="${a.primary ? num(Math.round(a.primary.totalCredits)) : 'No report'}" title="${esc(`${split}${a.reportCount ? ` · ${a.reportCount} report${a.reportCount === 1 ? '' : 's'}` : ''}`)}">${a.primary ? `<span class="credits">${num(Math.round(a.primary.totalCredits))}</span><span class="acc-split">T&amp;R ${short(a.primary.trCredits)} · Fusion ${short(a.primary.fusionCredits)}${a.primary.extraPercent ? ` · +${num(a.primary.extraPercent, 1)}%` : ''}</span>` : '<span class="muted">No report</span>'}</td>
         <td class="num" data-edit="sold" title="${esc(soldNote)}"><span class="cell-line end">${a.sold ? num(Math.round(a.sold)) : '<span class="muted">—</span>'}${can('sales.record') && a.primary ? pen('sold', 'Record a sale') : ''}</span></td>
         <td class="num">${a.remaining === null ? '—' : a.remaining === 0 && a.sold ? '<span class="chip ok"><i></i>Done</span>' : num(a.remaining)}</td>
         <td data-edit="shared"><span class="cell-line">${shared}${can('reports.share') && a.primary ? pen('shared', 'Shared with the customer, or not') : ''}</span></td>
@@ -312,6 +315,7 @@ export async function viewAccounts(params) {
   $('#team').onchange = (e) => go(`/accounts${e.target.value ? `?team=${encodeURIComponent(e.target.value)}` : ''}`);
   render();
   listState = { focus, reload: async () => { await reload(); outOfStep(); } };
+  if ($('#reload-btn')) $('#reload-btn').onclick = () => reloadFromReports(() => listState.reload());
 }
 
 export async function viewAccount(id) {
@@ -347,7 +351,7 @@ export async function viewAccount(id) {
     ${d.draft ? '<div class="callout draft-note"><b>Draft.</b> Only its Sales Engineer and the Admins see this account until a report is generated for it; then its team does.</div>' : ''}
     ${a.salesforceUrl ? '' : `<div class="callout warn">This account has no Salesforce opportunity or account link: no report can be generated until it is given.${d.can.edit ? ' Add it under Account details.' : ''}</div>`}
     <div class="acct-strip mt">
-      <div class="as-main"><small>Primary report · ${p ? (p.how === 'marked' ? 'marked' : 'the latest (none marked)') : 'none yet'}</small>${p ? `<span class="credits big serif" id="bigc"></span><span class="sub">T&amp;R ${num(Math.round(p.trCredits ?? 0))} · Fusion ${num(Math.round(p.fusionCredits ?? 0))}${p.extraPercent ? ` · +${num(p.extraPercent, 1)}%` : ''}${p.bundles ? ` · ${num(p.bundles)} bundle${p.bundles === 1 ? '' : 's'}` : ''} · ${esc(date(p.createdAt))} by ${esc(p.createdBy)}</span>` : `<b>—</b><span class="sub">Open the account in the calculator and generate one.</span>`}</div>
+      <div class="as-main"><small>Primary report · ${p ? (p.how === 'marked' ? 'marked' : 'the latest (none marked)') : 'none yet'}</small>${p ? `<span class="as-big"><span class="credits big serif" id="bigc"></span><span class="as-unit">credits</span></span><span class="sub">T&amp;R ${num(Math.round(p.trCredits ?? 0))} · Fusion ${num(Math.round(p.fusionCredits ?? 0))}${p.extraPercent ? ` · +${num(p.extraPercent, 1)}%` : ''}${p.bundles ? ` · ${num(p.bundles)} bundle${p.bundles === 1 ? '' : 's'}` : ''} · ${esc(date(p.createdAt))} by ${esc(p.createdBy)}</span>` : `<b>—</b><span class="sub">Open the account in the calculator and generate one.</span>`}</div>
       <div><small>Shared with the customer</small>${p ? (p.sharedAt ? `<b class="ok-t">✓ ${esc(date(p.sharedAt))}</b>${p.sharedWith?.length ? `<span class="sub">with ${esc(p.sharedWith.join(', '))}</span>` : ''}` : `<b class="warn-t">Not yet</b>${d.can.share ? `<button class="sm" id="share-primary">${icon('send')}Mark shared</button>` : ''}`) : '<b>—</b>'}</div>
       <div><small>Sold</small><b class="sold-t">${num(a.sold)}</b><span class="sub">${p ? `${Math.min(100, Math.round((a.sold / Math.max(1, p.totalCredits)) * 100))}% of the projection` : ''}</span></div>
       <div><small>Still needed</small><b>${a.remaining === null ? '—' : num(a.remaining)}</b></div>
@@ -381,7 +385,7 @@ export async function viewAccount(id) {
     $('#contacts')?.scrollIntoView({ block: 'start' });
     $('#contact-add input[name=email]')?.focus();
   }
-  if (p) countUp($('#bigc'), Math.round(p.totalCredits), ' credits');
+  if (p) countUp($('#bigc'), Math.round(p.totalCredits), '');
   if ($('#share-primary')) $('#share-primary').onclick = () => shareInline($('#share-primary').parentElement, p.id, { onDone: () => viewAccount(a.id), suggest: customerEmails(d) });
   wireSales(a, d);
   if ($('#forget-key')) $('#forget-key').onclick = async (e) => {
@@ -453,6 +457,48 @@ export async function viewAccount(id) {
       viewAccount(a.id);
     } catch (error) {
       toast(error.message, 'bad');
+    }
+  };
+}
+
+// ---- The Admin reloads accounts from the reports uploaded into them ----------------------------------------------------
+export async function reloadFromReports(done) {
+  let list;
+  try {
+    ({ accounts: list } = await api('/api/cc/reload-candidates'));
+  } catch (error) {
+    return toast(error.message, 'bad');
+  }
+  document.getElementById('reload-dlg')?.remove();
+  const dlg = document.createElement('dialog');
+  dlg.id = 'reload-dlg';
+  dlg.className = 'wide';
+  const now = (x) => (x.now.backlog || x.now.projects ? `${x.now.from === 'report' ? 'From a report' : x.now.from === 'cxone' ? 'Read from Checkmarx One' : x.now.from === 'upload' ? 'From the two exports' : 'Projects'} · ${num(x.now.projects)} projects${x.now.readAt ? ` · ${date(x.now.readAt)}` : ''}` : 'Nothing');
+  dlg.innerHTML = `<form method="dialog" class="form"><div class="dh"><h2>Reload from uploaded reports</h2></div><div class="db">
+    <p>Each account ticked gets its calculator rebuilt from the report uploaded into it (the primary one when it is uploaded, else the newest): its backlog, plan, Fusion projects, counted code and settings, as that report has them. What the calculator holds now is replaced. Reports, sales, the Salesforce link and contacts are not touched.</p>
+    ${list.length ? `<div class="tw"><table class="reload-table"><thead><tr><th><input type="checkbox" id="rl-all" checked aria-label="Every account" /></th><th>Account</th><th>Uploaded report</th><th>Its figures</th><th>The calculator now</th></tr></thead><tbody>${list.map((x) => `<tr><td>${x.report.loadable ? `<input type="checkbox" name="rl" value="${esc(x.id)}" checked aria-label="${esc(x.name)}" />` : ''}</td><td><b>${esc(x.name)}</b><span class="sub">${esc(x.owner)} · ${esc(x.team)}</span></td><td>${x.report.source === 'customer' ? 'Customer’s version' : 'Previous quote'}<span class="sub">${esc(date(x.report.createdAt))}</span></td><td>${x.report.loadable ? `${num(Math.round(x.report.total))} credits${x.report.projects !== null ? `<span class="sub">${num(x.report.projects)} Fusion projects</span>` : ''}` : '<span class="muted">No figures to load</span>'}</td><td>${esc(now(x))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">No account has an uploaded report.</p>'}
+    <p class="muted small">Each reload is recorded in the audit log. It cannot be undone, but a backup is taken every night and before every update.</p><div class="err" id="rl-err"></div></div>
+    <div class="df"><button type="button" class="ghost" id="rl-cancel">Cancel</button>${list.length ? '<button type="button" class="primary" id="rl-go">Reload the accounts ticked</button>' : ''}</div></form>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  dlg.querySelector('#rl-cancel').onclick = () => (dlg.close(), dlg.remove());
+  const all = dlg.querySelector('#rl-all');
+  if (all) all.onchange = () => dlg.querySelectorAll('[name=rl]').forEach((c) => (c.checked = all.checked));
+  const go = dlg.querySelector('#rl-go');
+  if (go) go.onclick = async () => {
+    const ids = [...dlg.querySelectorAll('[name=rl]:checked')].map((c) => c.value);
+    if (!ids.length) return void (dlg.querySelector('#rl-err').textContent = 'Tick at least one account.');
+    if (!confirm(`Replace what the calculator holds for ${num(ids.length)} account${ids.length === 1 ? '' : 's'} with their uploaded reports?`)) return;
+    go.disabled = true;
+    try {
+      const r = await api('/api/cc/reload-from-reports', { method: 'POST', body: { ids } });
+      dlg.close();
+      dlg.remove();
+      toast(`${num(r.reloaded.length)} account${r.reloaded.length === 1 ? '' : 's'} reloaded from their reports${r.skipped.length ? `; ${num(r.skipped.length)} not: ${r.skipped.map((x) => `${x.name} (${x.why})`).join(', ')}` : ''}.`, r.skipped.length ? 'bad' : 'ok', 9000);
+      done?.();
+    } catch (error) {
+      go.disabled = false;
+      dlg.querySelector('#rl-err').textContent = error.message;
     }
   };
 }

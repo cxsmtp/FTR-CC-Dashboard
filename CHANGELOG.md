@@ -2,6 +2,27 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.83.00 — 2026-11-12
+
+One customer's data in another's account: the last line closed, and the accounts it reached put right in one click.
+
+- **The server refuses a read saved into the wrong account.** Every Checkmarx One read is remembered with the account it was made for; saving it into any other account is refused, whatever the page sends, and recorded (cxone.read.misplaced). Kept across updates.
+- **Reload from uploaded reports** (Accounts, Admin only). It lists every account with a report brought into it (a previous quote or a customer's version), what that report says next to what the calculator holds now, every one ticked. Reloading rebuilds each ticked account's calculator from its report, as an upload does since CC-01.81.00. Reports, sales, links and contacts stay. Each is recorded (account.reloaded). For HDFC Bank, ENBD and any account read while connected to another customer before CC-01.78.00.
+- **Projects to read: every one, up to 1,000,000** (was 10,000). An account that still had the old 10,000 (saved with every account, though nobody chose it) now reads everything; a number someone typed stays. The quick guide's new *Limits to know* says what is not possible: an account keeps up to 32 MB (roughly 100,000 projects), a key reads one customer, an uploaded report brings months, not weeks.
+- **Accounts open on the SE's own accounts.** A Sales Engineer sees the accounts they are accountable for first (*Every SE* shows the rest of their team); every other role sees every account its access allows.
+- From the test report of 12 November:
+  - *#18* The extra credits % shows wherever T&R and Fusion do: in Accounts (*T&R 76K · Fusion 132K · +30%*) and on Overview (*extra 62,397*), so the parts add up to the total.
+  - *#7* A Sales Engineer's *shared* on Overview counts their accounts shared with the customer, not the shares they clicked.
+  - *#16* Jump to finds people (for everyone, not only those who manage people) and every page under Settings by its name or its group; each word typed must match; it says when it is still loading.
+  - *#17* CxOne API audit: *Only me* stays when applied, and the figures above the list follow the filters.
+  - *#19* An account's headline credits are never cut ("270,388 cre…").
+  - *#22* Audit log: *Refused* includes failed sign-ins and everything recorded as refused or failed.
+  - *#21* Engines & rates: *Changes save as you type* only for those who can change them.
+  - *#23* Every export says the file is on its way.
+  - *#25* "1 account", "1 person".
+  - *#3, #5* Settings → General: *Behind a reverse proxy*. Ticked, the audit log shows each person's own address instead of the proxy's, and browsers that came over HTTPS are sent HSTS. Applies at once, no restart.
+- The SE quick guide no longer says teammates see an account at once (they see it once its first report is made, since CC-01.80.00).
+
 ## CC-01.82.00 — 2026-11-12
 
 - **No account without its Salesforce link and a projection.** In the calculator, a new customer's name is not enough any more: the Salesforce link field sits next to it from the start, and Enter asks for the link when it is missing or not Salesforce's. The server refuses an account without a valid link too.

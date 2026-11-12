@@ -170,6 +170,15 @@ export class CalculatorService {
     const l = this.#links.get(userId);
     return l?.client ? l.boundTo ?? l.account ?? null : null;
   }
+  /**
+   * Which account each read was made for, by the moment it was read (its readAt, carried by everything it gave):
+   * the last line against one customer's data being saved into another's account, whatever the page sends.
+   */
+  readsFor = new Map();
+  /** The account a read (by its readAt) was made for, when this server made it. */
+  readOwner(readAt) {
+    return readAt ? this.readsFor.get(String(readAt)) ?? null : null;
+  }
   /** The account the last finished read was for: its figures are that account's alone. */
   readFor(userId) {
     const l = this.#links.get(userId);
@@ -202,7 +211,7 @@ export class CalculatorService {
       const job = l.job ? { ...l.job, live: null } : null;
       people.push({ userId, connection: l.connection, account: l.account ?? null, boundTo: l.boundTo ?? null, readFor: l.readFor ?? null, job: job?.state === 'running' ? null : job, rerun: job?.state === 'running' ? { input: job.input, account: job.account } : null, read: l.read.get() });
     }
-    return { people, interrupted: [...this.interrupted] };
+    return { people, interrupted: [...this.interrupted], readsFor: [...this.readsFor] };
   }
   /** After handing over: this process lets go, so reads still finishing here change nothing. */
   release() {
@@ -223,6 +232,7 @@ export class CalculatorService {
       }
     }
     for (const [userId, cut] of state?.interrupted ?? []) this.interrupted.set(userId, cut);
+    for (const [at, account] of state?.readsFor ?? []) this.readsFor.set(at, account);
   }
 
   /** Signed out, deactivated or removed: their key and what was read go. */
@@ -291,6 +301,11 @@ export class CalculatorService {
       .then(([{ perProject, ...tenant }, offer]) => {
         state.read.save(perProject);
         state.readFor = job.account ?? null;
+        if (perProject?.readAt && job.account) {
+          this.readsFor.set(String(perProject.readAt), { id: job.account.id, name: job.account.name });
+          // A few hundred are plenty: a read is saved into its account minutes after it finishes.
+          if (this.readsFor.size > 500) this.readsFor.delete(this.readsFor.keys().next().value);
+        }
         Object.assign(job, { state: 'done', result: { ...tenant, ...offer }, finishedAt: new Date().toISOString(), live: null });
         this.#note(userId, { kind: 'read', tenant: state.connection?.tenant, ok: true, ms: Date.now() - readStarted, detail: `finished: ${tenant.projects?.length ?? 0} projects` });
         this.onFinish(userId, job);

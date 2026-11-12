@@ -187,7 +187,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   })();
 
   // ---- Who is asking ----------------------------------------------------------------------------------
-  const ipOf = (req) => (config.trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '') || req.socket.remoteAddress || '';
+  // Behind a reverse proxy (set when the server starts, or by the Admin in Settings → General, at once): the address the
+  // proxy says the person came from, and whether they came over HTTPS. Otherwise the connection's own.
+  const behindProxy = () => Boolean(config.trustProxy || settings.value.trustProxy);
+  const ipOf = (req) => (behindProxy() ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '') || req.socket.remoteAddress || '';
   function context(req) {
     const token = cookies(req)[COOKIE];
     const session = iam.session(token);
@@ -705,7 +708,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         salesCount: a.salesCount ?? 0,
         lastSaleAt: a.lastSaleAt ?? null,
         remaining: p ? Math.max(0, Math.round((Number(p.totalCredits) || 0) - (a.soldCredits ?? 0))) : null,
-        primary: p ? { id: p.id, how, createdAt: p.createdAt, createdBy: p.createdBy, createdById: p.createdById, trCredits: p.trCredits, fusionCredits: p.fusionCredits, totalCredits: p.totalCredits, bundles: p.bundles, sharedAt: p.sharedAt, sharedWith: p.sharedWith ?? [] } : null,
+        primary: p ? { id: p.id, how, createdAt: p.createdAt, createdBy: p.createdBy, createdById: p.createdById, trCredits: p.trCredits, fusionCredits: p.fusionCredits, extraPercent: p.extraPercent ?? 0, totalCredits: p.totalCredits, bundles: p.bundles, sharedAt: p.sharedAt, sharedWith: p.sharedWith ?? [] } : null,
       };
     });
     return { teamIds, accounts: out, reports };
@@ -749,7 +752,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const people = peopleInScope(ctx.user, teamIds, iam.users()).filter((u) => u.active !== false && teamIds.has(u.teamId)).map((u) => {
       const owned = list.filter((a) => a.ownerId === u.id);
       const made = reports.filter((x) => x.createdById === u.id);
-      return { id: u.id, name: u.name, title: u.title, role: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamId: u.teamId, accounts: owned.length, withReport: owned.filter((a) => a.primary).length, reports: made.length, shared: made.filter((x) => x.sharedAt).length, missingSalesforce: owned.filter((a) => !a.salesforceUrl).length, credits: sum(owned), sold: owned.reduce((n, a) => n + (a.sold || 0), 0), remaining: owned.reduce((n, a) => n + (a.remaining || 0), 0), lastReportAt: made[0]?.createdAt ?? null };
+      return { id: u.id, name: u.name, title: u.title, role: iam.roles()[u.role]?.name ?? u.role, team: teams.get(u.teamId)?.name ?? '', teamId: u.teamId, accounts: owned.length, withReport: owned.filter((a) => a.primary).length, reports: made.length, shared: owned.filter((a) => a.sharedCount > 0).length, sharesMade: made.filter((x) => x.sharedAt).length, missingSalesforce: owned.filter((a) => !a.salesforceUrl).length, credits: sum(owned), sold: owned.reduce((n, a) => n + (a.sold || 0), 0), remaining: owned.reduce((n, a) => n + (a.remaining || 0), 0), lastReportAt: made[0]?.createdAt ?? null };
     });
     // Reports a month, the last 12 months.
     const months = [];
@@ -1305,11 +1308,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { ok: true };
   });
 
-  r('GET', '/api/settings', perm('settings.manage'), () => ({ ...settings.value, effective: hosts(), fromEnvironment: { salesforce: Boolean(config.salesforceHosts), cxone: Boolean(config.cxoneHosts), git: Boolean(config.gitHosts) }, dataDir: config.dataDir }));
+  r('GET', '/api/settings', perm('settings.manage'), () => ({ ...settings.value, trustProxyEnv: Boolean(config.trustProxy), effective: hosts(), fromEnvironment: { salesforce: Boolean(config.salesforceHosts), cxone: Boolean(config.cxoneHosts), git: Boolean(config.gitHosts) }, dataDir: config.dataDir }));
   const hostList = (v) => (Array.isArray(v) ? v : String(v ?? '').split(/[\s,]+/)).map((h) => String(h).trim().toLowerCase().replace(/^\*\./, '')).filter((h) => /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(h)).slice(0, 50);
   r('PUT', '/api/settings', perm('settings.manage'), (req, ctx, body) => {
     if (body?.organisationName !== undefined) settings.value.organisationName = clean(body.organisationName, 120) || settings.value.organisationName;
     if (body?.features !== undefined) settings.value.features = { ...(settings.value.features ?? {}), exports: body.features?.exports === true };
+    if (body?.trustProxy !== undefined) settings.value.trustProxy = body.trustProxy === true;
     if (body?.theme !== undefined) {
       const mode = ['light', 'dark', 'system'].includes(body.theme?.mode) ? body.theme.mode : 'light';
       const accent = ACCENTS.includes(body.theme?.accent) ? body.theme.accent : 'aurora';
@@ -1334,7 +1338,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     settings.save();
     syncHosts();
     record(ctx, req, 'settings.update', '', { changed: Object.keys(body ?? {}) });
-    return { ...settings.value, effective: hosts() };
+    return { ...settings.value, trustProxyEnv: Boolean(config.trustProxy), effective: hosts() };
   });
   // ---- HTTPS (Settings → HTTPS), as the calculator runs it ----------------------------------------------------------------
   const hostOf = (req) => String(req.headers.host ?? '').trim().toLowerCase();
@@ -1687,8 +1691,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (to && t >= to) return false;
       if (who && String(e.actor?.email ?? '').toLowerCase() !== who) return false;
       if (what && base(e.action) !== what && !base(e.action).startsWith(`${what}.`)) return false;
-      if (outcome === 'refused' && !String(e.action).startsWith('refused: ')) return false;
-      if (outcome === 'done' && String(e.action).startsWith('refused: ')) return false;
+      // Refused: what the router refused, a failed sign-in, and every action recorded as refused or failed.
+      const refused = /^refused: /.test(String(e.action)) || /\.(refused|failed)$/.test(base(e.action)) || base(e.action) === 'auth.failed';
+      if (outcome === 'refused' && !refused) return false;
+      if (outcome === 'done' && refused) return false;
       return !q || JSON.stringify(e).toLowerCase().includes(q);
     };
     return filter;
@@ -1822,10 +1828,15 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const summary = { calls: 0, failed: 0, attention: 0, recovered: 0, reads: 0, reports: 0, connects: 0, tenants: 0, ms: 0 };
     // Every call that did not succeed, grouped by what it was and why: the reason, what was done, the lesson.
     const groups = new Map();
+    // The person looking is always one of the people to pick ("Only me" is kept however little they did).
+    people.set(ctx.user.id, { id: ctx.user.id, name: ctx.user.name ?? ctx.user.email, email: ctx.user.email ?? '' });
     for (const e of seen) {
       if (e.user?.id) people.set(e.user.id, { id: e.user.id, name: e.user.name ?? e.user.email ?? e.user.id, email: e.user.email ?? '' });
       if (e.tenant) tenantSet.add(e.tenant);
       if (e.account?.id) accountsSeen.set(e.account.id, { id: e.account.id, name: e.account.name });
+    }
+    // The figures above the list follow the filters chosen (the choices themselves offer everything seen).
+    for (const e of seen.filter((x) => !before && matches(x))) {
       if (e.kind === 'call') {
         summary.calls++;
         summary.ms += e.ms ?? 0;
@@ -1847,7 +1858,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (e.kind === 'report') summary.reports++;
       if (e.kind === 'connect' && e.ok) summary.connects++;
     }
-    summary.tenants = tenantSet.size;
+    summary.tenants = new Set(seen.filter((x) => !before && matches(x)).map((x) => x.tenant).filter(Boolean)).size;
     summary.avgMs = summary.calls ? Math.round(summary.ms / summary.calls) : 0;
     const learned = calc.memory.summary(tenantSet);
     summary.avoided = learned.reduce((n, t) => n + t.avoided, 0);
@@ -1937,6 +1948,15 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   });
   r('GET', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => ({ customer: forBrowser(withTrRates(withRates(accounts.get(params.id, ctx.teamSet), ratesFor(ctx.user.id)))) }));
   r('PUT', '/api/projections/:id', calcTeam, (req, ctx, body, res, url, params) => {
+    // A Checkmarx One read goes into the account it was made for, and no other: refused here whatever the page sends.
+    for (const at of [body?.tr?.totals?.meta?.source === 'cxone' ? body.tr.totals.meta.readAt : null, body?.fusion?.readAt]) {
+      const owner = calc.readOwner(at);
+      if (owner && owner.id !== params.id) {
+        const target = accounts.accounts.meta(params.id);
+        record(ctx, req, 'cxone.read.misplaced', target?.name ?? params.id, { readFor: owner.name, readAt: at });
+        throw fail(409, `That Checkmarx One read was made for ${owner.name}, not for ${target?.name ?? 'this account'}: it is not saved here. Open ${owner.name} to see it, or read this account with its own key.`);
+      }
+    }
     const patch = {};
     for (const key of ['name', 'tr', 'fusion', 'fusionNew', 'totals', 'scope', 'impact']) if (body?.[key] !== undefined) patch[key] = body[key];
     // The triage and remediation credits are the Admin's, whatever the page sent.
@@ -2032,6 +2052,57 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'account.reset', a.name, { id: a.id, reportsRemoved: removed });
     return { ok: true, reportsRemoved: removed };
   });
+  /**
+   * The Admin reloads accounts from the reports brought into them (a previous quote, or a customer's version): each
+   * account's calculator rebuilt from that report's own figures, as an upload does (CC-01.81.00). For accounts whose
+   * live figures cannot be trusted. Listed first (GET), then reloaded for the ones ticked (POST).
+   */
+  const uploadedReportOf = (a) => {
+    const own = accounts.reports.list().filter((x) => x.customerId === a.id && (x.source === 'previous' || x.source === 'customer'));
+    if (!own.length) return null;
+    return own.find((x) => x.id === a.primaryReportId) ?? own.sort((x, y) => String(y.createdAt).localeCompare(String(x.createdAt)))[0];
+  };
+  r('GET', '/api/cc/reload-candidates', signedIn, (req, ctx) => {
+    if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin reloads accounts from their reports.');
+    const out = [];
+    for (const meta of accounts.accounts.list()) {
+      const rep = uploadedReportOf(meta);
+      if (!rep) continue;
+      const a = accounts.accounts.get(meta.id);
+      const full = accounts.reports.get(rep.id);
+      out.push({
+        id: meta.id,
+        name: meta.name,
+        team: teamPath(ctx.teams, meta.teamId).map((x) => x.name).join(' › '),
+        owner: userName(meta.ownerId),
+        report: { id: rep.id, source: rep.source, createdAt: rep.createdAt, total: rep.totalCredits, projects: full?.data?.fusion?.totals?.projects ?? null, loadable: Boolean(full?.data?.levers) },
+        now: { projects: a?.fusion?.projects?.filter((p) => p.source !== 'manual').length ?? 0, backlog: Boolean(a?.tr?.totals), from: a?.tr?.totals?.meta?.layout === 'report' ? 'report' : a?.tr?.totals?.meta?.source ?? null, readAt: a?.tr?.totals?.meta?.readAt ?? a?.fusion?.readAt ?? null },
+      });
+    }
+    return { accounts: out.sort((x, y) => x.name.localeCompare(y.name)) };
+  });
+  r('POST', '/api/cc/reload-from-reports', signedIn, (req, ctx, body) => {
+    if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin reloads accounts from their reports.');
+    const ids = new Set(Array.isArray(body?.ids) ? body.ids.map(String) : []);
+    const done = [];
+    const skipped = [];
+    for (const meta of accounts.accounts.list().filter((m) => ids.has(m.id))) {
+      const rep = uploadedReportOf(meta);
+      const data = rep ? accounts.reports.get(rep.id)?.data : null;
+      if (!data?.levers) {
+        skipped.push({ name: meta.name, why: 'its report has no figures to load' });
+        continue;
+      }
+      try {
+        accounts.update(meta.id, ctx.scope, { ...profileFromReport({ inputs: data.levers, base: { ...data, generatedAt: rep.createdAt } }), scope: {} }, ctx.user);
+        record(ctx, req, 'account.reloaded', meta.name, { id: meta.id, report: rep.id, source: rep.source, reportMadeAt: rep.createdAt, total: rep.totalCredits });
+        done.push(meta.name);
+      } catch (error) {
+        skipped.push({ name: meta.name, why: error.message });
+      }
+    }
+    return { reloaded: done, skipped };
+  });
   r('DELETE', '/api/cc/accounts/:id/cxone', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const a = accounts.forgetCxone(params.id, ctx.scope);
     record(ctx, req, 'cxone.key.forgotten', a.name);
@@ -2117,6 +2188,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (req.socket.encrypted) {
       const hsts = httpsManager.hstsHeader();
       if (hsts) res.setHeader('Strict-Transport-Security', hsts);
+    } else if (behindProxy() && String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https') {
+      // HTTPS ends at the proxy: the browser still came over HTTPS, so it is told to keep to it.
+      res.setHeader('Strict-Transport-Security', httpsManager.hstsHeader() || 'max-age=31536000');
     }
 
     if (method === 'GET' && LEGAL[pathname]) {

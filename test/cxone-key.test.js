@@ -135,3 +135,21 @@ test('what was read from Checkmarx One can be taken out of an account: its backl
   assert.equal((await se1.post(`/api/cc/accounts/${id}/cxone/clear`, {})).status, 409);
   assert.match(fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8'), /account\.cxone\.cleared/);
 });
+
+test('a read made for one account is refused when saved into another, whatever the page sends', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const a = (await se1.post('/api/projections', { name: 'Reader One', salesforceUrl: SF }, h)).data.customer.id;
+  const b = (await se1.post('/api/projections', { name: 'Reader Two', salesforceUrl: SF }, h)).data.customer.id;
+  const readAt = '2026-11-12T09:00:00.123Z';
+  calc.readsFor.set(readAt, { id: a, name: 'Reader One' });
+  const weeks = ['2026-10-01', '2026-11-01'];
+  const sev = { Critical: [1, 2], High: [0, 0], Medium: [0, 0], Low: [0, 0] };
+  const tr = { totals: { weeks, bySeverity: sev, meta: { source: 'cxone', readAt } }, fixed: { weeks, bySeverity: sev } };
+  const wrong = await se1.put(`/api/projections/${b}`, { tr }, h);
+  assert.equal(wrong.status, 409);
+  assert.match(wrong.data.error, /made for Reader One/);
+  assert.equal((await se1.put(`/api/projections/${b}`, { fusion: { readAt, projects: [{ id: 'x', name: 'x', loc: 1, frequency: 'month', source: 'scan' }] } }, h)).status, 409);
+  assert.equal((await se1.put(`/api/projections/${a}`, { tr }, h)).status, 200);
+  assert.match(fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8'), /cxone\.read\.misplaced/);
+});

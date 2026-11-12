@@ -214,6 +214,7 @@ export const ADMIN_VIEWS = {
     $('#tab').innerHTML = `<div class="panel"><h2>Hosts &amp; features <small>The name, logo and look are under Branding</small></h2><form class="form" id="sf">
       <label class="check"><input type="checkbox" name="exports" ${s.features?.exports ? 'checked' : ''} /><span>Allow the two Checkmarx One exports in the calculator <span class="chip warn">off by default</span><small>"Total" and "Fixed vulnerabilities by severity" from Checkmarx One → Analytics, dropped in by hand instead of reading the tenant with an API key. When on, the section stays collapsed until opened.</small></span></label>
 
+      <label class="check"><input type="checkbox" name="proxy" ${s.trustProxy || s.trustProxyEnv ? 'checked' : ''} ${s.trustProxyEnv ? 'disabled' : ''} /><span>Behind a reverse proxy${s.trustProxyEnv ? ' (set by TRUST_PROXY)' : ''}<small>Tick it when a proxy or load balancer sits in front of this server: the audit log then shows each person’s own address (X-Forwarded-For) instead of the proxy’s, and browsers that came over HTTPS are told to keep to it (HSTS). Leave it unticked when people reach this server directly: anyone could then claim any address.</small></span></label>
       <div class="row"><label class="f">Salesforce hosts${s.fromEnvironment.salesforce ? ' (set by SALESFORCE_HOSTS)' : ''}<textarea name="sfh" rows="3" ${s.fromEnvironment.salesforce ? 'disabled' : ''}>${esc(s.effective.salesforce.join('\n'))}</textarea></label>
       <label class="f">Checkmarx One hosts${s.fromEnvironment.cxone ? ' (set by CXONE_ALLOWED_HOSTS)' : ''}<textarea name="cxh" rows="3" ${s.fromEnvironment.cxone ? 'disabled' : ''}>${esc(s.effective.cxone.join('\n'))}</textarea></label>
       <label class="f">Git hosts${s.fromEnvironment.git ? ' (set by GIT_ALLOWED_HOSTS)' : ''}<textarea name="gh" rows="3" ${s.fromEnvironment.git ? 'disabled' : ''}>${esc(s.effective.git.join('\n'))}</textarea></label></div>
@@ -224,6 +225,7 @@ export const ADMIN_VIEWS = {
     const save = async () => {
       const f = new FormData($('#sf'));
       const body = { features: { exports: f.get('exports') === 'on' } };
+      if (!s.trustProxyEnv) body.trustProxy = f.get('proxy') === 'on';
       if (!s.fromEnvironment.salesforce) body.salesforceHosts = f.get('sfh');
       if (!s.fromEnvironment.cxone) body.cxoneHosts = f.get('cxh');
       if (!s.fromEnvironment.git) body.gitHosts = f.get('gh');

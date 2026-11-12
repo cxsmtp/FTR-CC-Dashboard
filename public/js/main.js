@@ -79,5 +79,10 @@ async function show() {
   }
 }
 
+// Every export says it started: the file is made on the server and arrives a moment later.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest?.('a[download][href^="/api/"]');
+  if (a) toast(`${a.textContent.trim() || 'Export'}: your file is being made and downloads in a moment.`, 'ok', 4000);
+});
 window.addEventListener('hashchange', route);
 route();

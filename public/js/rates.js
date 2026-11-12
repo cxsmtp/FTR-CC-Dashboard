@@ -36,7 +36,7 @@ export async function viewRates(params) {
   $('#main').innerHTML = `
     <div class="head compact"><div class="ht"><h1 class="serif">Fusion engines &amp; rates</h1><span class="crumbs">credits per 10K lines of code for each AI engine · the calculator applies them by itself, and they can still be changed there for one customer</span></div>
       <div class="tools"><a class="btn primary" href="/calculator">${icon('calc')}Open calculator</a></div></div>
-    <div class="saved-banner">✓ Changes save as you type; a change that does not work goes back to the last good one.</div>
+    ${d.canAdmin ? '<div class="saved-banner">✓ Changes save as you type; a change that does not work goes back to the last good one.</div>' : '<p class="muted small">The Admin sets these rates for everyone: you see them as the calculator uses them.</p>'}
     ${d.canAdmin ? `<div class="panel"><h2>For everyone <small>the Admin’s rates and the default engine for Fusion: the same for every team</small></h2>
       <form id="rates-admin" class="form" autocomplete="off" data-nodraft><div class="tw"><table class="rates"><thead><tr><th>Engine</th><th class="num">Credits per 10K LOC</th><th class="c">Default engine</th><th></th></tr></thead><tbody>${adminRows}</tbody></table></div>
       <div class="flex mt"><button type="button" class="sm" id="add-engine">${icon('plus')}Add an engine</button><span class="muted small">Name it as Checkmarx One does (“Opus 5.5”, “claude-opus-5-5” and “Claude Opus 5.5” are the same engine).</span></div></form>
