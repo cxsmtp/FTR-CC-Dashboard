@@ -2,6 +2,10 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.73.00 — 2026-11-12
+
+- **Calculator: the tabs are a band across the page.** Triage & remediation, the Fusion tabs and Generated reports are now large buttons side by side over the full width, in a tinted band with its own border; the one in view is filled in the accent colour with a shadow. On a narrow screen they wrap onto two rows.
+
 ## CC-01.72.00 — 2026-11-12
 
 - **Accounts: Delete the account, in the row's menu, for the Admin.** It asks first, naming the account, how many reports it has and the sales recorded on it; the account goes with its reports and sales, and the deletion is in the audit log. Only the Admin sees it in the list.
