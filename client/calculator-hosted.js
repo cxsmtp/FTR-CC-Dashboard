@@ -310,7 +310,7 @@ export async function startHosted() {
     if (work) busy.start(work);
     let answer;
     try {
-      answer = await server(url.pathname + url.search, { method, body: options.body, headers: method === 'POST' && url.pathname === '/api/projections/read' && account ? { 'X-Account': account.id } : {} });
+      answer = await server(url.pathname + url.search, { method, body: options.body, headers: account ? { 'X-Account': account.id } : {} });
     } catch (error) {
       if (method === 'POST' && url.pathname === '/api/projections/reports') busy.report(false);
       throw error;
@@ -564,6 +564,7 @@ export async function startHosted() {
 
   // ---- The account bar ------------------------------------------------------------------------------
   let account = null;
+  let reshowCx = null;
   let refreshTimer = null;
   const refreshAccountSoon = () => {
     clearTimeout(refreshTimer);
@@ -592,7 +593,9 @@ export async function startHosted() {
     }
     try {
       const { account: a, members } = await server(`/api/cc/accounts/${encodeURIComponent(id)}`);
+      const switched = account?.id !== a.id;
       account = a;
+      if (switched && lastCx && typeof reshowCx === 'function') reshowCx();
       bar.classList.toggle('missing-sf', !a.salesforceUrl);
       if (document.activeElement !== $('hc-sf')) $('hc-sf').value = a.salesforceUrl ?? '';
       $('hc-sf').disabled = $('hc-sf-save').disabled = false;
@@ -1371,16 +1374,22 @@ export async function startHosted() {
 
   // ---- The customer's Checkmarx One: the key goes to the server, which holds it in memory for this session -------
   const shell = document.querySelector('.shell');
+  // A connection is for one account (one customer): open another, and it is not connected until its own key is given.
+  let lastCx = null;
+  const forThis = (state) => Boolean(state?.connected) && (state.account === undefined || state.account === null || state.account.id === account?.id);
   const showState = (state) => {
-    connected = Boolean(state?.connected);
+    lastCx = state ?? null;
+    const other = Boolean(state?.connected) && !forThis(state);
+    connected = forThis(state);
     cxState = { connected, tenant: state?.tenant ?? '' };
     renderStatus();
     shell.classList.toggle('can-read', connected);
     $('sa-disconnect').hidden = !connected;
     $('sa-key').placeholder = connected ? 'Connected: paste another key to switch' : 'Paste the API key (not kept: in memory for your session only)';
-    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : `Not connected. A prospect not on Checkmarx One: use Code repositories (their cloc-fusion report, or their git token)${cfg.exportsEnabled ? ', or the two exports' : ''}.`, connected ? 'ok' : 'muted');
+    setStatus('sa-connect-status', connected ? `Connected to tenant ${state.tenant}` : other ? `Connected for ${state.account.name} (tenant ${state.tenant}), not for this account: paste this account's own API key to read it.` : `Not connected. A prospect not on Checkmarx One: use Code repositories (their cloc-fusion report, or their git token)${cfg.exportsEnabled ? ', or the two exports' : ''}.`, connected ? 'ok' : 'muted');
     calculator.refresh();
   };
+  reshowCx = () => showState(lastCx);
   $('sa-connect').addEventListener('submit', async (event) => {
     event.preventDefault();
     const apiKey = $('sa-key').value.trim();

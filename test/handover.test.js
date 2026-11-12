@@ -16,7 +16,7 @@ test('Checkmarx One connections and reads not yet put into their account move to
   // Over the launcher's channel, as a copy.
   const after = service();
   after.adopt(structuredClone(state));
-  assert.deepEqual(after.status('u1'), { connected: true, tenant: 'acme', baseUrl: 'https://eu.ast.checkmarx.net' });
+  assert.deepEqual(after.status('u1'), { connected: true, tenant: 'acme', baseUrl: 'https://eu.ast.checkmarx.net', account: null });
   const w = after.work('u1');
   assert.equal(w.read.state, 'done');
   assert.equal(w.read.applied, false);

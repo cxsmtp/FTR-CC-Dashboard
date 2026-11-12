@@ -77,3 +77,31 @@ test('sales roles: dashboards, accounts and recording sales; not the calculator'
   assert.equal((await ae.post(`/api/cc/accounts/${acct.id}/sales`, { credits: 1000 })).status, 200);
   assert.equal((await ae.put(`/api/cc/accounts/${acct.id}`, { salesforceUrl: SF })).status, 403);
 });
+
+test('a Checkmarx One connection is for one account: never read into another, and what was read never serves another', async () => {
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const make = async (name) => {
+    const id = (await se1.post('/api/projections', { name }, h)).data.customer.id;
+    await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: SF });
+    return { id, name, teamId: env.teams.emea.id };
+  };
+  const [first, second] = [await make('First Customer'), await make('Second Customer')];
+  // Connected for First Customer, with a read of it finished (as a version handing over would leave it).
+  calc.adopt({ people: [{ userId: env.users.se1.id, connection: { tenant: 'first-tenant', baseUrl: 'https://eu.ast.checkmarx.net', iamUrl: 'https://eu.iam.checkmarx.net', apiKey: 'x' }, account: first, boundTo: first, readFor: first, job: { id: 'j', state: 'done', account: first, applied: true, result: { projects: [] } }, read: { readAt: new Date().toISOString(), weeks: ['2026-10-01'], series: {} } }] });
+  assert.deepEqual((await se1.get('/api/cc/cxone/status')).data.account, { id: first.id, name: first.name });
+  // Read asked for Second Customer: refused, saying whose connection it is, and recorded.
+  const r = await se1.post('/api/projections/read', {}, { ...h, 'X-Account': second.id });
+  assert.equal(r.status, 409);
+  assert.match(r.data.error, /connected to Checkmarx One for First Customer, not for Second Customer/);
+  // No account named: refused too.
+  assert.equal((await se1.post('/api/projections/read', {}, h)).status, 409);
+  // The read that finished says whose it is, and its figures are refused to the other account.
+  assert.deepEqual((await se1.get('/api/projections/read', h)).data.account, { id: first.id, name: first.name });
+  const s = await se1.post('/api/projections/series', { projectIds: [] }, { ...h, 'X-Account': second.id });
+  assert.equal(s.status, 409);
+  assert.match(s.data.error, /last read for First Customer/);
+  assert.notEqual((await se1.post('/api/projections/series', { projectIds: [] }, { ...h, 'X-Account': first.id })).status, 409);
+  assert.match(fs.readFileSync(path.join(env.dataDir, 'audit.log'), 'utf8'), /cxone\.read\.refused/);
+  calc.forget(env.users.se1.id);
+});

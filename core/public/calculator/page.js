@@ -3221,7 +3221,9 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         return setStatus('calc-read-note', `${job.error || 'Checkmarx One could not be read.'}${some ? ` The figures shown are from the ${num(some)} projects read before it stopped: read again for them all.` : ''}`, 'error');
       }
       const blank = c.open && ((!c.open.tr?.totals && !c.open.fusion?.projects?.length) || (reading.stream && c.open.id === reading.customer));
-      if (job.state !== 'done' || !c.open || (c.open.id !== reading.customer && !blank)) {
+      // Hosted for many customers, a read says which account it is for: it goes into that account and no other.
+      const another = job.account !== undefined && (!c.open || job.account?.id !== c.open.id);
+      if (job.state !== 'done' || !c.open || another || (c.open.id !== reading.customer && !blank)) {
         settle(false);
         fxEnd(false, 'Read for another customer');
         return renderReadNote();
@@ -3307,6 +3309,11 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     } catch {}
     reading.starting = false;
     if (!c.open || reading.timer) return;
+    // A read for another account (another customer) is not this one's: neither followed here nor put here.
+    if (job && job.account !== undefined && job.account?.id !== c.open.id) {
+      if (job.state === 'running' && job.account?.name) setStatus('calc-read-note', `Checkmarx One is being read for ${job.account.name}. This account is read with its own key.`, 'muted');
+      return;
+    }
     if (job?.state === 'running') {
       follow();
       readProgress(job);

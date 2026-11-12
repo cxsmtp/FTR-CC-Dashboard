@@ -2,6 +2,16 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.78.00 — 2026-11-12
+
+One customer's Checkmarx One data can no longer end up in another customer's account.
+
+- **What went wrong.** A connection to Checkmarx One, and the last read made with it, belonged to the person signed in, not to the account. Connected with one customer's key, opening another account and reading (or opening an account with nothing read yet, while a read made for another had just finished or was running) put the first customer's projects and findings into the second account.
+- **A connection is for one account.** It is for the account it was made for. Open another account and the calculator says it is not connected for this one, naming the account the connection is for; reading is refused by the server with the same explanation, and recorded in the audit log (cxone.read.refused). Paste the account's own key, or use the key kept for it, to read it.
+- **A read is for one account.** A read says which account it is for and is put into that account only: it is not followed, shown or applied in another, and a read finished for another account no longer "serves" an empty one. Changing what is counted (scope, engines, shares) is refused when the last read was for another account.
+- **A kept key guards its account.** When a key is kept for an account, reading it while connected to another tenant is refused.
+- Nothing saved is changed by this update. **An account that already holds another customer's data keeps it until it is read again with its own key**: open it, connect with its key, read, and check the reports made from it since.
+
 ## CC-01.77.00 — 2026-11-12
 
 - **People: a reporting manager for everyone.** In a person's Manage panel, *Reports to* sets their manager: anyone with access, in any team, so the hierarchy of sales, SE and CSM leadership can be recorded as it is. The panel says whom they report to and who reports to them; the list shows "Reports to …" under the team.

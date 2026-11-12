@@ -1722,6 +1722,16 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const meta = id && accounts.accounts.meta(id);
     const account = meta && ctx.teamSet.has(meta.teamId) ? { id: meta.id, name: meta.name, teamId: meta.teamId } : null;
     if (meta && !meta.salesforceUrl) throw fail(409, 'Save the account\u2019s Salesforce opportunity or account link first: nothing is read or generated without it.');
+    // Each account is another customer: Checkmarx One is read only for the account the connection was made for.
+    if (!account) throw fail(409, 'Open the account first: Checkmarx One is read for an account.');
+    const bound = calc.connectedFor(ctx.user.id);
+    if (bound && bound.id !== account.id) {
+      record(ctx, req, 'cxone.read.refused', account.name, { connectedFor: bound.name, tenant: calc.status(ctx.user.id).tenant });
+      throw fail(409, `You are connected to Checkmarx One for ${bound.name}, not for ${account.name}. Paste ${account.name}\u2019s own API key (Data from, at the top) and read again: one customer\u2019s data is never read into another\u2019s account.`);
+    }
+    const kept = accounts.accounts.meta(account.id)?.cxone?.tenant;
+    const tenantNow = calc.status(ctx.user.id).tenant;
+    if (kept && tenantNow && kept !== tenantNow) throw fail(409, `${account.name} is kept with the Checkmarx One tenant ${kept}, and you are connected to ${tenantNow}. Connect with ${account.name}\u2019s key, or forget the key kept for it first.`);
     const view = calc.startRead(ctx.user.id, body, account);
     // Kept on disk until its result is in its account: a restart meanwhile starts it again.
     pendingReads.value.reads[ctx.user.id] = { account, input: { branches: body?.branches, maxProjects: body?.maxProjects }, startedAt: new Date().toISOString() };
@@ -1841,7 +1851,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     branding: brandingView(),
   }));
   r('GET', '/api/projections/read', calcTeam, (req, ctx, body, res, url) => calc.readView(ctx.user.id, url.searchParams.get('since')));
-  r('POST', '/api/projections/series', calcTeam, (req, ctx, body) => calc.series(ctx.user.id, body));
+  r('POST', '/api/projections/series', calcTeam, (req, ctx, body) => calc.series(ctx.user.id, body, String(req.headers['x-account'] ?? '') || null));
   r('GET', '/api/projections/git/connections', calcTeam, () => calc.gitConnections());
   r('POST', '/api/projections/git/organizations', calcTeam, (req, ctx, body) => calc.gitOrganizations(body));
   r('POST', '/api/projections/git/repositories', calcTeam, (req, ctx, body) => calc.gitRepositories(body));
@@ -1927,8 +1937,10 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (!forAccount || !ctx.scope.has(forAccount.teamId)) throw fail(409, 'Open the account first: Checkmarx One is read for an account.');
     if (!forAccount.salesforceUrl) throw fail(409, 'Save the account\u2019s Salesforce opportunity or account link first: nothing is read or generated without it.');
     calc.workingOn(ctx.user.id, { id: forAccount.id, name: forAccount.name, teamId: forAccount.teamId });
-    const state = await calc.connectKey(ctx.user.id, body);
-    record(ctx, req, 'cxone.connect', state.tenant, { baseUrl: state.baseUrl });
+    const connectedState = await calc.connectKey(ctx.user.id, body);
+    calc.boundTo(ctx.user.id, { id: forAccount.id, name: forAccount.name, teamId: forAccount.teamId });
+    const state = { ...connectedState, account: calc.status(ctx.user.id).account };
+    record(ctx, req, 'cxone.connect', state.tenant, { baseUrl: state.baseUrl, account: forAccount.name });
     // "Remember this key for the account": sealed on this server, used again by the team for one-click refreshes.
     if (body?.remember === true && body?.accountId) {
       const a = accounts.saveCxone(String(body.accountId), ctx.scope, { sealedKey: secrets.seal(JSON.stringify({ apiKey: String(body.apiKey ?? ''), baseUrl: String(body.baseUrl ?? ''), iamUrl: String(body.iamUrl ?? ''), tenant: String(body.tenant ?? '') })), connection: { tenant: state.tenant, baseUrl: state.baseUrl, iamUrl: '' }, user: ctx.user });
@@ -1952,8 +1964,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       record(ctx, req, 'cxone.key.failed', accounts.accounts.meta(params.id)?.name ?? '', { error: error.message });
       throw fail(error.status ?? 400, `${error.message} The kept key may have expired: paste a new one and tick "Remember".`);
     }
+    if (meta) calc.boundTo(ctx.user.id, { id: meta.id, name: meta.name, teamId: meta.teamId });
     record(ctx, req, 'cxone.key.used', accounts.accounts.meta(params.id)?.name ?? '', { tenant: state.tenant });
-    return state;
+    return { ...state, account: calc.status(ctx.user.id).account };
   });
   r('DELETE', '/api/cc/accounts/:id/cxone', perm('calculator.use'), (req, ctx, body, res, url, params) => {
     const a = accounts.forgetCxone(params.id, ctx.scope);

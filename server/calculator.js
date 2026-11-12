@@ -158,6 +158,23 @@ export class CalculatorService {
   workingOn(userId, account) {
     if (account) this.#link(userId).account = account;
   }
+  /**
+   * A connection to Checkmarx One is for one account: the one it was made for. Each account is another customer, so
+   * a key given for one is never read into another, and what was read for one never serves another.
+   */
+  boundTo(userId, account) {
+    if (account) this.#link(userId).boundTo = account;
+  }
+  /** The account this person's connection is for (the one they last read for, for a connection made before this was kept). */
+  connectedFor(userId) {
+    const l = this.#links.get(userId);
+    return l?.client ? l.boundTo ?? l.account ?? null : null;
+  }
+  /** The account the last finished read was for: its figures are that account's alone. */
+  readFor(userId) {
+    const l = this.#links.get(userId);
+    return l?.readFor ?? (l?.job?.state === 'done' ? l.job.account ?? null : null);
+  }
   constructor({ cxoneHosts, gitHosts, log = console.log, connect = (c) => new CxClient(c) }) {
     this.cxoneHosts = cxoneHosts;
     this.gitHosts = gitHosts;
@@ -183,7 +200,7 @@ export class CalculatorService {
     for (const [userId, l] of this.#links) {
       if (!l.connection) continue;
       const job = l.job ? { ...l.job, live: null } : null;
-      people.push({ userId, connection: l.connection, account: l.account ?? null, job: job?.state === 'running' ? null : job, rerun: job?.state === 'running' ? { input: job.input, account: job.account } : null, read: l.read.get() });
+      people.push({ userId, connection: l.connection, account: l.account ?? null, boundTo: l.boundTo ?? null, readFor: l.readFor ?? null, job: job?.state === 'running' ? null : job, rerun: job?.state === 'running' ? { input: job.input, account: job.account } : null, read: l.read.get() });
     }
     return { people, interrupted: [...this.interrupted] };
   }
@@ -198,7 +215,7 @@ export class CalculatorService {
     for (const p of state?.people ?? []) {
       try {
         const link = this.#link(p.userId);
-        Object.assign(link, { client: this.#client(p.userId, p.connection), connection: p.connection, job: p.job ?? null, account: p.account ?? null });
+        Object.assign(link, { client: this.#client(p.userId, p.connection), connection: p.connection, job: p.job ?? null, account: p.account ?? null, boundTo: p.boundTo ?? null, readFor: p.readFor ?? null });
         if (p.read?.weeks) link.read.save({ readAt: p.read.readAt, weeks: p.read.weeks, byProject: Object.entries(p.read.series ?? {}) });
         if (p.rerun) this.startRead(p.userId, p.rerun.input, p.rerun.account);
       } catch (error) {
@@ -215,7 +232,8 @@ export class CalculatorService {
 
   status(userId) {
     const l = this.#links.get(userId);
-    return { connected: Boolean(l?.client), tenant: l?.connection?.tenant ?? '', baseUrl: l?.connection?.baseUrl ?? '' };
+    const account = this.connectedFor(userId);
+    return { connected: Boolean(l?.client), tenant: l?.connection?.tenant ?? '', baseUrl: l?.connection?.baseUrl ?? '', account: account ? { id: account.id, name: account.name } : null };
   }
 
   async connectKey(userId, input) {
@@ -242,7 +260,7 @@ export class CalculatorService {
   disconnect(userId) {
     const tenant = this.#links.get(userId)?.connection?.tenant;
     if (tenant) this.#note(userId, { kind: 'disconnect', tenant, ok: true });
-    Object.assign(this.#link(userId), { client: null, connection: null, job: null, read: new TenantReadStore({ file: null }) });
+    Object.assign(this.#link(userId), { client: null, connection: null, job: null, boundTo: null, readFor: null, read: new TenantReadStore({ file: null }) });
     return this.status(userId);
   }
 
@@ -272,6 +290,7 @@ export class CalculatorService {
     ])
       .then(([{ perProject, ...tenant }, offer]) => {
         state.read.save(perProject);
+        state.readFor = job.account ?? null;
         Object.assign(job, { state: 'done', result: { ...tenant, ...offer }, finishedAt: new Date().toISOString(), live: null });
         this.#note(userId, { kind: 'read', tenant: state.connection?.tenant, ok: true, ms: Date.now() - readStarted, detail: `finished: ${tenant.projects?.length ?? 0} projects` });
         this.onFinish(userId, job);
@@ -291,7 +310,8 @@ export class CalculatorService {
    */
   readView(userId, since) {
     const job = this.#links.get(userId)?.job;
-    const view = readJobView(job, { since });
+    // Which account the read is for goes with it: the calculator puts it nowhere else.
+    const view = { ...readJobView(job, { since }), account: job?.account ? { id: job.account.id, name: job.account.name } : null };
     if (job?.state === 'done' && !job.applied) return { ...view, finishedAt: new Date().toISOString() };
     return view;
   }
@@ -317,7 +337,10 @@ export class CalculatorService {
     };
   }
 
-  series(userId, input) {
+  series(userId, input, accountId = null) {
+    // What was read is one account's: asked for another, it is refused (the figures would be another customer's).
+    const mine = this.readFor(userId);
+    if (accountId && mine && mine.id !== accountId) throw fail(409, `Checkmarx One was last read for ${mine.name}: connect with this account's own key and read it, before changing what is counted here.`);
     const read = this.#links.get(userId)?.read.get();
     if (!read?.weeks?.length) throw fail(409, 'Read Checkmarx One first: the scope is worked out from the last read.');
     const ids = Array.isArray(input?.projectIds) ? input.projectIds.slice(0, MAX_PROJECTS).map((id) => String(id).slice(0, 100)) : [];
