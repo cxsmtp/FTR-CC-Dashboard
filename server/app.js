@@ -42,6 +42,7 @@ import { registerUpdates } from './routes/updates.js';
 import { registerDiagnostics } from './routes/diagnostics.js';
 import { registerEmail } from './routes/email.js';
 import { registerProjections } from './routes/projections.js';
+import { registerEstimate } from './routes/estimate.js';
 import { registerRates } from './routes/rates.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -458,6 +459,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const { forBrowser, takenView } = registerProjections(d);
   // ---- Fusion rates: the Admin's engines and default engine, each team's own, and engines seen without a rate ----
   registerRates(d);
+  // ---- The vulnerability estimate, for Admins (server/estimate.js) ---------------------------------------
+  registerEstimate(d);
 
   // ---- The requests ---------------------------------------------------------------------------------------------
   const PUBLIC_DIR = path.join(config.root, 'public');

@@ -1,12 +1,13 @@
 import { $, api, applyTheme, avatar, brandHtml, can, esc, go, icon, num, state, themePicker, toast } from './core.js';
 import { ADMIN_TABS } from './settings.js';
 // ---- Settings: everything that is not Overview, Accounts or the Calculator, in one place ----
-export const SETTINGS_PAGES = ['people', 'teams', 'rates', 'audit', 'activity', 'admin'];
+export const SETTINGS_PAGES = ['people', 'teams', 'rates', 'estimate', 'audit', 'activity', 'admin'];
 export function settingsNav() {
   const system = ADMIN_TABS.some(([, , p]) => p && can(p)) ? ADMIN_TABS.filter(([, , p]) => !p || can(p)).map(([id, label]) => [label, `/admin/${id}`]) : [];
   return [
     ['People', [['People', '/people/people'], ...(can('teams.manage') || can('dashboard.view') ? [['Teams', '/teams']] : []), ...(can('users.manage') || can('roles.manage') ? [['Roles &amp; permissions', '/people/roles']] : []), ...(can('users.manage') ? [['Sign-in', '/people/signin']] : [])]],
-    ['Pricing', [['Engines &amp; rates', '/rates']]],
+    // The vulnerability estimate is the Admins' own (internal, never in a report).
+    ['Pricing', [['Engines &amp; rates', '/rates'], ...(state.me?.role?.id === 'admin' ? [['Vulnerability estimate', '/estimate']] : [])]],
     ['Records', [...(can('audit.view') ? [['Audit log', '/audit']] : []), ['CxOne API audit', '/activity']]],
     ...(system.length ? [['System', system]] : []),
   ];

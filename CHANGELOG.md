@@ -2,6 +2,18 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.106.00 — 2026-11-13
+
+- **Vulnerability estimate, for Admins** (Settings → Pricing). Internal: never in a report, and no other role sees it.
+  - For code that has only been counted (a cloc-fusion report, a git count): the findings a first scan would report,
+    low, typical and high, and their triage & remediation credits by the calculator's own sum.
+  - Drawn from this installation's own accounts: their lines of code against their open findings from Checkmarx One.
+    Only the figures across all of them are used.
+  - It tests itself: each account is predicted from the others and compared with what it really has, so the page says
+    how far the estimate can be trusted before anything is quoted.
+  - It needs 8 accounts to estimate from; until then, or for a customer your accounts do not resemble, your own
+    findings per 1,000 lines can be typed.
+
 ## CC-01.105.00 — 2026-11-13
 
 - **Faster as the data grows.**

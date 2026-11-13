@@ -173,3 +173,19 @@ as it is found and says "Staging" at the top of every page, so nobody takes it f
 
 Nothing of this changes an installation by itself: the mark and the hours are set by an Admin and recorded in the
 audit log.
+
+## Vulnerability estimate (Admins only)
+
+Settings → Pricing → **Vulnerability estimate**. Internal: it is never in a report and no other role sees it.
+
+For code that has only been counted (a cloc-fusion report, a git count), it estimates the findings a first scan would
+report and their triage & remediation credits. It is drawn from this installation's own accounts: their projects'
+lines of code against their open findings from Checkmarx One.
+
+- **What your accounts say**: the findings per 1,000 lines across your accounts (low, typical, high: the 25th, 50th
+  and 75th percentile), the new findings a month, and the test: each account predicted from the others and compared
+  with what it really has. Read the test before quoting anything: it says how wide the spread really is.
+- **An estimate** needs 8 accounts with 50,000 lines or more and a backlog from Checkmarx One. Until then, or for a
+  customer your accounts do not resemble, type your own findings per 1,000 lines.
+- Quote the range, not one number, and "typical" only where the customer has used a SAST tool before; an untouched
+  codebase sits at the high end. The first scan replaces the estimate.

@@ -4,6 +4,7 @@ import { viewActivity } from './activity.js';
 import { viewAudit } from './audit.js';
 import { firstStepsDone, home, viewForgot, viewLogin, viewReset, viewWelcome } from './auth.js';
 import { $, api, applyMyTheme, can, esc, go, setRedraw, state, toast, warm } from './core.js';
+import { viewEstimate } from './estimate.js';
 import { viewGuide } from './guide.js';
 import { viewHelp } from './help.js';
 import { viewOverview } from './overview.js';
@@ -63,6 +64,7 @@ async function show() {
     if (path.startsWith('/people/')) return await viewPeople(path.slice('/people/'.length));
     if (path === '/teams') return await viewTeams();
     if (path === '/rates') return await viewRates(params);
+    if (path === '/estimate') return await viewEstimate();
     if (path === '/admin') return await viewAdmin();
     if (path.startsWith('/admin/')) return await viewAdmin(path.slice('/admin/'.length));
     if (path === '/audit') return await viewAudit(params);

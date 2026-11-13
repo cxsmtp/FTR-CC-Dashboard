@@ -1198,3 +1198,5 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 .stage-win { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
 .stage-win input[type=time] { width: 112px; }
 .stage-box p { margin: 0; }
+/* Vulnerability estimate: the line to quote stands out. */
+#est-out tr.strong td { background: color-mix(in srgb, var(--brand, var(--accent)) 7%, transparent); font-weight: 600; }
