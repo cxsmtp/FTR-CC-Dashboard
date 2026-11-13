@@ -572,6 +572,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       organisationName: settings.value.organisationName,
       version: VERSION,
       versionLabel: versionLabel(),
+      // What this installation is marked as (Settings → Updates): 'staging' shows on every page.
+      stage: updates.stage ?? '',
       prefs: ctx.user.prefs ?? {},
       theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
       branding: brandingView(),
@@ -1583,8 +1585,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { ...updates.status(), ...out };
   });
   r('PUT', '/api/updates/auto', updPerm, (req, ctx, body) => {
-    const auto = updates.setAuto({ everyMinutes: body?.everyMinutes }, { by: ctx.user.email });
-    record(ctx, req, 'updates.auto', `every ${auto.everyMinutes} minutes`);
+    const auto = updates.setAuto({ everyMinutes: body?.everyMinutes, stage: body?.stage, window: body?.window }, { by: ctx.user.email });
+    record(ctx, req, 'updates.auto', `every ${auto.everyMinutes ?? 15} minutes`, { stage: auto.stage ?? '', window: auto.window ?? null });
     return updates.status();
   });
   r('POST', '/api/system/restart', updPerm, (req, ctx) => {
@@ -1936,6 +1938,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     // The menu and the look, as on the dashboard.
     teamName: teams.get(ctx.user.teamId)?.name ?? '',
     versionLabel: versionLabel(),
+    stage: updates.stage ?? '',
     prefs: { mode: ctx.user.prefs?.mode, accent: ctx.user.prefs?.accent, ops: ctx.user.prefs?.ops },
     theme: { mode: settings.value.theme?.mode ?? 'light', accent: settings.value.theme?.accent ?? 'aurora' },
     branding: brandingView(),

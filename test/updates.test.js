@@ -186,3 +186,35 @@ test('release files are downloaded from github.com, not through the API and its 
   await svc.install('9.9.9');
   assert.deepEqual(downloadsThroughApi, []);
 });
+
+test('an installation marked staging takes candidates; any other only promoted releases; updates wait for their hours', async () => {
+  const { UpdateService, VersionStore } = await import('../server/updates.js');
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-stage-'));
+  const store = new VersionStore({ dataDir, builtInDir: dataDir, builtInVersion: '1.0.0' });
+  const u = new UpdateService({ store, runningVersion: '1.0.0', repo: 'x/y', log: () => {} });
+  const candidate = { version: '1.2.0', prerelease: true, installable: true };
+  const promoted = { version: '1.1.0', prerelease: false, installable: true };
+  // Not marked: as it always was (promoted releases only).
+  assert.equal(u.stage, '');
+  assert.equal(u.takes(candidate), false);
+  assert.equal(u.takes(promoted), true);
+  u.setAuto({ stage: 'staging' });
+  assert.equal(u.takes(candidate), true);
+  u.setAuto({ stage: 'production' });
+  assert.equal(u.takes(candidate), false);
+  assert.throws(() => u.setAuto({ stage: 'anything' }), /Staging or Production/);
+  // The hours it may update in by itself, also over midnight; none: any time.
+  assert.equal(u.inWindow(new Date(2026, 0, 1, 13, 0)), true);
+  u.setAuto({ window: { from: '02:00', to: '05:00' } });
+  assert.equal(u.inWindow(new Date(2026, 0, 1, 3, 30)), true);
+  assert.equal(u.inWindow(new Date(2026, 0, 1, 13, 0)), false);
+  u.setAuto({ window: { from: '22:00', to: '04:00' } });
+  assert.equal(u.inWindow(new Date(2026, 0, 1, 23, 0)), true);
+  assert.equal(u.inWindow(new Date(2026, 0, 1, 3, 0)), true);
+  assert.equal(u.inWindow(new Date(2026, 0, 1, 12, 0)), false);
+  assert.throws(() => u.setAuto({ window: { from: '25:00', to: '04:00' } }), /HH:MM/);
+  u.setAuto({ window: null });
+  assert.equal(u.inWindow(new Date(2026, 0, 1, 12, 0)), true);
+  // Kept with the installation: read again by the next version.
+  assert.equal(new UpdateService({ store: new VersionStore({ dataDir, builtInDir: dataDir, builtInVersion: '1.0.0' }), runningVersion: '1.0.0', repo: 'x/y', log: () => {} }).stage, 'production');
+});

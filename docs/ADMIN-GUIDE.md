@@ -149,3 +149,27 @@ Making a release: bump `version` in package.json, add the CHANGELOG entry, and m
 
 - **General:** the organisation name on reports, the default theme for everyone, and the Salesforce, Checkmarx One and git hosts the server may call. Addresses inside the network are never called.
 - **Roles:** custom roles. Nobody can give permissions they do not hold, and the Admin-only ones cannot be given at all.
+
+## Staging and production
+
+One installation can be marked **Staging** or **Production** (Settings → Updates → *This installation is*). Not marked,
+it behaves as it always has: it takes every published release.
+
+**While the software is still being shaped (now).** Mark the one installation *Staging*. It takes every release as soon
+as it is found and says "Staging" at the top of every page, so nobody takes it for the finished product.
+
+**When it is ready for people to rely on.**
+
+1. Mark that installation **Production**. From then on it takes only *promoted* releases.
+2. Optionally give it hours to update in (for example 02:00 to 05:00, server time), so it never changes version while
+   people work. Installing by hand from the Updates page is never held back.
+3. Start a second installation beside it for trying versions first: the same image, its own port and its own data
+   folder (`DATA_DIR`), with a recent backup of production restored into it (Settings → Backups). Mark it **Staging**.
+4. Have releases published as *candidates*: add `"releaseChannel": "candidate"` to `package.json`. Each push is then a
+   GitHub pre-release: staging installs it within its check interval, production does not.
+5. When a candidate has run well on staging, **promote** it: GitHub → Actions → *release* → *Run workflow* → give its
+   tag (for example `v1.105.0`). Production takes it at its next check, inside its hours.
+6. An urgent fix: promote it at once, and install it by hand on production (Settings → Updates) if its hours are far.
+
+Nothing of this changes an installation by itself: the mark and the hours are set by an Admin and recorded in the
+audit log.

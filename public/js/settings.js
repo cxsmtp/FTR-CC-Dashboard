@@ -432,8 +432,10 @@ export const ADMIN_VIEWS = {
     const ev = { installed: 'Installed', 'install-failed': 'Install refused', switch: 'Switched', 'rolled-back': 'Rolled back', started: 'Started', refused: 'Not started', auto: 'Auto-update', trusted: 'Checksum kept', 'checksum-changed': 'Checksum changed: refused', 'changed-on-disk': 'Changed on disk' };
     const integ = await api('/api/integrity').catch(() => ({ state: 'checking', summary: '' }));
     const label = (v) => `CC-${String(v).split('.').map((n) => n.padStart(2, '0')).join('.')}`;
-    const newest = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered);
-    const avail = u.releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.failed && cmpVer(r.version, u.running) > 0);
+    // A staging installation also takes candidate releases (pre-releases); any other only promoted ones.
+    const takes = (r) => !r.prerelease || u.stage === 'staging';
+    const newest = u.releases.find((r) => takes(r) && r.installable && !r.tampered);
+    const avail = u.releases.find((r) => takes(r) && r.installable && !r.tampered && !r.failed && cmpVer(r.version, u.running) > 0);
     const lastSwitch = (u.events ?? []).find((e) => e.type === 'switch' && e.to === u.running);
     const INTEG = { genuine: ['ok', 'Genuine'], unconfirmed: ['warn', 'Not confirmed yet'], unsigned: ['', 'Built from the source'], tampered: ['bad', 'Changed'], 'not-genuine': ['bad', 'Not genuine'], checking: ['', 'Checking…'] };
     const [ic, il] = INTEG[integ.state] ?? ['', integ.state];
@@ -447,6 +449,15 @@ export const ADMIN_VIEWS = {
             <form id="auto" class="inline-num">Check every <input type="number" name="everyMinutes" min="5" max="1440" step="1" value="${esc(u.checkEveryMinutes ?? 15)}" /> minutes</form>
             <span class="faint" id="auto-saved">Installed without a restart; a version that fails to start is rolled back and never installed again by itself.</span></div>
         </div>
+        <form id="stage" class="stage-box" data-nodraft>
+          <div class="stage-h"><b>This installation is</b>
+            <span class="seg stage-seg" role="radiogroup" aria-label="What this installation is">
+              ${[['', 'Not marked'], ['staging', 'Staging'], ['production', 'Production']].map(([v, l]) => `<label class="${(u.stage ?? '') === v ? 'on' : ''}"><input type="radio" name="stage" value="${v}" ${(u.stage ?? '') === v ? 'checked' : ''} />${l}</label>`).join('')}
+            </span><span class="faint" id="stage-saved"></span></div>
+          <p class="muted small">${u.stage === 'staging' ? '<b>Staging:</b> where new versions are tried first. It takes every release as soon as it is found, candidates included, and says “Staging” at the top of every page.' : u.stage === 'production' ? '<b>Production:</b> where people work. It takes only releases promoted after they ran on staging, and only in the hours below when they are set.' : 'Not marked: it takes every published release, as it always has. Mark it <b>Staging</b> while the software is still being shaped; mark the one people work on <b>Production</b> when it is ready (a staging one beside it then tries each version first).'}</p>
+          <div class="stage-win"><span>Update by itself only between</span><input type="time" name="from" value="${esc(u.window?.from ?? '')}" aria-label="From" /><span>and</span><input type="time" name="to" value="${esc(u.window?.to ?? '')}" aria-label="To" />
+            <span class="faint">server time, now ${esc(u.serverTime ?? '')}. Empty: at any time. Installing by hand is never held back.${u.window && !u.inWindow && avail ? ` <b>${esc(label(avail.version))} is waiting for these hours.</b>` : ''}</span></div>
+        </form>
         <div class="integ"><div class="integ-h"><b>Software integrity</b><span class="chip ${ic}"><i></i>${esc(il)}</span><span class="spacer"></span><button class="sm" id="integ-check">Check now</button></div>
           <p>${esc(integ.summary ?? '')}</p>
           ${integ.digest ? `<dl class="kv">
@@ -575,6 +586,23 @@ export const ADMIN_VIEWS = {
         waitForRestart(r.to);
       } catch (error) {
         toast(error.message, 'bad');
+      }
+    };
+    // What this installation is marked as, and the hours it may update in: saved as they change.
+    $('#stage').onsubmit = (e) => e.preventDefault();
+    $('#stage').onchange = async (e) => {
+      const f = new FormData($('#stage'));
+      const body = e.target.name === 'stage' ? { stage: f.get('stage') } : { window: f.get('from') || f.get('to') ? { from: f.get('from'), to: f.get('to') } : null };
+      // Both hours are needed before they mean anything: the first one typed waits for the second.
+      if (body.window && !(body.window.from && body.window.to)) return ($('#stage-saved').textContent = 'Give both hours.');
+      try {
+        await api('/api/updates/auto', { method: 'PUT', body });
+        state.me.stage = e.target.name === 'stage' ? f.get('stage') : state.me.stage;
+        toast('Saved.', 'ok');
+        viewAdmin('updates');
+      } catch (x) {
+        toast(x.message, 'bad');
+        viewAdmin('updates');
       }
     };
     // Auto-update saves as it is changed.

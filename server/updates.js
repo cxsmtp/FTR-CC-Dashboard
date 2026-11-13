@@ -34,6 +34,7 @@ const RELEASE_HOSTS = ['api.github.com', 'github.com', 'objects.githubuserconten
 const MAX_ARCHIVE = 150 * 1024 * 1024;
 const MAX_FILE = 64 * 1024 * 1024;
 const VERSION = /^\d+\.\d+\.\d+$/;
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
 export const compareVersions = (a, b) => {
@@ -240,7 +241,7 @@ export class UpdateService {
     }
     this.cache = list;
     this.store.state.releases = list.slice(0, 20).map((r) => ({ ...r, notes: r.notes.slice(0, 1500) }));
-    this.store.state.lastCheck = { at: new Date().toISOString(), newest: list.find((r) => !r.prerelease)?.version ?? null };
+    this.store.state.lastCheck = { at: new Date().toISOString(), newest: list.find((r) => this.takes(r))?.version ?? null };
     this.store.save();
     return list;
   }
@@ -292,7 +293,7 @@ export class UpdateService {
   }
   /** The newest release that would be offered (from the last check): no files read. */
   newer() {
-    return (this.cache ?? []).find((r) => !r.prerelease && r.installable && !r.tampered && compareVersions(r.version, this.running) > 0) ?? null;
+    return (this.cache ?? []).find((r) => this.takes(r) && r.installable && !r.tampered && compareVersions(r.version, this.running) > 0) ?? null;
   }
   status() {
     const s = this.store.state;
@@ -311,6 +312,10 @@ export class UpdateService {
       auto: s.auto,
       lastCheck: s.lastCheck,
       checkEveryMinutes: s.auto?.everyMinutes ?? 15,
+      stage: this.stage,
+      window: this.window,
+      inWindow: this.inWindow(),
+      serverTime: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
       heldUpTo: s.heldUpTo ?? null,
       trusted: Object.entries(s.trusted ?? {}).map(([version, t]) => ({ version, sha256: t.archive, sums: t.sums, firstSeen: t.firstSeen, tampered: Boolean(t.tampered) })).sort((a, b) => compareVersions(b.version, a.version)),
       events: (s.events ?? []).slice(0, 30),
@@ -396,8 +401,43 @@ export class UpdateService {
     return { switching: true, to: s.current.version };
   }
 
-  setAuto({ everyMinutes }, { by = '' } = {}) {
+  /**
+   * What this installation is marked as, and when it may update by itself:
+   *   stage   '' (not marked: as before), 'staging' or 'production'. A staging one also takes candidate releases
+   *           (GitHub pre-releases), to try them before they are promoted; a production one only promoted releases.
+   *   window  null (any time), or { from: 'HH:MM', to: 'HH:MM' } in the server's own time: an update found outside it
+   *           waits for it (installing by hand is never held back).
+   */
+  get stage() {
+    const s = this.store.state.auto?.stage;
+    return s === 'staging' || s === 'production' ? s : '';
+  }
+  get window() {
+    const w = this.store.state.auto?.window;
+    return w && HHMM.test(w.from) && HHMM.test(w.to) && w.from !== w.to ? { from: w.from, to: w.to } : null;
+  }
+  /** Is `now` inside the hours updates may install by themselves? (A window may run over midnight.) */
+  inWindow(now = new Date()) {
+    const w = this.window;
+    if (!w) return true;
+    const at = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    return w.from < w.to ? at >= w.from && at < w.to : at >= w.from || at < w.to;
+  }
+  /** A release this installation takes: a promoted one, or (when marked staging) a candidate as well. */
+  takes(r) {
+    return Boolean(r) && (!r.prerelease || this.stage === 'staging');
+  }
+  setAuto({ everyMinutes, stage, window }, { by = '' } = {}) {
     const auto = { ...this.store.state.auto, enabled: true };
+    if (stage !== undefined) {
+      if (!['', 'staging', 'production'].includes(stage)) throw fail(400, 'Mark it Staging or Production, or leave it unmarked.');
+      auto.stage = stage;
+    }
+    if (window !== undefined) {
+      if (window === null || (!window.from && !window.to)) auto.window = null;
+      else if (!HHMM.test(String(window.from)) || !HHMM.test(String(window.to)) || window.from === window.to) throw fail(400, 'Give the hours as HH:MM to HH:MM (two different times), or leave both empty for any time.');
+      else auto.window = { from: window.from, to: window.to };
+    }
     if (everyMinutes !== undefined) {
       const m = Number(everyMinutes);
       if (!(Number.isInteger(m) && m >= 5 && m <= 1440)) throw fail(400, 'Check every 5 to 1,440 minutes.');
@@ -442,8 +482,10 @@ export class UpdateService {
     }
     this.#verifyInstalled().catch(() => {});
     const { failed = [], heldUpTo = null } = this.store.state;
-    const newest = releases.find((r) => !r.prerelease && r.installable && !r.tampered && !r.pinError && !failed.includes(r.version));
+    const newest = releases.find((r) => this.takes(r) && r.installable && !r.tampered && !r.pinError && !failed.includes(r.version));
     if (!newest || compareVersions(newest.version, this.running) <= 0) return null;
+    // Outside the hours it may update by itself: found, and left for those hours.
+    if (!this.inWindow(now)) return { waiting: newest.version, window: this.window };
     // Rolled back by hand: not back to that version, only to a newer one.
     if (heldUpTo && compareVersions(newest.version, heldUpTo) <= 0) return { held: newest.version };
     if (!this.supervised) return { available: newest.version };

@@ -2,6 +2,17 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.101.00 — 2026-11-13
+
+- **Mark an installation Staging or Production** (Settings → Updates). Not marked, it behaves as before.
+  - **Staging**: where new versions are tried first. It takes every release as soon as it is found, candidates
+    included, and says "Staging" at the top of every page and of the calculator.
+  - **Production**: where people work. It takes only releases promoted after they ran on staging.
+  - **Hours to update in**: an installation can be told to update by itself only between two times (server time); an
+    update found outside them waits. Installing by hand is never held back.
+  - Releases can be published as candidates and promoted from GitHub when they have run well (Admin guide, "Staging
+    and production"). Until that is turned on, every release is a full release, as now.
+
 ## CC-01.100.00 — 2026-11-13
 
 - **A restore gives back the backup, not a mix.** Accounts and reports made after the backup stayed beside the

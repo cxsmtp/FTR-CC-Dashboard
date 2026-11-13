@@ -7,6 +7,11 @@ on:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      promote:
+        description: 'Promote a candidate to a full release (its tag, e.g. v1.101.0): production installations then take it'
+        required: false
+        default: ''
 permissions:
   contents: write
   # Signing: the release's file list gets a GitHub build attestation (Sigstore, public log); servers check it.
@@ -19,6 +24,14 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # Promotion only: a candidate that ran well on staging becomes a full release; nothing is built.
+      - name: Promote a candidate
+        if: github.event_name == 'workflow_dispatch' && inputs.promote != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.promote }}
+        run: gh release edit "$TAG" --prerelease=false --latest
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -52,4 +65,5 @@ jobs:
           TAG: ${{ steps.v.outputs.tag }}
         run: |
           node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const v='CC-'+process.argv[1].slice(1).split('.').map(n=>n.padStart(2,'0')).join('.');const m=s.split(/\n(?=## )/).find(x=>x.startsWith('## '+v));require('fs').writeFileSync('notes.md',m||'See CHANGELOG.md')" "$TAG"
-          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "CC $TAG" --notes-file notes.md
+          PRE=""; if [ "$(node -p "require('./package.json').releaseChannel || ''")" = "candidate" ]; then PRE="--prerelease"; fi
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "CC $TAG" --notes-file notes.md $PRE

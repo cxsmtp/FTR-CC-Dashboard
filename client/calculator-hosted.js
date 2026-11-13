@@ -308,6 +308,7 @@ export async function startHosted() {
     $('cc-name').textContent = name;
     $('cc-role').textContent = `${cfg.roleName ?? ''}${cfg.teamName ? ` · ${cfg.teamName}` : ''}`;
     $('cc-ver').textContent = cfg.versionLabel ?? '';
+    if ($('cc-stage')) $('cc-stage').hidden = cfg.stage !== 'staging';
     // The DEFCON strip of the Command Center theme (shown only in it).
     $('cc-ops').innerHTML = `<span class="ops-dot"></span><b>DEFCON 5</b><span>All systems nominal</span><span class="ops-sep">\u2502</span><span>${location.protocol === 'https:' ? 'Secure link \u00b7 TLS' : 'Link open'}</span><span class="ops-sep">\u2502</span><span>Operator: ${esc(name)} \u00b7 ${esc(cfg.roleName ?? '')}</span><span class="ops-grow"></span><span id="cc-ops-clock"></span><span class="ops-sep">\u2502</span><span>${esc(cfg.versionLabel ?? '')}</span>`;
     const clock = () => {

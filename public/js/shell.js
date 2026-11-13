@@ -42,6 +42,7 @@ export function shell(active, content) {
       <header class="topbar">
         <button class="jump" id="jump" title="Jump to a page, an account or a person">${icon('search')}<span>Jump to…</span><kbd>Ctrl K</kbd></button>
         <span class="tb-grow"></span>
+        ${me.stage === 'staging' ? '<span class="tb-stage" title="This installation is marked Staging (Settings → Updates): new versions are tried here first">Staging</span>' : ''}
         <span class="tb-lights" id="tb-lights"></span>
         <button class="tb-icon" id="tb-mode" title="Light or dark" aria-label="Light or dark">${icon('theme')}</button>
         <div class="tb-me"><button class="tb-who" id="tb-who" aria-haspopup="true" aria-expanded="false">${avatar(me.user.name, me.picture)}<span><b>${esc(me.user.name)}</b><small>${esc(me.role.name)}${me.team ? ` · ${esc(me.team.name)}` : ''}</small></span></button>
