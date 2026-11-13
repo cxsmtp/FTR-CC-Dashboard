@@ -146,26 +146,6 @@ export function analyse(totalRows, fixedRows, lookbackMonths = DEFAULT_TR.lookba
   };
 }
 
-/** The plan's credits per severity and in total. `plan` = { selected, triageCost, fpPercent, remediationCost } by severity. */
-export function trCost(analysis, plan) {
-  const rows = {};
-  const totals = { backlog: 0, selected: 0, truePositives: 0, triageCredits: 0, remediationCredits: 0, credits: 0, backlogAfter: 0 };
-  for (const s of SEVERITIES) {
-    const backlog = analysis?.perSeverity[s].current ?? 0;
-    const selected = clamp(wholeNumber(plan.selected?.[s]) ?? 0, 0, backlog);
-    const triageCost = amount(plan.triageCost?.[s]) ?? DEFAULT_TR.triageCost[s];
-    const fp = clamp(amount(plan.fpPercent?.[s]) ?? DEFAULT_TR.fpPercent[s], 0, 100);
-    const remediationCost = amount(plan.remediationCost?.[s]) ?? DEFAULT_TR.remediationCost[s];
-    const truePositives = selected * (1 - fp / 100);
-    const triageCredits = selected * triageCost;
-    const remediationCredits = truePositives * remediationCost;
-    const row = { backlog, selected, triageCost, fp, remediationCost, truePositives, triageCredits, remediationCredits, credits: triageCredits + remediationCredits, backlogAfter: backlog - selected };
-    rows[s] = row;
-    for (const key of Object.keys(totals)) totals[key] += row[key];
-  }
-  return { rows, totals };
-}
-
 /** Findings to triage per severity: the plan's number, or every open one when it is not set (null). */
 export function resolveSelected(analysis, selected = {}) {
   return Object.fromEntries(SEVERITIES.map((s) => {
@@ -307,23 +287,6 @@ const addMonths = (month, n) => {
   const d = new Date(Date.UTC(y, m - 1 + n, 1));
   return d.toISOString().slice(0, 7);
 };
-
-/** Backlog history and 6 months ahead: as it goes (no action), and with the plan's findings fixed now. */
-export function backlogForecast(analysis, fixedNow, months = 6) {
-  if (!analysis?.history.length) return [];
-  const points = analysis.history.map((h) => ({ month: h.month, actual: h.open, forecast: null, withPlan: null }));
-  const last = points[points.length - 1];
-  let f = last.actual;
-  let w = Math.max(0, last.actual - fixedNow);
-  last.forecast = f;
-  last.withPlan = w;
-  for (let i = 1; i <= months; i += 1) {
-    f = Math.max(0, f + analysis.monthlyChange);
-    w = Math.max(0, w + analysis.monthlyChange);
-    points.push({ month: addMonths(analysis.history[analysis.history.length - 1].month, i), actual: null, forecast: f, withPlan: w });
-  }
-  return points;
-}
 
 /** Per severity: history, then 3 months with the plan's findings fixed evenly over them. */
 export function severityForecast(analysis, cost, months = 3) {

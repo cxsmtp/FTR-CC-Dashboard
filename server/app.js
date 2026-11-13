@@ -26,7 +26,6 @@ import { CallMemory, explainCall } from './resilience.js';
 import { DEFAULT_SUPPORT_EMAIL, KINDS as SUPPORT_KINDS, STATUSES as SUPPORT_STATUSES, SupportDesk, supportEmail } from './support.js';
 import { FusionRates, engineKey, rateModels, withRates } from './fusion-rates.js';
 import { DEFAULT_TR } from '../core/public/calculator/model.js';
-import { leverData } from '../core/public/calculator/levers.js';
 import { IntegrityService } from './integrity/service.js';
 import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
 import { describeBackup, isUpdateBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
@@ -36,6 +35,7 @@ import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTranspo
 import { HSTS_AGES, HttpsManager } from '../core/src/https-manager.js';
 import { AcmeService, CHALLENGE_PREFIX, RENEW_DAYS, cleanNames, validName } from '../core/src/acme.js';
 import { CALC_FONTS, CalculatorService, DEFAULT_CXONE_HOSTS, DEFAULT_GIT_HOSTS, calculatorPage, impactSettings, summary } from './calculator.js';
+import { leverData } from '../core/public/calculator/levers.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 /** The version as people see it, the calculator’s way: CC-01.01.00. */
@@ -1779,7 +1779,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, 'account.start', a.name, { id: a.id, team: teams.get(ctx.team)?.name, salesforce: salesforce.recordId });
     return { customer: withTrRates(withRates(a, ratesFor(ctx.user.id))) };
   });
-  r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../core/src/standalone-calculator.js')).reportRuntime());
+  r('GET', '/api/projections/report-runtime', calcTeam, async () => (await import('../core/src/calculator-bundle.js')).reportRuntime());
   r('GET', '/api/projections/reports', calcTeam, (req, ctx, body, res, url) => ({ reports: accounts.reportsOf(ctx.teamSet, String(url.searchParams.get('customer') ?? '')) }));
   r('POST', '/api/projections/reports', calcTeam, (req, ctx, body) => {
     {

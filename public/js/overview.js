@@ -177,32 +177,3 @@ export function paint() {
   });
 }
 
-export function monthsChart(months) {
-  const W = 560;
-  const H = 220;
-  const pad = { l: 30, r: 8, t: 12, b: 26 };
-  const max = Math.max(1, ...months.map((m) => Math.max(m.reports, m.shared)));
-  const bw = (W - pad.l - pad.r) / months.length;
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / max);
-  const ticks = [0, Math.ceil(max / 2), max];
-  const label = (k) => new Date(`${k}-01T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Reports generated and shared each month">
-    <defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#6366f1"/></linearGradient><linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
-    ${ticks.map((v) => `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" stroke-opacity=".12"/><text x="${pad.l - 6}" y="${y(v) + 4}" font-size="10" text-anchor="end" fill="currentColor" fill-opacity=".5">${v}</text>`).join('')}
-    ${months.map((m, i) => {
-      const x = pad.l + i * bw + bw * 0.16;
-      const w = bw * 0.32;
-      return `<rect x="${x}" y="${y(m.reports)}" width="${w}" height="${H - pad.b - y(m.reports)}" rx="3" fill="url(#gA)"><title>${m.month}: ${m.reports} generated</title></rect><rect x="${x + w + 2}" y="${y(m.shared)}" width="${w}" height="${H - pad.b - y(m.shared)}" rx="3" fill="url(#gB)"><title>${m.month}: ${m.shared} shared</title></rect><text x="${pad.l + i * bw + bw / 2}" y="${H - 8}" font-size="10" text-anchor="middle" fill="currentColor" fill-opacity=".55">${label(m.month)}</text>`;
-    }).join('')}
-  </svg>`;
-}
-
-export const sfChip = (a) => (a.salesforceUrl ? `<a class="chip sf" href="${esc(a.salesforceUrl)}" target="_blank" rel="noopener noreferrer" title="Open in Salesforce (new tab)">${icon('ext')}${a.salesforceKind === 'opportunity' ? 'Opportunity' : 'Account'}</a>` : '<span class="chip bad"><i></i>No SF link</span>');
-
-/** Credits sold for an account, and how far that goes against its projection. */
-export const soldCell = (a) => {
-  const total = Number(a.primary?.totalCredits) || 0;
-  if (!a.sold) return '<span class="muted">—</span>';
-  const p = total ? Math.min(100, Math.round((a.sold / total) * 100)) : 100;
-  return `<span class="credits">${num(Math.round(a.sold))}</span><span class="sub">${total ? `${p}%` : ''}${a.salesCount > 1 ? ` · ${num(a.salesCount)} sales` : ''}</span>`;
-};

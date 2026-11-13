@@ -65,12 +65,6 @@ export function engineScope(value) {
   return chosen.length && chosen.length < ENGINE_KEYS.length ? chosen : null;
 }
 
-/** Does this finding come from one of the chosen engines? (No choice keeps everything.) */
-export function inEngines(risk, engines) {
-  const scope = engineScope(engines);
-  return !scope || scope.includes(engineOf(risk?.scanner));
-}
-
 /** "SAST, SCA" for a choice, "all engines" for none. */
 export function describeEngines(engines) {
   const scope = engineScope(engines);

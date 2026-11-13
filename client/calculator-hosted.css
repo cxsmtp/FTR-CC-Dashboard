@@ -13,10 +13,6 @@
 .shell.standalone .sa-advanced { flex: 1 1 100%; font-size: 13px; }
 .shell.standalone .sa-advanced-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; margin-top: 8px; }
 .shell.standalone .sa-advanced .field { margin: 0; }
-.shell.standalone .sa-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 24px; color: var(--muted); font-size: 12px; }
-.shell.standalone .sa-foot a { color: inherit; }
-
-
 .hc-account { flex: 1 1 100%; display: grid; grid-template-columns: minmax(150px, 200px) minmax(220px, 300px) minmax(260px, 1fr) minmax(150px, 210px); gap: 10px 14px; align-items: end; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .hc-account .field { margin: 0; }
 .hc-sf-row { display: flex; gap: 8px; align-items: center; }
@@ -44,8 +40,9 @@
 .hc-delta small { display: block; color: var(--muted); font-size: 11.5px; }
 .hc-delta b { font-size: 20px; }
 .hc-pill.bad { color: #b91c1c; border-color: rgba(185, 28, 28, .35); }
-@media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; } }
-
+@media (max-width: 860px) {
+  .hc-account { grid-template-columns: 1fr; }
+}
 /* The status strip: always on top while working and generating. */
 .hc-status-wrap { position: sticky; top: 0; z-index: 20; margin: 10px 0 0; }
 .hc-status { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px -14px rgba(0, 0, 0, .35); font-size: 12.5px; }
@@ -62,7 +59,6 @@
 :root[data-theme="dark"] .hc-status .hc-st.ok { color: #34d399; }
 :root[data-theme="dark"] .hc-status .hc-st.warn { color: #fbbf24; }
 :root[data-theme="dark"] .hc-status .hc-st.bad { color: #f87171; }
-
 .hc-impact { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .hc-switch { display: inline-flex; gap: 10px; align-items: center; cursor: pointer; }
 .hc-switch input { width: 18px; height: 18px; }
@@ -73,7 +69,6 @@
 .hc-dialog h2 { margin: 0 0 8px; font-size: 18px; }
 .hc-dialog .field { display: grid; gap: 6px; margin: 10px 0; }
 .hc-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-
 /* Calculating: the working pill under the status strip, the report overlay, totals that count up. */
 .hc-work { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; color: #fff; background: linear-gradient(120deg, #0891b2, #4f46e5 55%, #7c3aed); background-size: 200% 100%; animation: hcflow 2.4s linear infinite; box-shadow: 0 8px 24px -12px rgba(79, 70, 229, .7); }
 .hc-work[hidden] { display: none; }
@@ -104,8 +99,9 @@
 .hc-note { margin: 0; font-weight: 600; font-size: 15px; }
 .hc-pop { animation: hcpop .5s ease; }
 @keyframes hcpop { 50% { transform: scale(1.06); text-shadow: 0 0 18px rgba(99, 102, 241, .5); } }
-@media (prefers-reduced-motion: reduce) { .hc-work, .hc-orbit i, .hc-pop { animation: none !important; } }
-
+@media (prefers-reduced-motion: reduce) {
+  .hc-work, .hc-orbit i, .hc-pop { animation: none !important; }
+}
 .hc-overlay.hc-corner { inset: auto 20px 20px auto; display: block; background: none; backdrop-filter: none; pointer-events: none; }
 .hc-overlay.hc-corner .hc-card { pointer-events: auto; min-width: 0; width: min(340px, 86vw); padding: 18px 20px; gap: 8px; }
 .hc-overlay.hc-corner .hc-orbit.big { width: 46px; height: 46px; }
@@ -114,7 +110,6 @@
 .hc-overlay.hc-corner h2 { font-size: 15px; }
 .hc-sub { margin: 0; font-size: 12px; color: var(--muted); }
 .hc-away { opacity: .85; font-size: 11.5px; }
-
 /* ==========================================================================
    One command center: the dashboard's menu, palette, background and buttons around the calculator.
    The calculator is the calculator’s (styles.css, nextgen.css); its colour tokens are set here from the dashboard's
@@ -206,7 +201,6 @@ html[data-cc] .cc-bg .orb { position: absolute; width: 520px; height: 520px; bor
 html[data-cc] .cc-bg .orb.a { background: var(--violet); top: -180px; right: -120px; }
 html[data-cc] .cc-bg .orb.b { background: var(--cyan); bottom: -220px; left: -160px; animation-delay: -9s; }
 @keyframes ccdrift { to { transform: translate(-80px, 60px) scale(1.12); } }
-
 /* Buttons, panels and tabs as on the dashboard. */
 html[data-cc][data-ui] button.primary, html[data-cc][data-ui] a.button.primary, html[data-cc][data-ui] .hc-btn.primary { border: 0; color: #fff; background: var(--grad); box-shadow: 0 8px 24px -10px color-mix(in srgb, var(--violet) 80%, transparent); }
 html[data-cc][data-ui] button.primary:hover:not(:disabled) { background: var(--grad); filter: brightness(1.06); box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--cyan) 70%, transparent); }
@@ -214,13 +208,12 @@ html[data-cc][data-ui] .panel, html[data-cc] .hc-account, html[data-cc] .sa-conn
 html[data-cc][data-ui] [data-ptabs] [data-pt].active { color: var(--text); box-shadow: inset 0 -2px 0 var(--cyan); }
 html[data-cc][data-ui] h1 { font-family: var(--ng-display); }
 html[data-cc] .shell.standalone .sa-top h1 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-html[data-cc] .hc-reports a, html[data-cc] .sa-foot a { color: var(--cyan); }
+html[data-cc] .hc-reports a { color: var(--cyan); }
 html[data-cc] .hc-work { background: linear-gradient(120deg, var(--cyan), var(--violet) 55%, var(--cyan)); background-size: 200% 100%; }
 html[data-cc] .hc-steps li.on::before { color: var(--violet); }
 html[data-cc] .hc-orbit.big { color: var(--violet); }
 html[data-cc] .hc-orbit.big i:nth-child(2) { border-top-color: var(--cyan); }
 html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(--line-hi); border-radius: 20px; box-shadow: var(--glow), 0 40px 80px -20px rgba(0, 0, 0, .5); }
-
 /* The menu: the dashboard's, the same on every page. */
 .cc-app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
 .cc-app > .shell.standalone { min-width: 0; }
@@ -281,19 +274,22 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
   .cc-nav .cc-label { display: none; }
   .cc-me { margin: 0; }
 }
-@media (prefers-reduced-motion: reduce) { html[data-cc] .cc-bg .orb { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-cc] .cc-bg .orb { animation: none; }
+}
 /* the calculator’s buttons draw their sheen with !important: primary buttons take the palette through the same variable. */
 html[data-cc][data-ui] button.primary, html[data-cc][data-ui] a.button.primary { --btn-sheen: var(--grad); --btn-hi: rgba(255, 255, 255, .18); --btn-lo: transparent; --btn-drop: 0 8px 24px -10px color-mix(in srgb, var(--violet) 80%, transparent); border-color: transparent; }
 html[data-cc][data-ui] .cc-seg button:not(.primary) { --btn-sheen: none; --btn-drop: 0 0 transparent; --btn-hi: transparent; --btn-lo: transparent; }
 html[data-cc][data-ui] .cc-swatches button.cc-swatch { display: flex; width: 100%; height: auto; min-height: 0; padding: 10px; flex-direction: column; align-items: flex-start; justify-content: flex-start; white-space: normal; text-align: left; border-radius: 14px; }
 html[data-cc][data-ui] .cc-swatches button.cc-swatch b { font-size: 13.5px; }
-
 /* The account is named in the account bar (as in Salesforce): the calculator’s Customer ▾ picker is not shown. */
 html[data-cc] .calc-cust-pick, html[data-cc] #calc-rename-field { display: none !important; }
 .hc-name > span:first-child small { color: var(--muted); font-weight: 400; }
 .hc-name input { flex: 1; min-width: 0; }
 .hc-account.missing-name .hc-name input { border-color: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 15%, transparent); }
-@media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; } }
+@media (max-width: 860px) {
+  .hc-account { grid-template-columns: 1fr; }
+}
 /* The account bar: the customer's name and its Salesforce link first, then the team and the accountable SE. */
 .hc-account { grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "name sf sf sf" "team owner . ."; }
 .hc-account .hc-name { grid-area: name; }
@@ -303,8 +299,12 @@ html[data-cc] .calc-cust-pick, html[data-cc] #calc-rename-field { display: none 
 .hc-name > span:first-child, .hc-name label { font: inherit; }
 html[data-cc] .shell.standalone .sa-top .title-row h1 { white-space: nowrap; }
 html[data-cc] .shell.standalone .sa-top .topbar-title { flex: 1 1 100%; }
-@media (max-width: 860px) { .hc-account { grid-template-columns: 1fr; grid-template-areas: "name" "sf" "team" "owner"; } }
-html[data-cc] .shell.standalone .sa-top .title-row { flex: none; } html[data-cc] .shell.standalone .sa-top .topbar-title { flex-wrap: wrap; gap: 4px 20px; align-items: baseline; } html[data-cc] .shell.standalone .sa-sub { flex: 1 1 380px; }
+@media (max-width: 860px) {
+  .hc-account { grid-template-columns: 1fr; grid-template-areas: "name" "sf" "team" "owner"; }
+}
+html[data-cc] .shell.standalone .sa-top .title-row { flex: none; }
+html[data-cc] .shell.standalone .sa-top .topbar-title { flex-wrap: wrap; gap: 4px 20px; align-items: baseline; }
+html[data-cc] .shell.standalone .sa-sub { flex: 1 1 380px; }
 /* The menu exactly as on the dashboard: same type, same line height, so nothing moves between pages. */
 html[data-cc] .cc-side { font: 14px/1.5 var(--font); letter-spacing: normal; }
 html[data-cc] .cc-side b { font-weight: 600; }
@@ -318,7 +318,6 @@ html[data-cc] .cc-me .cc-row button { font-size: 12.5px; padding: 5px 10px; min-
 #calc-heart .hc-heart-toggle { margin-left: auto; }
 #calc-heart.hc-collapsed > :not(.calc-heart-head):not(.calc-source) { display: none !important; }
 #calc-heart.hc-collapsed .calc-heart-head { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
-
 /* ---- Command Center: the war room, as on the dashboard (public/app.css) ---------------------------------------- */
 .cc-sw.command { background: radial-gradient(circle at 30% 50%, #39ff88 0 6%, transparent 7%), repeating-linear-gradient(90deg, rgba(57, 255, 136, .25) 0 1px, transparent 1px 8px), linear-gradient(120deg, #021208, #04301a 55%, #3a2a00); }
 html[data-cc][data-ui][data-accent="command"], html[data-cc][data-ui][data-theme="dark"][data-accent="command"] {
@@ -392,8 +391,9 @@ html[data-cc][data-accent="command"] .ops-strip .ops-grow { flex: 1; }
 html[data-cc][data-accent="command"] #cc-ops-clock { color: var(--amber); }
 .ops-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); animation: ccblink 1.6s steps(2, start) infinite; }
 @keyframes ccblink { to { visibility: hidden; } }
-@media (prefers-reduced-motion: reduce) { html[data-cc][data-accent="command"] .cc-bg::before, .ops-dot { animation: none; } }
-
+@media (prefers-reduced-motion: reduce) {
+  html[data-cc][data-accent="command"] .cc-bg::before, .ops-dot { animation: none; }
+}
 /* ---- The top bar, as on the dashboard; the menu's foot with the version and links ------------------------------- */
 .cc-topbar { position: sticky; top: 0; z-index: 25; display: flex; align-items: center; gap: 8px; padding: 10px clamp(14px, 2.6vw, 36px); border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(14px); }
 html[data-cc][data-ui] .cc-topbar button { --btn-sheen: none; --btn-drop: 0 0 transparent; --btn-hi: transparent; --btn-lo: transparent; }
@@ -433,8 +433,11 @@ html[data-cc][data-ui] .cc-topbar button { --btn-sheen: none; --btn-drop: 0 0 tr
 html[data-cc] .hc-status-wrap { top: 58px; }
 html[data-cc][data-accent="command"] .cc-topbar { top: 30px; }
 html[data-cc][data-accent="command"] .hc-status-wrap { top: 88px; }
-@media (max-width: 1100px) { .cc-lights { display: none; } .cc-jump { min-width: 0; } .cc-jump span, .cc-jump kbd { display: none; } }
-
+@media (max-width: 1100px) {
+  .cc-lights { display: none; }
+  .cc-jump { min-width: 0; }
+  .cc-jump span, .cc-jump kbd { display: none; }
+}
 /* ---- Branding: a logo of the organisation's, Theme not offered when looks are chosen for everyone, the menu on top -- */
 .cc-logo.img { background: none; box-shadow: none; overflow: hidden; }
 .cc-logo img { width: 100%; height: 100%; object-fit: contain; }
@@ -449,7 +452,6 @@ html[data-cc][data-menu="top"] .cc-guide-nav { margin: 0 0 0 auto; }
 html[data-cc][data-menu="top"] .cc-ver, html[data-cc][data-menu="top"] .cc-work { margin: 0; }
 html[data-cc][data-menu="top"] .cc-topbar { top: 57px; }
 html[data-cc][data-menu="top"] .hc-status-wrap { top: 115px; }
-
 /* ---- One compact panel: customer on one row, the data source on the next, the rest in a thin line -------------- */
 .shell.standalone .sa-top { padding: 10px 0 6px; gap: 6px 24px; align-items: baseline; }
 .shell.standalone .sa-sub { font-size: 12.5px; }
@@ -486,16 +488,18 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 /* The customer, first in the status strip */
 .hc-status .hc-st.cust { color: var(--text); border-color: var(--line-hi); background: var(--cc-panel-hi); }
 .hc-status .hc-st.cust i { background: var(--cyan); }
-@media (max-width: 1100px) { .hc-row1 { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 700px) { .hc-row1 { grid-template-columns: 1fr; } }
-
+@media (max-width: 1100px) {
+  .hc-row1 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 700px) {
+  .hc-row1 { grid-template-columns: 1fr; }
+}
 /* The Salesforce link, read as pasted; and what waits for it */
 .hc-sf-hint { display: block; margin-top: 4px; font-size: 12px; }
 .hc-sf-hint.ok { color: var(--green); }
 .hc-sf-hint.bad { color: var(--red); }
 .hc-sf-gate { flex: 1 1 100%; margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13px; color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); background: color-mix(in srgb, var(--amber) 8%, transparent); }
 .hc-account.no-sf .hc-sf input { border-color: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 15%, transparent); }
-
 /* Git: the token alone; the platform read from it */
 .hc-git #hc-git-token { flex: 1 1 320px; min-width: 0; }
 .hc-git-kind { font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -505,15 +509,10 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 .hc-git-list { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; }
 .hc-git-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
 .hc-git-chip button { padding: 0 2px; }
-
 /* Impact · Fusion: opt-in, its assumptions folded away */
 .calc-imp-fusion-on { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; font-weight: 600; }
 .calc-imp-fusion-on .hint { font-weight: 400; }
 .calc-imp-fusion-box > summary { cursor: pointer; font-size: 13px; color: var(--muted, inherit); margin-bottom: 6px; }
-.calc-impact-h4 { margin: 14px 0 6px; font-size: 13px; }
-.calc-breach-dialog { max-width: 620px; }
-.calc-breach-dialog .calc-terms { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
-
 /* Report ready: shared with the customer, right as it is made */
 .hc-share { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); text-align: left; }
 .hc-share-q { margin: 0; font-weight: 700; font-size: 15px; }
@@ -522,7 +521,6 @@ html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !imp
 .hc-share-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .hc-share-hint { margin: 0; font-size: 12px; color: var(--muted); }
 .hc-shared-cell { white-space: nowrap; }
-
 /* The customer's version: a raised, 3D button, in the panel and on the folded bar */
 .hc-3d { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px !important; border-radius: 10px !important; font-weight: 700; font-size: 13px; letter-spacing: .01em; cursor: pointer; white-space: nowrap;
   color: #fff !important; border: 0 !important; background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 82%, #fff) 0%, var(--cyan) 45%, color-mix(in srgb, var(--cyan) 70%, #000) 100%) !important;
@@ -541,14 +539,11 @@ html[data-cc][data-ui] button.hc-3d {
   --btn-drop: 0 4px 0 color-mix(in srgb, var(--cyan) 55%, #000); --btn-glow: 0 8px 16px -6px color-mix(in srgb, var(--cyan) 70%, transparent);
   background-color: var(--cyan) !important; color: #fff !important; height: auto; min-height: 0;
 }
-
 /* Customer Success: the SE to choose before anything is generated */
 .hc-owner.need-se select { border-color: var(--amber) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent) !important; }
 .hc-owner.need-se > span::after { content: " · choose one"; color: var(--amber); font-weight: 700; }
-
 .hc-share-in { display: inline-flex; gap: 4px; align-items: center; }
 .hc-share-in input { width: 170px; padding: 4px 8px; font-size: 12.5px; }
-
 /* ---- In a meeting with the customer ------------------------------------------------------------------------- */
 .hc-meet-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px !important; border-radius: 999px !important; border: 0 !important; font-weight: 800; letter-spacing: .01em; color: #fff !important; cursor: pointer; white-space: nowrap;
   background: linear-gradient(120deg, #e11d48, #f97316) !important; box-shadow: 0 6px 18px -6px rgba(225, 29, 72, .6), 0 1px 0 rgba(255, 255, 255, .35) inset !important; }
@@ -558,14 +553,11 @@ html[data-cc][data-ui] button.hc-3d {
 .hc-meet-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 0 rgba(255, 255, 255, .7); animation: hcmeet 1.6s infinite; }
 @keyframes hcmeet { 70% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); } }
 html[data-cc][data-ui] button.hc-meet-btn { --btn-sheen: linear-gradient(120deg, #e11d48, #f97316); --btn-hi: rgba(255, 255, 255, .35); --btn-lo: transparent; --btn-drop: 0 6px 18px -6px rgba(225, 29, 72, .6); --btn-glow: 0 0 0 transparent; height: auto; min-height: 0; }
-@media (prefers-reduced-motion: reduce) { .hc-meet-dot { animation: none; } }
-
+@media (prefers-reduced-motion: reduce) {
+  .hc-meet-dot { animation: none; }
+}
 /* What the customer sees: none of our frame, keys, links, people or other customers; the calculator, centred. */
-html[data-meeting] .cc-side, html[data-meeting] .cc-topbar, html[data-meeting] .ops-strip, html[data-meeting] .hc-status-wrap,
-html[data-meeting] .sa-top, html[data-meeting] .hc-account, html[data-meeting] .sa-foot, html[data-meeting] #cc-ops,
-html[data-meeting] [data-ptabs="calculator"] [data-pt="fusion-git"], html[data-meeting] [data-ptabs="calculator"] [data-pt="fusion-cloc"],
-html[data-meeting] [data-ptabs="calculator"] [data-pt="reports"], html[data-meeting] #calc-sample, html[data-meeting] .hc-share,
-html[data-meeting] #calc-rename, html[data-meeting] #calc-delete, html[data-meeting] #calc-restart { display: none !important; }
+html[data-meeting] .cc-side, html[data-meeting] .cc-topbar, html[data-meeting] .ops-strip, html[data-meeting] .hc-status-wrap, html[data-meeting] .sa-top, html[data-meeting] .hc-account, html[data-meeting] #cc-ops, html[data-meeting] [data-ptabs="calculator"] [data-pt="fusion-git"], html[data-meeting] [data-ptabs="calculator"] [data-pt="fusion-cloc"], html[data-meeting] [data-ptabs="calculator"] [data-pt="reports"], html[data-meeting] #calc-sample, html[data-meeting] .hc-share, html[data-meeting] #calc-rename, html[data-meeting] #calc-delete, html[data-meeting] #calc-restart { display: none !important; }
 html[data-meeting] .cc-app { padding: 0 !important; display: block !important; }
 html[data-meeting] .shell.standalone.hosted { margin: 0 auto !important; max-width: 1280px; padding: 0 24px 40px !important; }
 html[data-meeting] body { padding-top: 0 !important; }
@@ -579,9 +571,12 @@ html[data-meeting] body { padding-top: 0 !important; }
 .hc-mh-title span { color: var(--muted); font-size: 13px; }
 .hc-mh-leave { justify-self: end; opacity: .55; }
 .hc-mh-leave:hover { opacity: 1; }
-@media (max-width: 760px) { .hc-meet-head { grid-template-columns: 1fr; text-align: center; } .hc-mh-brand { justify-content: center; } .hc-mh-leave { justify-self: center; } }
+@media (max-width: 760px) {
+  .hc-meet-head { grid-template-columns: 1fr; text-align: center; }
+  .hc-mh-brand { justify-content: center; }
+  .hc-mh-leave { justify-self: center; }
+}
 html[data-meeting] #calc-saved { display: none !important; }
-
 /* ---- The account panel, aligned: one baseline per row, one control height, the actions together on the right ----
    Sizes follow the screen: a control is 34px on a laptop and up to 42px on a large monitor; text the same way. */
 html[data-cc] { --hc-h: clamp(34px, 2.3vw, 42px); --hc-fs: clamp(12.5px, .82vw, 14.5px); --hc-gap: clamp(8px, .8vw, 14px); }
@@ -639,7 +634,6 @@ html[data-cc] { --hc-h: clamp(34px, 2.3vw, 42px); --hc-fs: clamp(12.5px, .82vw, 
 .hc-fold-sum #hc-fold-meet { order: 10; margin-left: auto !important; flex: none; }
 .hc-fold-sum #hc-fold-cv { order: 11; margin-left: 0 !important; flex: none; }
 .hc-fold-sum #hc-unfold { order: 12; margin-left: 0 !important; flex: none; }
-
 /* ---- Projection settings, sleek: one control height and shape, light borders, a calm hierarchy ---------------- */
 html[data-cc] #calc-heart { padding: clamp(10px, .9vw, 16px) clamp(12px, 1.1vw, 18px) !important; border-radius: 14px !important; border: 1px solid var(--line, var(--border)) !important; box-shadow: none !important; background: color-mix(in srgb, var(--cc-panel, var(--surface)) 70%, transparent) !important; }
 html[data-cc] .calc-heart-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px !important; }
@@ -683,7 +677,6 @@ html[data-no-account] .hc-start { display: block; }
 html[data-no-account] .hc-status-wrap, html[data-no-account] .hc-src, html[data-no-account] .hc-meta, html[data-no-account] .hc-row1 .hc-owner, html[data-no-account] #hc-sf-open, html[data-no-account] #hc-reports, html[data-no-account] .hc-fold-sum { display: none !important; }
 html[data-no-account] .hc-row1 { grid-template-columns: minmax(220px, 360px) minmax(320px, 1fr) minmax(160px, 240px) !important; justify-content: start; }
 html[data-no-account] .hc-account { max-width: 1200px; }
-
 /* A previous report: beside the customer's version, the same height, quieter */
 .hc-meta #hc-prev-l { order: 6; height: var(--hc-h) !important; display: inline-flex !important; align-items: center; padding: 0 clamp(12px, 1vw, 18px) !important; border-radius: 10px; border: 1px solid var(--line-hi, var(--border)); background: var(--cc-panel, var(--surface)); font-weight: 600; font-size: var(--hc-fs); cursor: pointer; white-space: nowrap; }
 .hc-meta #hc-prev-l[hidden] { display: none !important; }
@@ -691,7 +684,6 @@ html[data-no-account] .hc-account { max-width: 1200px; }
 .hc-prev-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 8px 0 14px; }
 .hc-prev-facts dt { color: var(--muted); }
 .hc-prev-facts dd { margin: 0; }
-
 /* Tejas: the default logo, pointed at, shows itself larger with its line */
 .logo.tejas, .cc-logo.tejas { position: relative; overflow: visible !important; cursor: default; }
 .tejas-card { position: absolute; left: 0; top: calc(100% + 10px); z-index: 300; width: 300px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--line-hi, var(--border)); background: var(--panel-solid, var(--surface, #fff)); box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .45); color: var(--text); font-size: 13px; font-weight: 500; line-height: 1.45; letter-spacing: 0; text-transform: none; text-align: center; white-space: normal; opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity .18s, transform .18s, visibility .18s; pointer-events: none; }
@@ -708,7 +700,6 @@ html[data-no-account] .hc-account { max-width: 1200px; }
 .hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-refresh,
 .hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-forget { display: none !important; }
 .hc-account:is([data-src="git"], [data-src="cloc"]) .hc-meta #hc-meet { margin-left: auto; }
-
 /* In a meeting: the source picker sits under the title; Git and cloc-fusion show their Fusion tab when chosen. */
 .hc-meet-src { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: -8px 0 18px; padding: 12px 18px; border-radius: 16px; background: var(--cc-panel, var(--surface)); border: 1px solid var(--line-hi, var(--border)); }
 .hc-meet-src .hc-src { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; width: 100%; min-width: 0; }
@@ -716,16 +707,13 @@ html[data-no-account] .hc-account { max-width: 1200px; }
 html[data-meeting][data-src="git"] [data-ptabs="calculator"] [data-pt="fusion-git"],
 html[data-meeting][data-src="cloc"] [data-ptabs="calculator"] [data-pt="fusion-git"] { display: revert !important; }
 html[data-meeting] .hc-meet-src .hc-remember { display: none !important; }
-
 /* False positives: one small box for every severity, beside the per-severity results (not a field in each). */
 .calc-fp-one { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 10px; font-size: 12.5px; color: var(--muted); }
 .calc-fp-one input { width: 62px; height: 28px !important; min-height: 0 !important; padding: 0 6px !important; font-size: 12.5px !important; text-align: right; }
-
 .imp-bar { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 16px; font-size: 13px; color: #fff; background: linear-gradient(90deg, #b45309, #d97706); }
 .imp-bar span:nth-child(2) { flex: 1 1 260px; min-width: 0; }
 .imp-bar button { background: #fff !important; color: #92400e !important; border: 0 !important; font-weight: 700; }
 .imp-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; flex: none; }
-
 /* ---- One left edge: the projection lines up with the account panel above it; no box inside a box ---------------- */
 html[data-cc] .content > main { padding-left: 0 !important; padding-right: 0 !important; }
 html[data-cc] .calc-head > #calc-heart { border: 0 !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; }
@@ -739,19 +727,15 @@ html[data-cc] .calc-head > #calc-heart { border: 0 !important; padding: 0 !impor
 /* The tabs wrap onto a second line on a narrow screen; nothing runs off the side. */
 html[data-cc] [data-ptabs="calculator"] { display: flex; flex-wrap: wrap; gap: 2px 4px; overflow: visible; max-width: 100%; }
 html[data-cc] [data-ptabs="calculator"] [data-pt] { white-space: nowrap; }
-
 /* Lines of code show whole: six and seven digits fit (they were cut to their first five). */
 html[data-cc] input.calc-num[data-p="loc"], html[data-cc] input.calc-num[data-n="loc"] { width: 13ch !important; min-width: 13ch; text-align: end; font-variant-numeric: tabular-nums; }
-
 /* Rates are the Admin's (Settings → Engines & rates): the calculator shows no pricing table of its own. */
 html[data-cc] #calc-fusion-pricing { display: none !important; }
 /* Counted code on top of Checkmarx One. */
 .calc-fh-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-
 /* A new customer, Fusion only: no triage & remediation on the page (its tab, its half of the summary, Impact). */
 html[data-fusion-only] [data-ptabs="calculator"] [data-pt="tr"], html[data-fusion-only] [data-ptabs="calculator"] [data-pt="fusion"],
 html[data-fusion-only] [data-ptabs="calculator"] [data-pt="impact"], html[data-fusion-only] #calc-mix-tr { display: none !important; }
-
 /* ---- By how often projects are scanned: one small card per group, all in a row --------------------------------------
    Fusion (scans per project) and triage & remediation (% of findings counted) use the same card: the group's short
    name, the number to set, and how many projects are in it. */
@@ -775,7 +759,6 @@ html[data-cc] table.calc-rules td select { width: 100% !important; min-width: 0;
 .calc-shares { margin: 0 0 12px; display: grid; gap: 8px; }
 .calc-shares-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 .calc-shares-head .hint { flex: 1 1 260px; }
-
 /* ---- The plan by project: tick what triage & remediation counts ---------------------------------------------------- */
 .calc-plan-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; }
 .calc-plan-bar .hint { flex: 1 1 280px; }
@@ -791,7 +774,6 @@ tr.calc-plan-out td:not(.calc-plan-c) { opacity: .5; }
 .calc-plan-part small { color: var(--muted); font-size: 11px; font-weight: 400; }
 /* Code repositories: the customer's cloc-fusion report, or their git token. */
 .hc-pane .hc-cf-up { flex: none; height: var(--hc-h, 34px); box-sizing: border-box; display: inline-flex; align-items: center; white-space: nowrap; }
-.hc-pane .hc-or { flex: none; color: var(--muted); font-size: calc(var(--hc-fs, 13px) - 1px); }
 .hc-account.no-sf .hc-cf-up { opacity: .5; pointer-events: none; }
 .hc-pane .hc-git #hc-git-token { flex: 1 1 180px; }
 /* Projection settings, compact: the projects, their search options, what is applied and Apply on one line. */
@@ -805,7 +787,9 @@ html[data-cc] #calc-heart > .calc-pending.idle ul { display: none; }
 html[data-cc] #calc-heart > .calc-pending.idle ~ .calc-apply-hint { display: none; }
 html[data-cc] #calc-heart > .calc-source:not(:has(> :not(.calc-source-state):is(button, label, span, details):not([hidden]))) { display: none; }
 html[data-cc] #calc-heart .calc-heart-head { margin-bottom: 0 !important; }
-@media (max-width: 760px) { html[data-cc] #calc-heart > .calc-scope, html[data-cc] #calc-heart > .calc-pending.idle { grid-column: 1 / -1; } }
+@media (max-width: 760px) {
+  html[data-cc] #calc-heart > .calc-scope, html[data-cc] #calc-heart > .calc-pending.idle { grid-column: 1 / -1; }
+}
 html[data-cc] #calc-heart > .calc-source { padding-top: 0 !important; padding-bottom: 0 !important; border: 0 !important; margin: 0 !important; min-height: 0 !important; }
 /* The calculator's tabs are where the work is: a band across the page, every tab a button of its own, the one in view filled. */
 html[data-cc] [data-ptabs="calculator"] { display: flex !important; flex-wrap: wrap; gap: 8px !important; width: auto; max-width: none; padding: 8px !important; margin-top: 6px; border: 1.5px solid color-mix(in srgb, var(--brand, var(--cyan, #0e6b7c)) 45%, var(--line, var(--border))) !important; border-radius: 14px !important; background: color-mix(in srgb, var(--brand, var(--cyan, #0e6b7c)) 13%, var(--panel, var(--surface))) !important; box-shadow: 0 2px 8px rgba(0, 0, 0, .06); }
@@ -814,7 +798,10 @@ html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt]:hover { border-color:
 html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt].active, html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt][aria-selected="true"] { background: var(--brand, var(--cyan, #0e6b7c)) !important; border-color: var(--brand, var(--cyan, #0e6b7c)) !important; color: var(--on-brand, #fff) !important; box-shadow: 0 3px 10px color-mix(in srgb, var(--brand, var(--cyan, #0e6b7c)) 40%, transparent) !important; }
 html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt].active *, html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt][aria-selected="true"] * { color: inherit !important; }
 html[data-cc] [data-ptabs="calculator"] { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
-@media (min-width: 1000px) { html[data-cc] [data-ptabs="calculator"] { flex-wrap: nowrap; } html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt] { flex: 1 1 0; min-width: 0; padding-left: 8px !important; padding-right: 8px !important; } }
+@media (min-width: 1000px) {
+  html[data-cc] [data-ptabs="calculator"] { flex-wrap: nowrap; }
+  html[data-cc][data-ui] [data-ptabs="calculator"] [data-pt] { flex: 1 1 0; min-width: 0; padding-left: 8px !important; padding-right: 8px !important; }
+}
 /* A draft account, in the status strip. */
 .hc-st.draft { border-color: color-mix(in srgb, #b45309 45%, transparent) !important; color: #b45309 !important; background: color-mix(in srgb, #b45309 9%, transparent) !important; }
 .hc-st.draft i { background: #b45309 !important; }
@@ -827,8 +814,9 @@ html[data-opening] .hc-row1, html[data-opening] .hc-start { visibility: hidden; 
 .hc-opening { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--text); }
 .hc-opening-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--brand, #0e6b7c); animation: hc-opening 1s ease-in-out infinite alternate; }
 @keyframes hc-opening { from { opacity: .3; transform: scale(.8); } }
-@media (prefers-reduced-motion: reduce) { .hc-opening-dot { animation: none; } }
-
+@media (prefers-reduced-motion: reduce) {
+  .hc-opening-dot { animation: none; }
+}
 /* cloc-fusion report: upload and download on one line, with a word on how. */
 .hc-cloc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .hc-cloc .hc-cf-how { flex: 1 1 220px; min-width: 0; color: var(--muted); font-size: calc(var(--hc-fs, 13px) - 1px); }
@@ -845,7 +833,6 @@ html[data-cc] .hc-cloc .hc-cf-up:hover { background: color-mix(in srgb, var(--br
 html[data-cc] .hc-cloc .hc-cf-up:focus-within { outline: 2px solid var(--brand, #0b6b7f); outline-offset: 2px; }
 html[data-cc] .hc-cloc #hc-cf-dl { background: var(--surface, #fff) !important; color: var(--brand, var(--text)) !important; border: 1px solid var(--brand, var(--border)) !important; }
 html[data-cc] .hc-cloc #hc-cf-dl:hover { background: color-mix(in srgb, var(--brand, #0b6b7f) 8%, var(--surface, #fff)) !important; }
-
 /* Staging, said at the top (as on the dashboard). */
 .tb-stage { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; margin-right: 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--amber, #92400e); background: color-mix(in srgb, var(--amber, #d97706) 14%, transparent); border: 1px solid color-mix(in srgb, var(--amber, #d97706) 45%, transparent); }
 .tb-stage[hidden] { display: none; }

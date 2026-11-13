@@ -81,17 +81,6 @@ export function scopeLines(tr, L) {
 /** What the counted code is called: a new customer's, or (added on top) the repositories Checkmarx One does not have. */
 export const newLabel = (fusionNew, w) => (fusionNew?.onTop ? w('Fusion — repositories not in Checkmarx One') : w('Fusion — new customer'));
 
-/** The false positives the plan takes (triaged, never remediated): one % for every severity counted, or each its own. */
-export function falsePositiveLine(tr, L) {
-  const { w, num } = L;
-  const counted = SEVERITIES.filter((s) => (tr.rows?.[s]?.selected ?? 0) + (tr.rows?.[s]?.future ?? 0) > 0);
-  const fps = [...new Set(counted.map((s) => tr.rows[s].fp))];
-  if (!fps.length) return '';
-  return fps.length === 1
-    ? w('{0}% taken as false positives: triaged, not remediated.', num(fps[0]))
-    : w('Taken as false positives, triaged and not remediated: {0}.', counted.map((s) => `${w(s)} ${num(tr.rows[s].fp)}%`).join(', '));
-}
-
 /** The one line that says which projects were counted, when the customer narrowed them. */
 function scopeLine(source, L) {
   const { w } = L;
@@ -684,7 +673,6 @@ export function countedFusion(data) {
   const counts = (part) => (Number(part?.totals?.credits) > 0 ? part : null);
   return { ...data, fusion: counts(data.fusion), fusionNew: counts(data.fusionNew) };
 }
-
 
 /** The total of a report's data, as its answer says it. */
 const reportTotal = (data) => creditSummary(data.tr?.totals?.credits ?? null, fusionTotal(data.fusion, data.fusionNew), data.summary?.settings);

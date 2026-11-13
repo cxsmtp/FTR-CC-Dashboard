@@ -16,7 +16,7 @@ export async function reportFile(report, { accent = 'aurora', theme = 'light', o
   let script = null;
   if (data.levers) {
     try {
-      script = (await import('../core/src/standalone-calculator.js')).reportRuntime();
+      script = (await import('../core/src/calculator-bundle.js')).reportRuntime();
     } catch {
       script = null;
     }

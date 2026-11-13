@@ -1,0 +1,431 @@
+<!-- The calculator's page: its markup, as the hosted page carries it (server/calculator.js). -->
+<div id="page-calculator" class="page calc-page" hidden>
+  <div class="calc-toolbar">
+    <a class="button-like ghost sm" id="calc-download-standalone" href="/api/projections/standalone?kind=launcher" download="cx-credits-calculator.mjs" title="The calculator on its own, reading Checkmarx One with an API key: run it with Node.js (node cx-credits-calculator.mjs) and it opens in the browser. Customers and reports stay on that computer.">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11" /><path d="M7 10l5 5 5-5" /><path d="M5 20h14" /></svg>
+      <span>Download standalone calculator</span>
+    </a>
+    <a class="link calc-download-html" id="calc-download-html" href="/api/projections/standalone" download="cx-credits-calculator.html" title="The calculator on its own, as one HTML file: it runs in any browser with no server, works from the two Checkmarx One exports and makes the same reports">HTML only</a>
+  </div>
+  <section class="panel calc-head">
+    <div class="calc-customer">
+      <div class="calc-cust-pick">
+        <button type="button" class="calc-cust-btn" id="calc-cust-btn" aria-haspopup="true" aria-expanded="false" aria-controls="calc-cust-menu"><small>Customer</small> <b id="calc-cust-current" translate="no">None yet</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></button>
+        <div class="calc-cust-menu" id="calc-cust-menu" role="menu" aria-label="Customers" hidden>
+          <div class="calc-cust-list" id="calc-cust-list" role="group" aria-label="Saved customers"></div>
+          <button type="button" class="calc-cust-act" id="calc-new" role="menuitem">+ New customer</button>
+          <button type="button" class="calc-cust-act" id="calc-rename" role="menuitem">Rename…</button>
+          <button type="button" class="calc-cust-act danger" id="calc-delete" role="menuitem">Delete…</button>
+        </div>
+      </div>
+      <label class="calc-rename-field" id="calc-rename-field" hidden><span>Name</span><input type="text" id="calc-name" maxlength="120" autocomplete="off" translate="no" /></label>
+      <select id="calc-customer" translate="no" hidden aria-hidden="true" tabindex="-1"></select>
+      <span class="status" id="calc-saved" aria-live="polite"></span>
+    </div>
+    <div class="calc-heart" id="calc-heart">
+      <div class="calc-heart-head">
+        <span class="calc-heart-title">Projection settings</span>
+        <span class="calc-heart-sub">The heart of the projection. Change anything here, then <b>Apply</b> to work out every number below.</span>
+      </div>
+    <div class="calc-source">
+      <button type="button" class="secondary" id="calc-read">Read from Checkmarx One</button>
+      <label class="pill-check calc-branches" title="Unticked: each project's primary branch only (as set in Checkmarx One, else main, else master), so no finding is counted twice. Ticked: the scans of every branch, which is also what Fusion is charged for when feature branches are scanned with it."><input type="checkbox" id="calc-all-branches" /> Every branch</label>
+      <label class="calc-read-limit" title="How many of the tenant's projects a read takes: every one, up to 1,000,000, unless you set a smaller number. A very large tenant takes longer to read, and an account keeps up to 32 MB of data (roughly 100,000 projects): read fewer if it says it is too large.">Projects to read <input type="text" inputmode="numeric" class="calc-num" id="calc-max-projects" value="1,000,000" autocomplete="off" aria-describedby="calc-read-note" /></label>
+      <span class="calc-add-fusion" role="group" aria-labelledby="calc-add-fusion-label" data-i18n-ctx="add-fusion">
+        <b id="calc-add-fusion-label">Add Fusion:</b>
+        <label class="pill-check calc-fusion-pill" title="Ticked: Fusion for the customer's projects in Checkmarx One is projected: its credits, and the findings it adds to Triage &amp; remediation. Unticked: none of it is counted, Triage &amp; remediation's &quot;More found by Fusion&quot; is 0%, and the report leaves it out. Its settings are kept."><input type="checkbox" id="calc-fusion-on" checked /> Existing customer <small>· projects in Checkmarx One</small></label>
+        <label class="pill-check calc-fusion-pill" title="Ticked: Fusion for code that is not in Checkmarx One yet, its lines counted from git, read from a cloc-fusion report or counted with cloc (the Fusion — new customer tab), is in the credits and the report. Unticked: left out; its projects are kept."><input type="checkbox" id="calc-fusion-new-on" checked /> New customer <small>· code counted from git, cloc-fusion or cloc</small></label>
+      </span>
+      <span class="calc-origins" role="group" aria-labelledby="calc-origins-label">
+        <b id="calc-origins-label">Include scans from:</b>
+        <details class="col-picker engine-pick calc-origin-pick" id="calc-origin-pick">
+          <summary aria-labelledby="calc-origins-label calc-origin-summary" title="Where the scans came from: a CI tool, the CLI, the API or the web portal. Only the scans from those ticked count: how often each project is scanned (Fusion), and the backlog and its trend (triage &amp; remediation, each project at its latest scan from them). A project with no such scan is left out.">
+            <span id="calc-origin-summary">Every scan origin</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </summary>
+          <div class="col-menu engine-menu calc-origin-menu" id="calc-origin-menu"></div>
+        </details>
+      </span>
+      <div class="calc-source-state">
+        <span class="status" id="calc-read-note" aria-live="polite"></span>
+        <progress id="calc-read-progress" max="100" value="0" hidden></progress>
+      </div>
+    </div>
+    <div class="calc-scope" id="calc-scope-box">
+      <div class="calc-scope-line">
+        <span class="calc-scope-label">Projects</span>
+        <span id="calc-scope-summary" class="calc-scope-summary">All projects</span>
+        <button type="button" class="link" id="calc-scope-clear">Every project</button>
+        <span class="status" id="calc-scope-status" aria-live="polite"></span>
+      </div>
+      <details class="calc-scope-fold">
+        <summary>Search options</summary>
+      <div class="calc-scope-pick">
+        <div class="field">
+          <label for="calc-app-input">Applications</label>
+          <div class="chip-input" id="calc-apps"><input id="calc-app-input" list="calc-scope-applications-list" autocomplete="off" spellcheck="false" placeholder="Type an application name…" /></div>
+          <datalist id="calc-scope-applications-list"></datalist>
+        </div>
+        <div class="field">
+          <label for="calc-project-input">Projects</label>
+          <div class="chip-input" id="calc-projects"><input id="calc-project-input" list="calc-scope-projects-list" autocomplete="off" spellcheck="false" placeholder="Type a project name…" /></div>
+          <datalist id="calc-scope-projects-list"></datalist>
+        </div>
+      </div>
+      <p class="hint calc-scope-several">Empty: every project. These applications' projects, plus the projects picked. Enter adds every name that contains the text.</p>
+      <div class="calc-scope-leave" role="group" aria-label="Leave out projects with nothing to analyse">
+        <label class="pill-check"><input type="checkbox" id="calc-leave-no-code" checked /> Leave out projects with no lines of code</label>
+        <label class="pill-check"><input type="checkbox" id="calc-leave-no-findings" /> Leave out projects with no open findings</label>
+      </div>
+      <button type="button" class="link" id="calc-scope-toggle" aria-expanded="false" aria-controls="calc-scope-form">More filters</button>
+      <form class="calc-scope-form" id="calc-scope-form" hidden autocomplete="off">
+        <p class="hint">Narrow further, for triage &amp; remediation and for Fusion alike. Names take wildcards: <code translate="no">payments-*</code>, <code translate="no">*-api</code>.</p>
+        <div class="calc-scope-grid">
+          <label class="field"><span>Groups</span><input type="text" id="calc-scope-groups" list="calc-scope-groups-list" placeholder="Any group" /><datalist id="calc-scope-groups-list"></datalist></label>
+          <label class="field"><span>Project names</span><input type="text" id="calc-scope-names" placeholder="Any name, e.g. payments-*" /></label>
+          <label class="field"><span>Last scanned by</span><input type="text" id="calc-scope-initiators" list="calc-scope-initiators-list" placeholder="Anyone" /><datalist id="calc-scope-initiators-list"></datalist></label>
+        </div>
+        <p class="hint">Several at once: separate them with commas.</p>
+        <fieldset class="calc-scope-checks"><legend>How often they are scanned</legend><div id="calc-scope-frequencies"></div></fieldset>
+        <fieldset class="calc-scope-checks"><legend>Criticality</legend><div id="calc-scope-criticalities"></div></fieldset>
+      </form>
+      </details>
+    </div>
+    <div class="calc-pending" id="calc-pending" role="region" aria-labelledby="calc-pending-count" hidden>
+      <div class="calc-pending-text"><b id="calc-pending-count" aria-live="polite"></b><ul id="calc-pending-list"></ul></div>
+      <div class="calc-pending-actions">
+        <button type="button" class="calc-pending-undo" id="calc-undo">Undo</button>
+        <button type="button" class="calc-pending-go" id="calc-apply">Apply</button>
+      </div>
+    </div>
+    <p class="hint calc-apply-hint"><span>Nothing changes until <b>Apply</b>: change anything in this block and an <b>Apply</b> appears; it applies every setting at once, the project filters too, and works every figure below out again.</span> <span class="calc-apply-read">A change that needs Checkmarx One read again (<b>Every branch</b>, more <b>Projects to read</b>) asks first.</span></p>
+    </div><!-- /calc-heart -->
+    <div class="calc-strip" role="group" aria-label="Credits required">
+      <div class="calc-strip-set">
+        <label class="calc-strip-field"><span class="calc-strip-label">Projection period</span><select id="calc-horizon"><option value="6">6 months</option><option value="12">12 months</option><option value="18">18 months</option><option value="24">24 months</option><option value="36">36 months</option></select></label>
+        <label class="calc-strip-field"><span class="calc-strip-label">Extra credits (%)</span><input type="text" inputmode="decimal" id="calc-extra" class="calc-num" placeholder="0" autocomplete="off" /></label>
+      </div>
+      <div class="calc-strip-mix">
+        <span class="calc-strip-label">What the credits are for</span>
+        <div class="calc-mix-bar" id="calc-mix-bar" aria-hidden="true"></div>
+        <div class="calc-mix-keys">
+          <div class="calc-mix-key calc-mix-tr" id="calc-mix-tr"><i class="calc-mix-sw" aria-hidden="true"></i><div class="calc-mix-text"><span class="calc-strip-label">Triage &amp; remediation <button type="button" class="calc-why" data-why="credits" aria-haspopup="dialog" aria-label="How is this worked out?" title="How is this worked out?">?</button></span><span class="calc-mix-fig"><b id="calc-sum-tr" class="calc-strip-fig">—</b> <small class="calc-mix-pct" id="calc-mix-tr-pct"></small></span><small class="hint" id="calc-sum-tr-split"></small></div></div>
+          <div class="calc-mix-key calc-mix-fusion" id="calc-mix-fusion"><i class="calc-mix-sw" aria-hidden="true"></i><div class="calc-mix-text"><span class="calc-strip-label"><span id="calc-sum-fusion-label">Fusion</span> <button type="button" class="calc-why" data-why="fusion-credits" aria-haspopup="dialog" aria-label="How is this worked out?" title="How is this worked out?">?</button></span><span class="calc-mix-fig"><b id="calc-sum-fusion" class="calc-strip-fig">—</b> <small class="calc-mix-pct" id="calc-mix-fusion-pct"></small></span><small class="hint" id="calc-sum-fusion-split"></small></div></div>
+          <div class="calc-mix-key calc-mix-extra" id="calc-mix-extra" hidden><i class="calc-mix-sw" aria-hidden="true"></i><div class="calc-mix-text"><span class="calc-strip-label">Extra credits</span><span class="calc-mix-fig"><b id="calc-sum-extra" class="calc-strip-fig">—</b> <small class="calc-mix-pct" id="calc-mix-extra-pct"></small></span></div></div>
+        </div>
+      </div>
+      <div class="calc-strip-total">
+        <span class="calc-strip-label">Total credits required <button type="button" class="calc-why" data-why="total" aria-haspopup="dialog" aria-label="How is this worked out?" title="How is this worked out?">?</button></span>
+        <b id="calc-sum-total" class="calc-strip-fig">—</b>
+        <div class="calc-bundle-cells" id="calc-bundle-cells" aria-hidden="true" hidden></div>
+        <div class="calc-bundle-line">
+          <span class="calc-bundle-head"><span class="calc-strip-label">Bundles</span><button type="button" class="calc-why calc-bundle-q" id="calc-bundle-q" aria-expanded="false" aria-controls="calc-bundle-item" aria-label="Credits per bundle" title="Credits per bundle">?</button></span>
+          <b id="calc-sum-bundles">—</b> <small class="hint" id="calc-sum-exact"></small>
+          <div class="calc-bundle-pop" id="calc-bundle-item" role="group" aria-labelledby="calc-bundle-label" hidden>
+            <label class="field"><span id="calc-bundle-label">Credits per bundle</span><input type="text" inputmode="numeric" id="calc-bundle" class="calc-num" placeholder="10000" autocomplete="off" /></label>
+            <p class="hint" id="calc-bundle-size">Bundles of 10,000 credits, rounded up to whole bundles.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="calc-report-bar">
+      <p class="hint" id="calc-org-line"></p>
+      <div class="calc-report-actions">
+        <button type="button" class="ghost" id="calc-restart" title="Clear every choice made for this customer and read Checkmarx One again">Start again</button>
+        <button type="button" class="secondary" id="calc-email-open" aria-expanded="false" aria-controls="calc-email-form">Email the report</button>
+        <span class="calc-report-opts">
+        <label class="pill-check" title="Ticked: the report and its PDF name each project, and the customer can change each project's Fusion scans and model. Unticked: no project is named anywhere in them; the Fusion plan by scan frequency stays, and the customer can still change it."><input type="checkbox" id="calc-details" checked /> Include project names and details</label>
+        <label class="pill-check" title="Ticked: the report's appendix lists the open vulnerabilities of each project by severity (critical, high, medium, low), from the last read of Checkmarx One. Needs the project names and details."><input type="checkbox" id="calc-sev-report" /> Open vulnerabilities by project</label>
+        <label class="pill-check" title="Unticked: the PDF summary has the pages to present only. Ticked: the appendix too, with the trend and every number worked out step by step."><input type="checkbox" id="calc-pdf-calculations" /> Include the calculations in the PDF</label>
+        </span>
+        <span class="calc-report-go">
+        <button type="button" class="primary" id="calc-generate">Generate projection report</button>
+        <button type="button" class="secondary" id="calc-pdf" hidden title="The pages to present: triage &amp; remediation, Fusion, the credits needed overall and the impact">Download PDF summary</button>
+        </span>
+      </div>
+    </div>
+    <form class="calc-email" id="calc-email-form" hidden autocomplete="off">
+      <label class="field"><span>Send the report to</span><input type="text" id="calc-email-to" placeholder="name@company.com, other@company.com" /></label>
+      <button type="submit" class="primary">Send</button>
+      <span class="status" id="calc-email-status" aria-live="polite"></span>
+    </form>
+    <p class="hint" id="calc-empty" hidden>No customers yet. Open <strong>Customer</strong> and choose <strong>New customer</strong>: each customer keeps its own Checkmarx One data, plan and Fusion projects, saved as you go.</p>
+  </section>
+  <div class="ptabs" role="tablist" aria-label="Cx Credits Calculator" data-ptabs="calculator">
+    <button type="button" role="tab" class="ptab" data-pt="tr">Triage &amp; remediation</button>
+    <button type="button" role="tab" class="ptab" data-pt="fusion">Fusion · Checkmarx One</button>
+    <button type="button" role="tab" class="ptab" data-pt="fusion-git">Fusion · from Git</button>
+    <button type="button" role="tab" class="ptab" data-pt="impact">Impact</button>
+    <button type="button" role="tab" class="ptab" data-pt="reports">Generated reports <em class="calc-saved-count" id="calc-saved-count"></em></button>
+  </div>
+
+  <div data-ptpanel="calculator:tr" class="calc-panel">
+    <section class="panel calc-uploads" id="calc-uploads">
+      <div class="calc-upload-actions">
+        <span class="calc-tr-source" id="calc-tr-source"></span>
+        <button type="button" class="ghost" id="calc-present" aria-pressed="false">Customer view</button>
+      </div>
+      <details class="calc-alt" id="calc-alt">
+        <summary>Use the two Checkmarx One exports instead</summary>
+        <p class="hint">For a prospect whose tenant this server is not connected to: drop their two weekly exports from Checkmarx One → Analytics on the boxes below.</p>
+        <div class="calc-upload-row">
+          <label class="calc-slot" id="calc-slot-totals"><input type="file" id="calc-file-totals" accept=".xlsx,.csv,.tsv" hidden />
+            <b translate="no">Total Vulnerabilities by Severity</b><span class="hint" id="calc-file-totals-name">Choose or drop the .xlsx export</span></label>
+          <label class="calc-slot" id="calc-slot-fixed"><input type="file" id="calc-file-fixed" accept=".xlsx,.csv,.tsv" hidden />
+            <b translate="no">Fixed Vulnerabilities by Severity</b><span class="hint" id="calc-file-fixed-name">Choose or drop the .xlsx export</span></label>
+        </div>
+        <div class="calc-upload-actions">
+          <button type="button" class="ghost" id="calc-sample">Load sample data</button>
+          <span class="status" id="calc-upload-status"></span>
+        </div>
+      </details>
+    </section>
+    <div id="calc-tr"></div>
+  </div>
+
+  <div data-ptpanel="calculator:fusion" class="calc-panel" hidden>
+    <section class="calc-fh" id="calc-fh-fusion" aria-live="polite"></section>
+    <div class="calc-fslot" data-fslot="fusion"></div>
+    <section class="panel calc-fusion-viz-panel" id="calc-fusion-viz-panel" hidden>
+      <div class="calc-section-head"><h2>Fusion visuals</h2><span class="hint">Hide any you don't need — the choice is remembered.</span></div>
+      <div class="calc-viz-grid" id="calc-fusion-viz"></div>
+    </section>
+    <section class="panel calc-fusion-pricing" id="calc-fusion-pricing">
+      <div class="calc-section-head"><h2>Fusion pricing</h2><button type="button" class="secondary" id="calc-add-model">Add a model</button></div>
+      <p class="hint">Credits per 10K LOC for each model — this is what turns lines of code into Fusion credits, for new code counted from git and for projects already in Checkmarx One alike. Read with the projects when Checkmarx One gives it; otherwise type it as Checkmarx One shows when a scan is started. <b>Without a rate here, Fusion credits stay 0.</b></p>
+      <div class="table-wrap"><table class="data-table calc-models"><thead><tr><th>Model</th><th>Credits per 10K LOC</th><th></th></tr></thead><tbody id="calc-models"></tbody></table></div>
+      <p class="calc-notice calc-warn-note" id="calc-models-warn" hidden></p>
+      <p class="hint" id="calc-models-empty">No model yet: projects are counted in scans and 10K-LOC blocks, without credits, until a model has its credits per 10K LOC.</p>
+    </section>
+    <div class="calc-fsub" data-fsub="existing">
+    <section class="panel">
+      <h2>Fusion — existing customer: what each project needs</h2>
+      <p class="calc-notice calc-off-note" id="calc-fusion-off-note" hidden>Fusion is left out of this projection: the customer opted out, so none of it is counted in the credits, the findings (Triage &amp; remediation counts 0% more found by Fusion) or the report. The settings below are kept. <button type="button" class="link" id="calc-fusion-include">Include it</button></p>
+      <p class="calc-notice" data-help-fold>Each project's lines of code are rounded up to whole 10K-LOC blocks on their own, and one Fusion scan costs its model's credits per 10K LOC. The projects come from Checkmarx One with how often each is scanned: the rules below start from that, and you can give more scans to the projects scanned most often or most critical.</p>
+      <div class="calc-terms">
+        <label class="field"><span>Default Fusion scans per project</span><input type="number" id="calc-default-scans" min="0" step="1" /></label>
+        <label class="field"><span>Default model</span><select id="calc-default-model"></select></label>
+        <label class="field"><span>When frequency and criticality both set a number</span>
+          <select id="calc-combine"><option value="higher">Use the higher</option><option value="frequency">Scan frequency wins</option><option value="criticality">Criticality wins</option></select></label>
+      </div>
+    </section>
+    <section class="panel" id="calc-freq-panel">
+      <div class="calc-section-head"><h2>Fusion scans by how often projects are scanned</h2><button type="button" class="link" data-rule-models>Model per group</button></div>
+      <p class="hint calc-explain">Projects are grouped by how often Checkmarx One scanned them in the last 12 months. Each row is the number of Fusion scans one project of that group needs over the projection period: it starts at the scans the group runs today, so the forecast follows how the customer really works. Change a number to plan more or fewer; leave it empty to use the default. <button type="button" class="link" id="calc-suggest">Back to the suggested numbers</button></p>
+      <p class="hint calc-explain-git" hidden>Repositories counted from git or by cloc-fusion are grouped by how often they change: the commits on their default branch in the last year. The same numbers as for Checkmarx One projects scanned that often (they are one setting); change a number to plan more or fewer scans, or leave it empty to use the default.</p>
+      <div class="table-wrap"><table class="data-table calc-rules"><thead><tr><th>Scanned today</th><th>Projects</th><th>Fusion scans per project</th><th>Model</th></tr></thead><tbody id="calc-freq"></tbody></table></div>
+    </section>
+    <details class="panel calc-fold" id="calc-crit-fold">
+      <summary><h2>Fusion scans by criticality</h2><span class="hint">Optional: open it only to plan scans by how critical projects are</span></summary>
+      <p class="hint">The criticality each project has in Checkmarx One (5 is the most critical). Leave a number empty to use the default.</p>
+      <div class="table-wrap"><table class="data-table calc-rules"><thead><tr><th>Criticality</th><th>Projects</th><th>Fusion scans per project</th><th>Model</th></tr></thead><tbody id="calc-crit"></tbody></table></div>
+    </details>
+    <div class="calc-kpis" id="calc-fkpis"></div>
+    <section class="panel">
+      <div class="calc-table-head">
+        <h2>Projects</h2>
+        <span class="hint" id="calc-rows-count"></span>
+        <input type="search" id="calc-filter" placeholder="Find a project" aria-label="Find a project" />
+        <button type="button" class="secondary" id="calc-all">Include all</button>
+        <button type="button" class="secondary" id="calc-none">Include none</button>
+        <button type="button" class="secondary" id="calc-add">Add a project by hand</button>
+        <button type="button" class="secondary" id="calc-csv">Download CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table calc-projects">
+          <thead id="calc-projects-head"><tr><th>Include</th><th data-sort="name" aria-sort="none"><button type="button" class="th-sort">Project</button></th><th data-sort="criticality" aria-sort="none"><button type="button" class="th-sort">Criticality</button></th><th data-sort="frequency" aria-sort="none"><button type="button" class="th-sort">Scanned today</button></th><th data-sort="lines" aria-sort="none"><button type="button" class="th-sort">Lines of code</button></th><th data-sort="units" aria-sort="none"><button type="button" class="th-sort">10K-LOC blocks</button></th><th data-sort="scans" aria-sort="none"><button type="button" class="th-sort">Fusion scans</button></th><th data-sort="model" aria-sort="none"><button type="button" class="th-sort">Model</button></th><th data-sort="credits" aria-sort="none"><button type="button" class="th-sort">Credits</button></th></tr></thead>
+          <tbody id="calc-rows"></tbody>
+        </table>
+      </div>
+      <div class="calc-more" id="calc-rows-more" hidden><button type="button" class="secondary" id="calc-rows-more-btn">Show more</button></div>
+      <p class="hint" id="calc-rows-empty">No projects yet. <strong>Read from Checkmarx One</strong> lists every project in this tenant with its lines of code, criticality and how often it is scanned; or add projects by hand for a prospect.</p>
+    </section>
+  </div><!-- /calc-fsub existing -->
+
+  <div class="calc-fsub" data-fsub="new" hidden>
+    <section class="panel">
+      <h2>Fusion — new customer: code not in Checkmarx One yet</h2>
+      <p class="calc-notice calc-off-note" id="calc-fnew-off-note" hidden>This part is left out of the projection (Add Fusion: New customer is unticked): none of it is counted in the credits or the report. The projects below are kept. <button type="button" class="link" id="calc-fnew-include">Include it</button></p>
+      <p class="calc-notice" data-help-fold>Count the customer's code lines one of three ways. Each way, each repository becomes a project below, counted the same way: code lines only, no blank or comment lines. Counted from git or read from a cloc-fusion report, a project also says how often it changes, which sets its Fusion scans, and how many people work on it. Each project's code lines are rounded up to whole 10K-LOC blocks, and one Fusion scan costs its model's credits per 10K LOC, as on the existing customer tab; the models are that tab's.</p>
+      <div class="segmented calc-fnew-ways" id="calc-fnew-ways" role="radiogroup" aria-label="How the code lines are counted">
+        <label class="mode"><input type="radio" name="calc-fnew-way" value="git" checked /> <span>Count from git</span></label>
+        <label class="mode"><input type="radio" name="calc-fnew-way" value="report" /> <span>Import a cloc-fusion report</span></label>
+        <label class="mode"><input type="radio" name="calc-fnew-way" value="cloc" /> <span>Upload cloc results</span></label>
+      </div>
+      <div class="calc-cf-bar">
+        <button type="button" class="secondary sm" id="calc-cf-download">Download cloc-fusion</button>
+        <span class="hint">cloc-fusion, one HTML file with nothing to install: it measures every repository the customer's own token can see, in their browser, and its report imports here (Import a cloc-fusion report). <span class="calc-cf-sum" id="calc-cf-sum" translate="no"></span></span>
+      </div>
+      <div class="calc-fnew-way" id="calc-git" data-fnew-way="git">
+        <p class="calc-notice calc-warn-note" id="calc-git-offline" hidden>This file on its own cannot reach git. Download cloc-fusion above: it measures the customer's repositories where the code is, with their own token, and its report imports here (Import a cloc-fusion report). Or count from git with the launcher (<code>cx-credits-calculator.mjs</code>).</p>
+        <div class="calc-git-steps" id="calc-git-steps">
+          <div>
+            <h3>1 · Where the code is</h3>
+            <p class="hint calc-git-sub">Tick one or more: the Admin's git connections (the same tokens as Checkmarx One's code repository connections and Code authors), a token for this run, or both.</p>
+            <div class="calc-git-hosts" id="calc-git-hosts" role="group" aria-label="Where the code is"></div>
+            <div class="calc-git-token" id="calc-git-token" hidden>
+              <label class="field"><span>Git host</span><select id="calc-git-provider"><option value="github">GitHub</option><option value="gitlab">GitLab</option><option value="azure">Azure DevOps</option><option value="bitbucket">Bitbucket</option></select></label>
+              <label class="field"><span>Address</span><input type="url" id="calc-git-address" spellcheck="false" autocomplete="off" translate="no" /></label>
+              <label class="field calc-git-wide"><span>Token (read access to the repositories)</span><input type="password" id="calc-git-secret" spellcheck="false" autocomplete="off" placeholder="Paste a token: GitHub, GitLab, Azure DevOps, Bitbucket…" /></label>
+              <div class="calc-git-token-add calc-git-wide"><button type="button" class="secondary" id="calc-git-token-add">Add this token</button><span class="hint" id="calc-git-detected" aria-live="polite"></span></div>
+              <div class="calc-git-tokens calc-git-wide" id="calc-git-tokens" hidden></div>
+              <p class="hint calc-git-lock calc-git-wide">Used for this run only, then forgotten: never saved with the customer, never written to a log or shown again, and sent only to this host, as a header. Give a read-only token (GitHub: <i>Contents: read</i>, and <i>read:org</i> to list organizations; GitLab: <i>read_api</i> and <i>read_repository</i>; Azure DevOps: <i>Code (Read)</i>, and <i>User Profile (Read)</i> to list organizations; Bitbucket: <i>Repositories: Read</i>).</p>
+            </div>
+          </div>
+          <div>
+            <h3>2 · Which organizations and repositories</h3>
+            <div class="actions compact"><button type="button" class="secondary" id="calc-git-orgs-find">Find organizations</button><span class="hint">Each one's organizations, groups or workspaces, and Everything this token can see.</span></div>
+            <div class="calc-git-orgs" id="calc-git-orgs" hidden></div>
+            <div class="calc-git-owner">
+              <label class="field"><span id="calc-git-owner-label">Or type an organisation or group</span><input type="text" id="calc-git-owner" spellcheck="false" autocomplete="off" translate="no" /></label>
+              <button type="button" class="secondary" id="calc-git-list">List repositories</button>
+            </div>
+            <div class="calc-git-repos" id="calc-git-repos" hidden></div>
+            <label class="field calc-git-paste"><span>Or paste clone addresses, one a line:</span><textarea id="calc-git-paste" rows="3" spellcheck="false" translate="no" placeholder="https://github.com/acme/payments-api"></textarea></label>
+            <div class="calc-git-run">
+              <label class="field"><span>Engine</span><select id="calc-git-engine"><option value="auto">Automatic: git when it is installed</option><option value="git">git: shallow clones</option><option value="api">The platform's API: archives, no git</option></select></label>
+              <button type="button" class="primary" id="calc-git-count" disabled>Count code lines</button>
+            </div>
+            <p class="hint">Each one's default branch: its code lines, its commits in the last 365 days (so how often it changes) and the people who committed in the last 90 days.</p>
+            <p class="status" id="calc-git-status" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="rp-kpis calc-git-summary" id="calc-git-summary" aria-live="polite" hidden></div>
+        <details class="calc-git-details" id="calc-git-details" data-empty><summary><span id="calc-git-details-sum">How it is measured</span></summary>
+        <div class="calc-git-progress" id="calc-git-progress" hidden></div>
+        <p class="calc-notice calc-warn-note calc-git-how" id="calc-git-how">How it is measured, with cloc-fusion's engine: each repository's default branch is fetched from git into a temporary folder on this server, back to a year ago and without file contents but those counted (or read from the platform's API as an archive), counted, and the folder deleted at once. Lines are counted as cloc counts them: by each file's language, without blank lines or comments; dependencies, build output and generated files are left out. Commits are those on the default branch in the last 365 days, merges left out: how often a repository changes sets its Fusion scans. Developers are the people who committed in the last 90 days, bots left out, counted once across the run: only the counts are kept, never a name or an email. Up to 1,000 repositories a run, 2 GB each; files git marks as binary are skipped. Minified and generated code is sized as Checkmarx sizes it: a file of 64 KB or more with over 512 bytes a line of code, or one over 1 MB, counts as its bytes divided by 40.</p>
+        </details>
+      </div>
+      <div class="calc-fnew-way" id="calc-cf" data-fnew-way="report" hidden>
+        <p class="calc-cmd-label">When the code must not leave the customer, or they have many organizations: they open <b>cloc-fusion</b> (the file above; no install, nothing sent anywhere but their own git hosts), add their connections with a read-only token, press <b>Calculate Fusion credits</b>, and send you its report: any of the files it makes (JSON, HTML, CSV or Markdown). The JSON says the most (lines by language); the others give each repository's lines as one figure. A report holds counts and names of repositories, never code or tokens; its list of contributors is not read here.</p>
+        <div class="calc-cloc-drop" id="calc-cf-drop">
+          <p><b>Drop the cloc-fusion report here</b> (JSON, HTML, CSV or Markdown), or <button type="button" class="link" id="calc-cf-pick">choose the file</button>. Each repository it measured becomes a project, with its lines by language, commits, change frequency and developers; a project with the same address, or the same name, is replaced.</p>
+          <input type="file" id="calc-cf-file" accept=".json,.html,.htm,.csv,.md,application/json,text/html,text/csv,text/markdown" multiple hidden />
+          <div class="calc-cloc-files" id="calc-cf-files"></div>
+          <p class="status" id="calc-cf-status" aria-live="polite"></p>
+        </div>
+      </div>
+      <div class="calc-fnew-way" id="calc-cloc" data-fnew-way="cloc" hidden>
+      <p class="calc-cmd-label">When the code must not leave the customer: they run <b>cloc</b>, a free open-source tool (Count Lines of Code), where the code is and send you only the counts. <b translate="no">docker.io/aldanial/cloc</b> is cloc's official image, from its author Al Danial.</p>
+      <div class="calc-cloc-steps">
+        <div>
+          <h3>One file per repository</h3>
+          <p class="calc-cmd-label">On Windows with Podman (Windows cmd, one line):</p>
+          <pre class="calc-cmd" translate="no">podman run --rm -v "C:\code\payments-api:/src:ro" docker.io/aldanial/cloc --json --quiet /src &gt; payments-api.json</pre>
+          <p class="calc-cmd-label">Or with cloc installed:</p>
+          <pre class="calc-cmd" translate="no">cloc --json --quiet --report-file=payments-api.json C:\code\payments-api</pre>
+        </div>
+        <div>
+          <h3>Or many repositories in one file</h3>
+          <p class="calc-cmd-label">Run on the folder that holds them; each folder in it becomes a project:</p>
+          <pre class="calc-cmd" translate="no">podman run --rm -v "C:\code:/src:ro" docker.io/aldanial/cloc --json --by-file --quiet /src &gt; all-repos.json</pre>
+          <p class="calc-cmd-label">CSV works too (<code translate="no">--csv</code>).</p>
+        </div>
+      </div>
+      <div class="calc-cloc-drop" id="calc-cloc-drop">
+        <p><b>Drop cloc results here</b> (.json or .csv), or <button type="button" class="link" id="calc-cloc-pick">choose files</button>. A file for one repository is a project named after the file; rename it below. A project of the same name is replaced.</p>
+        <input type="file" id="calc-cloc-file" accept=".json,.csv,.txt,application/json,text/csv" multiple hidden />
+        <div class="calc-cloc-files" id="calc-cloc-files"></div>
+        <p class="status" id="calc-cloc-status" aria-live="polite"></p>
+      </div>
+      </div>
+      <div class="calc-fnew-hand"><button type="button" class="link" id="calc-fnew-add">+ Add a project by hand</button><span class="hint">for a repository that cannot be counted from here: type its lines of code</span></div>
+    </section>
+    <section class="panel">
+      <h2>How it is counted</h2>
+      <div class="calc-terms">
+        <label class="field"><span>Default Fusion scans per repository</span><input type="number" id="calc-fnew-scans" min="0" step="1" /></label>
+        <label class="field"><span>Model</span><select id="calc-fnew-model"></select></label>
+      </div>
+      <p class="hint">Only for a repository whose commits are not known (cloc results, or added by hand). The others get their scans from how often they change, in the cards above. Scans typed for one repository always win.</p>
+      <h3 class="calc-sub">What counts as code</h3>
+      <p class="hint">Languages found. A crossed-out one is not counted (not code Fusion scans): click a language to count it, or to leave it out.</p>
+      <div class="calc-langs" id="calc-fnew-langs"></div>
+      <p class="calc-notice calc-warn-note" id="calc-fnew-dup" hidden></p>
+      <div class="rp-kpis" id="calc-fnew-kpis"></div>
+      <details class="calc-fnew-log" id="calc-fnew-log">
+      <summary><b>Repositories counted</b> <span class="hint" id="calc-fnew-log-count"></span> <span class="hint">· the log of each one: open it to see or change a repository</span></summary>
+      <div class="table-wrap"><table class="data-table calc-projects calc-fnew-table">
+        <thead><tr><th>Include</th><th>Project</th><th>From</th><th>Languages</th><th>Lines of code</th><th>Change frequency</th><th>Fusion scans</th><th>Model</th><th>Credits</th></tr></thead>
+        <tbody id="calc-fnew-rows"></tbody>
+      </table></div>
+      <p class="hint" id="calc-fnew-empty">No projects yet. Count the customer's repositories from git, import a cloc-fusion report or drop their cloc results above, or add a project by hand.</p>
+      <p class="hint" id="calc-fnew-again" hidden>Counting again replaces a project of the same repository (or, for one without, the same name); <b>Count again</b> on a git project measures it again at its latest commit.</p>
+      </details>
+    </section>
+  </div><!-- /calc-fsub new -->
+  </div><!-- /calculator:fusion panel -->
+
+  <div data-ptpanel="calculator:fusion-git" class="calc-panel" hidden>
+    <section class="calc-fh" id="calc-fh-fusion-git" aria-live="polite"></section>
+    <div class="calc-fslot" data-fslot="fusion-git"></div>
+  </div>
+
+
+  <div data-ptpanel="calculator:impact" class="calc-panel" hidden>
+    <section class="panel">
+      <h2>What the credits give back</h2>
+      <p class="calc-notice" data-help-fold>Every finding AI Triage looks at is one a person does not triage by hand; every false positive it clears never reaches a developer; every true positive AI Remediation fixes saves the fix by hand, less the time a developer takes to review it. The hours, at what a developer's hour costs, set against what the credits cost, are the return. The figures follow the Triage &amp; remediation tab.</p>
+      <div class="calc-terms" id="calc-impact-terms">
+        <label class="field"><span>Minutes to triage a finding by hand</span><input type="number" id="calc-imp-triage" min="0" step="1" /></label>
+        <label class="field"><span>Minutes to fix a finding by hand</span><input type="number" id="calc-imp-fix" min="0" step="5" /></label>
+        <label class="field"><span>Minutes to review an AI fix</span><input type="number" id="calc-imp-review" min="0" step="1" /></label>
+        <label class="field"><span>A developer's hour costs</span><input type="number" id="calc-imp-rate" min="0" step="1" placeholder="e.g. 85" /></label>
+        <label class="field"><span>A credit costs</span><input type="number" id="calc-imp-price" min="0" step="0.01" placeholder="e.g. 1.50" /></label>
+        <label class="field"><span>Currency</span><select id="calc-imp-currency"><option value="USD" translate="no">USD</option><option value="EUR" translate="no">EUR</option><option value="GBP" translate="no">GBP</option><option value="INR" translate="no">INR</option><option value="JPY" translate="no">JPY</option><option value="CNY" translate="no">CNY</option><option value="KRW" translate="no">KRW</option><option value="AUD" translate="no">AUD</option><option value="CAD" translate="no">CAD</option><option value="CHF" translate="no">CHF</option><option value="SGD" translate="no">SGD</option><option value="HKD" translate="no">HKD</option><option value="TWD" translate="no">TWD</option><option value="MYR" translate="no">MYR</option><option value="IDR" translate="no">IDR</option><option value="THB" translate="no">THB</option><option value="VND" translate="no">VND</option><option value="AED" translate="no">AED</option><option value="SAR" translate="no">SAR</option><option value="ILS" translate="no">ILS</option><option value="BRL" translate="no">BRL</option><option value="MXN" translate="no">MXN</option><option value="ZAR" translate="no">ZAR</option><option value="SEK" translate="no">SEK</option><option value="NOK" translate="no">NOK</option><option value="DKK" translate="no">DKK</option><option value="PLN" translate="no">PLN</option><option value="NZD" translate="no">NZD</option></select></label>
+      </div>
+      <p class="hint">They start from Settings → Impact and are kept with this customer.</p>
+      <h3 class="calc-impact-h3">Fusion</h3>
+      <label class="check calc-imp-fusion-on"><input type="checkbox" id="calc-imp-fusion-on" /> Calculate Fusion’s impact <span class="hint">off by default: no Fusion figures in Impact, the return or the report until ticked</span></label>
+      <details class="calc-imp-fusion-box" id="calc-imp-fusion-box"><summary>Fusion assumptions</summary>
+      <div class="calc-terms" id="calc-impact-fterms">
+        <label class="field"><span>Lines an expert reviews in an hour</span><input type="number" id="calc-imp-lph" min="1" step="10" /></label>
+        <label class="field"><span>Reviewers in a team</span><input type="number" id="calc-imp-reviewers" min="1" step="1" /></label>
+        <label class="field"><span>A fix after release costs (× a fix while coding)</span><input type="number" id="calc-imp-later" min="1" step="0.5" /></label>
+      </div>
+      </details>
+    </section>
+    <div class="calc-kpis" id="calc-impact-overall"></div>
+    <h2 class="calc-impact-part">Triage &amp; remediation</h2>
+    <div class="calc-kpis" id="calc-impact-kpis"></div>
+    <section class="panel">
+      <h2>Where the time comes back, by severity</h2>
+      <div class="table-wrap"><table class="data-table calc-impact"><thead><tr><th>Severity</th><th class="num">Triaged by AI</th><th class="num">False positives cleared</th><th class="num">Fixed by AI</th><th class="num">Hours saved</th><th class="num">Credits</th></tr></thead><tbody id="calc-impact-rows"></tbody></table></div>
+      <p class="hint" id="calc-impact-empty" hidden>No triage &amp; remediation projection yet: read Checkmarx One (or use the two exports) on the Triage &amp; remediation tab.</p>
+    </section>
+    <h2 class="calc-impact-part">Fusion</h2>
+    <div class="calc-kpis" id="calc-impact-fusion"></div>
+    <p class="hint" id="calc-impact-fusion-empty" hidden>No Fusion projects yet: add them, with their lines of code, on the Fusion tab.</p>
+    <section class="panel" id="calc-impact-how"></section>
+  </div>
+
+  <div data-ptpanel="calculator:reports" class="calc-panel" hidden>
+    <section class="panel">
+      <div class="calc-section-head"><h2>Generated reports</h2><label class="check calc-saved-mine"><input type="checkbox" id="calc-reports-mine" checked /> This customer only</label></div>
+      <p class="hint">Every report generated is kept here. Download it again at any time: the file is named after the customer and when the report was made.</p>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Customer</th><th>Made</th><th>By</th><th>Triage &amp; remediation</th><th>Fusion</th><th>Extra</th><th>Total credits</th><th>Bundles</th><th></th></tr></thead><tbody id="calc-reports"></tbody></table></div>
+      <p class="hint" id="calc-reports-empty">No reports yet. <strong>Generate projection report</strong> makes one from the customer's triage &amp; remediation and Fusion figures.</p>
+    </section>
+  </div>
+
+  <!-- While Checkmarx One is read: each project as it comes in, on the right; the figures on the left fill in meanwhile. -->
+  <aside class="calc-readfx" id="calc-readfx" hidden aria-labelledby="calc-readfx-title">
+    <div class="calc-readfx-head">
+      <div><span class="calc-readfx-kick">Live from Checkmarx One</span><h3 id="calc-readfx-title">Reading the projects</h3></div>
+      <button type="button" class="link" id="calc-readfx-hide">Hide</button>
+    </div>
+    <div class="calc-readfx-track" aria-hidden="true"><div class="calc-readfx-fill" id="calc-readfx-fill"></div><span class="calc-readfx-runner flare-icon" id="calc-readfx-runner"></span></div>
+    <div class="calc-readfx-pct"><b id="calc-readfx-pct">0%</b><span id="calc-readfx-eta" aria-live="polite"></span></div>
+    <dl class="calc-readfx-stats">
+      <div><dt>Projects read</dt><dd id="calc-readfx-read">0</dd></div>
+      <div><dt>Lines of code</dt><dd id="calc-readfx-loc">0</dd></div>
+      <div><dt>Scans in the year</dt><dd id="calc-readfx-scans">0</dd></div>
+      <div><dt>Open findings</dt><dd id="calc-readfx-open">0</dd></div>
+    </dl>
+    <div class="calc-readfx-sev" id="calc-readfx-sev"></div>
+    <ol class="calc-readfx-feed" id="calc-readfx-feed"></ol>
+    <p class="calc-readfx-note" id="calc-readfx-note">The figures fill in as the projects come in: try the severities, the period or the scope meanwhile.</p>
+  </aside>
+  <button type="button" class="calc-readfx-pill" id="calc-readfx-pill" hidden><span class="calc-readfx-dot" aria-hidden="true"></span><span id="calc-readfx-pill-text">Reading Checkmarx One</span></button>
+
+</div>

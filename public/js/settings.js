@@ -1,7 +1,6 @@
 import { aboutHtml, md } from './about.js';
 import { home } from './auth.js';
 import { $, $$, LOGO, THEMES, api, applyMyTheme, can, date, dateTime, esc, go, icon, lookOf, num, state, toast } from './core.js';
-import { peopleList } from './people.js';
 import { loading, shell } from './shell.js';
 // ---- Settings: one tab per area, each only for those whose role allows it (the special ones are Admin-only) -------------
 export let adminTab = 'general';
@@ -681,45 +680,6 @@ export const ADMIN_VIEWS = {
     };
   },
 
-  async roles() {
-    const d = await peopleList();
-    const groups = [...new Set(d.permissions.map((p) => p.group))];
-    $('#tab').innerHTML = `<div class="panel"><h2>Roles <small>nobody can give permissions they do not hold · the special ones stay with Admins</small><button class="sm" id="newrole">${icon('plus')}New role</button></h2>
-      <div class="tw"><table><thead><tr><th>Role</th><th>Permissions</th><th></th></tr></thead><tbody>${d.roles.map((r) => `<tr data-id="${esc(r.id)}"><td><b>${esc(r.name)}</b><span class="sub">${esc(r.description)}</span></td><td class="small">${r.permissions.map((p) => esc(d.permissions.find((x) => x.id === p)?.label ?? p)).join(' · ')}</td><td class="actions">${r.locked ? '<span class="chip">Locked</span>' : '<button class="sm" data-act="role">Edit</button>'}</td></tr>`).join('')}</tbody></table></div></div>`;
-    const editRole = (r) => {
-      const dlg = document.createElement('dialog');
-      dlg.innerHTML = `<form class="form" id="rf"><div class="dh"><h2>${r ? `Edit ${esc(r.name)}` : 'New role'}</h2></div><div class="db form">
-        <div class="row"><label class="f">Name<input name="name" required maxlength="60" value="${esc(r?.name ?? '')}" /></label><label class="f">Description<input name="desc" maxlength="300" value="${esc(r?.description ?? '')}" /></label></div>
-        ${groups.map((g) => `<div><div class="muted small">${esc(g)}</div><div class="checks">${d.permissions.filter((p) => p.group === g).map((p) => `<label class="check"><input type="checkbox" name="p" value="${esc(p.id)}" ${r?.permissions.includes(p.id) ? 'checked' : ''} ${can(p.id) && !p.special ? '' : 'disabled'} /><span>${esc(p.label)}${p.special ? ' <span class="chip">Admin only</span>' : ''}<small>${esc(p.description)}</small></span></label>`).join('')}</div></div>`).join('')}
-        <div class="err" id="rerr"></div></div><div class="df">${r && !r.builtin ? '<button type="button" class="danger" id="rdel">Remove</button><span class="spacer"></span>' : ''}<button type="button" class="ghost" id="rclose">Cancel</button><button class="primary" type="submit">Save</button></div></form>`;
-      document.body.append(dlg);
-      dlg.showModal();
-      const close = () => (dlg.close(), dlg.remove());
-      $('#rclose', dlg).onclick = close;
-      $('#rf', dlg).onsubmit = async (e) => {
-        e.preventDefault();
-        const f = new FormData(e.target);
-        try {
-          await api(`/api/roles/${encodeURIComponent(r?.id ?? 'new')}`, { method: 'PUT', body: { name: f.get('name'), description: f.get('desc'), permissions: f.getAll('p') } });
-          close();
-          viewAdmin('roles');
-        } catch (error) {
-          $('#rerr', dlg).textContent = error.message;
-        }
-      };
-      if ($('#rdel', dlg)) $('#rdel', dlg).onclick = async () => {
-        try {
-          await api(`/api/roles/${encodeURIComponent(r.id)}`, { method: 'DELETE' });
-          close();
-          viewAdmin('roles');
-        } catch (error) {
-          $('#rerr', dlg).textContent = error.message;
-        }
-      };
-    };
-    $('#newrole').onclick = () => editRole(null);
-    for (const b of $$('[data-act="role"]')) b.onclick = () => editRole(d.roles.find((x) => x.id === b.closest('tr').dataset.id));
-  },
 };
 
 // ---- Email server (SMTP) ---------------------------------------------------------------

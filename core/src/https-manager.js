@@ -852,16 +852,3 @@ export class HttpsManager {
   }
 }
 
-/** Read the saved choices and change them, for scripts/https.mjs (the server picks it up within seconds). */
-export function setModeOffline(dataDir, mode) {
-  if (!MODES.includes(mode)) throw new Error(`Use one of: ${MODES.join(', ')}.`);
-  const file = path.join(dataDir, 'https.json');
-  let state = {};
-  try {
-    state = JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {}
-  state = { ...state, mode, changedAt: new Date().toISOString(), changedBy: 'scripts/https.mjs' };
-  if (mode !== 'https' && state.hsts) state.hsts = { ...state.hsts, enabled: false };
-  writeAtomic(file, JSON.stringify(state, null, 2));
-  return state;
-}

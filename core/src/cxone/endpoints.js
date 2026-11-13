@@ -222,8 +222,3 @@ export function deriveConnection(apiKey, overrides = {}) {
   };
 }
 
-/** The connection fields that are safe to hand back to the browser. */
-export function publicConnection(connection) {
-  const { apiKey, ...safe } = connection;
-  return safe;
-}

@@ -13,12 +13,12 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { mapWithConcurrency } from './cxone/client.js';
-import { DEFAULT_ENGINES, cleanEngines, engineOf, engineScope } from './engines.js';
+import { DEFAULT_ENGINES, engineOf, engineScope } from './engines.js';
 import { countProjects, getLastScans, lastScanDate, listApplications, listProjects } from './cxone/projects.js';
 import { BRANCH_HOW, branchOf, primaryScans } from './cxone/branches.js';
 import { CRITICALITIES, DEFAULT_READ_PROJECTS, amount, frequencyOf, modelsNamed, readLimit, wholeNumber } from '../public/calculator/model.js';
 import { modelChoices } from './fusion-usage.js';
-import { MAX_PROFILES, MAX_REPORTS, cleanFusion, cleanReportData, cleanTr, fail, finite, iso, migrate, newProfile, newReport, patchProfile, reportMeta, summary, text } from '../public/calculator/profiles.js';
+import { MAX_PROFILES, MAX_REPORTS, cleanFusion, cleanReportData, cleanTr, summary, text } from '../public/calculator/profiles.js';
 
 // The rules for customers and reports are shared with the standalone calculator (public/calculator/profiles.js).
 export { MAX_PROFILES, MAX_PROFILE_BYTES, MAX_REPORTS, MAX_REPORT_BYTES, cleanFusion, cleanReportData, cleanTr } from '../public/calculator/profiles.js';
@@ -31,121 +31,6 @@ function writeJson(file, value) {
   const tmp = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(value), { mode: 0o600 });
   fs.renameSync(tmp, file);
-}
-
-export class ProjectionStore {
-  #file;
-  #profiles;
-
-  constructor({ file }) {
-    this.#file = file;
-    this.#profiles = this.#load();
-  }
-
-  #load() {
-    try {
-      const raw = JSON.parse(fs.readFileSync(this.#file, 'utf8'));
-      return Array.isArray(raw.profiles) ? raw.profiles.filter((p) => p && typeof p.id === 'string').map(migrate) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  #save() {
-    writeJson(this.#file, { version: 2, profiles: this.#profiles });
-  }
-
-  list() {
-    return [...this.#profiles].sort((a, b) => String(a.name).localeCompare(String(b.name))).map(summary);
-  }
-
-  get(id) {
-    const found = this.#profiles.find((p) => p.id === id);
-    if (!found) throw fail(404, 'That customer no longer exists.');
-    return structuredClone(found);
-  }
-
-  create({ name, by, impact = {} }) {
-    if (this.#profiles.length >= MAX_PROFILES) throw fail(409, `There are already ${MAX_PROFILES} customers. Delete one first.`);
-    const profile = newProfile({ name, by, impact });
-    this.#profiles.push(profile);
-    this.#save();
-    return structuredClone(profile);
-  }
-
-  /** Save what changed: the customer's name, the T&R projection, the Fusion projection, the extra % and bundle size, the scope, the impact's assumptions (each optional). */
-  update(id, patch = {}, by = '') {
-    const index = this.#profiles.findIndex((p) => p.id === id);
-    if (index === -1) throw fail(404, 'That customer no longer exists.');
-    const next = patchProfile(this.#profiles[index], patch, by);
-    this.#profiles[index] = next;
-    this.#save();
-    return summary(next);
-  }
-
-  remove(id) {
-    const before = this.#profiles.length;
-    this.#profiles = this.#profiles.filter((p) => p.id !== id);
-    if (this.#profiles.length === before) throw fail(404, 'That customer no longer exists.');
-    this.#save();
-  }
-}
-
-const REPORT_ID = /^[0-9a-f-]{36}$/;
-
-/** Projection reports: each in its own file, listed newest first; the oldest go past MAX_REPORTS. */
-export class ReportStore {
-  #dir;
-
-  constructor({ dir }) {
-    this.#dir = dir;
-  }
-
-  #file(id) {
-    if (!REPORT_ID.test(String(id))) throw fail(404, 'That report no longer exists.');
-    return path.join(this.#dir, `${id}.json`);
-  }
-
-  #all() {
-    let names = [];
-    try {
-      names = fs.readdirSync(this.#dir).filter((n) => /^[0-9a-f-]{36}\.json$/.test(n));
-    } catch {}
-    const out = [];
-    for (const name of names) {
-      try {
-        const { data, ...meta } = JSON.parse(fs.readFileSync(path.join(this.#dir, name), 'utf8'));
-        out.push(meta);
-      } catch {}
-    }
-    return out.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  }
-
-  list(customerId = '') {
-    return this.#all().filter((r) => !customerId || r.customerId === customerId);
-  }
-
-  get(id) {
-    try {
-      return JSON.parse(fs.readFileSync(this.#file(id), 'utf8'));
-    } catch (error) {
-      if (error.status) throw error;
-      throw fail(404, 'That report no longer exists.');
-    }
-  }
-
-  add({ customerId, customer, by, data }) {
-    const report = newReport({ customerId, customer, by, data });
-    writeJson(this.#file(report.id), report);
-    for (const old of this.#all().slice(MAX_REPORTS)) fs.rmSync(this.#file(old.id), { force: true });
-    return reportMeta(report);
-  }
-
-  remove(id) {
-    const file = this.#file(id);
-    if (!fs.existsSync(file)) throw fail(404, 'That report no longer exists.');
-    fs.rmSync(file);
-  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -713,11 +598,6 @@ async function linesOfScan(client, scanId) {
     if (loc !== null) return { loc, source: 'scan' };
   } catch {}
   return { loc: null, source: 'none' };
-}
-
-/** Every project in the tenant for Fusion (see readTenant). */
-export async function readFusionProjects(client, options = {}) {
-  return (await readTenant(client, options)).projects;
 }
 
 /** The first number under any of these keys, at any depth (an answer whose shape is not documented). */

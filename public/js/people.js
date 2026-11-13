@@ -386,7 +386,6 @@ export function openPerson(d, u) {
 export async function personAction(d, u, act) {
   const path = `/api/people/${encodeURIComponent(u.id)}`;
   try {
-    if (act === 'edit') return editPerson(d, u);
     if (act === 'impersonate') {
       if (!confirm(`Sign in as ${u.name}? You see and work as they do for up to an hour; everything you do is recorded as you acting as them. Their password, profile and sessions stay theirs.`)) return;
       const r = await api(`${path}/impersonate`, { method: 'POST', body: {} });
@@ -524,75 +523,3 @@ export async function signInTab() {
   };
 }
 
-export function editPerson(d, u) {
-  const roles = d.roles.filter((r) => r.grantable || r.id === u?.role);
-  const teams = [...d.teams].sort((a, b) => a.path.localeCompare(b.path));
-  const dlg = document.createElement('dialog');
-  dlg.innerHTML = `<form class="form" id="pf"><div class="dh"><h2>${u ? `Edit ${esc(u.name)}` : 'Invite someone'}</h2></div><div class="db form">
-    <div class="row"><label class="f">Name<input name="name" required maxlength="120" value="${esc(u?.name ?? '')}" /></label><label class="f">Title<input name="title" maxlength="120" value="${esc(u?.title ?? '')}" placeholder="Sales Engineer" /></label></div>
-    ${u ? '' : '<label class="f">Work email<input name="email" type="email" required /></label>'}
-    <div class="row"><label class="f">Role<select name="role">${roles.map((r) => `<option value="${esc(r.id)}"${r.id === (u?.role ?? 'se') ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
-    <label class="f">Team<select name="team" required>${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u?.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></label></div>
-    <p class="muted small">${esc(roles.find((r) => r.id === (u?.role ?? 'se'))?.description ?? '')}</p>
-    ${u ? '' : `<label class="check"><input type="checkbox" name="welcome" ${d.mail ? 'checked' : 'disabled'} /><span>Email them a welcome<small>${d.mail ? 'Where to sign in, and how to set their password with "Forgot your password?". The one-time password is never emailed.' : 'Set up the email server in Settings to send one.'}</small></span></label>`}
-    ${u ? `<div class="flex"><button type="button" class="sm" id="reset">Reset password</button><button type="button" class="sm ${u.active ? 'danger' : ''}" id="active">${u.active ? 'Turn access off' : 'Turn access on'}</button><button type="button" class="sm danger" id="remove">Remove</button></div>` : ''}
-    <div class="err" id="perr"></div><div id="secret"></div></div>
-    <div class="df"><button type="button" class="ghost" id="close">Close</button><button class="primary" type="submit">${u ? 'Save' : 'Invite'}</button></div></form>`;
-  document.body.append(dlg);
-  dlg.showModal();
-  const done = () => {
-    dlg.close();
-    dlg.remove();
-    viewPeople();
-  };
-  $('#close', dlg).onclick = () => (dlg.close(), dlg.remove());
-  const showSecret = (temporary, email) => {
-    $('#secret', dlg).innerHTML = `<div class="callout mt"><b>One-time password for ${esc(email)}</b><p class="small muted">Give it to them in person or over a channel only they read. It is shown once; they choose their own at first sign-in.</p><div class="secret">${esc(temporary)}</div></div>`;
-    $('button[type=submit]', dlg).hidden = true;
-    $('#close', dlg).onclick = done;
-  };
-  $('#pf', dlg).onsubmit = async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target);
-    try {
-      if (u) {
-        const r = await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body: { name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team') } });
-        done();
-        toast(r.accountsMoved ? `Saved. Their ${num(r.accountsMoved)} account${r.accountsMoved === 1 ? '' : 's'} moved with them to the new team.` : 'Saved.', 'ok');
-      } else {
-        const r = await api('/api/people', { method: 'POST', body: { email: f.get('email'), name: f.get('name'), title: f.get('title'), role: f.get('role'), teamId: f.get('team'), sendWelcome: f.get('welcome') === 'on' } });
-        showSecret(r.temporary, r.user.email);
-        if (r.welcomed) $('#secret', dlg).insertAdjacentHTML('beforeend', '<p class="small muted mt">A welcome email is on its way to them.</p>');
-      }
-    } catch (error) {
-      $('#perr', dlg).textContent = error.message;
-    }
-  };
-  if (u) {
-    $('#reset', dlg).onclick = async () => {
-      try {
-        const r = await api(`/api/people/${encodeURIComponent(u.id)}/reset`, { method: 'POST', body: {} });
-        showSecret(r.temporary, u.email);
-      } catch (error) {
-        $('#perr', dlg).textContent = error.message;
-      }
-    };
-    $('#active', dlg).onclick = async () => {
-      try {
-        await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'PUT', body: { active: !u.active } });
-        done();
-      } catch (error) {
-        $('#perr', dlg).textContent = error.message;
-      }
-    };
-    $('#remove', dlg).onclick = async () => {
-      if (!confirm(`Remove ${u.name}? Their accounts and reports stay with their team.`)) return;
-      try {
-        await api(`/api/people/${encodeURIComponent(u.id)}`, { method: 'DELETE' });
-        done();
-      } catch (error) {
-        $('#perr', dlg).textContent = error.message;
-      }
-    };
-  }
-}

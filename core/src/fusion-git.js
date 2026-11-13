@@ -380,15 +380,6 @@ function splitPair(secret) {
   return at > 0 ? { username: secret.slice(0, at), token: secret.slice(at + 1) } : { username: '', token: secret };
 }
 
-/** The same from one of the Admin's connections (src/scm/providers.js scmConfigs, src/server.js githubConfig). */
-export function connectionSource(provider, cfg = {}, key = 'token') {
-  if (provider === 'github') return gitSource({ provider, address: cfg.apiUrl, token: cfg.token, key });
-  if (provider === 'gitlab') return gitSource({ provider, address: cfg.apiUrl, token: cfg.token, key });
-  if (provider === 'azure') return gitSource({ provider, address: cfg.orgUrl, token: cfg.token, key });
-  const cloud = cfg.kind !== 'server';
-  return gitSource({ provider, address: cloud ? 'https://bitbucket.org' : cfg.apiUrl, token: cfg.username ? `${cfg.username}:${cfg.token}` : cfg.token, key });
-}
-
 // ---- Discovery: organizations, then their repositories (cloc-fusion's providers) -----------------
 
 /**

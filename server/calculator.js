@@ -28,7 +28,7 @@ import { TenantReadStore, readFusionOffer, readJobView, readProgressOf, readTena
 import { CLOC_FUSION, GIT_COUNT_LIMITS, clocFusionPage, createGitCounter, gitSource, listOrganizations, listRepositories, sweepLeftovers } from '../core/src/fusion-git.js';
 import { MAX_PROJECTS, cleanOrigins, impactSettings, readLimit } from '../core/public/calculator/model.js';
 import { summary } from '../core/public/calculator/profiles.js';
-import { calculatorMarkup, reportRuntime, standaloneMarkup, wrapModule } from '../core/src/standalone-calculator.js';
+import { MODULES, calculatorMarkup, reportRuntime, standaloneMarkup, wrapModule } from '../core/src/calculator-bundle.js';
 import { fail } from './store.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -93,19 +93,11 @@ const inlined = (css, root) =>
 export const CALC_FONTS = path.join(MZ_PUBLIC, 'fonts');
 const scriptText = (s) => s.replace(/\r\n?/g, '\n').replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 const contentHash = (t) => `'sha256-${createHash('sha256').update(t, 'utf8').digest('base64')}'`;
-/** the calculator’s own bundle order (src/standalone-calculator.js), with this server's entry in place of its standalone.js. */
-const MODULES = (() => {
-  const text = fs.readFileSync(path.join(ROOT, 'core', 'src', 'standalone-calculator.js'), 'utf8');
-  const list = JSON.parse((/^const MODULES = (\[[^\]]*\]);/m.exec(text)?.[1] ?? '[]').replace(/'/g, '"'));
-  if (!list.includes('calculator/standalone.js')) throw new Error('core: the calculator bundle no longer ends with calculator/standalone.js; check scripts/sync-mz.mjs');
-  return list.map((f) => (f === 'calculator/standalone.js' ? 'calculator/hosted.js' : f));
-})();
-
 let built = null;
 
 /**
  * The hosted page, built once per start: the calculator’s calculator markup and modules bundled as the standalone calculator
- * is, with client/calculator-hosted.js in place of the calculator’s standalone.js. Its content security policy allows only its
+ * is, with client/calculator-hosted.js as its entry (calculator/hosted.js in the bundle). Its content security policy allows only its
  * own scripts (by hash) and calls to this server. The per-request settings go in a JSON element no script hash
  * depends on.
  */
@@ -121,7 +113,7 @@ export function calculatorPage() {
   // No licence gate: this product has no end date (the calculator it came from had one).
   const scripts = [...vendorScripts, main];
   const csp = `default-src 'none'; script-src ${scripts.map(contentHash).join(' ')}; script-src-attr 'none'; style-src 'unsafe-inline'; style-src-elem ${contentHash(css)}; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
-  const markup = standaloneMarkup(calculatorMarkup(read('index.html')), { launcher: true });
+  const markup = standaloneMarkup(calculatorMarkup(read('calculator.html')), { launcher: true });
   const head = fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.html'), 'utf8');
   const html = head
     .replace('<!--CSS-->', `<style>${css}</style>`)

@@ -21,7 +21,6 @@ export const NEXTGEN_ACCENTS = {
  * and each but Command center adds html[data-look].
  */
 export const LOOKS = ['cabin', 'circuit', 'residence', 'chronometer', 'signal', 'nextgen', 'studio', 'atelier', 'classic'];
-export const DEFAULT_LOOK = 'nextgen';
 /** Looks for files only, not offered in the app: Future is the standalone Cx Credits Calculator's (deep space, cyan and violet). */
 export const FILE_LOOKS = [...LOOKS, 'future'];
 

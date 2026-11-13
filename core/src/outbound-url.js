@@ -56,9 +56,3 @@ export function outboundUrlProblem(value, { allowLoopbackHttp = true } = {}) {
   return '';
 }
 
-/** `value` when the server may call it; otherwise an Error (status 400) that says why. */
-export function checkOutboundUrl(value, { label = 'address', allowLoopbackHttp = true, status = 400 } = {}) {
-  const problem = outboundUrlProblem(value, { allowLoopbackHttp });
-  if (problem) throw Object.assign(new Error(`The ${label} ${problem}.`), { status });
-  return String(value).trim();
-}

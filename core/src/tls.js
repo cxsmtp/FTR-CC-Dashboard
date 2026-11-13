@@ -64,25 +64,6 @@ export function selfSignedNames(env = process.env, extra = []) {
   return [...names].filter(Boolean).sort();
 }
 
-/** null when HTTPS is not configured; otherwise what https.createServer needs, plus how to reload it. */
-export function tlsConfig(env = process.env, dataDir = '') {
-  const mode = startMode(env);
-  if (mode === 'http') return null;
-  const given = environmentCertificate(env);
-  let files;
-  let load;
-  if (given) {
-    ({ files, load } = given);
-  } else {
-    const { cert, key } = ensureSelfSigned(path.join(dataDir || '.', 'tls'), selfSignedNames(env));
-    files = [cert, key];
-    load = () => ({ cert: readFile(cert), key: readFile(key) });
-  }
-  const options = { ...load(), minVersion: 'TLSv1.2' };
-  describeCertificate(options); // fails early, with a readable reason, on a wrong file or passphrase
-  return { options, files, load: () => ({ ...load(), minVersion: 'TLSv1.2' }), selfSigned: !given };
-}
-
 /** "CN=mz.acme.io, valid until 2027-05-01 (DNS:mz.acme.io)" for the log. */
 export function describeCertificate(options) {
   if (options.pfx) {
@@ -100,30 +81,6 @@ export function describeCertificate(options) {
   const key = createPrivateKey({ key: options.key, passphrase: options.passphrase });
   if (!cert.checkPrivateKey(key)) throw new Error('The private key does not belong to the certificate.');
   return `${cert.subject.replace(/\n/g, ', ')}, valid until ${new Date(cert.validTo).toISOString().slice(0, 10)}${cert.subjectAltName ? ` (${cert.subjectAltName})` : ''}`;
-}
-
-/**
- * Re-read the certificate when its files change (checked every few minutes), so
- * a renewed certificate is served without restarting. Returns stop().
- */
-export function watchCertificate(server, tls, { intervalMs = 5 * 60 * 1000, log = console } = {}) {
-  const stamp = () => tls.files.map((file) => fs.statSync(file, { throwIfNoEntry: false })?.mtimeMs ?? 0).join('|');
-  let seen = stamp();
-  const timer = setInterval(() => {
-    const now = stamp();
-    if (now === seen) return;
-    seen = now;
-    try {
-      const options = tls.load();
-      describeCertificate(options);
-      server.setSecureContext(options);
-      log.log(`[https] Certificate reloaded: ${describeCertificate(options)}`);
-    } catch (error) {
-      log.warn(`! [https] The changed certificate could not be used (still serving the previous one): ${error.message}`);
-    }
-  }, intervalMs);
-  timer.unref?.();
-  return () => clearInterval(timer);
 }
 
 // ---------------------------------------------------------------------------

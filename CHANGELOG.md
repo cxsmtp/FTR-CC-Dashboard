@@ -2,6 +2,19 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.102.00 — 2026-11-13
+
+- **What nothing used is gone.** Nothing looks or works differently: every page and calculator tab was photographed
+  before and after, in the Standard look and in the dark Command Center look, and compared.
+  - The calculator's styles: 260 KB of rules that nothing on the page can match any more (left from the product the
+    calculator came from). The calculator page goes from 411 KB to 358 KB.
+  - The 16 pages of that product's markup that came along with the calculator's own (3,700 lines), its standalone
+    download builder, its launcher and its licence code.
+  - 92 functions and constants that nothing called, in 20 files, and two editors no button led to.
+  - 11 MB of old screenshots.
+- For those who work on it: `scripts/visual.mjs` photographs every page and compares two sets; `scripts/prune-css.mjs`
+  lists (or removes) the style rules nothing can match.
+
 ## CC-01.101.00 — 2026-11-13
 
 - **Mark an installation Staging or Production** (Settings → Updates). Not marked, it behaves as before.

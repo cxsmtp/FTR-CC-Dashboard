@@ -1,5 +1,4 @@
 import { mapWithConcurrency } from './client.js';
-import { withinWindow } from '../window.js';
 
 /** FAE Flush's temporary copies ("<name>_FAE", tagged so): never part of the backlog anywhere else. */
 export const FAE_FLUSH_TAG = 'mz-fae-flush';
@@ -98,35 +97,3 @@ export function lastScanDate(scan) {
   return null;
 }
 
-/**
- * Narrow the project list to those scanned inside `window`, so the (expensive)
- * per-project risk fetch only runs for projects that have recent activity.
- *
- * Returns the kept projects plus the counts needed to explain the filtering,
- * and degrades to "keep everything" if the last-scan lookup is unavailable.
- */
-export async function filterProjectsByActivity(client, projects, window, { lastScans: known = null } = {}) {
-  if (!window) return { projects, lastScans: known ?? {}, skipped: 0, warning: null };
-
-  // `lastScans` given: the scans that count (each project's primary branch's, src/cxone/branches.js).
-  let lastScans = known;
-  try {
-    lastScans ??= await getLastScans(
-      client,
-      projects.map((project) => project.id),
-    );
-  } catch (error) {
-    return {
-      projects,
-      lastScans: {},
-      skipped: 0,
-      warning: `Could not read last-scan dates, so the project activity window was not applied: ${error.message}`,
-    };
-  }
-
-  const kept = projects.filter((project) =>
-    withinWindow(window, lastScanDate(lastScans[project.id])),
-  );
-
-  return { projects: kept, lastScans, skipped: projects.length - kept.length, warning: null };
-}

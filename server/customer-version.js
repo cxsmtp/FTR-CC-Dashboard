@@ -75,31 +75,6 @@ export function customerFigures(live) {
   return { data, total: sum.total, sentTotal: Number(live.sentTotal) || null, customer: String(live.base.customer ?? '') };
 }
 
-/** The account's calculator settings with the customer's choices in them (their numbers, from now on). */
-export function preferencesPatch(profile, inputs) {
-  const patch = {};
-  const plan = inputs.tr?.plan;
-  if (plan && profile.tr) {
-    patch.tr = { ...profile.tr };
-    // Triage and remediation credits are the Admin's for everyone: a customer's version never brings its own.
-    for (const k of ['selected', 'fpPercent']) if (plan[k] && typeof plan[k] === 'object') patch.tr[k] = { ...(profile.tr[k] ?? {}), ...plan[k] };
-    for (const k of ['includeFuture', 'aiDeclinePercent', 'newPacePercent', 'fusionUpliftPercent']) if (plan[k] !== undefined) patch.tr[k] = plan[k];
-  }
-  if (profile.fusion && (inputs.months || inputs.fusion)) {
-    const f = { ...profile.fusion };
-    if (inputs.months) f.periodMonths = inputs.months;
-    const s = inputs.fusion?.settings;
-    if (s?.models) f.models = (f.models ?? []).map((m) => ({ ...m, creditsPer10k: s.models.find((x) => x.id === m.id)?.creditsPer10k ?? m.creditsPer10k }));
-    if (s?.byFrequency) f.byFrequency = { ...(f.byFrequency ?? {}), ...s.byFrequency };
-    // Per project, matched by name: a project the customer changed keeps their scans and model.
-    const theirs = new Map((inputs.fusion?.projects ?? []).filter((p) => p.name).map((p) => [p.name, p]));
-    if (theirs.size && Array.isArray(f.projects)) f.projects = f.projects.map((p) => (theirs.has(p.name) ? { ...p, included: theirs.get(p.name).included !== false, scansOverride: theirs.get(p.name).scansOverride ?? null, modelOverride: theirs.get(p.name).modelOverride ?? null } : p));
-    patch.fusion = f;
-  }
-  if (inputs.totals) patch.totals = { ...(profile.totals ?? {}), ...inputs.totals };
-  return patch;
-}
-
 /**
  * The calculator's own data again, from what a report with levers keeps (`inputs`: the backlog's analysis, the plan,
  * Fusion's settings and projects; `base`: the code counted and how the report was made). Loaded into an account, the

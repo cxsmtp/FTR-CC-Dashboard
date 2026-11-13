@@ -132,20 +132,3 @@ export function startHelpTips({ translate } = {}) {
   scan();
 }
 
-/** "Behind ?" (the default) or "shown": every explanation shown as before. Kept in this browser. */
-export function setHelpMode(mode) {
-  const shown = mode === 'shown';
-  document.documentElement.toggleAttribute('data-help', shown);
-  if (shown) document.documentElement.dataset.help = 'shown';
-  try {
-    localStorage.setItem('mz-help', shown ? 'shown' : 'tips');
-  } catch {}
-}
-
-export function helpMode() {
-  try {
-    return localStorage.getItem('mz-help') === 'shown' ? 'shown' : 'tips';
-  } catch {
-    return 'tips';
-  }
-}
