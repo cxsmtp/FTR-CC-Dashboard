@@ -102,6 +102,76 @@ export class Collection {
  * The audit trail: one JSON line per event, appended, never rewritten, each chained to the one before by SHA-256
  * (as the calculator’s audit log is), so an edited, removed or reordered line shows when the log is verified.
  */
+/**
+ * A log of one JSON line per entry, as its lines parsed: read whole once, and after that only what was appended since
+ * (a page of the audit log or of the activity log is then a walk over memory, not the whole file read and parsed
+ * again each time, twice a page). A file that shrank or was replaced (rotated, restored) is read whole again. Beyond
+ * `MAX_KEPT` bytes nothing is kept, and it is read as before.
+ */
+const MAX_KEPT = 64 * 1024 * 1024;
+export class LogLines {
+  #file;
+  #size = -1;
+  #ino = null;
+  #entries = [];
+  #rest = '';
+  constructor(file) {
+    this.#file = file;
+  }
+  /** Every entry, oldest first (the array is this reader's own: do not change it). */
+  entries() {
+    let stat;
+    try {
+      stat = fs.statSync(this.#file);
+    } catch {
+      this.#size = -1;
+      this.#entries = [];
+      this.#rest = '';
+      return this.#entries;
+    }
+    if (stat.size > MAX_KEPT) {
+      this.#size = -1;
+      this.#entries = [];
+      return parseLines(fs.readFileSync(this.#file, 'utf8')).entries;
+    }
+    if (this.#size < 0 || stat.size < this.#size || stat.ino !== this.#ino) {
+      const { entries, rest } = parseLines(fs.readFileSync(this.#file, 'utf8'));
+      this.#entries = entries;
+      this.#rest = rest;
+    } else if (stat.size > this.#size) {
+      const fd = fs.openSync(this.#file, 'r');
+      try {
+        const buf = Buffer.alloc(stat.size - this.#size);
+        fs.readSync(fd, buf, 0, buf.length, this.#size);
+        const { entries, rest } = parseLines(this.#rest + buf.toString('utf8'));
+        for (const e of entries) this.#entries.push(e);
+        this.#rest = rest;
+      } finally {
+        fs.closeSync(fd);
+      }
+    }
+    this.#size = stat.size;
+    this.#ino = stat.ino;
+    return this.#entries;
+  }
+  /** The file was replaced under this reader: read whole next time. */
+  forget() {
+    this.#size = -1;
+  }
+}
+/** The entries of whole lines, and what follows the last line break (a line still being written). */
+function parseLines(text) {
+  const cut = text.lastIndexOf('\n');
+  const entries = [];
+  for (const line of (cut < 0 ? '' : text.slice(0, cut)).split('\n')) {
+    if (!line) continue;
+    try {
+      entries.push(JSON.parse(line));
+    } catch {}
+  }
+  return { entries, rest: cut < 0 ? text : text.slice(cut + 1) };
+}
+
 export class AuditLog {
   #last = '';
   constructor(file) {
@@ -124,6 +194,7 @@ export class AuditLog {
   /** The file was replaced (a backup restored): the chain continues from what is on disk now. */
   reload() {
     this.#last = this.#tail();
+    this.#lines?.forget();
   }
   record({ actor = null, action, target = '', details = {}, ip = '' }) {
     const event = { at: new Date().toISOString(), actor, action, target, details, ip };
@@ -161,23 +232,16 @@ export class AuditLog {
     return { ok: true, events: n };
   }
   /** The newest events first, up to `limit`, those matching `filter`. */
+  #lines = null;
   recent({ limit = 200, filter = () => true } = {}) {
-    let text = '';
-    try {
-      text = fs.readFileSync(this.file, 'utf8');
-    } catch {
-      return [];
-    }
+    this.#lines ??= new LogLines(this.file);
+    const all = this.#lines.entries();
     const out = [];
-    const lines = text.split('\n');
-    for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
-      if (!lines[i]) continue;
-      try {
-        const { prev, hash, ...event } = JSON.parse(lines[i]);
-        void prev;
-        void hash;
-        if (filter(event)) out.push(event);
-      } catch {}
+    for (let i = all.length - 1; i >= 0 && out.length < limit; i--) {
+      const { prev, hash, ...event } = all[i];
+      void prev;
+      void hash;
+      if (filter(event)) out.push(event);
     }
     return out;
   }

@@ -8,6 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { LogLines } from './store.js';
 
 const KINDS = ['connect', 'disconnect', 'call', 'read', 'report', 'refresh'];
 
@@ -65,24 +66,14 @@ export class ActivityLog {
   }
 
   /** Newest first, those `filter` keeps, up to `limit`; both files. */
+  #lines = new Map(); // file -> its lines as parsed, kept between pages (server/store.js LogLines)
   recent({ limit = 200, filter = () => true } = {}) {
     this.flush();
     const out = [];
     for (const file of [this.file, this.old]) {
-      let text = '';
-      try {
-        text = fs.readFileSync(file, 'utf8');
-      } catch {
-        continue;
-      }
-      const lines = text.split('\n');
-      for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
-        if (!lines[i]) continue;
-        try {
-          const e = JSON.parse(lines[i]);
-          if (filter(e)) out.push(e);
-        } catch {}
-      }
+      if (!this.#lines.has(file)) this.#lines.set(file, new LogLines(file));
+      const all = this.#lines.get(file).entries();
+      for (let i = all.length - 1; i >= 0 && out.length < limit; i--) if (filter(all[i])) out.push(all[i]);
       if (out.length >= limit) break;
     }
     return out;

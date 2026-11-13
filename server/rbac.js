@@ -82,8 +82,14 @@ export function subtree(teams, rootId) {
 }
 
 /** The path from the top to a team: [Global, EMEA, EMEA North]. */
+const teamMaps = new WeakMap(); // a list of teams -> its teams by id (the same list is asked hundreds of times a page)
 export function teamPath(teams, id) {
-  const byId = new Map(teams.map((t) => [t.id, t]));
+  let byId = teamMaps.get(teams);
+  // Made again when the list changed under it: another length, or a team the map does not know.
+  if (!byId || byId.size !== teams.length || (id && !byId.has(id) && teams.some((t) => t.id === id))) {
+    byId = new Map(teams.map((t) => [t.id, t]));
+    teamMaps.set(teams, byId);
+  }
   const out = [];
   for (let t = byId.get(id), n = 0; t && n < 50; t = byId.get(t.parentId), n++) out.unshift(t);
   return out;

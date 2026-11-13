@@ -103,7 +103,20 @@ export class Iam {
   }
 
   save() {
+    this.#byId = null;
     this.doc.save();
+  }
+  // People by id and by email, made when first asked for and again after any change is saved (dashboards ask for the
+  // same people hundreds of times a page).
+  #byId = null;
+  #byEmail = null;
+  #indexed = null;
+  #index() {
+    const users = this.doc.value.users;
+    if (this.#byId && this.#indexed === users && this.#byId.size === users.length) return;
+    this.#byId = new Map(users.map((u) => [u.id, u]));
+    this.#byEmail = new Map(users.map((u) => [u.email, u]));
+    this.#indexed = users;
   }
 
   // ---- Roles ------------------------------------------------------------------------------------
@@ -154,10 +167,15 @@ export class Iam {
     return this.doc.value.users;
   }
   byId(id) {
-    return this.users().find((u) => u.id === id) ?? null;
+    this.#index();
+    return this.#byId.get(id) ?? null;
   }
   byEmail(email) {
-    return this.users().find((u) => u.email === norm(email)) ?? null;
+    this.#index();
+    // An address changed and not saved yet is still found the slow way.
+    const address = norm(email);
+    const hit = this.#byEmail.get(address);
+    return (hit && hit.email === address ? hit : this.users().find((u) => u.email === address)) ?? null;
   }
   activeAdmins() {
     return this.users().filter((u) => u.active !== false && u.role === 'admin');

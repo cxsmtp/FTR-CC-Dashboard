@@ -2,6 +2,14 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.105.00 — 2026-11-13
+
+- **Faster as the data grows.**
+  - The audit log and the CxOne API audit were read and parsed whole for every page, twice a page. They are read once,
+    and after that only what was added. With 100,000 entries a page of the audit log takes 1 ms, not 200.
+  - People are found by a look-up, not by walking through everyone (the dashboards ask for the same people hundreds of
+    times a page), and a team's path is worked out from one map of the teams a page, not a new one at every call.
+
 ## CC-01.104.00 — 2026-11-13
 
 - **For those who work on it: the server is in parts.** Its routes were one file of 2,500 lines; they are now 16 files
