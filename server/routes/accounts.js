@@ -2,6 +2,7 @@ import { summary } from '../calculator.js';
 import { suggestCurrency } from '../currency.js';
 import { needTeam, teamPath } from '../rbac.js';
 import { fail } from '../store.js';
+import { cleanIndustry } from '../estimate.js';
 
 /**
  * Accounts: their details, accountable SE and team, contacts, reports, sales and sharing.
@@ -99,6 +100,8 @@ export function registerAccounts(d) {
     if (body?.impactCurrency !== undefined) patch.impactCurrency = body.impactCurrency;
     if (body?.impactEnabled !== undefined) patch.impactEnabled = body.impactEnabled === true;
     if (body?.contacts !== undefined) patch.contacts = body.contacts;
+    // Its industry (for the estimate): one of the list, or none.
+    if (body?.industry !== undefined) patch.industry = cleanIndustry(body.industry);
     const had = new Set((before.contacts ?? []).map((c) => c.email));
     const after = accounts.setDetails(params.id, ctx.scope, patch, hosts().salesforce, { impactBase: ctx.user.prefs?.impact ?? null });
     // Moved with its SE to a team this person does not work in: said, as the account is no longer theirs to see.

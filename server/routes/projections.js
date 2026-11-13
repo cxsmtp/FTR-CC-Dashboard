@@ -4,6 +4,7 @@ import { withRates } from '../fusion-rates.js';
 import { teamPath } from '../rbac.js';
 import { explainCall } from '../resilience.js';
 import { fail } from '../store.js';
+import { INDUSTRIES } from '../estimate.js';
 
 /**
  * The calculator's API (/api/projections…) per team, the status lights, the Checkmarx One activity log, and the rule that a Salesforce link belongs to one account.
@@ -199,6 +200,8 @@ export function registerProjections(d) {
     ownTeamId: ctx.user.teamId,
     organisationName: settings.value.organisationName,
     exportsEnabled: settings.value.features?.exports === true,
+    // The indicative triage & remediation estimate for code only counted (beta, turned on by an Admin).
+    estimate: { ...d.estimateBeta(), industries: INDUSTRIES },
     // The menu and the look, as on the dashboard.
     teamName: teams.get(ctx.user.teamId)?.name ?? '',
     versionLabel: versionLabel(),
@@ -220,7 +223,7 @@ export function registerProjections(d) {
   r('GET', '/api/projections/git/count', calcTeam, (req, ctx, body, res, url) => calc.gitCountView(ctx.user.id, url.searchParams.get('id'), url.searchParams.get('after')));
   r('GET', '/api/projections/git/cloc-fusion', calcTeam, () => calc.clocFusion());
   /** An account for the calculator: never with its kept Checkmarx One key, sealed or not. */
-  const forBrowser = ({ cxone, ...a }) => ({ ...a, cxone: cxone ? { tenant: cxone.tenant, savedBy: cxone.savedBy, savedAt: cxone.savedAt, lastReadAt: cxone.lastReadAt ?? null } : null });
+  const forBrowser = ({ cxone, estimate, ...a }) => ({ ...a, estimate: estimate && d.estimateBeta().calculator ? { ...estimate, include: estimate.include === true && d.estimateBeta().report } : null, cxone: cxone ? { tenant: cxone.tenant, savedBy: cxone.savedBy, savedAt: cxone.savedAt, lastReadAt: cxone.lastReadAt ?? null } : null });
 
   return { forBrowser, takenView };
 }

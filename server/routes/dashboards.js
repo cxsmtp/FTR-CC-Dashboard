@@ -37,6 +37,7 @@ export function registerDashboards(d) {
         ownerId: a.ownerId,
         owner: userName(a.ownerId),
         salesforceUrl: a.salesforceUrl,
+        industry: a.industry ?? '',
         salesforceKind: a.salesforceKind,
         salesforceId: a.salesforceId,
         updatedAt: a.updatedAt,

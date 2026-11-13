@@ -107,6 +107,7 @@ const accountMeta = (a) => ({
   salesCount: (a.sales ?? []).length,
   lastSaleAt: (a.sales ?? []).map((x) => x.date).sort().at(-1) ?? null,
   impactCurrencyConfirmed: Boolean(a.impactCurrencyConfirmed),
+  industry: a.industry ?? '',
   publishedAt: a.publishedAt ?? null,
   pendingSince: a.pendingSince ?? null,
 });
@@ -189,6 +190,11 @@ export class Accounts {
   isDraft(id) {
     return !this.accounts.meta(id)?.publishedAt && !this.reports.list().some((r) => r.customerId === id);
   }
+  /** The indicative triage & remediation estimate kept with an account whose code was only counted (or none: null). */
+  setEstimate(id, teamIds, estimate) {
+    const account = this.get(id, teamIds);
+    return this.accounts.put({ ...account, estimate: estimate ?? null, ...(estimate?.industry ? { industry: estimate.industry } : {}), updatedAt: new Date().toISOString() });
+  }
   /** Its calculator was filled from this report: said, so it is not offered again until either changes. */
   markLoaded(id, reportId, at) {
     const account = this.accounts.get(id);
@@ -258,7 +264,7 @@ export class Accounts {
     if (next.pendingSince && hasProjection(next)) next.pendingSince = null;
     return this.accounts.put(next);
   }
-  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency, contacts }, hosts, { impactBase = null } = {}) {
+  setDetails(id, teamIds, { salesforceUrl, ownerId, teamId, name, impactEnabled, impactCurrency, contacts, industry }, hosts, { impactBase = null } = {}) {
     const account = this.get(id, teamIds);
     // Impact (beta): the soft savings in the report, off until the SE turns it on and confirms the currency.
     if (impactCurrency !== undefined) {
@@ -281,6 +287,7 @@ export class Accounts {
       Object.assign(account, { salesforceUrl: sf.url, salesforceKind: sf.kind, salesforceId: sf.recordId });
     }
     if (contacts !== undefined) account.contacts = cleanContacts(contacts);
+    if (industry !== undefined) account.industry = String(industry ?? '').slice(0, 60);
     if (ownerId !== undefined) account.ownerId = ownerId;
     if (teamId !== undefined) {
       account.teamId = teamId;

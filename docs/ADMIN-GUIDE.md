@@ -174,18 +174,26 @@ as it is found and says "Staging" at the top of every page, so nobody takes it f
 Nothing of this changes an installation by itself: the mark and the hours are set by an Admin and recorded in the
 audit log.
 
-## Vulnerability estimate (Admins only)
+## Vulnerability estimate
 
-Settings → Pricing → **Vulnerability estimate**. Internal: it is never in a report and no other role sees it.
+Settings → Pricing → **Vulnerability estimate** is the Admins' board. For code that has only been counted (a
+cloc-fusion report, a git count), it estimates the findings a first scan would report and their triage & remediation
+credits, from this installation's own accounts: their projects' lines of code against their open findings.
 
-For code that has only been counted (a cloc-fusion report, a git count), it estimates the findings a first scan would
-report and their triage & remediation credits. It is drawn from this installation's own accounts: their projects'
-lines of code against their open findings from Checkmarx One.
-
-- **What your accounts say**: the findings per 1,000 lines across your accounts (low, typical, high: the 25th, 50th
-  and 75th percentile), the new findings a month, and the test: each account predicted from the others and compared
-  with what it really has. Read the test before quoting anything: it says how wide the spread really is.
-- **An estimate** needs 8 accounts with 50,000 lines or more and a backlog from Checkmarx One. Until then, or for a
-  customer your accounts do not resemble, type your own findings per 1,000 lines.
-- Quote the range, not one number, and "typical" only where the customer has used a SAST tool before; an untouched
-  codebase sits at the high end. The first scan replaces the estimate.
+- **What goes into it.** Lines of code set the backlog. How much of the code is still being changed (repositories with
+  commits in the last year) sets the findings still to come. The developers are shown beside it; they are not in the
+  sum, as nothing here yet says how findings follow from them.
+- **The test.** Each account is predicted from the others and compared with what it really has. Read it before quoting.
+- **Freeze.** "Freeze these figures" keeps the figures as they are: every estimate uses them until you work them out
+  again, so a new account does not change a quote already given.
+- **Industry.** Each account has an industry: its SE picks it in the calculator, or you set it on the board. An
+  industry's own figures count from 5 of its accounts. Before that, or to use a figure of your own, type the
+  industry's standard (findings per 1,000 lines, by severity): what you type is used first.
+- **Where SEs see it (beta, off until you turn it on).**
+  - *In the calculator*: on an account whose code was only counted, the SE picks the industry and whether a SAST tool
+    was used before, and gets two estimates side by side: from all accounts, and the industry's standard.
+  - *In the report*: when its SE ticks it, the report of such an account carries a section of its own, marked as an
+    estimate. It is never part of the credits required.
+- An estimate from all accounts needs 8 accounts with 50,000 lines or more and a backlog from Checkmarx One. Quote the
+  range; "typical" where the customer has used a SAST tool before, the high end for an untouched codebase. The first
+  scan replaces the estimate.

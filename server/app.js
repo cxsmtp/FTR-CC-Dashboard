@@ -61,6 +61,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     get ACCENTS() { return ACCENTS; },
     get accountDetail() { return accountDetail; },
     get accounts() { return accounts; },
+    get estimateBeta() { return estimateBeta; },
     get acme() { return acme; },
     get activity() { return activity; },
     get audit() { return audit; },
@@ -460,7 +461,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // ---- Fusion rates: the Admin's engines and default engine, each team's own, and engines seen without a rate ----
   registerRates(d);
   // ---- The vulnerability estimate, for Admins (server/estimate.js) ---------------------------------------
-  registerEstimate(d);
+  const { estimateBeta } = registerEstimate(d);
 
   // ---- The requests ---------------------------------------------------------------------------------------------
   const PUBLIC_DIR = path.join(config.root, 'public');

@@ -218,6 +218,37 @@ function story(data, L) {
 }
 
 /** What the credits give back (model.js trImpact, fusionImpact, overallImpact, worked out when the report was made). */
+/**
+ * The indicative triage & remediation estimate (beta), for a customer whose code was only counted: what a first scan
+ * is likely to report and the credits to triage and remediate it, from comparable accounts and from the industry's
+ * standard. A section of its own, marked as an estimate: it is not part of the credits required.
+ */
+function estimateSection(data, L) {
+  const e = data.estimate;
+  if (!e || (!e.own && !e.standard)) return '';
+  const { w, num } = L;
+  const q = e.quote === 'high' ? 'high' : 'typical';
+  const span = (lo, hi) => (lo === hi ? '—' : `${num(lo)} ${w('to')} ${num(hi)}`);
+  const row = (label, x) => (x ? `<tr><td>${label}</td><td class="num">${span(x.low.total, x.high.total)}</td><td class="num"><b>${num(x[q].total)}</b></td><td class="num">${num(x[q].newMonthly)}</td><td class="num">${span(x.low.credits, x.high.credits)}</td><td class="num"><b>${num(x[q].credits)}</b></td></tr>` : '');
+  const code = e.code ?? {};
+  const facts = [
+    `${num(code.lines)} ${w('lines of code')}`,
+    `${num(code.repositories)} ${w('repositories')}`,
+    code.commits ? `${num(code.commits)} ${w('commits a year')}` : '',
+    code.developers ? `${num(code.developers)} ${w('developers in the last 90 days')}` : '',
+    code.activeShare === null || code.activeShare === undefined ? '' : `${num(Math.round(code.activeShare * 100))}% ${w('of the code still being changed')}`,
+  ].filter(Boolean).join(' · ');
+  return `<section class="estimate"><h2>${w('Indicative triage & remediation estimate')} <span class="beta">${w('beta')}</span></h2>
+<p class="note"><b>${w('An estimate, not a scan, and not part of the credits required.')}</b> ${w('This code has been counted, not scanned. What a first scan is likely to report is estimated from comparable accounts: their lines of code against their open findings. Codebases of one size differ widely, so it is a range; the first scan replaces it.')}</p>
+<p class="sub">${esc(facts)}</p>
+<div class="table-wrap"><table><thead><tr><th>${w('Estimated from')}</th><th class="num">${w('Open findings, range')}</th><th class="num">${w('Open findings')}</th><th class="num">${w('New a month')}</th><th class="num">${w('Credits, range')}</th><th class="num">${w('Triage & remediation credits')}</th></tr></thead><tbody>
+${row(`${w('Comparable accounts')}${e.own ? ` (${num(e.own.accounts)})` : ''}`, e.own)}
+${row(`${w('Industry standard')}: ${esc(w(e.industry))}`, e.standard)}
+</tbody></table></div>
+<p class="sub">${e.priorSast === false ? w('The figure in bold is the high end of the range: code that no static analysis has looked at before sits there.') : w('The figure in bold is the typical one, for code that static analysis has looked at before.')} ${w('Over')} ${num(e.months)} ${w('months')}: ${w('every finding triaged and the true ones remediated; the findings still to come are counted on the code that is still being changed.')}</p>
+</section>`;
+}
+
 function impactSection(data, L) {
   const m = data.impact?.tr;
   const f = data.impact?.fusion;
@@ -511,7 +542,7 @@ h2{margin:0 0 12px;font-size:18px;font-weight:600} h3{margin:18px 0 6px;font-siz
 .card{border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
 .card h3{margin:0 0 8px}
 .figure{margin:0 0 6px;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums} .figure span{font-size:13px;color:var(--muted);font-weight:400}
-.impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .lv-num[data-fixed]{background:transparent;border-color:transparent;pointer-events:none;color:var(--ink)} .beta-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;background:#ffe2a8;border:1px solid #f0b443;vertical-align:middle} .impact-tile.beta{border-style:dashed} .beta-note{border-left:3px solid #f0b443;padding-left:10px} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
+.estimate{margin-top:28px;padding:18px 20px;border:1px dashed var(--line,#cbd5e1);border-radius:12px} .estimate .beta{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;vertical-align:middle;opacity:.75} .estimate .note{margin:6px 0 10px} .estimate table{width:100%} .impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .lv-num[data-fixed]{background:transparent;border-color:transparent;pointer-events:none;color:var(--ink)} .beta-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;background:#ffe2a8;border:1px solid #f0b443;vertical-align:middle} .impact-tile.beta{border-style:dashed} .beta-note{border-left:3px solid #f0b443;padding-left:10px} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
 .sevs{list-style:none;margin:0 0 8px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:13px}
 .sevs li{display:flex;align-items:center;gap:6px} .sevs i{width:8px;height:8px;border-radius:2px;display:inline-block} .sevs b{margin-inline-start:auto;font-variant-numeric:tabular-nums;font-weight:500}
 table.calc{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
@@ -754,6 +785,7 @@ export function reportMain(raw, { t, lang = 'en', live = null } = {}) {
 ${live ? leversPanel(data, live, L) : ''}
 ${story(data, L)}
 ${impactSection(data, L)}
+${estimateSection(data, L)}
 ${assumptions(data, sum, L)}
 ${data.tr || data.fusion || data.fusionNew ? `<p class="appendix-title">${w('Appendix: every figure')}</p>` : ''}
 ${data.tr ? trAppendix(data.tr, L) : ''}

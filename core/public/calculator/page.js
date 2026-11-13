@@ -85,7 +85,7 @@ function appLook() {
  * customer tab may count code from git (on the server, or in the launcher on its computer; never in the
  * HTML file on its own, which can reach nothing).
  */
-export function initCalculator({ api, $, esc, toast, setStatus, showError, handleAuthLoss, fmtDateTime, me, can, standalone = false, sampleFile = null, canRead = () => !standalone, canGit = () => !standalone, impactOn = () => false }) {
+export function initCalculator({ api, $, esc, toast, setStatus, showError, handleAuthLoss, fmtDateTime, me, can, standalone = false, sampleFile = null, canRead = () => !standalone, canGit = () => !standalone, impactOn = () => false, estimateOf = () => null }) {
   // On its own with no way to Checkmarx One (the HTML file opened from disk): the two exports are the way in.
   const offline = () => standalone && !canRead();
   const c = { customers: [], open: null, pending: null, timer: null, saving: null, draft: {}, dirty: {}, present: false, remainingCredits: null, reports: [] };
@@ -892,9 +892,10 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     if (pickShares) {
       const activeOnes = pickShares.dataset.shares === 'active';
       const order = FREQUENCIES.map((f) => f.id);
+      const was = tr();
       c.open.tr = { ...tr(), activeOnly: false, shares: Object.fromEntries(order.map((id, i) => [id, !activeOnes || i <= order.indexOf('month') ? 100 : 0])) };
       save({ tr: c.open.tr });
-      return applyScope();
+      return recountBacklog(was);
     }
     if (event.target.closest('[data-ahead-reset]')) {
       c.open.tr = { ...tr(), includeFuture: DEFAULT_TR.includeFuture, fusionUpliftPercent: DEFAULT_TR.fusionUpliftPercent, aiDeclinePercent: DEFAULT_TR.aiDeclinePercent, newPacePercent: DEFAULT_TR.newPacePercent };
@@ -908,16 +909,18 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     if (event.target.matches('[data-plan-project]')) {
       const id = event.target.dataset.planProject;
       const before = aheadSettings(tr()).excluded;
+      const was = tr();
       c.open.tr = { ...tr(), excluded: event.target.checked ? before.filter((x) => x !== id) : [...before, id] };
       save({ tr: c.open.tr });
-      return applyScope();
+      return recountBacklog(was);
     }
     // A group's share of findings: the backlog is added up again from the last read.
     if (event.target.matches('[data-share]')) {
       const shares = { ...aheadSettings(tr()).shares, [event.target.dataset.share]: amount(event.target.value) ?? 100 };
+      const was = tr();
       c.open.tr = { ...tr(), shares, activeOnly: false };
       save({ tr: c.open.tr });
-      return applyScope();
+      return recountBacklog(was);
     }
     const engine = event.target.dataset.engine;
     if (engine) {
@@ -2701,6 +2704,38 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     changeScope({ [kind]: next().scope[kind].filter((k) => k !== button.dataset.key) });
   });
 
+  /**
+   * What triage & remediation counts was changed (a group's share, a project ticked or unticked): the backlog is
+   * added up again from the last read. When that cannot be done (the read is no longer held: it is kept only while
+   * connected to this account), the change is taken back and the reason said where it was made, instead of a figure
+   * left as it was beside a setting that says otherwise.
+   */
+  let lastCounted = null; // what was counted before the changes still being worked out (several can follow each other)
+  let recounts = 0;
+  async function recountBacklog(given) {
+    // The setting to go back to is the one before the first change still on its way, not one of those in between.
+    lastCounted ??= given;
+    const was = lastCounted;
+    recounts += 1;
+    const done = await applyScope();
+    recounts -= 1;
+    if (done !== false) {
+      if (!recounts) lastCounted = null;
+      return;
+    }
+    if (recounts) return; // a later change is still being worked out: it settles what stands
+    lastCounted = null;
+    // As it was, spelled out (a setting left out of what is saved would keep the value just tried).
+    const before = aheadSettings(was);
+    c.open.tr = { ...tr(), shares: { ...before.shares }, excluded: [...before.excluded], activeOnly: Boolean(was.activeOnly) };
+    save({ tr: c.open.tr });
+    // The box being typed in is left alone by a redraw (so typing is never lost): here it is put back by hand.
+    document.activeElement?.blur?.();
+    renderTr();
+    const shares = aheadSettings(tr()).shares;
+    for (const box of $('calc-tr').querySelectorAll('[data-share]')) box.value = shares[box.dataset.share] ?? 100;
+  }
+
   /** Use the scope: Fusion counts its projects, and triage & remediation reads their backlog (from the last read). */
   async function applyScope({ quiet = false } = {}) {
     if (!c.open) return;
@@ -2740,10 +2775,17 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       save({ tr: c.open.tr });
       if (!quiet) setStatus('calc-scope-status', `${num(ids.length)} projects counted.`, 'ok');
     } catch (error) {
-      if (handleAuthLoss(error)) return;
-      if (!quiet) showError('calc-scope-status', error);
+      if (handleAuthLoss(error)) return false;
+      if (!quiet) {
+        showError('calc-scope-status', error);
+        // Said where the change was made too (the status above sits in the settings, which may be closed).
+        toast(/Read Checkmarx One first/.test(error.message) ? 'Not changed: what each project has open is kept only while you are connected to this account. Connect and read Checkmarx One again (Refresh, at the top), then change what is counted.' : `Not changed: ${error.message}`, 'bad', 12000);
+      }
+      renderTr();
+      return false;
     }
     renderTr();
+    return true;
   }
 
   // More filters: each change waits for Apply; Enter in a field applies.
@@ -3746,6 +3788,9 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     });
     const base = {
       version: 2,
+      // The indicative triage & remediation estimate of an account whose code was only counted (beta): in the report
+      // only when its SE ticked it and the Admin allows it. Never part of the credits.
+      estimate: estimateOf()?.include ? estimateOf() : null,
       organisation: me()?.organisationName ?? '',
       customer: c.open.name,
       preparedBy: who?.name || who?.email || '',
@@ -3828,7 +3873,8 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       await flush();
     }
     const data = reportData();
-    if (!data.tr && !data.fusion) {
+    // Code that was only counted (Fusion · from Git) is something to report too: a Fusion-only customer has nothing else.
+    if (!data.tr && !data.fusion && !data.fusionNew) {
       toast(offline() ? 'Nothing to report yet: drop the two Checkmarx One exports below (or load the sample data), or add Fusion projects first.' : 'Nothing to report yet: read Checkmarx One (or use the two exports), or add Fusion projects first.', 'warn');
       return null;
     }

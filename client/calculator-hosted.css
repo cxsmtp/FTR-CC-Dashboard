@@ -836,3 +836,13 @@ html[data-cc] .hc-cloc #hc-cf-dl:hover { background: color-mix(in srgb, var(--br
 /* Staging, said at the top (as on the dashboard). */
 .tb-stage { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; margin-right: 8px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--amber, #92400e); background: color-mix(in srgb, var(--amber, #d97706) 14%, transparent); border: 1px solid color-mix(in srgb, var(--amber, #d97706) 45%, transparent); }
 .tb-stage[hidden] { display: none; }
+
+/* Triage & remediation estimate (beta), on Fusion · from Git for an account whose code was only counted. */
+.hc-estimate { border-style: dashed !important; }
+.hc-est-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin: 10px 0; }
+.hc-est-form .field { flex: 1 1 220px; min-width: 0; margin: 0; }
+.hc-est-form .hc-check { flex: 1 1 100%; }
+.hc-est-form .status { flex: 1 1 100%; }
+.hc-est-table { table-layout: fixed; width: 100%; }
+.hc-est-table :is(th, td) { white-space: normal !important; overflow-wrap: anywhere; }
+.hc-est-table th:first-child { width: 26%; }

@@ -2,6 +2,28 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.109.00 — 2026-11-13
+
+- **Vulnerability estimate, taken further.**
+  - **Freeze**: the Admin keeps the figures as they are; every estimate uses them until they are worked out again, so a
+    new account does not move a quote already given.
+  - **Industry**: each account has one (its SE picks it in the calculator; the Admin on the board). An estimate is made
+    twice, side by side: from all accounts, and the **industry's standard**: that industry's own accounts once there
+    are 5 of them, or the standard the Admin types for it.
+  - **Commits and developers count for what they say.** Lines of code set the backlog. The findings still to come are
+    counted only on the code still being changed (repositories with commits in the last year). The developers are
+    shown beside it.
+  - **In the calculator (beta)**, when the Admin turns it on: on an account whose code was only counted, the SE picks
+    the industry and whether a SAST tool was used before, and sees both estimates.
+  - **In the report (beta)**, when the Admin allows it and the SE ticks it: a section of its own, marked as an
+    estimate and never part of the credits required.
+- **A customer with only counted code can have a report.** Generating said "Nothing to report yet" when there was code
+  counted from Git or a cloc-fusion report and nothing from Checkmarx One, although the status said "Ready to
+  generate".
+- **A percentage of findings counted that cannot be applied says so.** Changing a group's share needs what each
+  project has open, which is kept only while connected to that account. Later the box took the new figure and the
+  credits stayed as they were. It now says why, and the percentage goes back.
+
 ## CC-01.108.00 — 2026-11-13
 
 - **The calculator no longer lags on a large account.** It was not the network: with thousands of projects the browser

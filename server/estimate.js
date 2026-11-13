@@ -14,6 +14,12 @@
  */
 import { DEFAULT_TR, SEVERITIES, analyse, seriesRows, trProjection } from '../core/public/calculator/model.js';
 
+/** The industries an account can be in (its SE picks it in the calculator; an Admin on the estimate's page). */
+export const INDUSTRIES = ['Banking & financial services', 'Insurance', 'Telecom', 'Technology & software', 'Retail & e-commerce', 'Healthcare & life sciences', 'Manufacturing & automotive', 'Energy & utilities', 'Government & public sector', 'Media & entertainment', 'Transport & logistics', 'Other'];
+export const cleanIndustry = (value) => (INDUSTRIES.includes(String(value ?? '')) ? String(value) : '');
+/** An industry's own figures count from this many of its accounts; with fewer, an Admin's typed standard, or none. */
+export const MIN_INDUSTRY = 5;
+
 /** An account needs this much code and this many findings to count (a pilot of three projects says little). */
 export const MIN_LINES = 50_000;
 /** Fewer accounts than this: no estimate is offered (a "typical" of two or three accounts is not one). */
@@ -39,6 +45,7 @@ export function accountFacts(account) {
   return {
     id: account.id,
     name: account.name,
+    industry: cleanIndustry(account.industry),
     lines,
     projects: projects.length,
     open,
@@ -99,9 +106,12 @@ export function benchmark(facts) {
  * usual plan: every finding triaged, the true ones remediated). `density` may be given by hand (per severity, per
  * 1,000 lines) in place of the accounts' own.
  */
-export function estimate({ lines, months = 12, includeNew = true }, bench, { rates = {}, density = null } = {}) {
+export function estimate({ lines, months = 12, includeNew = true, activeShare = null }, bench, { rates = {}, density = null } = {}) {
   const kloc = Math.max(0, Number(lines) || 0) / 1000;
-  const grow = bench.addedPct?.typical ?? 0;
+  // New findings come from code that changes: counted on the share of the lines in repositories with commits in the
+  // last year (all of them when that is not known).
+  const alive = activeShare === null || activeShare === undefined ? 1 : Math.min(1, Math.max(0, Number(activeShare) || 0));
+  const grow = (bench.addedPct?.typical ?? 0) * alive;
   const today = new Date();
   const iso = (d) => d.toISOString().slice(0, 10);
   const before = new Date(today);
@@ -125,5 +135,78 @@ export function estimate({ lines, months = 12, includeNew = true }, bench, { rat
       aheadCredits: Math.round(p?.totals?.aheadCredits ?? 0),
     };
   }
-  return { lines: Math.round(kloc * 1000), months, includeNew: Boolean(includeNew), byHand: Boolean(density), ...out };
+  return { lines: Math.round(kloc * 1000), months, includeNew: Boolean(includeNew), byHand: Boolean(density), activeShare: activeShare === null || activeShare === undefined ? null : alive, ...out };
+}
+
+/**
+ * What code that was only counted says (a git count, a cloc-fusion report): its lines, and how alive it is.
+ *   lines        code lines counted, in the repositories included
+ *   commits      commits a year on the default branches (as measured over each repository's window)
+ *   developers   people who committed in the last 90 days (the most any one count saw; counts are not added up, as
+ *                one person may work in several repositories)
+ *   activeShare  the share of the lines that sit in repositories changed in the last year (0 to 1; null when no
+ *                repository says how often it changes): new findings come from code that changes, so the findings
+ *                still to come are counted on this share only.
+ * `linesOf(project)` gives a repository's code lines (the calculator's own count).
+ */
+export function codeFacts(account, linesOf) {
+  const own = account?.fusionNew ?? {};
+  const projects = (own.projects ?? []).filter((p) => p?.included !== false);
+  let lines = 0;
+  let known = 0;
+  let active = 0;
+  let commits = 0;
+  let developers = 0;
+  for (const p of projects) {
+    const n = Number(linesOf(p, own.leftOut)) || 0;
+    lines += n;
+    const a = p.activity;
+    const c = Number(a?.commits);
+    const days = Number(a?.windowDays) || 365;
+    if (Number.isFinite(c) && c >= 0) {
+      known += n;
+      if (c > 0) active += n;
+      commits += Math.round((c * 365) / days);
+    }
+    developers = Math.max(developers, Number(a?.devs90) || 0);
+  }
+  return { lines, repositories: projects.length, commits, developers, activeShare: known > 0 ? active / known : null };
+}
+
+/** A benchmark as it is kept when frozen: its figures only (no account's name or numbers). */
+export const figuresOf = (b) => ({ accounts: b.accounts, density: b.density, densityBySeverity: b.densityBySeverity, addedPct: b.addedPct, within2: b.within2, within3: b.within3, tested: b.backtest?.length ?? b.tested ?? 0 });
+
+/** The figures across all accounts and for each industry with accounts in it. */
+export function benchmarks(facts) {
+  const list = facts.filter(Boolean);
+  const industries = {};
+  for (const name of INDUSTRIES) {
+    const of = list.filter((f) => f.industry === name);
+    if (of.length) industries[name] = benchmark(of);
+  }
+  return { all: benchmark(list), industries };
+}
+
+/**
+ * The two sets of figures an estimate for `industry` is made from, out of `state`:
+ *   state.live       benchmarks(facts) as the accounts stand now
+ *   state.frozen     { at, by, all, industries } kept by an Admin (figuresOf each), or null: used instead of live
+ *   state.standards  { industry: { Critical, High, Medium, Low } } typed by an Admin (findings per 1,000 lines)
+ * Returns { own, standard }: `own` from every account; `standard` for the industry, from the Admin's typed standard
+ * first, else that industry's own accounts when there are MIN_INDUSTRY of them; null when there is neither.
+ */
+export function figuresFor(industry, state) {
+  const from = state.frozen ?? { all: figuresOf(state.live.all), industries: Object.fromEntries(Object.entries(state.live.industries).map(([k, v]) => [k, figuresOf(v)])) };
+  const own = { ...from.all, enough: from.all.accounts >= MIN_ACCOUNTS, source: 'accounts' };
+  const name = cleanIndustry(industry);
+  const typed = name ? state.standards?.[name] : null;
+  const hasTyped = typed && SEVERITIES.some((s) => Number(typed[s]) > 0);
+  let standard = null;
+  if (hasTyped) {
+    const one = (s) => ({ low: Number(typed[s]) || 0, typical: Number(typed[s]) || 0, high: Number(typed[s]) || 0 });
+    standard = { accounts: 0, densityBySeverity: Object.fromEntries(SEVERITIES.map((s) => [s, one(s)])), addedPct: from.all.addedPct, enough: true, source: 'typed', industry: name };
+  } else if (name && from.industries?.[name]?.accounts >= MIN_INDUSTRY) {
+    standard = { ...from.industries[name], enough: true, source: 'industry', industry: name };
+  }
+  return { own, standard, frozenAt: state.frozen?.at ?? null };
 }
