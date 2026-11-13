@@ -53,8 +53,8 @@ async function show() {
   if (!state.me) return viewLogin();
   applyMyTheme();
   if (path === '/login') return go(firstStepsDone() ? home() : '/welcome');
-  if (!firstStepsDone()) return viewWelcome();
   try {
+    if (!firstStepsDone()) return await viewWelcome();
     if (path === '/' || path === '/welcome') return go(home());
     if (path === '/overview') return await viewOverview(params);
     if (path === '/accounts') return await viewAccounts(params);

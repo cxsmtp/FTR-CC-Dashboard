@@ -1,6 +1,5 @@
-import { $, $$, ago, api, can, date, dateTime, esc, go, icon, initials, num, state, toast } from './core.js';
+import { $, $$, ago, api, can, date, dateTime, esc, go, icon, initials, num, once, state, toast } from './core.js';
 import { paint, teamSelect } from './overview.js';
-import { peopleList } from './people.js';
 import { loading, shell } from './shell.js';
 // ---- Accounts --------------------------------------------------------------------------------------------
 /** Email addresses typed for "shared with": one or more, comma or space between; null when one is not an address. */
@@ -24,7 +23,7 @@ export function shareInline(host, reportId, { onDone, onCancel, suggest = [] } =
     host.innerHTML = before;
     onCancel?.();
   };
-  const save = async () => {
+  const save = once(async () => {
     const emails = emailList(input.value);
     if (!emails) {
       input.setCustomValidity('Type the email address(es) of whom it was shared with.');
@@ -40,7 +39,7 @@ export function shareInline(host, reportId, { onDone, onCancel, suggest = [] } =
       toast(error.message, 'bad');
       host.querySelectorAll('button').forEach((b) => (b.disabled = false));
     }
-  };
+  });
   host.querySelector('[data-ok]').onclick = (e) => (e.stopPropagation(), save());
   host.querySelector('[data-x]').onclick = (e) => (e.stopPropagation(), cancel());
   input.onkeydown = (e) => (e.key === 'Enter' ? (e.preventDefault(), save()) : e.key === 'Escape' && cancel());
@@ -76,10 +75,9 @@ export async function viewAccounts(params) {
   closeAccount({ quiet: true });
   shell('accounts', loading());
   const listUrl = `/api/accounts${focus ? `?team=${encodeURIComponent(focus)}` : ''}`;
-  let [{ accounts }, people] = await Promise.all([api(listUrl), peopleList()]);
+  let { accounts } = await api(listUrl);
   const owners = [...new Map(accounts.map((a) => [a.ownerId, a.owner])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
-  void people;
-  let sort = { key: 'credits', dir: -1 };
+  const sort = { key: 'credits', dir: -1 };
   // An SE sees the accounts they are accountable for first (Every SE shows the rest of their team); every other role
   // sees every account it may, as its access allows. A link that names an SE wins.
   const ownerFirst = params.get('owner') ?? (state.me.role?.id === 'se' && owners.some(([id]) => id === state.me.user.id) ? state.me.user.id : '');
@@ -212,6 +210,8 @@ export async function viewAccounts(params) {
     try {
       ({ accounts: list } = await api('/api/cc/accounts-out-of-step'));
     } catch {}
+    // The page was drawn again while this was asked for: that banner is no longer the one on the page.
+    if (!box.isConnected) return;
     if (!list.length) return void (box.innerHTML = '');
     const one = list.length === 1;
     box.innerHTML = `<div class="panel follow-panel"><div class="flex"><div><b>${num(list.length)} account${one ? ' is' : 's are'} in another team than ${one ? 'its' : 'their'} accountable SE.</b>
@@ -228,9 +228,10 @@ export async function viewAccounts(params) {
         toast(error.message, 'bad');
       }
     };
-    $('#follow-show').onclick = () => ($('#follow-list').hidden = !$('#follow-list').hidden);
-    $('#follow-all').onclick = () => move(null);
-    for (const b of $$('#follow-list [data-follow]')) b.onclick = () => move([b.dataset.follow]);
+    const listBox = box.querySelector('#follow-list');
+    box.querySelector('#follow-show').onclick = () => (listBox.hidden = !listBox.hidden);
+    box.querySelector('#follow-all').onclick = () => move(null);
+    for (const b of box.querySelectorAll('[data-follow]')) b.onclick = () => move([b.dataset.follow]);
   };
   outOfStep();
   /** A cell edited in place: Enter or leaving it saves, Esc puts it back. */
@@ -238,7 +239,8 @@ export async function viewAccounts(params) {
     const kind = cell.dataset.edit;
     const before = cell.innerHTML;
     const restore = () => (cell.innerHTML = before);
-    const done = async (fn, msg) => {
+    // Sent once, however often Enter or the button is pressed while it is on its way.
+    const done = once(async (fn, msg) => {
       try {
         await fn();
         toast(msg, 'ok');
@@ -247,7 +249,7 @@ export async function viewAccounts(params) {
         toast(error.message, 'bad');
         restore();
       }
-    };
+    });
     if (kind === 'name') {
       cell.innerHTML = `<input class="cell-edit" maxlength="120" value="${esc(a.name)}" aria-label="Account name, as in Salesforce" />`;
       const input = cell.querySelector('input');
@@ -305,10 +307,6 @@ export async function viewAccounts(params) {
       cell.onkeydown = (e) => (e.key === 'Enter' ? save() : e.key === 'Escape' && restore());
     }
   }
-  for (const th of $$('th.sort')) th.onclick = () => {
-    sort = { key: th.dataset.k, dir: sort.key === th.dataset.k ? -sort.dir : th.dataset.k === 'name' || th.dataset.k === 'owner' ? 1 : -1 };
-    render();
-  };
   $('#q').oninput = render;
   $('#owner').onchange = render;
   $('#status').onchange = render;
@@ -652,16 +650,22 @@ export function salesPanel(a, d) {
 export function wireSales(a, d) {
   const form = $('#sale');
   if (form) {
-    form.onsubmit = async (e) => {
-      e.preventDefault();
+    const record = once(async () => {
       const f = new FormData(form);
+      const send = form.querySelector('button[type=submit], button:not([type])');
+      if (send) send.disabled = true;
       try {
         await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/sales`, { method: 'POST', body: { credits: Number(f.get('credits')), date: f.get('date'), opportunityUrl: f.get('opportunityUrl'), reference: f.get('reference'), note: f.get('note'), reportId: f.get('reportId') || null } });
         toast(`${num(Number(f.get('credits')))} credits recorded as sold.`, 'ok');
         viewAccount(a.id);
       } catch (error) {
         $('#sale-err').textContent = error.message;
+        if (send) send.disabled = false;
       }
+    });
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      record();
     };
     if ($('#sale-rest')) $('#sale-rest').onclick = () => (form.credits.value = a.remaining);
   }
@@ -759,7 +763,7 @@ export async function linkTaken(url, exceptId = '') {
     });
     dlg.showModal();
   });
-  if (choice === 'account') viewAccount(taken.id);
+  if (choice === 'account') go(`/accounts/${encodeURIComponent(taken.id)}`);
   else if (choice === 'calc') location.href = `/calculator?team=${encodeURIComponent(taken.teamId)}&account=${encodeURIComponent(taken.id)}`;
   return true;
 }

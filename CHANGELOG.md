@@ -2,6 +2,30 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.98.00 — 2026-11-13
+
+- **The page cache, made right.**
+  - Pointing at a link and then clicking shows what is kept and is drawn again when the newer answer arrives (the
+    redraw was missed).
+  - An answer on its way when you save, sign out or the session ends is dropped when it arrives: it can no longer put
+    older data, or another person's, back.
+  - The audit log and the CxOne API audit are always read live.
+  - A page is not drawn again over work in progress: a person's panel, a search typed, a sorted or filtered table, an
+    open menu or filter.
+- **A sale or a share is recorded once**, however often Enter or the button is pressed while it is being sent.
+- **Accounts sorts one way**: by its column headers, like every table (it had a second sort under the same click).
+- **"Cannot set properties of null" on Accounts**: the banner of accounts in another team wired its buttons after the
+  page had been drawn again. It leaves a page that has moved on alone.
+- **Settings → HTTPS no longer says it worked when the confirmed try failed** (mode, certificate, previous certificate).
+- **First sign-in**: when the terms cannot be loaded the reason is shown, not a blank page.
+- **"Older entries"** in the audit pages says why it failed and can be pressed again.
+- **What you type in a dialog is kept** and brought back, as in pages. Drafts are each person's own on a shared
+  browser, and never shown over an account's saved details.
+- **Messages meant to stay longer do**: an error asked to stay 9 seconds was gone after 5.5.
+- **Calculator**: an account opened while another was still loading is the one that stands; when your settings cannot
+  be loaded it says so with "Load again", in place of a calculator that could not save. The work indicator keeps
+  looking after one failed look.
+
 ## CC-01.97.00 — 2026-11-13
 
 - **No end date.** The calculator carried the licence gate of the product it came from, which would have shut it on

@@ -1,4 +1,4 @@
-import { $, ago, api, dateTime, esc, go, num } from './core.js';
+import { $, ago, api, dateTime, esc, go, num, toast } from './core.js';
 import { loading, shell } from './shell.js';
 import { multiPick, pickValues, wirePicks } from './widgets.js';
 // ---- Checkmarx One activity: every call to a customer's tenant, reads, connections, reports generated --------------
@@ -69,7 +69,13 @@ export async function viewActivity(params) {
   let shown = d.events.length;
   $('#actmore').onclick = async (e) => {
     e.target.disabled = true;
-    const next = await api(`/api/activity?${new URLSearchParams([...new URLSearchParams(qs()), ['before', last]])}`);
+    let next;
+    try {
+      next = await api(`/api/activity?${new URLSearchParams([...new URLSearchParams(qs()), ['before', last]])}`);
+    } catch (error) {
+      e.target.disabled = false;
+      return toast(error.message, 'bad');
+    }
     $('#actrows').insertAdjacentHTML('beforeend', next.events.map(row).join(''));
     last = next.events.at(-1)?.at ?? last;
     shown += next.events.length;

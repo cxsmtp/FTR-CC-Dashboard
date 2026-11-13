@@ -1,4 +1,4 @@
-import { esc, num } from './core.js';
+import { esc, num, state } from './core.js';
 // ---- Multi-select: a dropdown of checkboxes with a search, for filters everywhere --------------------------------------
 /** options: [[value, label]]; selected: a Set of values. The chosen values are read with pickValues(root). */
 export function multiPick(name, label, options, selected = new Set()) {
@@ -209,8 +209,9 @@ export function enhanceTable(table) {
 export const DRAFT = 'cc-draft:';
 /** Fields that hold a secret (a password, token or key) are never kept as a draft, whatever their type. */
 export const SECRET_FIELD = /pass(word)?|token|secret|api.?key|^key$/i;
-export const draftable = (el) => el.form && el.name && !el.closest('[data-nodraft], .filters, .mpick') && !['password', 'file', 'hidden', 'submit', 'button', 'search'].includes(el.type) && !SECRET_FIELD.test(el.name) && !el.form.matches('#sf, #bf, #auto, #af, #actf');
-export const draftKey = (el) => `${DRAFT}${location.hash.split('?')[0]}:${el.form.id || el.form.className}:${el.name}`;
+export const draftable = (el) => el.form && el.name && !el.closest('[data-nodraft], .filters, .mpick') && !['password', 'file', 'hidden', 'submit', 'button', 'search'].includes(el.type) && !SECRET_FIELD.test(el.name) && !el.form.matches('#sf, #bf, #auto, #af, #actf, #acct');
+/** A draft is its writer's: the person signed in is part of its name, so it is never shown to the next one on a shared browser. */
+export const draftKey = (el) => `${DRAFT}${state.me?.user?.id ?? 'nobody'}:${location.hash.split('?')[0]}:${el.form.id || el.form.className}:${el.name}`;
 document.addEventListener('input', (e) => {
   const el = e.target;
   if (!draftable(el)) return;
@@ -243,8 +244,9 @@ export function restoreDrafts(root) {
 /** Tables appear as pages draw: each is given sorting and filters once. */
 new MutationObserver(() => {
   for (const t of document.querySelectorAll('#app table:not([data-tx])')) enhanceTable(t);
-  restoreDrafts(document.getElementById('app') ?? document.body);
-}).observe(document.getElementById('app') ?? document.body, { childList: true, subtree: true });
+  // Dialogs are added to the page itself, beside the app: what was typed in them is kept and brought back too.
+  restoreDrafts(document.body);
+}).observe(document.body, { childList: true, subtree: true });
 window.addEventListener('hashchange', () => document.querySelector('.tx-pop')?.remove());
 
 // ---- Menus inside a table: opened over the page, not inside the table's own scrolling -------------------------------

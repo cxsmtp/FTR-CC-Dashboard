@@ -56,7 +56,13 @@ export async function viewAudit(params) {
   };
   $('#amore').onclick = async (e) => {
     e.target.disabled = true;
-    const next = await api(`/api/audit?${new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), before: last })}`);
+    let next;
+    try {
+      next = await api(`/api/audit?${new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), before: last })}`);
+    } catch (error) {
+      e.target.disabled = false;
+      return toast(error.message, 'bad');
+    }
     $('#arows').insertAdjacentHTML('beforeend', next.events.map(row).join(''));
     last = next.events.at(-1)?.at ?? last;
     shown += next.events.length;

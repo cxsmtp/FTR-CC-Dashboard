@@ -209,6 +209,8 @@ export async function watchWork() {
   try {
     w = await api('/api/cc/work');
   } catch {
+    // One look that failed (a dropped connection, an update under way): looked at again in a while.
+    workTimer = setTimeout(watchWork, 15000);
     return;
   }
   const el = $('#bgwork');

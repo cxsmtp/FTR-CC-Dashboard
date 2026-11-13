@@ -340,8 +340,12 @@ export const ADMIN_VIEWS = {
       try {
         await api('/api/https/mode', { method: 'POST', body: { mode } });
       } catch (error) {
-        if (/Confirm/.test(error.message) && confirm(error.message)) await api('/api/https/mode', { method: 'POST', body: { mode, confirm: true } }).catch(err);
-        else return err(error);
+        if (!(/Confirm/.test(error.message) && confirm(error.message))) return err(error);
+        try {
+          await api('/api/https/mode', { method: 'POST', body: { mode, confirm: true } });
+        } catch (again) {
+          return err(again);
+        }
       }
       toast(`Now ${MODE[mode]}.`, 'ok');
       viewAdmin('https');
@@ -369,15 +373,22 @@ export const ADMIN_VIEWS = {
       try {
         await api('/api/https/certificate', { method: 'POST', body });
       } catch (error) {
-        if (/Confirm|confirm/.test(error.message) && confirm(error.message)) {
-          await api('/api/https/certificate', { method: 'POST', body: { ...body, confirm: true } }).catch((x) => ($('#upres').textContent = x.message));
-        } else return ($('#upres').textContent = error.message);
+        if (!(/Confirm|confirm/.test(error.message) && confirm(error.message))) return ($('#upres').textContent = error.message);
+        try {
+          await api('/api/https/certificate', { method: 'POST', body: { ...body, confirm: true } });
+        } catch (again) {
+          return ($('#upres').textContent = again.message);
+        }
       }
       toast('Certificate in use.', 'ok');
       viewAdmin('https');
     };
     if ($('#prev')) $('#prev').onclick = async () => {
-      await api('/api/https/certificate/previous', { method: 'POST', body: {} }).catch(err);
+      try {
+        await api('/api/https/certificate/previous', { method: 'POST', body: {} });
+      } catch (error) {
+        return err(error);
+      }
       viewAdmin('https');
     };
     const names = (form) => String(new FormData(form).get('names') ?? '').split(/[\s,]+/).filter(Boolean);

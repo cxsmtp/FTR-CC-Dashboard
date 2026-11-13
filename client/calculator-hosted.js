@@ -103,14 +103,38 @@ export async function startHosted() {
     document.documentElement.removeAttribute('data-opening');
     document.getElementById('hc-opening')?.remove();
   };
-  try {
-    const res = await fetch('/api/cc/calc-config', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-    if (res.status === 401) {
-      location.href = `/#/login?next=${encodeURIComponent(location.pathname + location.search)}`;
-      return;
+  // Who you are here (teams, permissions, the token changes are sent with): asked twice before giving up, and without
+  // it the calculator does not start half-working (nothing could be saved): it says so.
+  let loaded = false;
+  for (let attempt = 0; attempt < 2 && !loaded; attempt++) {
+    try {
+      const res = await fetch('/api/cc/calc-config', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      if (res.status === 401) {
+        location.href = `/#/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+      cfg = await res.json();
+      loaded = true;
+    } catch {
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 900));
     }
-    cfg = await res.json();
-  } catch {}
+  }
+  if (!loaded) {
+    openingDone();
+    const note = document.createElement('p');
+    note.className = 'hc-warn-box';
+    note.setAttribute('role', 'alert');
+    note.innerHTML = '<b>The calculator could not load your settings.</b> The command center did not answer (a dropped connection, or an update under way). ';
+    const again = document.createElement('button');
+    again.type = 'button';
+    again.className = 'primary sm';
+    again.textContent = 'Load again';
+    again.onclick = () => location.reload();
+    note.append(again);
+    (document.getElementById('hc-account') ?? document.body).prepend(note);
+    return;
+  }
   const $ = (id) => document.getElementById(id);
   const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const perms = new Set(cfg.permissions ?? []);
@@ -637,12 +661,14 @@ export async function startHosted() {
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => account && showAccount(account.id), 400);
   };
+  let showAsked = 0; // the last account asked for: an earlier answer arriving late changes nothing
   async function showAccount(id) {
     const bar = $('hc-account');
     // No account open: nothing of a projection on the page (it waits for a name).
     document.documentElement.toggleAttribute('data-no-account', !id);
     if (id) openingDone();
     if (!id) {
+      showAsked += 1;
       account = null;
       bar.classList.remove('missing-sf');
       // A new account: its name and its Salesforce link, together.
@@ -662,7 +688,10 @@ export async function startHosted() {
       return;
     }
     try {
+      const asked = ++showAsked;
       const { account: a, members, draft, pending } = await server(`/api/cc/accounts/${encodeURIComponent(id)}`);
+      // Another account was opened while this one was on its way: the later one stands.
+      if (asked !== showAsked) return;
       accountDraft = Boolean(draft);
       accountPending = Boolean(pending);
       const switched = account?.id !== a.id;

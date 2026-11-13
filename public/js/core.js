@@ -65,9 +65,20 @@ export const state = { me: null, people: null };
 const KEPT = new Map();
 /** Fresh enough to show without asking again; older, it is still shown at once, and asked for again behind it. */
 const KEPT_MS = 30_000;
-/** The lists and records the pages open with (not the ones that change as you watch, nor anything with secrets). */
-const keepable = (path) => /^\/api\/(accounts|people|dashboard|fusion-rates|tr-rates)(\?|$)|^\/api\/cc\/accounts\/[^/?]+$|^\/api\/(audit|activity)(\?|$)/.test(path);
-export const forgetKept = () => KEPT.clear();
+/**
+ * The lists and records the pages open with. Not the logs (the audit log and the CxOne API audit are always read
+ * live), nor anything with secrets.
+ */
+const keepable = (path) => /^\/api\/(accounts|people|dashboard|fusion-rates|tr-rates)(\?|$)|^\/api\/cc\/accounts\/[^/?]+$/.test(path);
+/**
+ * Everything kept is dropped (a change was sent, someone signed out, the session ended). Answers still on their way
+ * from before are dropped too when they arrive: they may be older than the change, or another person's.
+ */
+let keptSince = 0;
+export const forgetKept = () => {
+  keptSince += 1;
+  KEPT.clear();
+};
 /** Ask for the lists in the background, so the next page has them already. */
 export function warm(paths) {
   for (const p of paths) {
@@ -75,20 +86,33 @@ export function warm(paths) {
     if (keepable(p) && (!hit || Date.now() - hit.at >= KEPT_MS)) refreshKept(p);
   }
 }
-/** Asks again for a kept answer; when the page showing the old one is still open and it changed, the page is drawn again. */
+/**
+ * Asks again for a kept answer. `shownOn`: the page (its address) showing the old one; when it is still open as the
+ * new answer arrives and it differs, that page is drawn again. A page that joins a request already on its way (begun
+ * by pointing at its link) is told as well.
+ */
 function refreshKept(path, shownOn = null) {
   const before = KEPT.get(path);
-  if (before?.refreshing) return before.refreshing;
+  if (before?.refreshing) {
+    if (shownOn) before.watchers.add(shownOn);
+    return before.refreshing;
+  }
+  const since = keptSince;
   const data = fetchApi(path);
-  const entry = { at: Date.now(), data, refreshing: null };
-  if (before) before.refreshing = data;
+  const entry = { at: Date.now(), data, refreshing: null, watchers: new Set() };
+  if (before) {
+    before.refreshing = data;
+    if (shownOn) before.watchers.add(shownOn);
+  }
   data.then(
     async (fresh) => {
+      if (since !== keptSince) return; // dropped meanwhile: this answer is from before
       const old = before ? await before.data.catch(() => null) : null;
       KEPT.set(path, entry);
-      if (shownOn && old && location.hash === shownOn && JSON.stringify(old) !== JSON.stringify(fresh)) redrawQuietly();
+      if (old && before.watchers.has(location.hash) && JSON.stringify(old) !== JSON.stringify(fresh)) redrawQuietly();
     },
     () => {
+      if (since !== keptSince) return;
       if (before) before.refreshing = null;
       else KEPT.delete(path);
     },
@@ -96,13 +120,23 @@ function refreshKept(path, shownOn = null) {
   if (!before) KEPT.set(path, entry);
   return data;
 }
-/** The page again with what just came in, unless someone is typing or a dialog is open: their work comes first. */
+/**
+ * What someone is in the middle of: typing, a dialog, a menu or a column filter open, a person's panel, a table they
+ * sorted or filtered, a search they typed. Their work comes first: the page is not drawn again over it (it has the
+ * newer data the next time it is opened).
+ */
+const midWork = () =>
+  Boolean(
+    document.activeElement?.matches?.('input, textarea, select, [contenteditable]') ||
+      document.querySelector('dialog[open], .menu[open], details.mpick[open], .tx-pop, .cards-pop:not([hidden]), #person-drawer, #main .tx-asc, #main .tx-desc, #main .tx-filtered, #main .mpick.active') ||
+      [...document.querySelectorAll('#main input[type=search], #main input[type=text]:not([data-keep])')].some((el) => el.value.trim() && !el.closest('form')),
+  );
+/** The page again with what just came in, unless someone is in the middle of something. */
 let redrawSoon = null;
 function redrawQuietly() {
   clearTimeout(redrawSoon);
   redrawSoon = setTimeout(() => {
-    const busy = document.activeElement?.matches?.('input, textarea, select, [contenteditable]') || document.querySelector('dialog[open], .menu[open]');
-    if (busy) return;
+    if (midWork()) return;
     const y = window.scrollY;
     const drawer = document.querySelector('#acct-drawer .drawer');
     const dy = drawer?.scrollTop ?? 0;
@@ -121,14 +155,18 @@ export async function api(path, { method = 'GET', body } = {}) {
     const hit = KEPT.get(path);
     if (hit) {
       // Shown at once from what is kept; asked again behind it when it is not fresh, and the page redrawn if it changed.
-      if (Date.now() - hit.at >= KEPT_MS) refreshKept(path, location.hash);
+      if (Date.now() - hit.at >= KEPT_MS || hit.refreshing) refreshKept(path, location.hash);
       return structuredClone(await hit.data);
     }
     return structuredClone(await refreshKept(path));
   }
-  const out = await fetchApi(path, { method, body });
-  if (method !== 'GET') KEPT.clear();
-  return out;
+  if (method === 'GET') return fetchApi(path, { method, body });
+  // A change, whether it went through or not (it may have gone through in part): nothing kept is trusted after it.
+  try {
+    return await fetchApi(path, { method, body });
+  } finally {
+    forgetKept();
+  }
 }
 /** Pointing at a link or an account: its data is asked for before the click, so the page opens at once. */
 const HOVER_DATA = { '#/overview': ['/api/dashboard'], '#/accounts': ['/api/accounts'], '#/people': ['/api/people'], '#/people/people': ['/api/people'], '#/rates': ['/api/fusion-rates', '/api/tr-rates'] };
@@ -147,7 +185,8 @@ async function fetchApi(path, { method = 'GET', body } = {}) {
   if (method !== 'GET' && state.me?.csrf) headers['X-CSRF-Token'] = state.me.csrf;
   const res = await fetch(path, { method, headers, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
   if (res.status === 401 && !path.startsWith('/api/auth/') && state.me) {
-    // The session ended (signed out elsewhere, idle, access removed): back to sign-in.
+    // The session ended (signed out elsewhere, idle, access removed): back to sign-in, with nothing kept.
+    forgetKept();
     state.me = null;
     go('/login');
     throw Object.assign(new Error('Sign in first.'), { status: 401 });
@@ -159,14 +198,32 @@ async function fetchApi(path, { method = 'GET', body } = {}) {
 }
 
 export let toastTimer;
-export function toast(message, kind = '') {
+/** A short message at the bottom; `ms`: how long it stays (longer for what must be read, such as an error). */
+export function toast(message, kind = '', ms = 5500) {
   const el = $('#toast');
   el.textContent = message;
   el.className = `toast ${kind}`;
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), 5500);
+  toastTimer = setTimeout(() => (el.hidden = true), Math.max(1500, Number(ms) || 5500));
 }
+
+/**
+ * `fn`, but never twice at once: a second press of Enter or of the button while the first is still being sent does
+ * nothing (a sale or a share is recorded once).
+ */
+export const once = (fn) => {
+  let busy = false;
+  return async (...args) => {
+    if (busy) return undefined;
+    busy = true;
+    try {
+      return await fn(...args);
+    } finally {
+      busy = false;
+    }
+  };
+};
 
 export const can = (p) => state.me?.permissions?.includes(p);
 export const go = (path) => {
