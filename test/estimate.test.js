@@ -84,7 +84,12 @@ test('the estimate is the Admins’ alone, and says when the accounts are too fe
   const own = await admin.post('/api/estimate', { lines: 100000, includeNew: false, density: { Critical: 0.1, High: 1, Medium: 2, Low: 3 } });
   assert.equal(own.status, 200);
   assert.equal(own.data.typical.total, 610);
-  assert.equal(own.data.newLeftOut, true);
+  assert.equal(own.data.newLeftOut, false);
+  // Asked for with the findings still to come: left out and said so, as their pace would come from too few accounts.
+  const ahead = await admin.post('/api/estimate', { lines: 100000, density: { Critical: 0.1, High: 1, Medium: 2, Low: 3 } });
+  assert.equal(ahead.data.newLeftOut, true);
+  assert.equal(ahead.data.includeNew, false);
+  assert.equal(ahead.data.typical.credits, own.data.typical.credits);
   assert.equal((await admin.post('/api/estimate', { lines: 10 })).status, 400);
   // Recorded, like every action.
   const { events } = (await admin.get('/api/audit?limit=20')).data;
