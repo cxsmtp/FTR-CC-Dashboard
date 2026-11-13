@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 import { recoverDataDir } from '../server/recover.js';
 import { writeBackupTo } from '../server/backup.js';
@@ -108,4 +109,38 @@ test('the Admin seals backups with a passphrase from Settings, at once: the next
   assert.equal((await admin.get('/api/backups')).data.sealed, false);
   await env.close();
   fs.rmSync(env.dataDir, { recursive: true, force: true });
+});
+
+test('a backup of real size is restored from the page, and the audit log still checks out after it', async () => {
+  const env = await start();
+  try {
+    const admin = await client(env.base, 'admin@t.example');
+    const se1 = await client(env.base, 'se1@t.example');
+    const h = { 'X-Team': env.teams.emea.id };
+    // An account with enough in it that its backup is well over the usual 256 KB a request may carry.
+    const { data } = await se1.post('/api/projections', { name: 'Big Corp', salesforceUrl: sfLink() }, h);
+    const id = data.customer.id;
+    const projects = Array.from({ length: 12000 }, (_, i) => ({ id: `p${i}`, name: `project-${i}-${randomBytes(40).toString('hex')}`, lines: 1000 + i, included: true, source: 'manual' }));
+    assert.equal((await se1.put(`/api/projections/${id}`, { fusion: { projects } }, h)).status, 200);
+    const made = await admin.post('/api/backups', {});
+    assert.equal(made.status, 200);
+    const file = await fetch(`${env.base}/api/backups/${made.data.name}`, { headers: { Cookie: admin.cookie } });
+    const bytes = Buffer.from(await file.arrayBuffer());
+    assert.ok(bytes.length > 300 * 1024, `the backup is ${bytes.length} bytes`);
+    // Changed after the backup: the restore brings the earlier name back.
+    await se1.put(`/api/cc/accounts/${id}`, { name: 'Renamed Corp' });
+    const body = { data: bytes.toString('base64') };
+    assert.equal((await admin.post('/api/backups/inspect', body)).status, 200);
+    assert.equal((await admin.post('/api/backups/restore', body)).status, 409);
+    const restored = await admin.post('/api/backups/restore', { ...body, confirm: true });
+    assert.equal(restored.status, 200);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(env.dataDir, 'accounts', `${id}.json`), 'utf8')).name, 'Big Corp');
+    // The chain goes on from the restored log's last line.
+    const check = await admin.get('/api/audit/verify');
+    assert.equal(check.data.ok, true, JSON.stringify(check.data));
+    // Someone who does not manage backups is not given the large allowance.
+    assert.equal((await se1.post('/api/backups/restore', body)).status, 413);
+  } finally {
+    await env.close();
+  }
 });

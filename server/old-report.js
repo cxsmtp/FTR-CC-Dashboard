@@ -12,7 +12,69 @@ import { leverInputs } from '../core/public/calculator/levers.js';
 import { fail } from './store.js';
 
 const MON = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sept: 9, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
-const un = (s) => String(s).replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+// The page is cut by position (indexOf), never by patterns that can backtrack: a malformed or hostile file of any size
+// is read in time that grows with its length, not its square (which once held the whole server up).
+/** `text` without its tags (`<…>`), each replaced by `fill`; a `<` that is never closed stays as it is. */
+function untag(text, fill = '') {
+  const t = String(text);
+  const out = [];
+  let at = 0;
+  for (;;) {
+    const a = t.indexOf('<', at);
+    if (a < 0) break;
+    const b = t.indexOf('>', a + 1);
+    if (b < 0) break;
+    out.push(t.slice(at, a), b > a + 1 ? fill : t.slice(a, b + 1));
+    at = b + 1;
+  }
+  out.push(t.slice(at));
+  return out.join('');
+}
+/** What is inside each `<tag …>` … `</closeTag>` of `text`, in order (`tags`: the names an opener may have). */
+function inside(text, tags, closers = tags) {
+  const out = [];
+  let at = 0;
+  for (;;) {
+    let a = -1;
+    for (const tag of tags) {
+      const i = text.indexOf(`<${tag}`, at);
+      if (i >= 0 && (a < 0 || i < a)) a = i;
+    }
+    if (a < 0) break;
+    const gt = text.indexOf('>', a);
+    if (gt < 0) break;
+    let b = -1;
+    let len = 0;
+    for (const tag of closers) {
+      const i = text.indexOf(`</${tag}>`, gt + 1);
+      if (i >= 0 && (b < 0 || i < b)) {
+        b = i;
+        len = tag.length + 3;
+      }
+    }
+    if (b < 0) break;
+    out.push(text.slice(gt + 1, b));
+    at = b + len;
+  }
+  return out;
+}
+/** `text` without each `<tag … </tag>` block, replaced by `fill`. */
+function without(text, tag, fill = '') {
+  const out = [];
+  const close = `</${tag}>`;
+  let at = 0;
+  for (;;) {
+    const a = text.indexOf(`<${tag}`, at);
+    if (a < 0) break;
+    const b = text.indexOf(close, a);
+    if (b < 0) break;
+    out.push(text.slice(at, a), fill);
+    at = b + close.length;
+  }
+  out.push(text.slice(at));
+  return out.join('');
+}
+const un = (s) => untag(s).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const n = (s) => {
   const v = Number(String(s ?? '').replace(/[,\s%+]/g, '').replace('−', '-'));
   return s !== undefined && s !== null && String(s).trim() !== '' && Number.isFinite(v) ? v : null;
@@ -29,10 +91,10 @@ export const isOldReport = (html) => /credits projection/i.test(html) && !/id="c
 export function readOldReport(html, { force = false } = {}) {
   const page = String(html ?? '');
   if (!force && !isOldReport(page)) throw fail(400, 'That is not a projection report: use the report file the calculator made.');
-  const tables = [...page.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/g)].map((m) => [...m[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((r) => [...r[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((c) => un(c[1]))));
+  const tables = inside(page, ['table']).map((t) => inside(t, ['tr']).map((r) => inside(r, ['td', 'th']).map((c) => un(c))));
   const table = (firstCell) => tables.find((t) => t.some((r) => r[0] === firstCell));
   const body = page.slice(page.indexOf('<body'));
-  const text = un(body.replace(/<style[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<svg[\s\S]*?<\/svg>/g, ' ').replace(/<[^>]+>/g, ' '));
+  const text = un(untag(without(without(without(body, 'style'), 'script'), 'svg', ' '), ' '));
   const titles = [...page.matchAll(/<title>([^<]*)<\/title>/g)].map((m) => un(m[1]));
 
   const customer = (/<h1>([^<:]*):/.exec(page)?.[1] ?? '').trim() || 'Customer';

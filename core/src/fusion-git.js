@@ -892,6 +892,36 @@ export function createGitCounter({ allowHost = () => true, fetchImpl = null, tmp
         });
       return view(job);
     },
+    /**
+     * For an update without a restart: the runs as they stand, for the version taking over. One still running is
+     * ended here (its repositories not yet counted say so), since the tokens it runs on are never handed on.
+     */
+    handoff() {
+      prune();
+      const now = new Date().toISOString();
+      return [...jobs.values()].map((job) => {
+        const running = job.state === 'running';
+        return {
+          id: job.id,
+          owner: job.owner,
+          state: 'done',
+          engine: job.engine,
+          startedAt: job.startedAt,
+          finishedAt: job.finishedAt ?? now,
+          host: job.host,
+          seq: job.seq + (running ? 1 : 0),
+          people: [...job.people],
+          repositories: job.repositories.map((r) => (running && r.state !== 'done' && r.state !== 'failed' ? { ...r, state: 'failed', error: 'Not counted: the command center moved to a new version meanwhile. Count again.', seq: job.seq + 1 } : { ...r })),
+        };
+      });
+    },
+    /** The other half of handoff(), in the version taking over: the runs are here to be read as before. */
+    adopt(list) {
+      for (const j of Array.isArray(list) ? list : []) {
+        if (!j?.id || jobs.has(j.id)) continue;
+        jobs.set(j.id, { ...j, salt: null, people: new Set(j.people ?? []), repositories: (j.repositories ?? []).map((r) => ({ ...r })) });
+      }
+    },
     /** A run as the page follows it: only its owner's; `after`: only the repositories changed since that view's seq. */
     view(owner, id, { after = 0 } = {}) {
       prune();

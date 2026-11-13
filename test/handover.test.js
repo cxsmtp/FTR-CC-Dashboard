@@ -27,3 +27,44 @@ test('Checkmarx One connections and reads not yet put into their account move to
   before.release();
   assert.equal(before.status('u1').connected, false);
 });
+
+test('password-reset links sent before an update still work after it', async () => {
+  const { PasswordResets } = await import('../core/src/password-reset.js');
+  const user = { id: 'u1', passwordHash: 'scrypt$abc$def' };
+  const before = new PasswordResets();
+  const { token } = before.issue(user);
+  const after = new PasswordResets();
+  after.adopt(structuredClone(before.handoff()));
+  assert.equal(after.check(token, () => user)?.id, 'u1');
+  // The count of links sent goes too: three an hour, a minute apart, whichever version sent them.
+  assert.equal(after.maySend('u1'), false);
+  assert.equal(new PasswordResets().check(token, () => user), null);
+});
+
+test('git counts move to the next version; one still running is ended and says so', async () => {
+  const { createGitCounter } = await import('../core/src/fusion-git.js');
+  const before = createGitCounter();
+  // As a count stands in memory: one repository counted, one still waiting.
+  before.adopt([{ id: 'job-1', owner: 'u1', state: 'done', engine: 'git', startedAt: new Date(Date.now() - 60_000).toISOString(), finishedAt: new Date().toISOString(), host: 'github.com', seq: 3, people: ['p1', 'p2'], repositories: [{ i: 0, name: 'api', state: 'done', lines: 1200, seq: 2 }, { i: 1, name: 'web', state: 'failed', error: 'x', seq: 3 }] }]);
+  const after = createGitCounter();
+  after.adopt(structuredClone(before.handoff()));
+  const seen = after.view('u1', 'job-1');
+  assert.equal(seen.state, 'done');
+  assert.equal(seen.summary.measured, 1);
+  assert.equal(seen.summary.lines, 1200);
+  assert.equal(seen.summary.developers, 2);
+  // Only its owner's.
+  assert.throws(() => after.view('u2', 'job-1'), /no longer here/);
+});
+
+test('an earlier report that is malformed or hostile is read in time that grows with its size, not its square', async () => {
+  const { readOldReport } = await import('../server/old-report.js');
+  for (const piece of ['<table', '<', '<style', '<tr><td', '<svg']) {
+    const page = piece.repeat(Math.round(3_000_000 / piece.length));
+    const start = performance.now();
+    try {
+      readOldReport(page, { force: true });
+    } catch {}
+    assert.ok(performance.now() - start < 3000, `${piece} took too long`);
+  }
+});

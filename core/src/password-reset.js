@@ -49,6 +49,18 @@ export class PasswordResets {
     this.#now = now;
   }
 
+  /** For an update without a restart: the links sent and the counts kept, for the version taking over (memory only). */
+  handoff() {
+    return { links: [...this.#links], sent: [...this.#sent], asked: [...this.#asked] };
+  }
+  /** The other half of handoff(): links sent before the update go on working until they expire. */
+  adopt(state) {
+    const now = this.#now();
+    for (const [k, v] of state?.links ?? []) if (v?.exp > now) this.#links.set(k, v);
+    for (const [k, v] of state?.sent ?? []) this.#sent.set(k, v);
+    for (const [k, v] of state?.asked ?? []) this.#asked.set(k, v);
+  }
+
   /** Has this network address asked (or tried dead links) too often lately? Counts nothing. */
   ipBlocked(ip) {
     const now = this.#now();

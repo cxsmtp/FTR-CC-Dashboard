@@ -2,6 +2,22 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.97.00 — 2026-11-13
+
+- **No end date.** The calculator carried the licence gate of the product it came from, which would have shut it on
+  1 January 2027 without an activation code. The gate is gone from the calculator.
+- **Restoring a backup from the page works for backups of any real size.** The upload was held to 256 KB, so a backup
+  over about 190 KB was refused as too large. Those who manage backups may now send up to 400 MB. After a restore the
+  audit log goes on from the restored log's last line (it reported itself broken).
+- **A malformed report can no longer hold the server up.** Reading an earlier report cut the page with patterns whose
+  time grew with the square of a malformed file's size (half a megabyte took 14 seconds, for everyone). It is cut by
+  position now: 6 MB of the same takes a tenth of a second, and real reports read exactly as before.
+- **An update keeps more of what is in memory.** Password-reset links sent before an update go on working, a single
+  sign-on begun before it ends well after it, and git counts are still there to read (one still running is ended, and
+  says its repositories were not counted because of the update).
+- **A request refused as too large is answered.** The sender was left waiting; it now gets the refusal and the
+  connection is closed.
+
 ## CC-01.96.00 — 2026-11-12
 
 - **The calculator page is half the size.** Its fonts were written into the page (509 KB of it, which barely

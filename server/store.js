@@ -121,6 +121,10 @@ export class AuditLog {
   static hashOf(prev, event) {
     return createHash('sha256').update(`${prev}\n${JSON.stringify(event)}`).digest('hex');
   }
+  /** The file was replaced (a backup restored): the chain continues from what is on disk now. */
+  reload() {
+    this.#last = this.#tail();
+  }
   record({ actor = null, action, target = '', details = {}, ip = '' }) {
     const event = { at: new Date().toISOString(), actor, action, target, details, ip };
     const hash = AuditLog.hashOf(this.#last, event);

@@ -29,7 +29,6 @@ import { CLOC_FUSION, GIT_COUNT_LIMITS, clocFusionPage, createGitCounter, gitSou
 import { MAX_PROJECTS, cleanOrigins, impactSettings, readLimit } from '../core/public/calculator/model.js';
 import { summary } from '../core/public/calculator/profiles.js';
 import { calculatorMarkup, reportRuntime, standaloneMarkup, wrapModule } from '../core/src/standalone-calculator.js';
-import { licenceGateScript } from '../core/src/licence-gate.js';
 import { fail } from './store.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -110,30 +109,28 @@ let built = null;
  * own scripts (by hash) and calls to this server. The per-request settings go in a JSON element no script hash
  * depends on.
  */
-export function calculatorPage({ productCode = '' } = {}) {
-  if (built?.productCode === productCode) return built;
+export function calculatorPage() {
+  if (built) return built;
   const read = (file) => fs.readFileSync(path.join(MZ_PUBLIC, file), 'utf8');
   const index = new Map(MODULES.map((file, i) => [file, i]));
   const source = (file) => (file === 'calculator/hosted.js' ? fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.js'), 'utf8') : read(file));
   const bundle = MODULES.map((file) => wrapModule(file, source(file), index)).join('\n\n');
-  const gate = `\n${scriptText(licenceGateScript())}\n`;
-  // An activation code given to the server (MZ_PRODUCT_CODE) is offered to the gate, so nobody has to type it.
-  const seed = productCode ? `\n${scriptText(`try { if (!localStorage.getItem('mz-product-code')) localStorage.setItem('mz-product-code', ${JSON.stringify(productCode)}); } catch {}`)}\n` : '';
   const vendorScripts = ['calculator/vendor/xlsx-lite.js', 'calculator/vendor/parse.js'].map((file) => `\n${scriptText(read(file))}\n`);
-  const main = `\n${scriptText(`const __m = [];\n${bundle}\nlet __started = false;\nwindow.__mzStart = () => {\n  if (__started) return;\n  __started = true;\n  __m[${index.get('calculator/hosted.js')}].startHosted();\n};\nif (!window.__mzBlocked) window.__mzStart();`)}\n`;
+  const main = `\n${scriptText(`const __m = [];\n${bundle}\n__m[${index.get('calculator/hosted.js')}].startHosted();`)}\n`;
   const css = `\n${`${inlined(read('styles.css'), MZ_PUBLIC)}\n${inlined(read('nextgen.css'), MZ_PUBLIC)}\n${fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.css'), 'utf8')}\n${fs.readFileSync(path.join(ROOT, 'public', 'standard.css'), 'utf8')}`.replace(/\r\n?/g, '\n')}\n`;
-  const scripts = [...(seed ? [seed] : []), gate, ...vendorScripts, main];
+  // No licence gate: this product has no end date (the calculator it came from had one).
+  const scripts = [...vendorScripts, main];
   const csp = `default-src 'none'; script-src ${scripts.map(contentHash).join(' ')}; script-src-attr 'none'; style-src 'unsafe-inline'; style-src-elem ${contentHash(css)}; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
   const markup = standaloneMarkup(calculatorMarkup(read('index.html')), { launcher: true });
   const head = fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.html'), 'utf8');
   const html = head
     .replace('<!--CSS-->', `<style>${css}</style>`)
     .replace('<!--CALCULATOR-->', markup)
-    .replace('<!--SCRIPTS-->', `${seed ? `<script>${seed}</script>\n` : ''}<script>${gate}</script>\n<script type="application/json" id="cx-report-runtime">${JSON.stringify(reportRuntime({ root: MZ_PUBLIC })).replace(/</g, '\\u003c')}</script>\n${vendorScripts.map((t) => `<script>${t}</script>`).join('\n')}\n<script type="module">${main}</script>`);
+    .replace('<!--SCRIPTS-->', `<script type="application/json" id="cx-report-runtime">${JSON.stringify(reportRuntime({ root: MZ_PUBLIC })).replace(/</g, '\\u003c')}</script>\n${vendorScripts.map((t) => `<script>${t}</script>`).join('\n')}\n<script type="module">${main}</script>`);
   // The same page for everyone (each person's settings come from /api/cc/calc-config): compressed once, cached by ETag.
   const gz = zlib.gzipSync(html, { level: 9 });
   const etag = `"cc-${createHash('sha256').update(html).digest('hex').slice(0, 20)}"`;
-  built = { productCode, html, csp, gz, etag };
+  built = { html, csp, gz, etag };
   return built;
 }
 
@@ -219,7 +216,7 @@ export class CalculatorService {
       const job = l.job ? { ...l.job, live: null } : null;
       people.push({ userId, connection: l.connection, account: l.account ?? null, boundTo: l.boundTo ?? null, readFor: l.readFor ?? null, job: job?.state === 'running' ? null : job, rerun: job?.state === 'running' ? { input: job.input, account: job.account } : null, read: l.read.get() });
     }
-    return { people, interrupted: [...this.interrupted], readsFor: [...this.readsFor] };
+    return { people, interrupted: [...this.interrupted], readsFor: [...this.readsFor], gitCounts: this.counter.handoff?.() ?? [] };
   }
   /** After handing over: this process lets go, so reads still finishing here change nothing. */
   release() {
@@ -241,6 +238,7 @@ export class CalculatorService {
     }
     for (const [userId, cut] of state?.interrupted ?? []) this.interrupted.set(userId, cut);
     for (const [at, account] of state?.readsFor ?? []) this.readsFor.set(at, account);
+    this.counter.adopt?.(state?.gitCounts);
   }
 
   /** Signed out, deactivated or removed: their key and what was read go. */

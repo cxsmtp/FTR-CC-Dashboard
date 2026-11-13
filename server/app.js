@@ -43,6 +43,8 @@ export const versionLabel = (v = VERSION) => `CC-${String(v).split('.').map((n) 
 const COOKIE = 'cc_session';
 const BODY_LIMIT = 256 * 1024;
 const CALC_LIMIT = 40 * 1024 * 1024;
+// A backup sent back to be looked at or restored (its file, as base64): only from those who manage backups.
+const BACKUP_LIMIT = 400 * 1024 * 1024;
 
 export function createApp(config, { log: baseLog = console.log, calculatorService = null, mailTransport = smtpTransport, updateService = null } = {}) {
   // Errors kept for the troubleshooting report (the last 50, without request bodies).
@@ -1478,6 +1480,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (body?.confirm !== true) throw fail(409, 'Confirm: everything here is replaced by the backup (a backup of what is here now is taken first).');
     const before = takeBackup(`before restoring a backup from ${bundle.at}`);
     restoreBackup(bundle, { dataDir: config.dataDir });
+    // The audit log on disk is the backup's now: the chain goes on from its last line, not from the one replaced.
+    audit.reload();
     record(ctx, req, 'backup.restore', bundle.at, { ...describeBackup(bundle), before });
     if (supervised) {
       // Nothing more is written by this process: the version taking over reads what was restored.
@@ -2340,7 +2344,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (!ctx) return send(res, 302, '', { Location: '/#/login?next=%2Fcalculator' });
       if (ctx.user.mustChangePassword || !terms.acceptedBy(ctx.user.id)) return send(res, 302, '', { Location: '/#/welcome' });
       if (!ctx.permissions.has('calculator.use')) return send(res, 302, '', { Location: '/#/overview' });
-      const page = calculatorPage({ productCode: config.productCode });
+      const page = calculatorPage();
       const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': page.csp, 'Cache-Control': 'private, no-cache', ETag: page.etag, Vary: 'Accept-Encoding' };
       if (req.headers['if-none-match'] === page.etag) return send(res, 304, '', headers);
       if (/\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) return send(res, 200, page.gz, { ...headers, 'Content-Encoding': 'gzip' });
@@ -2370,7 +2374,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
         const origin = req.headers.origin;
         // The page's own address (whatever name or IP it was opened by), or PUBLIC_URL (behind a proxy that changes Host).
         if (origin && !sameSite(origin, req)) throw fail(403, 'That request came from another site.');
-        body = await readBody(req, pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') || pathname.endsWith('/previous-report') ? CALC_LIMIT : pathname === '/api/settings/branding' || pathname === '/api/me/profile' ? 512 * 1024 : BODY_LIMIT);
+        const backupUpload = (pathname === '/api/backups/restore' || pathname === '/api/backups/inspect') && ctx?.permissions?.has('backup.manage');
+        body = await readBody(req, backupUpload ? BACKUP_LIMIT : pathname.startsWith('/api/projections') || pathname.endsWith('/customer-version') || pathname.endsWith('/previous-report') ? CALC_LIMIT : pathname === '/api/settings/branding' || pathname === '/api/me/profile' ? 512 * 1024 : BODY_LIMIT);
       }
       // Who is looking goes with the request: a draft account is its SE's (and an Admin's) until its first report.
       const handle = async () => {
@@ -2495,7 +2500,9 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const handoff = () => {
     stop();
     frozen = frozen ?? 'The command center is moving to its new version: try again in a moment.';
-    return { calc: calc.handoff() };
+    // Everything held only in memory goes to the next version (CLAUDE.md): the Checkmarx One connections and git
+    // counts, password-reset links, single sign-ons under way, and what the Admins are shown of the last backup.
+    return { calc: calc.handoff(), resets: passwordResets.handoff(), sso: sso.handoff(), lastBackup, recentErrors: recentErrors.slice(-50) };
   };
   /** The next version did not come up: carry on as before. */
   const resume = () => {
@@ -2504,7 +2511,14 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     acme.startRenewal();
     httpsManager.watch();
   };
-  const adopt = (state) => state?.calc && calc.adopt(state.calc);
+  const adopt = (state) => {
+    if (!state) return;
+    if (state.calc) calc.adopt(state.calc);
+    if (state.resets) passwordResets.adopt(state.resets);
+    if (state.sso) sso.adopt(state.sso);
+    if (state.lastBackup?.at) lastBackup = state.lastBackup;
+    if (Array.isArray(state.recentErrors)) recentErrors.unshift(...state.recentErrors.filter((e) => e?.at && e?.line));
+  };
 
   return { handle, httpsOnly, started, stop, activity, handoff, resume, adopt, release: () => calc.release(), https: httpsManager, acme, version: VERSION, versionLabel: versionLabel(), ready, iam, teams, accounts, audit, terms, settings, calc, SECURITY_HEADERS, APP_CSP };
 }

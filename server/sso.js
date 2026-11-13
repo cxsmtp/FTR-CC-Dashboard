@@ -92,6 +92,41 @@ export function spUrls(publicUrl) {
 export class Sso {
   #saml = null;
   #key = '';
+  // The sign-ins under way (the request ids the identity provider must answer to), kept here and not inside the SAML
+  // client, so they can be handed to the next version: a sign-in begun before an update ends well after it.
+  #asked = new Map(); // request id -> { value, at }
+  #cache = {
+    saveAsync: async (key, value) => {
+      if (this.#asked.has(key)) return null;
+      const now = Date.now();
+      for (const [k, v] of this.#asked) if (now - v.at > 10 * 60 * 1000) this.#asked.delete(k);
+      const item = { value, createdAt: now };
+      this.#asked.set(key, { value, at: now });
+      return item;
+    },
+    getAsync: async (key) => {
+      const v = this.#asked.get(key);
+      return v && Date.now() - v.at <= 10 * 60 * 1000 ? v.value : null;
+    },
+    removeAsync: async (key) => {
+      const had = this.#asked.has(key);
+      this.#asked.delete(key);
+      return had ? key : null;
+    },
+    // Taken and removed in one step: of two copies of an answer arriving together, only one is accepted.
+    consumeAsync: async (key) => {
+      const v = this.#asked.get(key);
+      this.#asked.delete(key);
+      return v && Date.now() - v.at <= 10 * 60 * 1000 ? v.value : null;
+    },
+  };
+  /** For an update without a restart: the sign-ins under way (memory only). */
+  handoff() {
+    return { asked: [...this.#asked] };
+  }
+  adopt(state) {
+    for (const [k, v] of state?.asked ?? []) if (v && Date.now() - v.at <= 10 * 60 * 1000) this.#asked.set(k, v);
+  }
   constructor({ settings, publicUrl }) {
     this.settings = settings;
     this.publicUrl = publicUrl;
@@ -119,6 +154,7 @@ export class Sso {
         wantAssertionsSigned: true,
         wantAuthnResponseSigned: Boolean(c.wantResponseSigned),
         validateInResponseTo: 'always',
+        cacheProvider: this.#cache,
         requestIdExpirationPeriodMs: 10 * 60 * 1000,
         acceptedClockSkewMs: 5000,
         disableRequestedAuthnContext: true,

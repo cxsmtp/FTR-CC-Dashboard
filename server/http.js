@@ -30,8 +30,10 @@ export function send(res, status, body, headers = {}) {
     out = zlib.gzipSync(out, { level: 5 });
     Object.assign(extra, { 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
   }
-  res.writeHead(status, { ...SECURITY_HEADERS, 'Cache-Control': 'no-store', ...(isText ? {} : { 'Content-Type': 'application/json; charset=utf-8' }), ...extra, ...headers });
-  res.end(out);
+  const cut = Boolean(res.req?.cutShort);
+  res.writeHead(status, { ...SECURITY_HEADERS, 'Cache-Control': 'no-store', ...(isText ? {} : { 'Content-Type': 'application/json; charset=utf-8' }), ...extra, ...headers, ...(cut ? { Connection: 'close' } : {}) });
+  // A request cut short (too large) is not read to its end: once the answer is out, the connection goes.
+  res.end(out, cut ? () => setTimeout(() => res.req?.socket?.destroy(), 250).unref?.() : undefined);
 }
 
 export async function readBody(req, limit) {
@@ -40,7 +42,12 @@ export async function readBody(req, limit) {
   const parts = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > limit) throw Object.assign(new Error('That request is too large.'), { status: 413 });
+    if (size > limit) {
+      // The rest is not read: the answer says so, and the connection is closed after it (send), so the sender is not
+      // left writing into a request nobody reads.
+      req.cutShort = true;
+      throw Object.assign(new Error('That request is too large.'), { status: 413 });
+    }
     parts.push(chunk);
   }
   if (!parts.length) return {};
