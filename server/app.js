@@ -29,7 +29,7 @@ import { DEFAULT_TR } from '../core/public/calculator/model.js';
 import { leverData } from '../core/public/calculator/levers.js';
 import { IntegrityService } from './integrity/service.js';
 import { DEFAULT_BRANDING, LOOKS, cleanColour, imageFromUpload, imageFromUrl, imageHeaders, publicBranding } from './branding.js';
-import { describeBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
+import { describeBackup, isUpdateBackup, listBackups, readBackup, restoreBackup, writeBackupTo } from './backup.js';
 import { recoverDataDir } from './recover.js';
 import { PasswordResets, RESET_POLICIES, RESET_TTL_MS, maskEmail, resetAllowed } from './password-reset.js';
 import { MailError, Secrets, mergeSmtp, publicSmtp, smtpFingerprint, smtpTransport, systemEmail } from './mailer.js';
@@ -1521,7 +1521,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   startJobs.push(() => {
     // Nightly: an hour after the last one is a day old.
     const t = setInterval(() => {
-      const last = listBackups(backupDir)[0];
+      // The newest that is not one taken before an update: those do not stand in for the nightly one.
+      const last = listBackups(backupDir).find((b) => !isUpdateBackup(b.name));
       if (!last || Date.now() - Date.parse(last.at) > 24 * 3600 * 1000) {
         try {
           takeBackup('nightly');

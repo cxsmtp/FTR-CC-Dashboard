@@ -2,6 +2,16 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.100.00 — 2026-11-13
+
+- **A restore gives back the backup, not a mix.** Accounts and reports made after the backup stayed beside the
+  restored ones. They are removed now (a backup of what was there is taken first, as before). Settings, certificates
+  and keys are replaced by the backup's and never removed.
+- **A day of updates no longer pushes the nightly backups out.** A backup is taken before every update, and only the
+  newest 14 of all were kept. Those taken before an update are now kept apart (the newest 6), and the nightly and
+  hand-made ones keep their own 14. A backup before an update does not stand in for the nightly one.
+- **A backup is whole or not there**: written beside and renamed, so one cut short is never taken for the newest.
+
 ## CC-01.99.00 — 2026-11-13
 
 - **Nothing is changed before the first steps.** Someone with a temporary password, or who has not accepted the terms,

@@ -15,6 +15,8 @@ export const FORMAT = 'ftr-cc-backup';
 const MAGIC_SEALED = Buffer.from('CCBAK1S');
 const SKIP = new Set(['app', 'backups', 'initial-admin-password.txt']);
 const MAX_UNPACKED = 1024 * 1024 * 1024;
+/** The folders of records, one file each: a restore leaves in them only what the backup holds. */
+const RECORD_FOLDERS = ['accounts', 'reports'];
 
 function collect(dataDir) {
   const files = {};
@@ -74,6 +76,20 @@ export const describeBackup = (b) => ({ version: b.version, at: b.at, reason: b.
 
 /** Put a backup's files in place (after a backup of what is there now). The server restarts to read them. */
 export function restoreBackup(bundle, { dataDir }) {
+  // Everything is checked before anything is written: a backup naming a file outside the data folder changes nothing.
+  for (const rel of Object.keys(bundle.files)) {
+    if (!path.join(dataDir, rel).startsWith(path.resolve(dataDir) + path.sep)) throw fail(400, 'That backup names a file outside the data folder.');
+  }
+  // The records here that are not in the backup were made after it (an account, a report): they go,
+  // so the records are the backup's and not a mix of both. (A backup of what is here now was taken first.) Settings,
+  // certificates and keys are replaced by the backup's where it has them, and never removed.
+  for (const folder of RECORD_FOLDERS) {
+    const dir = path.join(dataDir, folder);
+    if (!fs.existsSync(dir)) continue;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isFile() && !(`${folder}/${e.name}` in bundle.files)) fs.rmSync(path.join(dir, e.name), { force: true });
+    }
+  }
   for (const [rel, b64] of Object.entries(bundle.files)) {
     const out = path.join(dataDir, rel);
     if (!out.startsWith(path.resolve(dataDir) + path.sep)) throw fail(400, 'That backup names a file outside the data folder.');
@@ -84,7 +100,9 @@ export function restoreBackup(bundle, { dataDir }) {
   }
 }
 
-export const backupName = (now = new Date()) => `cc-backup-${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}.ccbackup`;
+/** `kind` 'update': one taken before a version switch (kept apart, so a day of updates never pushes the nightly ones out). */
+export const backupName = (now = new Date(), kind = '') => `cc-backup-${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}${kind ? `-${kind}` : ''}.ccbackup`;
+export const isUpdateBackup = (name) => /-update\.ccbackup$/.test(String(name));
 
 export function listBackups(dir) {
   try {
@@ -98,11 +116,17 @@ export function listBackups(dir) {
   }
 }
 
-export function writeBackupTo(dir, { dataDir, passphrase = '', version = '', reason = '', keep = 14 }) {
+export function writeBackupTo(dir, { dataDir, passphrase = '', version = '', reason = '', keep = 14, keepUpdate = 6 }) {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const name = backupName();
+  const update = /^before switching/.test(reason);
+  const name = backupName(new Date(), update ? 'update' : '');
   const buf = createBackup({ dataDir, passphrase, version, reason });
-  fs.writeFileSync(path.join(dir, name), buf, { mode: 0o600 });
-  for (const old of listBackups(dir).slice(keep)) fs.rmSync(path.join(dir, old.name), { force: true });
+  // Whole or not there: written beside, then renamed (a backup cut short is never the newest one).
+  const part = path.join(dir, `${name}.part`);
+  fs.writeFileSync(part, buf, { mode: 0o600 });
+  fs.renameSync(part, path.join(dir, name));
+  // The nightly and hand-made ones, and those taken before an update, are each kept to their own number.
+  const all = listBackups(dir);
+  for (const old of [...all.filter((b) => !isUpdateBackup(b.name)).slice(keep), ...all.filter((b) => isUpdateBackup(b.name)).slice(keepUpdate)]) fs.rmSync(path.join(dir, old.name), { force: true });
   return { name, bytes: buf.length, sha256: createHash('sha256').update(buf).digest('hex') };
 }

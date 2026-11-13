@@ -129,12 +129,16 @@ test('a backup of real size is restored from the page, and the audit log still c
     assert.ok(bytes.length > 300 * 1024, `the backup is ${bytes.length} bytes`);
     // Changed after the backup: the restore brings the earlier name back.
     await se1.put(`/api/cc/accounts/${id}`, { name: 'Renamed Corp' });
+    // Made after the backup: gone after the restore (the data is the backup's, not a mix).
+    const later = (await se1.post('/api/projections', { name: 'Made Later Corp', salesforceUrl: sfLink() }, h)).data.customer.id;
+    assert.ok(fs.existsSync(path.join(env.dataDir, 'accounts', `${later}.json`)));
     const body = { data: bytes.toString('base64') };
     assert.equal((await admin.post('/api/backups/inspect', body)).status, 200);
     assert.equal((await admin.post('/api/backups/restore', body)).status, 409);
     const restored = await admin.post('/api/backups/restore', { ...body, confirm: true });
     assert.equal(restored.status, 200);
     assert.equal(JSON.parse(fs.readFileSync(path.join(env.dataDir, 'accounts', `${id}.json`), 'utf8')).name, 'Big Corp');
+    assert.equal(fs.existsSync(path.join(env.dataDir, 'accounts', `${later}.json`)), false);
     // The chain goes on from the restored log's last line.
     const check = await admin.get('/api/audit/verify');
     assert.equal(check.data.ok, true, JSON.stringify(check.data));
