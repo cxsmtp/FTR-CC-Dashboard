@@ -25,5 +25,7 @@ Rules from the owner, for every change:
   Command Center. New screens are built for Standard first and must not bring back gradients, glass or glow there.
 - The menu is Overview, Accounts, Calculator and Settings; anything else goes under Settings (public/js/shell.js
   `settingsNav`).
+- The server's routes are one module per area in server/routes/ (server/app.js builds the app and hands each one `d`,
+  what the app holds, read by name when used). Add a route in the file of its area; a new area gets its own file.
 - The dashboard's code is one module per page in public/js/ (main.js is the router; core.js the shared helpers;
   shell.js the frame and menus; widgets.js tables, multi-selects and drafts). Add a page as its own file.

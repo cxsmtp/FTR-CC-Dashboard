@@ -2,6 +2,16 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.104.00 — 2026-11-13
+
+- **For those who work on it: the server is in parts.** Its routes were one file of 2,500 lines; they are now 16 files
+  by area in `server/routes/` (accounts, people, backups, updates, HTTPS, the calculator's API and so on), and the
+  file that builds the app is 720 lines. Nothing was rewritten: each part was moved as it stood, and what it uses of
+  the app is handed to it. Every page, the calculator, a generated report and an update through the launcher were
+  checked after it.
+- A Salesforce link and email addresses are read by one piece of code, shared by the dashboard and the calculator
+  (they were two copies that had to be kept the same).
+
 ## CC-01.103.00 — 2026-11-13
 
 - **Calculator, tidied.**

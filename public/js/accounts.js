@@ -1,12 +1,9 @@
 import { $, $$, ago, api, can, date, dateTime, esc, go, icon, initials, num, once, state, toast } from './core.js';
+import { emailList } from './links.js';
 import { paint, teamSelect } from './overview.js';
 import { loading, shell } from './shell.js';
 // ---- Accounts --------------------------------------------------------------------------------------------
-/** Email addresses typed for "shared with": one or more, comma or space between; null when one is not an address. */
-export function emailList(value) {
-  const list = String(value ?? '').split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
-  return list.length && list.every((e) => /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[a-z]{2,}$/i.test(e)) ? list : null;
-}
+export { emailList };
 /** Who it went to, for a table cell. */
 export const sharedTo = (r) => (r?.sharedWith?.length ? r.sharedWith.join(', ') : r?.sharedNote || '');
 /**

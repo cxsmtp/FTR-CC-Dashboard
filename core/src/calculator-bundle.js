@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
 /** The calculator's modules, in the order they are bundled (each one's imports come before it). The last is the page's entry. */
-export const MODULES = ['engines.js', 'look.js', 'i18n.js', 'help-tips.js', 'speedsters.js', 'calculator/model.js', 'calculator/charts.js', 'calculator/explain.js', 'calculator/report.js', 'calculator/slides.js', 'calculator/levers.js', 'calculator/profiles.js', 'calculator/page.js', 'calculator/hosted.js'];
+export const MODULES = ['engines.js', 'look.js', 'i18n.js', 'help-tips.js', 'speedsters.js', 'calculator/model.js', 'calculator/charts.js', 'calculator/explain.js', 'calculator/report.js', 'calculator/slides.js', 'calculator/levers.js', 'calculator/profiles.js', 'calculator/page.js', 'links.js', 'calculator/hosted.js'];
 
 const IMPORT = /^import\s*\{([^}]*)\}\s*from\s*'([^']+)';?[ \t]*$/gm;
 const EXPORT_DECL = /^export\s+(async\s+function\*?|function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm;

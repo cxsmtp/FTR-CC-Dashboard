@@ -1,5 +1,6 @@
 import { $, api, applyMyTheme, brandHtml, can, esc, go, icon, state } from './core.js';
 import { guideHtml, personaOf } from './guide.js';
+import { sfRead } from './links.js';
 import { signOut } from './shell.js';
 // ---- Sign in --------------------------------------------------------------------------------------------
 export function viewLogin() {
@@ -102,39 +103,8 @@ export async function viewReset(params) {
   };
 }
 
+export { sfRead };
 export const firstStepsDone = () => state.me && !state.me.user.mustChangePassword && state.me.terms.accepted && state.me.guideSeen;
-/**
- * A Salesforce link, read as the server reads it (server/accounts.js checkSalesforceUrl): https, an opportunity (006)
- * or an account (001) whose object in a Lightning link agrees, and an 18-character id whose last three letters check.
- */
-export function sfRead(value) {
-  const text = String(value ?? '').trim();
-  if (!text) return { error: 'Paste the opportunity or account link from Salesforce.' };
-  let url;
-  try {
-    url = new URL(text);
-  } catch {
-    return { error: 'That is not a link: copy it from the address bar of the opportunity or account.' };
-  }
-  if (url.protocol !== 'https:' || url.username || url.password) return { error: 'Give the https link from the address bar.' };
-  if (!/(^|\.)(force\.com|salesforce\.com|lightning\.force\.com)$/i.test(url.hostname)) return { error: `${url.hostname} is not Salesforce.` };
-  const parts = url.pathname.split('/').filter(Boolean);
-  const id = parts.find((p) => /^(001|006)[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?$/.test(p)) ?? '';
-  const kind = id.startsWith('006') ? 'opportunity' : id.startsWith('001') ? 'account' : '';
-  const object = parts.includes('r') ? (parts[parts.indexOf('r') + 1] ?? '').toLowerCase() : '';
-  if (!kind || (object && object !== kind)) return { error: `That link is to ${object && object !== 'r' ? `a ${object}` : 'something else'}: open the opportunity (006…) or the account (001…).` };
-  if (id.length === 18) {
-    const map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
-    let sum = '';
-    for (let b = 0; b < 3; b++) {
-      let n = 0;
-      for (let i = 0; i < 5; i++) if (/[A-Z]/.test(id[b * 5 + i])) n |= 1 << i;
-      sum += map[n];
-    }
-    if (sum !== id.slice(15)) return { error: `The id ${id} is not a whole Salesforce id: copy the link again.` };
-  }
-  return { kind, id, label: `${kind === 'opportunity' ? 'Opportunity' : 'Account'} ${id}` };
-}
 
 // Salesforce links are read as they are typed, wherever one is asked for (the account's link; a sale's opportunity).
 document.addEventListener('input', (e) => {

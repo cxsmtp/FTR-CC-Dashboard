@@ -105,7 +105,8 @@ export function calculatorPage() {
   if (built) return built;
   const read = (file) => fs.readFileSync(path.join(MZ_PUBLIC, file), 'utf8');
   const index = new Map(MODULES.map((file, i) => [file, i]));
-  const source = (file) => (file === 'calculator/hosted.js' ? fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.js'), 'utf8') : read(file));
+  // The page's entry is this product's (client/); what it shares with the dashboard is the dashboard's own file.
+  const source = (file) => (file === 'calculator/hosted.js' ? fs.readFileSync(path.join(ROOT, 'client', 'calculator-hosted.js'), 'utf8') : file === 'links.js' ? fs.readFileSync(path.join(ROOT, 'public', 'js', 'links.js'), 'utf8') : read(file));
   const bundle = MODULES.map((file) => wrapModule(file, source(file), index)).join('\n\n');
   const vendorScripts = ['calculator/vendor/xlsx-lite.js', 'calculator/vendor/parse.js'].map((file) => `\n${scriptText(read(file))}\n`);
   const main = `\n${scriptText(`const __m = [];\n${bundle}\n__m[${index.get('calculator/hosted.js')}].startHosted();`)}\n`;
