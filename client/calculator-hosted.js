@@ -58,6 +58,8 @@ export async function startHosted() {
   let cfg = {};
   // Asked for at once, in parallel, as soon as the team is known: what the calculator asks for first anyway.
   const early = new Map();
+  const earlyAt = Date.now();
+  const EARLY_MS = 6000; // how long an early answer serves the same question again
   // The account named at start is being opened: the start screen waits for it.
   let opening = false;
   const openingDone = () => {
@@ -169,7 +171,10 @@ export async function startHosted() {
       p.catch(() => {});
       early.set(path, p);
     };
-    for (const path of ['/api/projections', '/api/status', '/api/cc/cxone/status', ...(openId ? [`/api/projections/${encodeURIComponent(openId)}`, `/api/cc/accounts/${encodeURIComponent(openId)}`] : [])]) ask(path);
+    // Everything the page asks for as it opens, at once: the list, the lights, the work under way, and for the account
+    // named in the address its figures, its details and its reports (they were asked for one wave after another).
+    for (const path of ['/api/projections', '/api/status', '/api/cc/cxone/status', '/api/cc/work', ...(openId ? [`/api/projections/${encodeURIComponent(openId)}`, `/api/cc/accounts/${encodeURIComponent(openId)}`, `/api/projections/reports?customer=${encodeURIComponent(openId)}`, '/api/projections/git/connections'] : [])]) ask(path);
+    setTimeout(() => early.clear(), EARLY_MS + 1000);
     // While that account is on its way, the page says it is opening it, instead of the empty "new account" start.
     if (openId) {
       opening = true;
@@ -316,11 +321,14 @@ export async function startHosted() {
 
   // ---- Requests to the server ----------------------------------------------------------------------
   async function server(path, { method = 'GET', body, headers = {} } = {}) {
-    // Asked for early (once): that answer, not another round trip.
-    if (method === 'GET' && early.has(path)) {
+    // Asked for early: that answer, not another round trip. While the page is opening (its first seconds) the same
+    // question asked twice gets the same answer; after that, and after anything is changed, it is asked afresh.
+    if (method !== 'GET') early.clear();
+    else if (early.has(path)) {
       const p = early.get(path);
-      early.delete(path);
-      return p;
+      if (Date.now() - earlyAt > EARLY_MS) early.delete(path);
+      // Each asker gets a copy of its own: what one does with the answer never shows in another's.
+      return p.then((answer) => structuredClone(answer));
     }
     let response;
     try {

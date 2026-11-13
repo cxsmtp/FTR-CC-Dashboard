@@ -2,6 +2,13 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.107.00 — 2026-11-13
+
+- **An account opens in the calculator in one round of requests.** Its reports, the git connections and the work under
+  way were asked for only after its figures had arrived, in two further rounds, and its reports twice. Everything the
+  page needs is asked for at once as it opens (8 requests in one round, where there were 10 in three). On a far
+  network that is about half a second sooner.
+
 ## CC-01.106.00 — 2026-11-13
 
 - **Vulnerability estimate, for Admins** (Settings → Pricing). Internal: never in a report, and no other role sees it.
