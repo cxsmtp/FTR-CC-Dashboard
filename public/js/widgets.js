@@ -241,11 +241,43 @@ export function restoreDrafts(root) {
     el.title = 'Kept from what you typed before';
   }
 }
+/**
+ * Everything can be used without a mouse and read by a screen reader, whatever page drew it:
+ *   - a field with only a placeholder (a search box, a filter) is named by it;
+ *   - a card or a line that opens something when clicked (a team, a person, an account on the Overview) can be
+ *     reached with Tab and opened with Enter or Space.
+ */
+export function reachable(root) {
+  for (const el of root.querySelectorAll('input:not([type=hidden]):not([aria-label]), select:not([aria-label]), textarea:not([aria-label])')) {
+    if (el.dataset.named || el.closest('label') || (el.id && root.querySelector(`label[for="${CSS.escape(el.id)}"]`)) || el.getAttribute('aria-labelledby')) continue;
+    el.dataset.named = '1';
+    const name = el.placeholder || el.title || (el.tagName === 'SELECT' ? el.options[0]?.textContent : '') || el.name || '';
+    if (name.trim()) el.setAttribute('aria-label', name.trim());
+  }
+  for (const el of root.querySelectorAll('div[data-team], div[data-person], div[data-account], li[data-team], li[data-person], li[data-account], li.click, div.click')) {
+    if (el.dataset.kb || el.closest('#acct-drawer')) continue;
+    el.dataset.kb = '1';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+  }
+  // A table's line that opens something (an account): reached with Tab, opened with Enter. It stays a table row.
+  for (const el of root.querySelectorAll('tr.click:not([data-kb])')) {
+    el.dataset.kb = 'row';
+    el.tabIndex = 0;
+  }
+}
+document.addEventListener('keydown', (e) => {
+  const kb = e.target.dataset?.kb;
+  if (e.target !== document.activeElement || !((kb === '1' && (e.key === 'Enter' || e.key === ' ')) || (kb === 'row' && e.key === 'Enter'))) return;
+  e.preventDefault();
+  e.target.click();
+});
 /** Tables appear as pages draw: each is given sorting and filters once. */
 new MutationObserver(() => {
   for (const t of document.querySelectorAll('#app table:not([data-tx])')) enhanceTable(t);
   // Dialogs are added to the page itself, beside the app: what was typed in them is kept and brought back too.
   restoreDrafts(document.body);
+  reachable(document.body);
 }).observe(document.body, { childList: true, subtree: true });
 window.addEventListener('hashchange', () => document.querySelector('.tx-pop')?.remove());
 

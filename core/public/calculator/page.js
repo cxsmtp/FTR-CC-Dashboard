@@ -218,7 +218,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     renderTop();
     $('calc-email-form').hidden = true;
     $('calc-email-open').setAttribute('aria-expanded', 'false');
-    rowsShown = ROWS_PAGE;
+    rowsShown = ROWS_FIRST;
     saved('Saved', customer.updatedAt, 'muted');
     syncDraft();
     setStatus('calc-upload-status', '');
@@ -615,7 +615,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
           <label class="check"><input type="checkbox" data-ahead="includeFuture"${A.includeFuture ? ' checked' : ''} /> Count findings still to come</label>
           <label class="calc-assume-num"><span>New findings counted (%)</span><input type="text" inputmode="decimal" class="calc-num" data-ahead="newPacePercent" value="${esc(A.newPacePercent)}"${A.includeFuture ? '' : ' disabled'} /></label>
           <label class="calc-assume-num"><span>AI adoption: fewer new findings over a year (%)</span><input type="text" inputmode="decimal" class="calc-num" data-ahead="aiDeclinePercent" value="${esc(A.aiDeclinePercent)}" /></label>
-          <label class="calc-assume-num"${fusionOff() ? ' title="Fusion for the existing customer is left out of this projection: tick Add Fusion: Existing customer at the top to count it."' : ''}><span>More found by Fusion (%)</span><input type="text" inputmode="decimal" class="calc-num" data-ahead="fusionUpliftPercent" value="${esc(fusionOff() ? 0 : A.fusionUpliftPercent)}"${fusionOff() ? ' disabled' : ''} /></label>
+          <label class="calc-assume-num"${fusionOff() ? ' title="Fusion · Checkmarx One is left out of this projection: use it on its tab to count it."' : ''}><span>More found by Fusion (%)</span><input type="text" inputmode="decimal" class="calc-num" data-ahead="fusionUpliftPercent" value="${esc(fusionOff() ? 0 : A.fusionUpliftPercent)}"${fusionOff() ? ' disabled' : ''} /></label>
           <button type="button" class="link" data-ahead-reset>Defaults</button>
         </div>
         ${A.includeFuture ? `<p class="hint calc-pace-note"><b>New findings counted</b>: 100% counts as many new findings a month as the last ${num(tr().lookbackMonths)} months had (${num(P.arrivals)} a month), 50% half as many, 0% none. Lower it when the customer expects fewer new findings, raise it when more code or projects are coming.</p>` : ''}
@@ -969,8 +969,10 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     return { noCode: sc.leaveOutNoCode ? now - without({ leaveOutNoCode: false }) : 0, noFindings: sc.leaveOutNoFindings ? now - without({ leaveOutNoFindings: false }) : 0, noOrigin: read.length - projects.length };
   }
   const estimate = () => fusionEstimate(scoped(), fusion());
+  // The projects table opens short (the page stays light with thousands of projects); each press shows many more.
+  const ROWS_FIRST = 25;
   const ROWS_PAGE = 100;
-  let rowsShown = ROWS_PAGE;
+  let rowsShown = ROWS_FIRST;
   const saveFusion = () => save({ fusion: fusion() });
   const modelOptions = (selected, blank) =>
     `<option value="">${esc(blank)}</option>` + fusion().models.filter((m) => m.creditsPer10k !== null || m.id === selected).map((m) => `<option value="${esc(m.id)}"${m.id === selected ? ' selected' : ''}>${esc(m.name || 'Unnamed model')}${m.creditsPer10k === null ? '' : ` · ${num(m.creditsPer10k, 2)}`}</option>`).join('');
@@ -1232,7 +1234,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     $('calc-fnew-off-note').hidden = !fnewOff();
     $('calc-fnew-scans').value = f.defaultScans;
     const fallback = fusion().models.find((m) => m.id === fusion().defaultModel);
-    $('calc-fnew-model').innerHTML = modelOptions(f.defaultModel, fallback ? t('As the existing customer tab: {0}').replace('{0}', fallback.name || t('Unnamed model')) : 'No model yet');
+    $('calc-fnew-model').innerHTML = modelOptions(f.defaultModel, fallback ? t('As Fusion · Checkmarx One: {0}').replace('{0}', fallback.name || t('Unnamed model')) : 'No model yet');
     // Every language found, most lines first: each one counted or left out with a click.
     const langs = new Map();
     for (const p of f.projects) for (const [lang, n] of Object.entries(p.langs ?? {})) langs.set(lang, (langs.get(lang) ?? 0) + (wholeNumber(n) ?? 0));
@@ -1244,7 +1246,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const existing = new Set((fusionOff() ? [] : scoped().filter((p) => p.included !== false)).map((p) => String(p.name).toLowerCase()));
     const twice = fnewOff() ? [] : est.rows.filter((r) => r.included && existing.has(String(r.name).toLowerCase())).map((r) => r.name);
     $('calc-fnew-dup').hidden = !twice.length;
-    $('calc-fnew-dup').textContent = twice.length ? t('Also on the existing customer tab, so counted on both: {0}. Untick it on one of them unless it really is a second copy of the code.').replace('{0}', twice.join(', ')) : '';
+    $('calc-fnew-dup').textContent = twice.length ? t('Also on Fusion · Checkmarx One, so counted on both: {0}. Untick it on one of them unless it really is a second copy of the code.').replace('{0}', twice.join(', ')) : '';
     // (Named `tot`, not `t`: `t` is the translation used above in this function.)
     const tot = est.totals;
     $('calc-fnew-kpis').innerHTML = f.projects.length
@@ -1435,7 +1437,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
 
   // ---- The two Fusion tabs: Checkmarx One, and code counted (from Git or a cloc-fusion report); one in the credits --
   const BASES = {
-    cxone: { tab: 'fusion', kick: 'Fusion · existing customer', title: 'From Checkmarx One projects', short: 'Checkmarx One', what: 'projects' },
+    cxone: { tab: 'fusion', kick: 'Fusion · Checkmarx One', title: 'From Checkmarx One projects', short: 'Checkmarx One', what: 'projects' },
     git: { tab: 'fusion-git', kick: 'Fusion · from Git', title: 'From code counted in git or by cloc-fusion', short: 'from Git', what: 'repositories' },
   };
   /** The estimate in the credits: one of the three, or none. A customer saved with both parts on counts both until one is chosen. */
@@ -2495,7 +2497,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   });
 
   $('calc-filter').addEventListener('input', () => {
-    rowsShown = ROWS_PAGE;
+    rowsShown = ROWS_FIRST;
     renderProjects();
   });
   for (const [id, on] of [
@@ -2674,7 +2676,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   async function applyScope({ quiet = false } = {}) {
     if (!c.open) return;
     renderScopeSummary();
-    rowsShown = ROWS_PAGE;
+    rowsShown = ROWS_FIRST;
     renderRules();
     renderProjects();
     const fromTenant = tr()?.totals?.meta?.source === 'cxone';
@@ -3620,7 +3622,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const f = currentFusionImpact();
     const { w } = L;
     $('calc-impact-fusion-empty').hidden = Boolean(f);
-    $('calc-impact-fusion-empty').textContent = !impact().countFusion ? 'Fusion’s impact is not calculated: tick Calculate Fusion’s impact above to see its figures (and count them in the return).' : fusionOff() ? 'Fusion for the existing customer is left out of this projection: tick Add Fusion: Existing customer at the top to count it.' : 'No Fusion projects yet: add them, with their lines of code, on the Fusion tabs.';
+    $('calc-impact-fusion-empty').textContent = !impact().countFusion ? 'Fusion’s impact is not calculated: tick Calculate Fusion’s impact above to see its figures (and count them in the return).' : fusionOff() ? 'Fusion · Checkmarx One is left out of this projection: use it on its tab to count it.' : 'No Fusion projects yet: add them, with their lines of code, on the Fusion tabs.';
     if (!f) return ($('calc-impact-fusion').innerHTML = '');
     const cash = (n) => esc(money(n, f.settings.currency));
     $('calc-impact-fusion').innerHTML = [

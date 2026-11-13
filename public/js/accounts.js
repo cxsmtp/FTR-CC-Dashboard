@@ -51,13 +51,22 @@ let listState = null;
 let focusNext = '';
 const listUp = () => Boolean(listState && $('#main')?.dataset.page === 'accounts' && $('#rows') && $('#count'));
 /** Close the account's side panel: back on the list, read again as the account may have changed. */
+let drawerOpener = null; // what had the focus when the account's panel opened
 function closeAccount({ quiet = false } = {}) {
   const wrap = $('#acct-drawer');
   if (!wrap) return;
   wrap.remove();
-  if (quiet || !listUp()) return;
+  const opener = drawerOpener;
+  const row = wrap.dataset.account;
+  drawerOpener = null;
+  // Back to the line it was opened from (drawn again by then), for those working by keyboard.
+  const back = () => {
+    if (!opener) return;
+    (opener.isConnected ? opener : document.querySelector(`#main tr[data-account="${CSS.escape(row ?? '')}"]`))?.focus({ preventScroll: true });
+  };
+  if (quiet || !listUp()) return back();
   history.replaceState(null, '', `#/accounts${listState.focus ? `?team=${encodeURIComponent(listState.focus)}` : ''}`);
-  listState.reload().catch(() => {});
+  listState.reload().then(back, () => {});
 }
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || !$('#acct-drawer') || e.target.closest?.('.cell-edit, .share-inline')) return;
@@ -327,7 +336,18 @@ export async function viewAccount(id) {
     wrap.className = 'drawer-wrap';
     wrap.innerHTML = `<div class="drawer-shade" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Account"><button type="button" class="drawer-close" data-close title="Close (Esc)" aria-label="Close the account">✕</button><div id="acct-body">${loading()}</div></aside>`;
     wrap.addEventListener('click', (e) => e.target.matches('[data-close]') && closeAccount());
+    drawerOpener = document.activeElement?.closest?.('tr[data-account], [data-account], a, button') ?? null;
     $('#app').append(wrap);
+    // The panel takes the focus (its Close button), and Tab stays inside it while it is open.
+    wrap.querySelector('.drawer-close')?.focus({ preventScroll: true });
+    wrap.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...wrap.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex="0"]')].filter((x) => x.offsetParent);
+      if (!items.length) return;
+      const [first, last] = [items[0], items[items.length - 1]];
+      if (e.shiftKey && document.activeElement === first) (e.preventDefault(), last.focus());
+      else if (!e.shiftKey && document.activeElement === last) (e.preventDefault(), first.focus());
+    });
   }
   const drawer = wrap.querySelector('.drawer');
   const at = wrap.dataset.account === id ? drawer.scrollTop : 0;

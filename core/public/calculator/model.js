@@ -1068,8 +1068,8 @@ export function topSettings(value = {}) {
 const SETTING_NAMES = [
   ['allBranches', 'Every branch'],
   ['maxProjects', 'Projects to read'],
-  ['fusionOn', 'Add Fusion: Existing customer'],
-  ['fusionNewOn', 'Add Fusion: New customer'],
+  ['fusionOn', 'Fusion · Checkmarx One'],
+  ['fusionNewOn', 'Fusion · from Git'],
   ['origins', 'Include scans from'],
   ['applications', 'Applications'],
   ['projects', 'Projects'],

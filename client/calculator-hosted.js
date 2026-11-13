@@ -810,7 +810,7 @@ export async function startHosted() {
       '<span class="hc-label">Status</span>',
       account ? `<span class="hc-st cust"><i></i><b>${esc(account.name)}</b></span>` : '',
       account && accountPending ? '<span class="hc-st draft" title="Kept for you alone: it becomes an account once it has a projection (read Checkmarx One, upload the two exports or a report, or count code). Left with nothing for a day, it is discarded."><i></i>Not saved yet: bring in data to keep it</span>' : account && accountDraft ? '<span class="hc-st draft" title="Only you (its SE) and the Admins see this account until a report is generated for it; then its team does."><i></i>Draft: only you and Admins see it</span>' : '',
-      fusionOnly ? chip('ok', 'New customer · Fusion only') : cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
+      fusionOnly ? chip('ok', 'Fusion only · code from Git') : cxState.connected ? chip('ok', `Checkmarx One: connected · ${cxState.tenant}`) : chip('warn', 'Checkmarx One: not connected'),
     ];
     if (account) {
       if (!fusionOnly) parts.push(trSource === 'cxone' ? chip('ok', 'T&R: read from Checkmarx One') : trSource === 'upload' && cu?.tr?.totals?.meta?.layout === 'report' ? chip('ok', 'T&R: from an uploaded report') : trSource === 'upload' ? chip('ok', 'T&R: from the two exports') : trSource ? chip('ok', 'T&R: worked out') : chip('off', 'T&R: no data yet'));
@@ -1646,6 +1646,18 @@ export async function startHosted() {
   if (impactTab) impactTab.innerHTML = 'Impact <i class="hc-beta">beta</i>';
   for (const hint of document.querySelectorAll('#page-calculator .hint')) if (hint.textContent.includes('They start from Settings → Impact')) hint.textContent = 'Kept with this account: the minutes to triage and to remediate a finding by hand, and the developers\u2019 hourly rate, in the currency confirmed above.';
   renderStatus();
+  // The status strip stays at the top as the page scrolls, and is taller when its chips wrap. Whatever is scrolled to
+  // (a tab, a section) stops under it, not behind it.
+  {
+    const strip = document.querySelector('.hc-status-wrap');
+    const room = () => {
+      if (!strip || strip.hidden || !strip.offsetHeight) return void document.documentElement.style.removeProperty('scroll-padding-top');
+      document.documentElement.style.scrollPaddingTop = `${Math.round((parseFloat(getComputedStyle(strip).top) || 0) + strip.offsetHeight + 12)}px`;
+    };
+    if (strip && 'ResizeObserver' in window) new ResizeObserver(room).observe(strip);
+    window.addEventListener('resize', room);
+    room();
+  }
   startHelpTips();
   const fresh = !params.get('account');
   await calculator.load({ fresh });

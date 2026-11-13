@@ -2,6 +2,23 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.103.00 — 2026-11-13
+
+- **Calculator, tidied.**
+  - Fewer sizes of type: the half-pixel sizes are gone (11, 12, 13 and 14 are what text is set in).
+  - The projects table opens with 25 projects, not 100 (Show more brings 100 at a time): with thousands of projects
+    the Fusion · Checkmarx One tab is less than half as long.
+  - The words follow the tabs: "Fusion · Checkmarx One" and "Fusion · from Git" wherever it still said existing and
+    new customer.
+  - Whatever is scrolled to stops under the status strip, not behind it, also when the strip is two lines tall.
+- **By keyboard, and for screen readers.**
+  - The Overview's teams, Sales Engineers and accounts, and the lines of the Accounts table, can be reached with Tab
+    and opened with Enter.
+  - An account's side panel takes the focus when it opens, keeps Tab inside it, closes with Esc and gives the focus
+    back to the line it was opened from.
+  - Search boxes and filters that had only a hint inside them have a name.
+  - A page being drawn is no longer read out whole; messages still are.
+
 ## CC-01.102.00 — 2026-11-13
 
 - **What nothing used is gone.** Nothing looks or works differently: every page and calculator tab was photographed

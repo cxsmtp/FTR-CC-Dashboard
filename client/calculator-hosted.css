@@ -30,14 +30,14 @@
 .hc-tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
 .hc-tools #hc-kept { color: var(--muted); }
 .hc-file { cursor: pointer; border: 1px solid var(--border); border-radius: 9px; padding: 5px 10px; }
-.hc-remember { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; align-self: center; }
+.hc-remember { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; align-self: center; }
 .hc-remember small { color: var(--muted); }
 .hc-dialog.hc-wide { max-width: 680px; width: min(680px, 92vw); }
-.hc-check { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: 13.5px; }
+.hc-check { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: 13px; }
 .hc-changes { max-height: 220px; overflow: auto; margin: 8px 0; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; }
 .hc-delta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
 .hc-delta div { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
-.hc-delta small { display: block; color: var(--muted); font-size: 11.5px; }
+.hc-delta small { display: block; color: var(--muted); font-size: 12px; }
 .hc-delta b { font-size: 20px; }
 .hc-pill.bad { color: #b91c1c; border-color: rgba(185, 28, 28, .35); }
 @media (max-width: 860px) {
@@ -45,7 +45,7 @@
 }
 /* The status strip: always on top while working and generating. */
 .hc-status-wrap { position: sticky; top: 0; z-index: 20; margin: 10px 0 0; }
-.hc-status { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px -14px rgba(0, 0, 0, .35); font-size: 12.5px; }
+.hc-status { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px -14px rgba(0, 0, 0, .35); font-size: 12px; }
 .hc-status .hc-st { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
 .hc-status .hc-st i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .hc-status .hc-st.ok { color: #047857; border-color: rgba(4, 120, 87, .35); background: rgba(16, 185, 129, .08); }
@@ -63,14 +63,14 @@
 .hc-switch { display: inline-flex; gap: 10px; align-items: center; cursor: pointer; }
 .hc-switch input { width: 18px; height: 18px; }
 .hc-switch small { display: block; color: var(--muted); font-size: 12px; }
-.hc-beta { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; color: #7c3aed; border: 1px solid rgba(124, 58, 237, .4); }
+.hc-beta { font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; color: #7c3aed; border: 1px solid rgba(124, 58, 237, .4); }
 .hc-dialog { border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; max-width: 460px; background: var(--surface); color: inherit; }
 .hc-dialog::backdrop { background: rgba(6, 10, 25, .5); }
 .hc-dialog h2 { margin: 0 0 8px; font-size: 18px; }
 .hc-dialog .field { display: grid; gap: 6px; margin: 10px 0; }
 .hc-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 /* Calculating: the working pill under the status strip, the report overlay, totals that count up. */
-.hc-work { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; color: #fff; background: linear-gradient(120deg, #0891b2, #4f46e5 55%, #7c3aed); background-size: 200% 100%; animation: hcflow 2.4s linear infinite; box-shadow: 0 8px 24px -12px rgba(79, 70, 229, .7); }
+.hc-work { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; border-radius: 12px; font-size: 12px; color: #fff; background: linear-gradient(120deg, #0891b2, #4f46e5 55%, #7c3aed); background-size: 200% 100%; animation: hcflow 2.4s linear infinite; box-shadow: 0 8px 24px -12px rgba(79, 70, 229, .7); }
 .hc-work[hidden] { display: none; }
 .hc-work b { font-weight: 600; }
 .hc-bar { flex: 1; max-width: 260px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .25); overflow: hidden; }
@@ -109,7 +109,7 @@
 .hc-overlay.hc-corner .hc-orbit.big i:nth-child(3) { inset: 14px; }
 .hc-overlay.hc-corner h2 { font-size: 15px; }
 .hc-sub { margin: 0; font-size: 12px; color: var(--muted); }
-.hc-away { opacity: .85; font-size: 11.5px; }
+.hc-away { opacity: .85; font-size: 12px; }
 /* ==========================================================================
    One command center: the dashboard's menu, palette, background and buttons around the calculator.
    The calculator is the calculator’s (styles.css, nextgen.css); its colour tokens are set here from the dashboard's
@@ -223,7 +223,7 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
 .cc-logo { width: 34px; height: 34px; border-radius: 11px; background: var(--grad); box-shadow: 0 0 24px color-mix(in srgb, var(--violet) 55%, transparent); display: grid; place-items: center; flex: none; }
 .cc-logo svg { width: 20px; height: 20px; }
 .cc-brand b { display: block; font-size: 15px; font-family: var(--font); }
-.cc-brand small { display: block; color: var(--muted); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; }
+.cc-brand small { display: block; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .cc-nav { display: grid; gap: 0; }
 .cc-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; color: var(--muted); font-weight: 500; text-decoration: none; transition: background .15s, color .15s; }
 .cc-nav a:hover { background: var(--cc-panel-hi); color: var(--text); }
@@ -238,9 +238,9 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
 .cc-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 13px; color: #fff; background: var(--grad); flex: none; }
 .cc-row { display: flex; gap: 6px; }
 .cc-row button { display: inline-flex; align-items: center; gap: 6px; }
-.cc-ver { margin-top: 8px; align-self: flex-start; color: var(--faint); font-family: var(--mono); font-size: 11.5px; padding: 2px 8px; text-decoration: none; }
+.cc-ver { margin-top: 8px; align-self: flex-start; color: var(--faint); font-family: var(--mono); font-size: 12px; padding: 2px 8px; text-decoration: none; }
 .cc-ver:hover { color: var(--cyan); }
-.cc-work { display: flex; gap: 10px; align-items: center; margin-top: auto; margin-bottom: 8px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line-hi); background: var(--cc-panel); color: var(--text); font-size: 12.5px; text-decoration: none; }
+.cc-work { display: flex; gap: 10px; align-items: center; margin-top: auto; margin-bottom: 8px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line-hi); background: var(--cc-panel); color: var(--text); font-size: 12px; text-decoration: none; }
 .cc-work[hidden] { display: none; }
 .cc-work:not([hidden]) + .cc-me { margin-top: 0; }
 .cc-work b, .cc-work small { display: block; }
@@ -258,7 +258,7 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
 .cc-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .cc-swatch { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; border-radius: 14px; text-align: left; white-space: normal; }
 .cc-swatch.on { border-color: var(--cyan); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 25%, transparent); }
-.cc-swatch small { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+.cc-swatch small { color: var(--muted); font-weight: 400; font-size: 12px; }
 .cc-sw { display: block; width: 100%; height: 34px; border-radius: 10px; }
 .cc-sw.aurora { background: linear-gradient(120deg, #22d3ee, #6366f1 55%, #a855f7); }
 .cc-sw.ocean { background: linear-gradient(120deg, #0ea5e9, #2563eb 55%, #14b8a6); }
@@ -281,7 +281,7 @@ html[data-cc] .hc-dialog { background: var(--cc-panel-solid); border-color: var(
 html[data-cc][data-ui] button.primary, html[data-cc][data-ui] a.button.primary { --btn-sheen: var(--grad); --btn-hi: rgba(255, 255, 255, .18); --btn-lo: transparent; --btn-drop: 0 8px 24px -10px color-mix(in srgb, var(--violet) 80%, transparent); border-color: transparent; }
 html[data-cc][data-ui] .cc-seg button:not(.primary) { --btn-sheen: none; --btn-drop: 0 0 transparent; --btn-hi: transparent; --btn-lo: transparent; }
 html[data-cc][data-ui] .cc-swatches button.cc-swatch { display: flex; width: 100%; height: auto; min-height: 0; padding: 10px; flex-direction: column; align-items: flex-start; justify-content: flex-start; white-space: normal; text-align: left; border-radius: 14px; }
-html[data-cc][data-ui] .cc-swatches button.cc-swatch b { font-size: 13.5px; }
+html[data-cc][data-ui] .cc-swatches button.cc-swatch b { font-size: 13px; }
 /* The account is named in the account bar (as in Salesforce): the calculator’s Customer ▾ picker is not shown. */
 html[data-cc] .calc-cust-pick, html[data-cc] #calc-rename-field { display: none !important; }
 .hc-name > span:first-child small { color: var(--muted); font-weight: 400; }
@@ -308,7 +308,7 @@ html[data-cc] .shell.standalone .sa-sub { flex: 1 1 380px; }
 /* The menu exactly as on the dashboard: same type, same line height, so nothing moves between pages. */
 html[data-cc] .cc-side { font: 14px/1.5 var(--font); letter-spacing: normal; }
 html[data-cc] .cc-side b { font-weight: 600; }
-html[data-cc] .cc-me .cc-row button { font-size: 12.5px; padding: 5px 10px; min-height: 0; line-height: 1.5; }
+html[data-cc] .cc-me .cc-row button { font-size: 12px; padding: 5px 10px; min-height: 0; line-height: 1.5; }
 /* Quick guide: just above the person, as on the dashboard. */
 .cc-guide-nav { margin-top: auto; }
 .cc-work:not([hidden]) ~ .cc-guide-nav { margin-top: 0; }
@@ -404,7 +404,7 @@ html[data-cc][data-ui] .cc-topbar button { --btn-sheen: none; --btn-drop: 0 0 tr
 .cc-tb-icon { border-radius: 999px !important; padding: 7px !important; min-width: 0 !important; }
 .cc-grow { flex: 1; }
 .cc-lights { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-.cc-light { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-hi); background: var(--cc-panel); color: var(--text); font-size: 12.5px; font-weight: 500; white-space: nowrap; text-decoration: none; }
+.cc-light { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-hi); background: var(--cc-panel); color: var(--text); font-size: 12px; font-weight: 500; white-space: nowrap; text-decoration: none; }
 .cc-light:hover { border-color: var(--cyan); }
 .cc-light i { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
 .cc-light.on i { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
@@ -413,7 +413,7 @@ html[data-cc][data-ui] .cc-topbar button { --btn-sheen: none; --btn-drop: 0 0 tr
 .cc-me2 { position: relative; }
 .cc-who2 { display: flex !important; align-items: center; gap: 8px; padding: 4px 12px 4px 4px !important; border-radius: 999px !important; text-align: left; }
 .cc-who2 b { display: block; font-size: 13px; line-height: 1.2; }
-.cc-who2 small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.2; font-weight: 400; }
+.cc-who2 small { display: block; color: var(--muted); font-size: 12px; line-height: 1.2; font-weight: 400; }
 .cc-who2 .cc-avatar { width: 30px; height: 30px; font-size: 12px; }
 .cc-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 200px; display: grid; padding: 6px; border-radius: 14px; border: 1px solid var(--line-hi); background: var(--cc-panel-solid); box-shadow: var(--glow), 0 20px 40px -20px rgba(0, 0, 0, .5); }
 .cc-menu a, .cc-menu button { display: block; text-align: left; padding: 8px 10px; border-radius: 9px; font-size: 13px; color: var(--text); text-decoration: none; border: 0 !important; background: transparent !important; justify-content: flex-start !important; }
@@ -454,7 +454,7 @@ html[data-cc][data-menu="top"] .cc-topbar { top: 57px; }
 html[data-cc][data-menu="top"] .hc-status-wrap { top: 115px; }
 /* ---- One compact panel: customer on one row, the data source on the next, the rest in a thin line -------------- */
 .shell.standalone .sa-top { padding: 10px 0 6px; gap: 6px 24px; align-items: baseline; }
-.shell.standalone .sa-sub { font-size: 12.5px; }
+.shell.standalone .sa-sub { font-size: 12px; }
 .hc-account { display: grid !important; grid-template-columns: none !important; grid-template-areas: none !important; gap: 10px !important; padding: 12px 16px !important; }
 .hc-row1 { display: grid; grid-template-columns: minmax(200px, 1.1fr) minmax(260px, 2fr) minmax(150px, .8fr) minmax(150px, .8fr); gap: 10px 14px; align-items: end; }
 .hc-row1 .field { margin: 0; }
@@ -469,15 +469,15 @@ html[data-cc][data-ui] .hc-seg button.on { background: var(--grad); color: #fff;
 .shell.standalone .hc-pane .sa-connect { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; }
 html[data-cc] .hc-pane .sa-connect { background: none !important; border: 0 !important; box-shadow: none !important; }
 .hc-pane #sa-key { flex: 1 1 280px; min-width: 200px; max-width: 520px; }
-.hc-pane .hc-remember { font-size: 12.5px; }
-.hc-pane .sa-advanced { flex: none; font-size: 12.5px; }
+.hc-pane .hc-remember { font-size: 12px; }
+.hc-pane .sa-advanced { flex: none; font-size: 12px; }
 .hc-pane .sa-advanced[open] { flex: 1 1 100%; }
-.hc-pane .status { flex: 1 1 100%; font-size: 12.5px; }
-.hc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12.5px; }
+.hc-pane .status { flex: 1 1 100%; font-size: 12px; }
+.hc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12px; }
 .hc-meta .hc-impact, .hc-meta .hc-tools { grid-column: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .hc-meta .hc-switch input { width: 16px; height: 16px; }
 .hc-fold-btn { margin-left: auto; }
-.hc-reports { font-size: 12.5px !important; }
+.hc-reports { font-size: 12px !important; }
 /* Folded: one line, the essentials, and Edit */
 .hc-fold-sum { display: none; }
 .hc-account.folded > :not(.hc-fold-sum) { display: none !important; }
@@ -543,13 +543,13 @@ html[data-cc][data-ui] button.hc-3d {
 .hc-owner.need-se select { border-color: var(--amber) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent) !important; }
 .hc-owner.need-se > span::after { content: " · choose one"; color: var(--amber); font-weight: 700; }
 .hc-share-in { display: inline-flex; gap: 4px; align-items: center; }
-.hc-share-in input { width: 170px; padding: 4px 8px; font-size: 12.5px; }
+.hc-share-in input { width: 170px; padding: 4px 8px; font-size: 12px; }
 /* ---- In a meeting with the customer ------------------------------------------------------------------------- */
 .hc-meet-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px !important; border-radius: 999px !important; border: 0 !important; font-weight: 800; letter-spacing: .01em; color: #fff !important; cursor: pointer; white-space: nowrap;
   background: linear-gradient(120deg, #e11d48, #f97316) !important; box-shadow: 0 6px 18px -6px rgba(225, 29, 72, .6), 0 1px 0 rgba(255, 255, 255, .35) inset !important; }
 .hc-meet-btn:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); }
 .hc-meet-btn:disabled { opacity: .45; cursor: not-allowed; }
-.hc-meet-btn.sm { padding: 5px 12px !important; font-size: 12.5px; }
+.hc-meet-btn.sm { padding: 5px 12px !important; font-size: 12px; }
 .hc-meet-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 0 rgba(255, 255, 255, .7); animation: hcmeet 1.6s infinite; }
 @keyframes hcmeet { 70% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); } }
 html[data-cc][data-ui] button.hc-meet-btn { --btn-sheen: linear-gradient(120deg, #e11d48, #f97316); --btn-hi: rgba(255, 255, 255, .35); --btn-lo: transparent; --btn-drop: 0 6px 18px -6px rgba(225, 29, 72, .6); --btn-glow: 0 0 0 transparent; height: auto; min-height: 0; }
@@ -708,8 +708,8 @@ html[data-meeting][data-src="git"] [data-ptabs="calculator"] [data-pt="fusion-gi
 html[data-meeting][data-src="cloc"] [data-ptabs="calculator"] [data-pt="fusion-git"] { display: revert !important; }
 html[data-meeting] .hc-meet-src .hc-remember { display: none !important; }
 /* False positives: one small box for every severity, beside the per-severity results (not a field in each). */
-.calc-fp-one { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 10px; font-size: 12.5px; color: var(--muted); }
-.calc-fp-one input { width: 62px; height: 28px !important; min-height: 0 !important; padding: 0 6px !important; font-size: 12.5px !important; text-align: right; }
+.calc-fp-one { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 10px; font-size: 12px; color: var(--muted); }
+.calc-fp-one input { width: 62px; height: 28px !important; min-height: 0 !important; padding: 0 6px !important; font-size: 12px !important; text-align: right; }
 .imp-bar { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 16px; font-size: 13px; color: #fff; background: linear-gradient(90deg, #b45309, #d97706); }
 .imp-bar span:nth-child(2) { flex: 1 1 260px; min-width: 0; }
 .imp-bar button { background: #fff !important; color: #92400e !important; border: 0 !important; font-weight: 700; }
@@ -746,12 +746,12 @@ html[data-cc] table.calc-rules tr, .calc-share { display: flex; flex-direction: 
 html[data-cc] table.calc-rules td { display: block; padding: 0 !important; border: 0 !important; background: transparent !important; min-width: 0; text-align: left !important; }
 html[data-cc] table.calc-rules td:first-child, .calc-share-name { order: 1; font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html[data-cc] table.calc-rules td:nth-child(3), .calc-share-in { order: 2; }
-html[data-cc] table.calc-rules td:nth-child(2), .calc-share-n { order: 3; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+html[data-cc] table.calc-rules td:nth-child(2), .calc-share-n { order: 3; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 html[data-cc] table.calc-rules td:nth-child(2)::after { content: " projects"; }
 html[data-cc] table.calc-rules td:nth-child(4) { order: 4; display: none; }
 html[data-cc] table.calc-rules.show-models td:nth-child(4) { display: block; }
 html[data-cc] table.calc-rules td input, .calc-share-in input { width: 100% !important; min-width: 0 !important; height: 30px !important; min-height: 0 !important; padding: 0 8px !important; text-align: center !important; font-size: 15px !important; font-weight: 600; font-variant-numeric: tabular-nums; }
-html[data-cc] table.calc-rules td select { width: 100% !important; min-width: 0; height: 26px !important; min-height: 0 !important; padding: 0 18px 0 6px !important; font-size: 11.5px !important; }
+html[data-cc] table.calc-rules td select { width: 100% !important; min-width: 0; height: 26px !important; min-height: 0 !important; padding: 0 18px 0 6px !important; font-size: 12px !important; }
 .calc-share-in { position: relative; display: block; }
 .calc-share-in i { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 12px; color: var(--muted); pointer-events: none; }
 .calc-share.changed { border-color: var(--amber, #b45309); }
@@ -834,5 +834,5 @@ html[data-cc] .hc-cloc .hc-cf-up:focus-within { outline: 2px solid var(--brand, 
 html[data-cc] .hc-cloc #hc-cf-dl { background: var(--surface, #fff) !important; color: var(--brand, var(--text)) !important; border: 1px solid var(--brand, var(--border)) !important; }
 html[data-cc] .hc-cloc #hc-cf-dl:hover { background: color-mix(in srgb, var(--brand, #0b6b7f) 8%, var(--surface, #fff)) !important; }
 /* Staging, said at the top (as on the dashboard). */
-.tb-stage { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; margin-right: 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--amber, #92400e); background: color-mix(in srgb, var(--amber, #d97706) 14%, transparent); border: 1px solid color-mix(in srgb, var(--amber, #d97706) 45%, transparent); }
+.tb-stage { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; margin-right: 8px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--amber, #92400e); background: color-mix(in srgb, var(--amber, #d97706) 14%, transparent); border: 1px solid color-mix(in srgb, var(--amber, #d97706) 45%, transparent); }
 .tb-stage[hidden] { display: none; }
