@@ -636,3 +636,48 @@ test('a Salesforce link belongs to one account: a second use is refused and name
   assert.equal((await se1.put(`/api/cc/accounts/${second.data.customer.id}`, { salesforceUrl: link })).status, 409);
   assert.equal((await se1.put(`/api/cc/accounts/${id}`, { salesforceUrl: link })).status, 200);
 });
+
+test('before the first steps (own password, terms) nothing of an account can be changed', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = team(env.teams.emea.id);
+  const { data } = await se1.post('/api/projections', { name: 'First Steps Corp', salesforceUrl: sfLink() }, h);
+  const id = data.customer.id;
+  // Someone just added: a temporary password, terms not accepted.
+  const added = await admin.post('/api/people', { email: 'fresh@t.example', name: 'Fresh', role: 'se', teamId: env.teams.emea.id, password: 'Temp-Password-For-Tests-9' });
+  assert.equal(added.status, 200);
+  const fresh = await client(env.base, 'fresh@t.example', 'Temp-Password-For-Tests-9');
+  assert.equal((await fresh.put(`/api/cc/accounts/${id}`, { name: 'Taken Over' })).status, 403);
+  assert.equal((await fresh.get('/api/cc/name-tidy')).status, 403);
+  assert.equal((await fresh.get(`/api/cc/salesforce-taken?url=${encodeURIComponent(sfLink())}`)).status, 403);
+  assert.equal((await se1.get(`/api/cc/accounts/${id}`)).data.account.name, 'First Steps Corp');
+});
+
+test('the same person is not added twice when two adds arrive together', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const body = { email: 'twice@t.example', name: 'Twice', role: 'se', teamId: env.teams.emea.id };
+  const both = await Promise.all([admin.post('/api/people', body), admin.post('/api/people', body)]);
+  assert.deepEqual(both.map((r) => r.status).sort(), [200, 409]);
+  const people = (await admin.get('/api/people')).data.people.filter((p) => p.email === 'twice@t.example');
+  assert.equal(people.length, 1);
+});
+
+test('a cookie that is not valid percent-encoding does not break the request', async () => {
+  const res = await fetch(`${env.base}/api/auth/sso`, { headers: { Cookie: 'other=%E0%A4%A; x=%' } });
+  assert.equal(res.status, 200);
+  assert.equal((await fetch(`${env.base}/%E0%A4%A.js`)).status < 500, true);
+});
+
+test('behind a proxy the address is the one the proxy saw, not one the client sent', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  assert.equal((await admin.put('/api/settings', { trustProxy: true })).status, 200);
+  try {
+    // A made-up first entry, as a client can send; the proxy appends the address it really saw.
+    await fetch(`${env.base}/api/auth/signin`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '6.6.6.6, 203.0.113.9' }, body: JSON.stringify({ email: 'nobody@t.example', password: 'wrong-password-123' }) });
+    const { events } = (await admin.get('/api/audit?limit=20')).data;
+    const failed = events.find((e) => e.action === 'auth.failed' && e.target === 'nobody@t.example');
+    assert.equal(failed.ip, '203.0.113.9');
+  } finally {
+    await admin.put('/api/settings', { trustProxy: false });
+  }
+});

@@ -63,7 +63,12 @@ export function cookies(req) {
   const out = {};
   for (const part of String(req.headers.cookie ?? '').split(';')) {
     const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    if (i <= 0) continue;
+    try {
+      out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    } catch {
+      // Not valid percent-encoding (a cookie of another site's on the same host): left out.
+    }
   }
   return out;
 }
@@ -108,7 +113,11 @@ export class RateLimit {
     const entry = this.#hits.get(key);
     if (!entry || now - entry.start > this.windowMs) {
       this.#hits.set(key, { start: now, count: 1 });
-      if (this.#hits.size > 50_000) this.#hits.clear();
+      // Full: the oldest go (a Map keeps the order they were added in), never everyone's counts at once.
+      if (this.#hits.size > 50_000) for (const k of this.#hits.keys()) {
+        this.#hits.delete(k);
+        if (this.#hits.size <= 45_000) break;
+      }
       return true;
     }
     entry.count += 1;
@@ -120,7 +129,13 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 
 /** A file from one folder, never outside it; GET and HEAD only. */
 export function serveStatic(root, req, res, pathname, { cache = 'no-cache' } = {}) {
-  const rel = path.normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/, '');
+  let decoded;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return false; // not a valid address
+  }
+  const rel = path.normalize(decoded).replace(/^([/\\])+/, '');
   const file = path.resolve(root, rel);
   if (!file.startsWith(path.resolve(root) + path.sep)) return false;
   let stat;

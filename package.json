@@ -1,6 +1,6 @@
 {
   "name": "ftr-cc-dashboard",
-  "version": "1.98.0",
+  "version": "1.99.0",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "description": "FTR Credits Command Center: the Cx Credits Calculator hosted for every Sales Engineer, with team-based RBAC and leadership dashboards of every projection made and shared.",

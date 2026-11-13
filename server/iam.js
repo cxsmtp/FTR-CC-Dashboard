@@ -167,7 +167,7 @@ export class Iam {
   async create({ email, name, role, teamId = null, title = '', password = '' }) {
     const address = norm(email);
     if (!EMAIL.test(address)) throw fail(400, 'Give a valid email address.');
-    if (this.byEmail(address)) throw fail(409, 'Someone with that email already has access.');
+    if (this.byEmail(address) || this.#adding.has(address)) throw fail(409, 'Someone with that email already has access.');
     if (!this.doc.value.roles[role]) throw fail(400, 'Choose a role.');
     // A temporary password typed by whoever adds them (checked like any other), or one made here.
     if (password) {
@@ -175,10 +175,23 @@ export class Iam {
       if (problem) throw fail(400, `Temporary password: ${problem}`);
     }
     const temporary = password || generatePassword();
-    const user = { id: randomUUID(), email: address, name: clean(name) || address.split('@')[0], title: clean(title), role, teamId, active: true, passwordHash: await hashPassword(temporary), mustChangePassword: true, createdAt: new Date().toISOString(), failed: 0, lockedUntil: 0, lastSignInAt: null, guideSeenAt: null };
+    // Held from here until the person is in the list (hashing takes a moment): a second add of the same address,
+    // arriving meanwhile, is refused instead of making a second person.
+    this.#adding.add(address);
+    let user;
+    try {
+      user = await this.#newUser({ address, name, title, role, teamId, temporary });
+    } finally {
+      this.#adding.delete(address);
+    }
     this.users().push(user);
     this.save();
     return { user, temporary };
+  }
+  #adding = new Set();
+  async #newUser({ address, name, title, role, teamId, temporary }) {
+    const user = { id: randomUUID(), email: address, name: clean(name) || address.split('@')[0], title: clean(title), role, teamId, active: true, passwordHash: await hashPassword(temporary), mustChangePassword: true, createdAt: new Date().toISOString(), failed: 0, lockedUntil: 0, lastSignInAt: null, guideSeenAt: null };
+    return user;
   }
 
   update(id, patch) {

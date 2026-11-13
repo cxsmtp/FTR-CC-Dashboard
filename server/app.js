@@ -197,7 +197,12 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   // Behind a reverse proxy (set when the server starts, or by the Admin in Settings → General, at once): the address the
   // proxy says the person came from, and whether they came over HTTPS. Otherwise the connection's own.
   const behindProxy = () => Boolean(config.trustProxy || settings.value.trustProxy);
-  const ipOf = (req) => (behindProxy() ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '') || req.socket.remoteAddress || '';
+  /**
+   * Who is asking. Behind a trusted proxy: the address the proxy saw, which is the last entry of X-Forwarded-For (a
+   * proxy appends; anything before it was sent by the client and can be made up, to dodge the sign-in limits or to
+   * put a false address in the audit log).
+   */
+  const ipOf = (req) => (behindProxy() ? String(req.headers['x-forwarded-for'] ?? '').split(',').map((x) => x.trim()).filter(Boolean).pop() ?? '' : '') || req.socket.remoteAddress || '';
   function context(req) {
     const token = cookies(req)[COOKIE];
     const session = iam.session(token);
@@ -272,7 +277,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     audit.record({ actor: actorOf(ctx), action, target: String(target), details: { method, path: pathname, ...(outcome.status >= 400 ? { status: outcome.status, error: String(outcome.error ?? '').slice(0, 200) } : {}) }, ip: ipOf(req) });
   }
 
-  const cookie = (value, maxAge, req) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict${config.secureCookies || req?.socket?.encrypted || httpsManager.mode === 'https' ? '; Secure' : ''}; Max-Age=${maxAge}`;
+  const cookie = (value, maxAge, req) => `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict${config.secureCookies || req?.socket?.encrypted || httpsManager.mode === 'https' || (behindProxy() && String(req?.headers?.['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https') ? '; Secure' : ''}; Max-Age=${maxAge}`;
 
   // Guards: signed in; then (for everything but the first-sign-in steps) a password of their own and the terms.
   const signedIn = (req, ctx) => {
@@ -843,7 +848,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const a = accounts.get(params.id, ctx.scope);
     return suggestCurrency({ accountName: a.name, teamNames: teamPath(ctx.teams, a.teamId).reverse().flatMap((t) => [t.name, t.region].filter(Boolean)), timeZone: String(url.searchParams.get('tz') ?? '').slice(0, 64) });
   });
-  r('PUT', '/api/cc/accounts/:id', signedIn, (req, ctx, body, res, url, params) => {
+  r('PUT', '/api/cc/accounts/:id', ready2, (req, ctx, body, res, url, params) => {
     const before = accounts.get(params.id, ctx.scope);
     // The calculator's people change an account; leaders and above may change its accountable SE, whoever made it.
     const onlyOwner = body && Object.keys(body).every((k) => k === 'ownerId');
@@ -907,7 +912,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     record(ctx, req, body?.primary === false ? 'report.unprimary' : 'report.primary', rep.customer, { id: rep.id, totalCredits: rep.totalCredits });
     return accountDetail(ctx, rep.customerId);
   });
-  r('POST', '/api/cc/reports/:id/shared', signedIn, (req, ctx, body, res, url, params) => {
+  r('POST', '/api/cc/reports/:id/shared', ready2, (req, ctx, body, res, url, params) => {
     {
       const r0 = accounts.report(params.id, ctx.scope);
       const owner = accounts.accounts.meta(r0.customerId)?.ownerId;
@@ -1109,6 +1114,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       if (missing.length) {
         if (!canTeams) {
           err(`No team "${missing[0]}" there: an Executive or Admin can create teams.`);
+          continue;
+        }
+        // Made only where this person may make teams: under a team they work in (a top-level team: all teams).
+        if (!ctx.permissions.has('scope.all') && !(parentId && (String(parentId).startsWith('new:') || ctx.scope.has(parentId)))) {
+          err(`No team "${missing[0]}" there, and it would be outside the teams you work in: an Admin can create it.`);
           continue;
         }
         for (const name of missing) {
@@ -1746,7 +1756,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     const canOpen = Boolean(ctx.scope?.has(meta.teamId)) && !viewing.run({ id: ctx.user.id, admin: ctx.user.role === 'admin', calc: false }, () => accounts.hiddenFrom(meta));
     return { id: meta.id, name: meta.name, team: teams.get(meta.teamId)?.name ?? '', owner: userName(meta.ownerId), salesforceId: meta.salesforceId ?? '', canOpen, teamId: canOpen ? meta.teamId : null, calculator: canOpen && ctx.permissions.has('calculator.use'), starting: Boolean(meta.pendingSince) };
   }
-  r('GET', '/api/cc/salesforce-taken', signedIn, (req, ctx, body, res, url) => {
+  r('GET', '/api/cc/salesforce-taken', ready2, (req, ctx, body, res, url) => {
     let sf;
     try {
       sf = checkSalesforceUrl(url.searchParams.get('url') ?? '', hosts().salesforce);
@@ -1957,7 +1967,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
       trRates: trRates(),
     };
   };
-  r('GET', '/api/fusion-rates', signedIn, (req, ctx) => ratesView(ctx));
+  r('GET', '/api/fusion-rates', ready2, (req, ctx) => ratesView(ctx));
   r('PUT', '/api/fusion-rates', perm('settings.manage'), (req, ctx, body) => {
     const { before, after } = fusionRates.setAdmin({ models: body?.models, defaultModel: body?.defaultModel });
     const was = new Map(before.models.map((m) => [engineKey(m.name), m.creditsPer10k]));
@@ -2078,7 +2088,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
    * counted, the scope, the totals), and its reports too when asked. The account, its Salesforce link, SE, team,
    * contacts and sales stay. Admin only.
    */
-  r('POST', '/api/cc/accounts/:id/reset', signedIn, (req, ctx, body, res, url, params) => {
+  r('POST', '/api/cc/accounts/:id/reset', ready2, (req, ctx, body, res, url, params) => {
     if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin can remove every calculation from an account.');
     const a = accounts.get(params.id, ctx.scope);
     const fresh = newProfile({ name: a.name, by: ctx.user.name });
@@ -2121,7 +2131,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (!own.length) return null;
     return own.find((x) => x.id === a.primaryReportId) ?? own.sort((x, y) => String(y.createdAt).localeCompare(String(x.createdAt)))[0];
   };
-  r('GET', '/api/cc/reload-candidates', signedIn, (req, ctx) => {
+  r('GET', '/api/cc/reload-candidates', ready2, (req, ctx) => {
     if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin reloads accounts from their reports.');
     const out = [];
     for (const meta of accounts.accounts.list()) {
@@ -2152,7 +2162,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { similar };
   });
   /** The Admin's look at every account's name: those that would read better tidied, and those that look like one account twice. */
-  r('GET', '/api/cc/name-tidy', signedIn, (req, ctx) => {
+  r('GET', '/api/cc/name-tidy', ready2, (req, ctx) => {
     if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin tidies account names.');
     const all = accounts.accounts.list().filter((m) => !m.pendingSince);
     const where = (m) => ({ id: m.id, name: m.name, team: teamPath(ctx.teams, m.teamId).map((x) => x.name).join(' › '), owner: userName(m.ownerId), salesforceId: m.salesforceId });
@@ -2161,7 +2171,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     for (const m of all) groups.set(nameKey(m.name), [...(groups.get(nameKey(m.name)) ?? []), where(m)]);
     return { renames, duplicates: [...groups.values()].filter((g) => g.length > 1) };
   });
-  r('POST', '/api/cc/name-tidy', signedIn, (req, ctx, body) => {
+  r('POST', '/api/cc/name-tidy', ready2, (req, ctx, body) => {
     if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin tidies account names.');
     const ids = new Set(Array.isArray(body?.ids) ? body.ids.map(String) : []);
     const done = [];
@@ -2174,7 +2184,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     }
     return { renamed: done };
   });
-  r('POST', '/api/cc/reload-from-reports', signedIn, (req, ctx, body) => {
+  r('POST', '/api/cc/reload-from-reports', ready2, (req, ctx, body) => {
     if (ctx.user.role !== 'admin') throw fail(403, 'Only an Admin reloads accounts from their reports.');
     const ids = new Set(Array.isArray(body?.ids) ? body.ids.map(String) : []);
     const done = [];

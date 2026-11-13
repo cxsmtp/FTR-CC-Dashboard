@@ -2,6 +2,20 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.99.00 — 2026-11-13
+
+- **Nothing is changed before the first steps.** Someone with a temporary password, or who has not accepted the terms,
+  could still change an account, mark a report shared and reach the Admin's clean-up actions' checks. Those ask for
+  the first steps now, as everything else does.
+- **Behind a proxy, the address is the one the proxy saw.** The first entry of X-Forwarded-For was taken, which a
+  client can make up: it let the sign-in limits be dodged and put a false address in the audit log. The entry the
+  proxy itself added is taken. The sign-in limiter forgets its oldest entries when full, never everyone's at once.
+- **The session cookie is Secure behind a proxy that ends TLS** (it was only when this server itself served https).
+- **Bulk import makes a team only where you may make teams**: under a team you work in. It made the team first and
+  refused the row after.
+- **One email, one person**: two adds of the same address arriving together made two people.
+- A cookie or an address that is not valid percent-encoding no longer fails the whole request.
+
 ## CC-01.98.00 — 2026-11-13
 
 - **The page cache, made right.**
