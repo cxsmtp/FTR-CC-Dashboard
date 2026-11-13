@@ -2,6 +2,19 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.108.00 — 2026-11-13
+
+- **The calculator no longer lags on a large account.** It was not the network: with thousands of projects the browser
+  spent seconds working out, again and again, the same thing.
+  - Which projects count was worked out by cleaning the account's scope settings three times for every project, at
+    every list drawn. They are cleaned once.
+  - The Projection settings box, closed, held a name to pick for every project (3,700 entries nobody was looking
+    at). They are made when the box is opened.
+  - On a computer four times slower than a server, an account of 3,700 projects shows its figures after 2.2 seconds;
+    it took 5.2.
+- **What is new** (About) shows the latest three versions open, and the earlier ones ten at a time when asked for. A
+  long line of the notes is one line again (it was broken into separate paragraphs).
+
 ## CC-01.107.00 — 2026-11-13
 
 - **An account opens in the calculator in one round of requests.** Its reports, the git connections and the work under

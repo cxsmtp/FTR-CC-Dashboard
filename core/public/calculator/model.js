@@ -987,10 +987,13 @@ const list = (value, max, size = MAX_SCOPE_ITEMS) =>
  * frequencies, criticalities, and project names with wildcards (* any text, ? one character).
  * Empty everywhere: every project.
  */
+const CLEAN_SCOPES = new WeakSet(); // scopes this made: given one of them again, it is given back as it is
 export function cleanScope(value = {}) {
+  // Asked for every project of every list drawn (is it in the scope?): cleaned once, not thousands of times.
+  if (value && typeof value === 'object' && CLEAN_SCOPES.has(value)) return value;
   const v = value && typeof value === 'object' ? value : {};
   const ids = new Set(FREQUENCIES.map((f) => f.id));
-  return {
+  const clean = {
     applications: list(v.applications, 200),
     // Projects picked one by one, by id.
     projects: list(v.projects, 200, MAX_PROJECTS),
@@ -1007,6 +1010,8 @@ export function cleanScope(value = {}) {
     // The scan origins whose scans count (null: every one, also those a later read finds).
     origins: cleanOrigins(v.origins),
   };
+  CLEAN_SCOPES.add(clean);
+  return clean;
 }
 
 /** Scan origins by name ("Jenkins", "CLI"…), each once; null (every origin) unless a list is given. */

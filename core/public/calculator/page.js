@@ -949,14 +949,28 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   // ---- Fusion -------------------------------------------------------------------------------
 
   const fusion = () => c.open?.fusion;
-  const scope = () => cleanScope(c.open?.scope);
+  // The scope as the customer keeps it, cleaned once for each scope it has (not at every question about a project).
+  let scopeFrom = null;
+  let scopeNow = cleanScope({});
+  const scope = () => {
+    const raw = c.open?.scope;
+    if (raw !== scopeFrom) {
+      scopeFrom = raw;
+      scopeNow = cleanScope(raw);
+    }
+    return scopeNow;
+  };
   /** Is this project in the scope, as the scans from the scan origins chosen see it (byOrigins)? */
   const counts = (p, sc = scope()) => {
     const seen = byOrigins(p, sc.origins);
     return Boolean(seen) && inScope(seen, sc, trEngines());
   };
   /** The projects that count, as the scans from the scan origins chosen see them (a project added by hand always counts). */
-  const scoped = () => fusion().projects.map((p) => byOrigins(p, scope().origins)).filter((p) => p && (p.source === 'manual' || inScope(p, scope(), trEngines())));
+  const scoped = () => {
+    const sc = scope();
+    const engines = trEngines();
+    return fusion().projects.map((p) => byOrigins(p, sc.origins)).filter((p) => p && (p.source === 'manual' || inScope(p, sc, engines)));
+  };
   /** Projects read from Checkmarx One that the scope leaves out: none when it counts them all. */
   const leftOutBy = (sc = scope()) => (fusion()?.projects ?? []).filter((p) => p.source !== 'manual' && !counts(p, sc));
   const narrowed = () => leftOutBy().length > 0;
@@ -964,7 +978,11 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   function leftOutCounts(sc = scope()) {
     const read = (fusion()?.projects ?? []).filter((p) => p.source !== 'manual');
     const projects = read.map((p) => byOrigins(p, sc.origins)).filter(Boolean);
-    const without = (change) => projects.filter((p) => !inScope(p, { ...sc, ...change }, trEngines())).length;
+    const engines = trEngines();
+    const without = (change) => {
+      const changed = cleanScope({ ...sc, ...change });
+      return projects.filter((p) => !inScope(p, changed, engines)).length;
+    };
     const now = without({});
     return { noCode: sc.leaveOutNoCode ? now - without({ leaveOutNoCode: false }) : 0, noFindings: sc.leaveOutNoFindings ? now - without({ leaveOutNoFindings: false }) : 0, noOrigin: read.length - projects.length };
   }
@@ -2533,14 +2551,10 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   function renderScope() {
     if (!c.open) return;
     const { scope: sc, allBranches } = next();
-    const projects = fusion()?.projects ?? [];
-    const offer = (id, values) => {
-      $(id).replaceChildren(...[...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b)).slice(0, 500).map((v) => Object.assign(document.createElement('option'), { value: v })));
-    };
-    offer('calc-scope-applications-list', projects.flatMap((p) => p.applications ?? []));
-    $('calc-scope-projects-list').replaceChildren(...projects.filter((p) => p.source !== 'manual').slice(0, 5000).map((p) => Object.assign(document.createElement('option'), { value: p.name })));
-    offer('calc-scope-groups-list', projects.flatMap((p) => p.groups ?? []));
-    offer('calc-scope-initiators-list', projects.map((p) => p.initiator));
+    // The names offered as you type (every project, application, group and person): made when the settings are
+    // opened, not for a box that is closed (thousands of entries nobody is looking at).
+    if (!$('calc-scope-form').hidden) fillScopeLists();
+    else scopeListsFor = null;
     drawScopeChips();
     $('calc-scope-groups').value = sc.groups.join(', ');
     $('calc-scope-names').value = sc.names.join(', ');
@@ -2555,6 +2569,20 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     renderOrigins();
     renderScopeSummary();
     renderPending();
+  }
+
+  let scopeListsFor = null; // the projects the lists of names were last made from
+  function fillScopeLists() {
+    const projects = fusion()?.projects ?? [];
+    if (scopeListsFor === projects && $('calc-scope-projects-list').childElementCount) return;
+    scopeListsFor = projects;
+    const offer = (id, values) => {
+      $(id).replaceChildren(...[...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b)).slice(0, 500).map((v) => Object.assign(document.createElement('option'), { value: v })));
+    };
+    offer('calc-scope-applications-list', projects.flatMap((p) => p.applications ?? []));
+    $('calc-scope-projects-list').replaceChildren(...projects.filter((p) => p.source !== 'manual').slice(0, 5000).map((p) => Object.assign(document.createElement('option'), { value: p.name })));
+    offer('calc-scope-groups-list', projects.flatMap((p) => p.groups ?? []));
+    offer('calc-scope-initiators-list', projects.map((p) => p.initiator));
   }
 
   /** The projects counted now (as applied): how many, and what narrows them. */
@@ -2587,6 +2615,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const form = $('calc-scope-form');
     form.hidden = !form.hidden;
     $('calc-scope-toggle').setAttribute('aria-expanded', String(!form.hidden));
+    if (!form.hidden) fillScopeLists();
     if (!form.hidden) $('calc-scope-groups').focus();
   });
 
