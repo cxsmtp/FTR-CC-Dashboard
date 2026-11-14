@@ -84,6 +84,8 @@ export class Collection {
   list() {
     return [...this.#index.values()];
   }
+  /** Goes up by one with every change: what is worked out from the whole list can be kept until it moves. */
+  version = 0;
   get(id) {
     if (!this.has(id)) return null;
     return readJson(this.#file(id), null);
@@ -91,12 +93,14 @@ export class Collection {
   put(record) {
     writeJson(this.#file(record.id), record);
     this.#index.set(record.id, this.#meta(record));
+    this.version += 1;
     return record;
   }
   remove(id) {
     if (!this.has(id)) return false;
     fs.rmSync(this.#file(id), { force: true });
     this.#index.delete(String(id));
+    this.version += 1;
     return true;
   }
   get size() {

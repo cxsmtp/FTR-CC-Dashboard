@@ -18,7 +18,7 @@ import { countProjects, getLastScans, lastScanDate, listApplications, listProjec
 import { BRANCH_HOW, branchOf, primaryScans } from './cxone/branches.js';
 import { CRITICALITIES, DEFAULT_READ_PROJECTS, amount, frequencyOf, modelsNamed, readLimit, wholeNumber } from '../public/calculator/model.js';
 import { modelChoices } from './fusion-usage.js';
-import { MAX_PROFILES, MAX_REPORTS, cleanFusion, cleanReportData, cleanTr, summary, text } from '../public/calculator/profiles.js';
+import { text } from '../public/calculator/profiles.js';
 
 // The rules for customers and reports are shared with the standalone calculator (public/calculator/profiles.js).
 export { MAX_PROFILES, MAX_PROFILE_BYTES, MAX_REPORTS, MAX_REPORT_BYTES, cleanFusion, cleanReportData, cleanTr } from '../public/calculator/profiles.js';

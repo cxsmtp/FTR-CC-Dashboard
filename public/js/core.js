@@ -1,5 +1,5 @@
 import { route } from './main.js';
-import { sureParts } from './links.js';
+import { showToast, sureParts } from './links.js';
 import { OPS, THEMES, applyKeptTheme, applyOps, applyTheme, lookOf } from './theme.js';
 
 // FTR Credits Command Center: the dashboard. One page, routes in the hash (#/overview, #/accounts/<id>…), every
@@ -199,8 +199,6 @@ async function fetchApi(path, { method = 'GET', body } = {}) {
   return data;
 }
 
-export let toastTimer;
-/** A short message at the bottom; `ms`: how long it stays (longer for what must be read, such as an error). */
 /** "Are you sure?", in the app's own dialog (never the browser's grey box): resolves true when confirmed. */
 export function sure(message) {
   return new Promise((resolve) => {
@@ -218,14 +216,8 @@ export function sure(message) {
   });
 }
 
-export function toast(message, kind = '', ms = 5500) {
-  const el = $('#toast');
-  el.textContent = message;
-  el.className = `toast ${kind}`;
-  el.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), Math.max(1500, Number(ms) || 5500));
-}
+/** A short message at the bottom; `ms`: how long it stays (longer for what must be read, such as an error). */
+export const toast = (message, kind = '', ms = 5500) => showToast($('#toast'), message, kind, ms);
 
 /**
  * `fn`, but never twice at once: a second press of Enter or of the button while the first is still being sent does

@@ -51,13 +51,17 @@ for (let r = 0; r < REGIONS; r++) {
 }
 iam.save();
 const regionIds = [...seByTeam.keys()];
-// A whole 18-character opportunity id: 15 characters and their checksum, as Salesforce shows it.
-const SF = `https://bench.lightning.force.com/lightning/r/Opportunity/006AB000001xYzQ${sfChecksum('006AB000001xYzQ')}/view`;
+// A whole 18-character opportunity id for each account (15 characters and their checksum, as Salesforce shows it):
+// each opportunity belongs to one account.
+const SF = (i) => {
+  const id = `006AB${String(i).padStart(10, '0')}`;
+  return `https://bench.lightning.force.com/lightning/r/Opportunity/${id}${sfChecksum(id)}/view`;
+};
 for (let i = 0; i < ACCOUNTS; i++) {
   const teamId = regionIds[i % regionIds.length];
   const owner = seByTeam.get(teamId)[Math.floor(rand() * SES)];
   const a = accounts.create({ name: `Account ${i + 1}`, teamId, user: owner });
-  accounts.setDetails(a.id, new Set([teamId]), { salesforceUrl: SF }, ['force.com']);
+  accounts.setDetails(a.id, new Set([teamId]), { salesforceUrl: SF(i + 1) }, ['force.com']);
   const n = 1 + Math.floor(rand() * 5);
   let last;
   for (let k = 0; k < n; k++) {

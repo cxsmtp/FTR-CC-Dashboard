@@ -1,5 +1,6 @@
-// What people type that must be read the same way everywhere: a Salesforce link and email addresses. One copy, used
-// by the dashboard's pages and by the calculator (it is part of the calculator's bundle too, server/calculator.js).
+// What the dashboard and the calculator must do the same way: read a Salesforce link and email addresses, ask "are
+// you sure?", show a short message. One copy, used by the dashboard's pages and by the calculator (it is part of the
+// calculator's bundle too, server/calculator.js).
 
 /**
  * A Salesforce link, read as the server reads it (server/accounts.js checkSalesforceUrl): https, an opportunity (006)
@@ -51,3 +52,17 @@ export const sureParts = (message) => {
   const verb = /^(Delete|Remove|Forget|Replace|Restore|Reload|Switch|Move|Roll back|Sign in|Start again)\b/.exec(question)?.[1] ?? 'Confirm';
   return { question, rest, danger, verb };
 };
+
+/**
+ * A short message in the corner (#toast on either page), gone after `ms` (at least a second and a half). The
+ * dashboard's toast() and the calculator's are this one.
+ */
+let toastTimer = null;
+export function showToast(el, message, kind = '', ms = 5500) {
+  if (!el || !message) return;
+  el.textContent = message;
+  el.className = `toast ${kind}`;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), Math.max(1500, Number(ms) || 5500));
+}

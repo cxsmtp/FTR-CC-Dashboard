@@ -2,6 +2,20 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.113.00 — 2026-11-14
+
+- **Faster under heavy load.** A load test (200 people at once, over HTTPS) found every request paying for a walk
+  over all accounts and reports, to tell drafts from published accounts, and the reports sorted again for each
+  dashboard. Both are now worked out once and kept until an account or a report changes. With no pauses at all, the
+  server answers 608 requests a second again (520 before, 604 in CC-01.54) with no errors; at a normal pace, half of
+  all answers take 1–4 ms. The results are in docs/performance.md.
+- **Clean-up.** The message that appears in the corner is one piece of code for the dashboard and the calculator, as
+  "are you sure?" and the looks already are. 42 style rules nothing uses any more are gone (old sign-in page, an old
+  sold strip and others); every page was photographed in both looks and at three widths before and after, and none
+  changed. An unused import is gone.
+- **The load test runs again.** Its made-up organisation gave every account the same Salesforce link, which the
+  server refuses since CC-01.91; each now has its own.
+
 ## CC-01.112.00 — 2026-11-14
 
 - **Profile pictures are files of their own.** They were kept inside the people file, which is written whole on every

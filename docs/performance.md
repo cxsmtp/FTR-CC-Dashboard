@@ -1,6 +1,6 @@
 # Performance and sizing
 
-Measured on CC-01.05.00 with `loadtest/run.sh` (and the same load against the container). The organisation: 202 people (8 regions × 24 Sales Engineers, their leaders, a VP and an Admin), 1,000 accounts and 3,000 reports.
+Measured with `loadtest/run.sh` (first on CC-01.05.00, last on CC-01.113.00) (and the same load against the container). The organisation: 202 people (8 regions × 24 Sales Engineers, their leaders, a VP and an Admin), 1,000 accounts and 3,000 reports.
 
 All the load ran over **HTTPS**. The generator was pinned to other CPUs than the server.
 
@@ -14,6 +14,35 @@ Each person signs in, then works for two minutes, pausing 0.5–2.5 s (1.5 s on 
 | **Leaders, the VP and the Admin** | The dashboards for all their teams and for one team; accounts; account pages; People. |
 
 A stress run removes the pauses: everyone clicks as fast as the server answers.
+
+## Results, CC-01.113.00 (2026-11-14)
+
+The same organisation and load, after the review and clean-up releases (CC-01.95 to CC-01.112), over HTTPS. Each run
+was on a fresh copy of the data, with the server pinned to its CPUs and the load generator to two others.
+
+| Run | Server | Requests/s | Errors | Slowest action, p95 | Slowest, p99 | Server CPU (1 core = 100%) | Memory (RSS, max) |
+| --- | --- | ---: | ---: | ---: | ---: | --- | ---: |
+| **200 people, normal pace** | **2 vCPU** | **124** | **0** | **21 ms** | **33 ms** | **avg 25%, max 40%** | **240 MB** |
+| **200 people, normal pace** | **1 vCPU** | **123** | **0** | **24 ms** | **104 ms*** | **avg 25%, max 38%** | **246 MB** |
+| 200 people, stress (no pauses) | 2 vCPU | 608 | 0 | 373 ms | 442 ms | ~100% (one core: Node.js) | 345 MB |
+| The same stress, CC-01.112.00 (before the fix below) | 2 vCPU | 520 | 0 | 430 ms | 485 ms | ~100% | 328 MB |
+| The same stress, CC-01.54.00, on this machine | 2 vCPU | 604 | 0 | 419 ms | 469 ms | ~100% | 405 MB |
+
+\* The team dashboard, opened 73 times in the run: one slow answer sets its p99. Every other action stays under 34 ms
+at p99 on one CPU.
+
+At a normal pace, half of all answers take 1–4 ms on the server and sign-in 50–60 ms (by design: scrypt).
+
+**What the test found, and the fix.** Under stress CC-01.112 served 14% less than CC-01.54 on the same machine, with
+every action slower alike: a cost on every request. The profile showed it: deciding which accounts are still drafts
+went through all 3,000 reports and 1,000 accounts on every request, even for one account or an Admin, and the reports
+were sorted again for every dashboard. Both are now worked out once for each state of the data (they are worked out
+again when an account or a report changes), and an Admin or an account's own SE is not looked up at all. Stress
+throughput is back to CC-01.54's, and the slowest answers are faster than then.
+
+**Left as it is, on purpose.** Compressing large answers (the dashboards) is now the largest single cost, about a
+sixth of the server's time under stress. A faster level would save under a millisecond an answer but send about 23%
+more to people working from far away: not worth it.
 
 ## Results, CC-01.54.00 (2026-11-11)
 

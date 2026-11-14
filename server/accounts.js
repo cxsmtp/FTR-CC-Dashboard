@@ -187,22 +187,30 @@ export class Accounts {
 
   // ---- Accounts ---------------------------------------------------------------------------------
 
-  /** Published: an account that has had a report (it stays so if its reports are deleted). The others are drafts. */
+  /**
+   * Published: an account that has had a report (it stays so if its reports are deleted). The others are drafts.
+   * Worked out once for each state of the accounts and reports (it was once a request: a walk over all of both).
+   */
+  #published = { at: '', set: null };
   published() {
-    const out = new Set(this.reports.list().map((r) => r.customerId));
-    for (const a of this.accounts.list()) if (a.publishedAt) out.add(a.id);
-    return out;
+    const at = `${this.accounts.version}:${this.reports.version}`;
+    if (this.#published.at !== at) {
+      const out = new Set(this.reports.list().map((r) => r.customerId));
+      for (const a of this.accounts.list()) if (a.publishedAt) out.add(a.id);
+      this.#published = { at, set: out };
+    }
+    return this.#published.set;
   }
   /** A draft, and the person looking is neither its SE, nor who made it, nor an Admin. */
-  hiddenFrom(meta, published = this.published(), { listing = false } = {}) {
+  hiddenFrom(meta, published = null, { listing = false } = {}) {
     const v = viewing.getStore();
     // Started but not made yet (no projection): its maker's alone, and listed only in the calculator they work in.
     if (meta.pendingSince) return !v || (meta.ownerId !== v.id && meta.createdById !== v.id && !(v.admin && !listing)) || (listing && !v.calc);
-    if (!v || v.admin || published.has(meta.id)) return false;
-    return meta.ownerId !== v.id && meta.createdById !== v.id;
+    if (!v || v.admin || meta.ownerId === v.id || meta.createdById === v.id) return false;
+    return !(published ?? this.published()).has(meta.id);
   }
   isDraft(id) {
-    return !this.accounts.meta(id)?.publishedAt && !this.reports.list().some((r) => r.customerId === id);
+    return !this.accounts.meta(id)?.publishedAt && !this.published().has(id);
   }
   /** The indicative triage & remediation estimate kept with an account whose code was only counted (or none: null). */
   setEstimate(id, teamIds, estimate) {
@@ -391,11 +399,14 @@ export class Accounts {
 
   // ---- Reports ----------------------------------------------------------------------------------
 
+  /** The reports newest first, sorted once for each state of the reports (the callers only filter it: never changed). */
+  #newestFirst = { at: -1, list: [] };
   reportsOf(teamIds, customerId = '') {
-    return this.reports
-      .list()
-      .filter((r) => teamIds.has(r.teamId) && (!customerId || r.customerId === customerId))
-      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    if (this.#newestFirst.at !== this.reports.version) {
+      const list = this.reports.list().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      this.#newestFirst = { at: this.reports.version, list };
+    }
+    return this.#newestFirst.list.filter((r) => teamIds.has(r.teamId) && (!customerId || r.customerId === customerId));
   }
   report(id, teamIds) {
     const meta = this.reports.meta(id);

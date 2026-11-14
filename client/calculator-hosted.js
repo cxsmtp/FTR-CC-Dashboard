@@ -4,7 +4,7 @@
 // its accountable SE and its team, and shows its primary report and what was shared with the customer.
 
 import { initCalculator } from './page.js';
-import { emailList, sfRead, sureParts } from '../links.js';
+import { emailList, sfRead, showToast, sureParts } from '../links.js';
 import { OPS, THEMES as ACCENTS, applyKeptTheme, applyOps, applyTheme } from '../theme.js';
 import { startHelpTips } from '../help-tips.js';
 
@@ -97,16 +97,7 @@ export async function startHosted() {
       });
       dlg.showModal();
     });
-  let toastTimer = null;
-  const toast = (message, kind = '', ms = 6000) => {
-    if (!message) return;
-    const el = $('toast');
-    el.textContent = message;
-    el.className = `toast ${kind}`;
-    el.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (el.hidden = true), ms);
-  };
+  const toast = (message, kind = '', ms = 6000) => showToast($('toast'), message, kind, ms);
   const setStatus = (id, message, kind = '') => {
     const el = $(id);
     if (!el) return;
