@@ -2,6 +2,20 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.115.00 — 2026-11-14
+
+- **The vulnerability estimate can count in the credits total (beta, off until an Admin turns it on).** Settings →
+  Pricing → Vulnerability estimate → "In the credits total". For an account whose code was only counted (no scan):
+  - its estimated triage & remediation counts in the credits required: in the calculator's strip, in the report's
+    headline and "Try other numbers", in the PDF summary, and on Overview and Accounts;
+  - marked "estimated" everywhere, in its own colour, with a line saying the code was counted, not scanned;
+  - from all accounts until its SE chooses the customer's industry, then from that industry's standard where there is
+    one. It is made by itself as the account opens: the SE does not have to do anything;
+  - a scanned backlog always comes first; reports already made stay as they are; a report sent while it is off never
+    counts an estimate.
+- **The message in the corner no longer gets in the way.** It is text only, so clicks now go through it to what it
+  covers (it sat on Generate projection report for a few seconds after some actions).
+
 ## CC-01.114.00 — 2026-11-14
 
 - **A way on from every page.** A page someone may not open, or that cannot be shown (the vulnerability estimate or

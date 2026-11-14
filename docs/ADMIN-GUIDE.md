@@ -201,8 +201,13 @@ credits, from this installation's own accounts: their projects' lines of code ag
 - **Where SEs see it (beta, off until you turn it on).**
   - *In the calculator*: on an account whose code was only counted, the SE picks the industry and whether a SAST tool
     was used before, and gets two estimates side by side: from all accounts, and the industry's standard.
+  - *In the credits total*: the estimated triage & remediation of such an account counts in its credits required: in
+    the calculator, in its report's headline and on Overview and Accounts, marked "estimated" everywhere. It uses the
+    figure from all accounts until the SE chooses the customer's industry, then that industry's standard where there
+    is one. Only you can turn it on; reports already made stay as they are, and the first scan replaces the estimate.
+    A report sent while it is off never counts an estimate.
   - *In the report*: when its SE ticks it, the report of such an account carries a section of its own, marked as an
-    estimate. It is never part of the credits required.
+    estimate, with how it was made.
 - An estimate from all accounts needs 8 accounts with 50,000 lines or more and a backlog from Checkmarx One. Quote the
   range; "typical" where the customer has used a SAST tool before, the high end for an untouched codebase. The first
   scan replaces the estimate.

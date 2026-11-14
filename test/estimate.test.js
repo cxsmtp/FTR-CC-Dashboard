@@ -121,7 +121,7 @@ test('in the calculator (beta): off until an Admin turns it on; the SE picks the
   await admin.put('/api/estimate/settings', { beta: { calculator: false, report: true } });
   assert.equal((await se1.get('/api/cc/calc-config')).data.estimate.report, false);
   assert.equal((await admin.put('/api/estimate/settings', { beta: { calculator: true, report: true } })).status, 200);
-  assert.deepEqual({ ...(await se1.get('/api/cc/calc-config')).data.estimate, industries: undefined }, { calculator: true, report: true, industries: undefined });
+  assert.deepEqual({ ...(await se1.get('/api/cc/calc-config')).data.estimate, industries: undefined }, { calculator: true, report: true, total: false, industries: undefined });
   assert.equal((await se1.post('/api/projections/estimate', { accountId: id }, h)).status, 400);
   const got = await se1.post('/api/projections/estimate', { accountId: id, industry: 'Insurance', priorSast: false, include: true }, h);
   assert.equal(got.status, 200, JSON.stringify(got.data));
@@ -147,6 +147,51 @@ test('in the calculator (beta): off until an Admin turns it on; the SE picks the
   await admin.put('/api/estimate/settings', { beta: { report: false } });
   assert.equal((await se1.get(`/api/projections/${id}`, h)).data.customer.estimate.include, false);
   assert.equal((await se1.post('/api/projections/estimate', { accountId: id, remove: true }, h)).data.estimate, null);
+});
+
+test('in the total (beta): an Admin turns it on; from all accounts until the industry is chosen; refused while off', async () => {
+  const admin = await client(env.base, 'admin@t.example');
+  const se1 = await client(env.base, 'se1@t.example');
+  const h = { 'X-Team': env.teams.emea.id };
+  const made = await se1.post('/api/projections', { name: 'Counted Only Co', salesforceUrl: sfLink() }, h);
+  const id = made.data.customer.id;
+  const projects = [{ id: 'r1', name: 'core', included: true, langs: { Java: 500_000 }, activity: { commits: 100, windowDays: 365, devs90: 4, frequency: 'more-5-week' }, git: { host: 'github.com' } }];
+  assert.equal((await se1.put(`/api/projections/${id}`, { fusionNew: { projects } }, h)).status, 200);
+  // Only with the calculator's estimate on, and only by an Admin.
+  assert.equal((await se1.put('/api/estimate/settings', { beta: { total: true } })).status, 403);
+  await admin.put('/api/estimate/settings', { beta: { calculator: false, total: true } });
+  assert.equal((await se1.get('/api/cc/calc-config')).data.estimate.total, false);
+  assert.equal((await admin.put('/api/estimate/settings', { beta: { calculator: true, total: true } })).status, 200);
+  assert.equal((await se1.get('/api/cc/calc-config')).data.estimate.total, true);
+  // No industry chosen: from all accounts, and there are too few yet: said so, nothing made up.
+  const none = await se1.post('/api/projections/estimate', { accountId: id, auto: true }, h);
+  assert.equal(none.status, 409);
+  assert.match(none.data.error, /choose the customer’s industry/);
+  // The industry chosen: its standard.
+  const ins = await se1.post('/api/projections/estimate', { accountId: id, industry: 'Insurance' }, h);
+  assert.equal(ins.status, 200, JSON.stringify(ins.data));
+  const credits = ins.data.estimate.standard.typical.credits;
+  assert.ok(credits > 0);
+  // A report with the estimate in its total: Overview and Accounts count it as its headline does.
+  const data = { fusionNew: { totals: { credits: 1000 } }, estimateTotal: { credits, from: 'industry', industry: 'Insurance' } };
+  const rep = await se1.post('/api/projections/reports', { customerId: id, data }, h);
+  assert.equal(rep.status, 200, JSON.stringify(rep.data));
+  assert.equal(rep.data.report.totalCredits, 1000 + credits);
+  assert.equal(rep.data.report.trCredits, credits);
+  assert.equal(rep.data.report.trEstimated, true);
+  // A scanned backlog always wins over an estimate.
+  const scanned = await se1.post('/api/projections/reports', { customerId: id, data: { ...data, tr: { totals: { credits: 50 } } } }, h);
+  assert.equal(scanned.data.report.totalCredits, 1050);
+  assert.equal(scanned.data.report.trEstimated, false);
+  // Turned off: a report sent with an estimate does not count it.
+  await admin.put('/api/estimate/settings', { beta: { total: false } });
+  const off = await se1.post('/api/projections/reports', { customerId: id, data }, h);
+  assert.equal(off.data.report.totalCredits, 1000);
+  assert.equal(off.data.report.trCredits, null);
+  // And without the total, an estimate needs the industry again.
+  assert.equal((await se1.post('/api/projections/estimate', { accountId: id }, h)).status, 400);
+  const { events } = (await admin.get('/api/audit?limit=40')).data;
+  assert.ok(events.some((e) => e.action === 'estimate.settings' && /in the total on/.test(e.target)));
 });
 
 test('figures frozen stay as they were when accounts change; an industry counts from five accounts', async () => {

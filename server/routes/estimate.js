@@ -24,7 +24,9 @@ export function registerEstimate(d) {
   /** What the Admin set: figures frozen (or null), a standard typed for an industry, and where the estimate shows. */
   const kept = () => {
     const e = settings.value.estimate ?? {};
-    return { frozen: e.frozen ?? null, standards: e.standards ?? {}, beta: { calculator: e.beta?.calculator === true, report: e.beta?.report === true } };
+    const calculator = e.beta?.calculator === true;
+    // In the total: off until an Admin turns it on (beta), and only where the calculator has the estimate.
+    return { frozen: e.frozen ?? null, standards: e.standards ?? {}, beta: { calculator, report: e.beta?.report === true, total: calculator && e.beta?.total === true } };
   };
   // What the accounts say, worked out again at most once a minute (every account's file is read for it).
   let cache = null;
@@ -117,8 +119,9 @@ export function registerEstimate(d) {
       const calculator = body.beta.calculator === undefined ? was.calculator : body.beta.calculator === true;
       // In a report only where it is in the calculator: that is where it is made.
       const report = calculator && (body.beta.report === undefined ? was.report : body.beta.report === true);
-      e.beta = { calculator, report };
-      said.push(`in the calculator ${calculator ? 'on' : 'off'}, in reports ${report ? 'on' : 'off'}`);
+      const total = calculator && (body.beta.total === undefined ? was.total : body.beta.total === true);
+      e.beta = { calculator, report, total };
+      said.push(`in the calculator ${calculator ? 'on' : 'off'}, in reports ${report ? 'on' : 'off'}, in the total ${total ? 'on' : 'off'}`);
     }
     settings.value.estimate = e;
     settings.save();
@@ -161,11 +164,12 @@ export function registerEstimate(d) {
     const code = codeFacts(account, clocLines);
     if (!(code.lines >= 1000)) throw fail(409, 'Count the customer’s code first (from Git or their cloc-fusion report): the estimate is made from its lines.');
     const industry = cleanIndustry(body?.industry);
-    if (!industry) throw fail(400, 'Choose the customer’s industry.');
+    // Counted in the total: from all accounts until the customer's industry is chosen (then its standard, where set).
+    if (!industry && !k.beta.total) throw fail(400, 'Choose the customer’s industry.');
     const months = Math.min(60, Math.max(1, Math.round(Number(body?.months) || 12)));
     const priorSast = body?.priorSast !== false;
     const out = both({ lines: code.lines, months, includeNew: true, activeShare: code.activeShare, industry });
-    if (!out.own && !out.standard) throw fail(409, `There are too few accounts to estimate from yet (${out.have} of ${out.needed}), and no standard is set for ${industry}: ask an Admin.`);
+    if (!out.own && !out.standard) throw fail(409, industry ? `There are too few accounts to estimate from yet (${out.have} of ${out.needed}), and no standard is set for ${industry}: ask an Admin.` : `There are too few accounts to estimate from yet (${out.have} of ${out.needed}): choose the customer’s industry to use its standard.`);
     const slim = (e) => (e ? { accounts: e.accounts, source: e.source ?? 'accounts', ...Object.fromEntries(['low', 'typical', 'high'].map((l) => [l, e[l]])) } : null);
     const est = {
       industry,
@@ -182,7 +186,7 @@ export function registerEstimate(d) {
       frozenAt: out.frozenAt,
     };
     accounts.setEstimate(account.id, ctx.teamSet, est);
-    record(ctx, req, 'estimate.account', account.name, { id: account.id, industry, lines: code.lines, priorSast, inReport: est.include });
+    record(ctx, req, 'estimate.account', account.name, { id: account.id, industry, lines: code.lines, priorSast, inReport: est.include, inTotal: k.beta.total, auto: body?.auto === true });
     return { estimate: est };
   });
 

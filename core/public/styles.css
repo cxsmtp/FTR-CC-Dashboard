@@ -1813,3 +1813,8 @@ td:has(> .sb-eng) { white-space: nowrap; }
   .calc-fnew-table th:nth-child(2) { width: 15%; }
   .calc-fnew-table :is(input:not([type=checkbox]), select) { padding-left: 4px !important; padding-right: 4px !important; }
 }
+
+/* The estimated triage & remediation in the credits strip (beta): its own colour and a tag, never taken for a scan. */
+.calc-seg-est { background: #7c3aed; }
+.calc-mix-key.calc-mix-est .calc-mix-sw { background: #7c3aed; }
+.calc-est-tag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; border: 1px solid #7c3aed; color: #7c3aed; vertical-align: 1px; }

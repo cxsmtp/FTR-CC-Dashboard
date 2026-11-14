@@ -7,7 +7,7 @@
 // projects that work out alike (scan frequency, criticality, what was set for them) are kept as one
 // row of their count and their 10K units, which gives the same credits as the projects one by one.
 
-import { SEVERITIES, creditSummary, fusionEstimate, fusionImpact, impactSettings, linesOf, overallImpact, planForecast, severityPlan, trImpact, trProjection, unitsOf, wholeNumber } from './model.js';
+import { creditSummary, fusionEstimate, fusionImpact, impactSettings, linesOf, overallImpact, planForecast, SEVERITIES, severityPlan, trCreditsOf, trImpact, trProjection, unitsOf, wholeNumber } from './model.js';
 
 const debtFigures = (x) => ({ current: x.current, prior: x.prior, fixed: x.fixed, arrivals: x.arrivals, debtRate: x.debtRate, fixRate: x.fixRate, fixedMonthly: x.fixedMonthly, netMonthly: x.netMonthly, addedPct: x.addedPct, fixedPct: x.fixedPct });
 
@@ -158,7 +158,8 @@ export function leverData(sent, inputs) {
   return {
     ...sent,
     months: inputs.months,
-    summary: creditSummary(tr ? tr.totals.credits : null, fusionCredits, inputs.totals),
+    // Code only counted: the estimate the report was sent with stays in its total (the levers do not move it).
+    summary: creditSummary(tr ? tr.totals.credits : trCreditsOf(sent), fusionCredits, inputs.totals),
     tr: tr ? trReport(inputs.tr.analysis, tr, { recent: inputs.tr.recent, weekly: inputs.tr.weekly }) : sent.tr ?? null,
     fusion: fusion ?? sent.fusion ?? null,
     impact: sent.impact ? impact : null,

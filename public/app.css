@@ -1213,3 +1213,6 @@ dialog.sured .db p.small { white-space: pre-line; overflow-wrap: anywhere; }
 
 /* A page that cannot be shown: what happened, and a way on (public/js/auth.js stuckHtml). */
 .empty.stuck { display: grid; gap: 14px; justify-items: center; }
+
+/* The message in the corner is text only: clicks go through it to what is under it (a button it happens to cover). */
+.toast { pointer-events: none; }

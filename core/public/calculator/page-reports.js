@@ -101,9 +101,13 @@ export function setupReports(d) {
     const fn = fnewEstimate();
     c.fusionNewCredits = fnewCounts(fn) ? fn.totals.credits : null;
     // Fusion for the customer's projects in Checkmarx One and for its new code, together.
-    const sum = creditSummary(c.trCredits, fusionTotal({ totals: { credits: c.fusionCredits } }, { totals: { credits: c.fusionNewCredits } }), totals());
+    // Code only counted, no scan: the estimate counts as triage & remediation where an Admin turned that on (beta).
+    const est = c.trCredits === null || c.trCredits === undefined ? d.estimateInTotal() : null;
+    const sum = creditSummary(est ? est.credits : c.trCredits, fusionTotal({ totals: { credits: c.fusionCredits } }, { totals: { credits: c.fusionNewCredits } }), totals());
     $('calc-sum-tr').textContent = num(sum.trShown);
-    $('calc-sum-tr-split').textContent = c.trSplit ? `${num(Math.round(c.trSplit.backlogCredits))} backlog + ${num(Math.round(c.trSplit.aheadCredits))} ahead` : '';
+    $('calc-sum-tr-split').textContent = est ? `Estimated (beta) from ${est.from === 'industry' ? `the industry standard for ${est.industry}` : 'all accounts'}: not scanned yet, the first scan replaces it.` : c.trSplit ? `${num(Math.round(c.trSplit.backlogCredits))} backlog + ${num(Math.round(c.trSplit.aheadCredits))} ahead` : '';
+    $('calc-mix-tr').classList.toggle('calc-mix-est', Boolean(est));
+    $('calc-mix-tr-est').hidden = !est;
     // One Fusion figure, for the part that applies to this customer (ticked, with projects counted): both
     // added up when both do, with the split under it.
     const existing = c.fusionCredits !== null && c.fusionCredits !== undefined;
@@ -128,7 +132,7 @@ export function setupReports(d) {
    */
   function renderMix(sum, fusionExisting, fusionNew, fusionCounts) {
     const whole = sum.total > 0 ? sum.total : 0;
-    const parts = [['tr', sum.tr ?? 0], ['fx', fusionExisting ?? 0], ['fn', fusionNew ?? 0], ['extra', sum.extra]].filter(([, v]) => v > 0);
+    const parts = [[$('calc-mix-tr').classList.contains('calc-mix-est') ? 'est' : 'tr', sum.tr ?? 0], ['fx', fusionExisting ?? 0], ['fn', fusionNew ?? 0], ['extra', sum.extra]].filter(([, v]) => v > 0);
     $('calc-mix-bar').replaceChildren(...(whole ? parts : []).map(([key, value]) => {
       const seg = document.createElement('i');
       seg.className = `calc-mix-seg calc-seg-${key}`;
@@ -343,9 +347,10 @@ export function setupReports(d) {
     });
     const base = {
       version: 2,
-      // The indicative triage & remediation estimate of an account whose code was only counted (beta): in the report
-      // only when its SE ticked it and the Admin allows it. Never part of the credits.
+      // The indicative triage & remediation estimate of an account whose code was only counted (beta): its section in
+      // the report when its SE ticked it and the Admin allows it; in the total when the Admin lets it count there.
       estimate: estimateOf()?.include ? estimateOf() : null,
+      estimateTotal: c.trCredits === null || c.trCredits === undefined ? d.estimateInTotal() : null,
       organisation: me()?.organisationName ?? '',
       customer: c.open.name,
       preparedBy: who?.name || who?.email || '',

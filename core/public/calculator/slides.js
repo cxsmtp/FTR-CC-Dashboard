@@ -7,7 +7,7 @@
 // Each page is drawn on a canvas (so every language's script and direction is drawn by the
 // browser), kept as a JPEG, and the three are written into a PDF here: no library, nothing sent.
 
-import { FREQUENCIES, HOURS_A_YEAR, SEVERITIES, aheadMonths, creditSummary, fusionTotal } from './model.js';
+import { FREQUENCIES, HOURS_A_YEAR, SEVERITIES, aheadMonths, creditSummary, fusionTotal, trCreditsOf } from './model.js';
 import { allSections, moneyText } from './explain.js';
 import { forecastChart } from './charts.js';
 import { assumptionItems, countedFusion, newLabel, reportFileName, scopeLines, trFigures, wording } from './report.js';
@@ -71,7 +71,7 @@ export function slideContent(raw, { t, lang = 'en', calculations = false } = {})
   const L = wording({ t, lang });
   const { num } = L;
   const w = (...args) => plain(L.w(...args));
-  const sum = creditSummary(data.tr?.totals?.credits ?? null, fusionTotal(data.fusion, data.fusionNew), data.summary?.settings);
+  const sum = creditSummary(trCreditsOf(data), fusionTotal(data.fusion, data.fusionNew), data.summary?.settings);
   const customer = data.customer || L.t('Customer');
   const months = data.tr?.months ?? data.months ?? data.fusion?.periodMonths ?? 12;
   const pages = [];

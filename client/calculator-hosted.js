@@ -772,6 +772,21 @@ export async function startHosted() {
   // standard, and keeps it with the account. In the report only when ticked here and allowed by the Admin.
   let estimateKept = { id: '', value: null }; // the open account's estimate, as last made here or read with the account
   const estimateOf = () => (account && estimateKept.id === account.id ? estimateKept.value : null);
+  /**
+   * The estimate counted in the credits total (beta, where an Admin turned it on): the industry's standard once the
+   * customer's industry is chosen and has one, else the figure from all accounts; typical, or high for code no SAST
+   * tool has looked at. Only for code not scanned: the calculator asks for it only then.
+   */
+  const estimateInTotal = () => {
+    if (!cfg.estimate?.total) return null;
+    const e = estimateOf();
+    const pick = e?.standard ?? e?.own ?? null;
+    if (!pick) return null;
+    const q = e.quote === 'high' ? 'high' : 'typical';
+    const credits = Math.round(Number(pick[q]?.credits) || 0);
+    return credits > 0 ? { credits, from: e.standard ? 'industry' : 'accounts', industry: e.standard ? e.industry : '', quote: q, months: e.months, at: e.at } : null;
+  };
+  let estimating = '';
   function renderEstimate(cu, hasBacklog) {
     const on = Boolean(cfg.estimate?.calculator) && Boolean(account) && Boolean(cu) && (cu.fusionNew?.projects?.length ?? 0) > 0 && !hasBacklog;
     let box = $('hc-estimate');
@@ -787,7 +802,17 @@ export async function startHosted() {
     }
     const e = estimateOf();
     // Drawn again only when what it shows changed (it sits on a tab that is redrawn often, and holds two pickers).
-    const key = JSON.stringify([account.id, e?.at ?? '', e?.include ?? false, cfg.estimate?.report ?? false]);
+    // Counted in the total and none made yet: made at once from all accounts (the industry can be chosen after).
+    if (cfg.estimate?.total && !e && estimating !== account.id) {
+      estimating = account.id;
+      server('/api/projections/estimate', { method: 'POST', body: { accountId: account.id, auto: true } }).then(({ estimate }) => {
+        if (estimateKept.id !== account.id) return;
+        estimateKept = { id: account.id, value: estimate };
+        renderEstimate(openCustomer, false);
+        calculator?.summary?.();
+      }, () => {});
+    }
+    const key = JSON.stringify([account.id, e?.at ?? '', e?.include ?? false, cfg.estimate?.report ?? false, cfg.estimate?.total ?? false]);
     if (box.dataset.key === key) return;
     box.dataset.key = key;
     const industry = e?.industry ?? account.industry ?? '';
@@ -795,9 +820,9 @@ export async function startHosted() {
     const span = (lo, hi) => (lo === hi ? '—' : `${num(lo)} to ${num(hi)}`);
     const row = (label, x) => (x ? `<tr><td>${label}</td><td class="num">${span(x.low.total, x.high.total)}</td><td class="num"><b>${num(x[q].total)}</b></td><td class="num">${num(x[q].newMonthly)}</td><td class="num">${span(x.low.credits, x.high.credits)}</td><td class="num"><b>${num(x[q].credits)}</b></td></tr>` : '');
     const c = e?.code;
-    box.innerHTML = `<div class="calc-section-head"><h2>Triage &amp; remediation estimate <i class="hc-beta">beta</i></h2><span class="hint">What a first scan is likely to report, for code that has only been counted. A range from comparable accounts, not a scan: it is not part of the credits required.</span></div>
+    box.innerHTML = `<div class="calc-section-head"><h2>Triage &amp; remediation estimate <i class="hc-beta">beta</i></h2><span class="hint">What a first scan is likely to report, for code that has only been counted. A range from comparable accounts, not a scan: ${cfg.estimate?.total ? '<b>counted in the credits required</b> (set by an Admin), marked as estimated.' : 'it is not part of the credits required.'}</span></div>
       <form class="hc-est-form" id="hc-est-form" autocomplete="off">
-        <label class="field"><span>The customer’s industry</span><select id="hc-est-industry" required><option value="">Choose…</option>${(cfg.estimate?.industries ?? []).map((n) => `<option${n === industry ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+        <label class="field"><span>The customer’s industry</span><select id="hc-est-industry"${cfg.estimate?.total ? '' : ' required'}><option value="">${cfg.estimate?.total ? 'Not chosen: all accounts' : 'Choose…'}</option>${(cfg.estimate?.industries ?? []).map((n) => `<option${n === industry ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
         <label class="field"><span>Have they used a SAST tool before?</span><select id="hc-est-prior"><option value="yes"${e?.priorSast === false ? '' : ' selected'}>Yes: the typical figure</option><option value="no"${e?.priorSast === false ? ' selected' : ''}>No: the high figure</option></select></label>
         ${cfg.estimate?.report ? `<label class="hc-check"><input type="checkbox" id="hc-est-include" ${e?.include ? 'checked' : ''} /> Put it in the report, as a section of its own marked as an estimate</label>` : ''}
         <button type="submit" class="primary sm">${e ? 'Estimate again' : 'Estimate'}</button>${e ? '<button type="button" class="ghost sm" id="hc-est-remove">Remove</button>' : ''}
@@ -806,9 +831,9 @@ export async function startHosted() {
       ${e ? `<p class="hint">${num(c.lines)} lines of code · ${num(c.repositories)} repositories${c.commits ? ` · ${num(c.commits)} commits a year` : ''}${c.developers ? ` · ${num(c.developers)} developers in the last 90 days` : ''}${c.activeShare === null || c.activeShare === undefined ? '' : ` · ${num(c.activeShare * 100)}% of the code still being changed (the findings still to come are counted on that part)`}. Over ${num(e.months)} months${e.frozenAt ? `, at figures frozen ${esc(fmtDateTime(e.frozenAt))}` : ''}.</p>
       <div class="table-wrap"><table class="data-table hc-est-table"><thead><tr><th>Estimated from</th><th class="num">Open findings, range</th><th class="num">Open findings</th><th class="num">New a month</th><th class="num">Credits, range</th><th class="num">T&amp;R credits</th></tr></thead><tbody>
         ${row(`All accounts${e.own ? ` (${num(e.own.accounts)})` : ''}`, e.own)}${e.own ? '' : '<tr><td>All accounts</td><td colspan="5" class="hint">Too few accounts yet to estimate from.</td></tr>'}
-        ${row(`Industry standard: ${esc(e.industry)}`, e.standard)}${e.standard ? '' : `<tr><td>Industry standard: ${esc(e.industry)}</td><td colspan="5" class="hint">None yet for this industry: an Admin can set one.</td></tr>`}
+        ${row(`Industry standard: ${esc(e.industry)}`, e.standard)}${e.standard ? '' : `<tr><td>Industry standard${e.industry ? `: ${esc(e.industry)}` : ''}</td><td colspan="5" class="hint">${e.industry ? 'None yet for this industry: an Admin can set one.' : 'Choose the customer’s industry above to compare with its standard.'}</td></tr>`}
       </tbody></table></div>
-      <p class="hint">The figure in bold is the ${q === 'high' ? 'high end of the range (no SAST tool before)' : 'typical one'}. ${e.include ? 'It is in the report, in a section of its own.' : 'It is not in the report.'} Made ${esc(fmtDateTime(e.at))} by ${esc(e.by)}.</p>` : ''}`;
+      <p class="hint">The figure in bold is the ${q === 'high' ? 'high end of the range (no SAST tool before)' : 'typical one'}. ${estimateInTotal() ? `<b>${num(estimateInTotal().credits)} credits count in the total</b>, from ${estimateInTotal().from === 'industry' ? `the standard for ${esc(estimateInTotal().industry)}` : 'all accounts'}. ` : ''}${e.include ? 'It is in the report, in a section of its own.' : cfg.estimate?.report ? 'Its section is not in the report.' : ''} Made ${esc(fmtDateTime(e.at))} by ${esc(e.by)}.</p>` : ''}`;
     const send = async (body, said) => {
       $('hc-est-status').textContent = 'Working it out…';
       try {
@@ -817,6 +842,7 @@ export async function startHosted() {
         if (estimate?.industry) account.industry = estimate.industry;
         toast(said, 'ok');
         renderEstimate(openCustomer, false);
+        calculator?.summary?.();
       } catch (error) {
         $('hc-est-status').textContent = error.message;
       }
@@ -826,6 +852,8 @@ export async function startHosted() {
       send({ industry: $('hc-est-industry').value, priorSast: $('hc-est-prior').value !== 'no', include: Boolean($('hc-est-include')?.checked) }, 'Estimated, and kept with the account.');
     });
     $('hc-est-remove')?.addEventListener('click', () => send({ remove: true }, 'The estimate is removed.'));
+    // Counted in the total: choosing the industry makes it so at once (its standard replaces the figure from all accounts).
+    if (cfg.estimate?.total) $('hc-est-industry').addEventListener('change', () => $('hc-est-industry').value && send({ industry: $('hc-est-industry').value, priorSast: $('hc-est-prior').value !== 'no', include: Boolean($('hc-est-include')?.checked) }, `Industry: ${$('hc-est-industry').value}. The total uses its standard where there is one.`));
     // Ticking or unticking the report makes it so at once (the estimate itself stays as it was made).
     $('hc-est-include')?.addEventListener('change', () => e && send({ industry: $('hc-est-industry').value || e.industry, priorSast: $('hc-est-prior').value !== 'no', include: $('hc-est-include').checked }, $('hc-est-include').checked ? 'In the report from now on.' : 'Out of the report.'));
   }
@@ -1103,6 +1131,7 @@ export async function startHosted() {
     impactOn: () => Boolean(account?.impactEnabled),
     // The estimate kept with the open account goes into its report where the Admin allows it and the SE ticked it.
     estimateOf: () => (cfg.estimate?.report ? estimateOf() : null),
+    estimateInTotal,
     sampleFile: (name) => fetch(`/calc-assets/samples/${encodeURIComponent(name)}`, { credentials: 'same-origin' }),
   });
   showAccount(null);

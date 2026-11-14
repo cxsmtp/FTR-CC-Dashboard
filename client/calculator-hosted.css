@@ -852,3 +852,9 @@ html[data-cc] .hc-cloc #hc-cf-dl:hover { background: color-mix(in srgb, var(--br
 .hc-sure-q { margin: 0 0 8px; font-size: 15px; font-weight: 600; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
 .hc-sure .hint { white-space: pre-line; overflow-wrap: anywhere; }
 .hc-sure button.hc-danger { color: var(--red, #dc2626) !important; border-color: color-mix(in srgb, var(--red, #dc2626) 45%, transparent) !important; }
+
+/* A Fusion-only account hides triage & remediation, except the estimate counted in the total (beta). */
+html[data-fusion-only] #calc-mix-tr.calc-mix-est { display: grid !important; }
+
+/* The message in the corner is text only: clicks go through it to what is under it (Generate, often). */
+#toast, .toast { pointer-events: none; }

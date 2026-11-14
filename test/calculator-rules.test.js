@@ -163,3 +163,12 @@ test('a report from an earlier version (figures on its page only) is read back i
   assert.throws(() => readOldReport('<html><body>hello</body></html>'), /not a projection report/);
 });
 const SEV_CURRENT = (a) => ['Critical', 'High', 'Medium', 'Low'].map((s) => a.perSeverity[s].current);
+
+test('triage & remediation in the total: the scan first, else the estimate counted (beta), else none', async () => {
+  const { trCreditsOf, creditSummary } = await import('../core/public/calculator/model.js');
+  assert.equal(trCreditsOf({ tr: { totals: { credits: 120 } }, estimateTotal: { credits: 900 } }), 120);
+  assert.equal(trCreditsOf({ estimateTotal: { credits: 900 } }), 900);
+  assert.equal(trCreditsOf({ estimateTotal: { credits: 0 } }), null);
+  assert.equal(trCreditsOf({}), null);
+  assert.equal(creditSummary(trCreditsOf({ estimateTotal: { credits: 900 } }), 100, { extraPercent: 10 }).total, 1100);
+});

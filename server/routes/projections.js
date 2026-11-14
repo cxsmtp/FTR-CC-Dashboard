@@ -52,7 +52,10 @@ export function registerProjections(d) {
       const owner = meta ? iam.byId(meta.ownerId) : null;
       if (meta && (!owner || owner.role === 'cs' || owner.active === false)) throw fail(409, 'Choose the accountable Sales Engineer for this account first (at the top of the calculator): a projection is always for an SE.');
     }
-    const rep = accounts.addReport({ customerId: String(body?.customerId ?? ''), data: body?.data, user: ctx.user }, ctx.teamSet);
+    // The estimate counts in a report's total only while an Admin lets it (beta), and only for code not scanned.
+    const sent = body?.data;
+    const counted = sent?.estimateTotal && (!d.estimateBeta().total || Number.isFinite(sent?.tr?.totals?.credits)) ? { ...sent, estimateTotal: null } : sent;
+    const rep = accounts.addReport({ customerId: String(body?.customerId ?? ''), data: counted, user: ctx.user }, ctx.teamSet);
     record(ctx, req, 'report.create', rep.customer, { id: rep.id, totalCredits: rep.totalCredits, team: teams.get(rep.teamId)?.name });
     const repMeta = accounts.accounts.meta(String(body?.customerId ?? ''));
     activity.add({ kind: 'report', user: { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, teamId: ctx.user.teamId }, account: repMeta ? { id: repMeta.id, name: repMeta.name, teamId: repMeta.teamId } : null, tenant: calc.status(ctx.user.id).tenant || '', ok: true, detail: `${Math.round(rep.totalCredits ?? 0).toLocaleString('en')} credits` });

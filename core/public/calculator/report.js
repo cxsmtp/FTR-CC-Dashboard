@@ -11,7 +11,7 @@
 
 import { describeEngines } from '../engines.js';
 import { NEXTGEN_ACCENTS, lookPalette, reportLook } from '../look.js';
-import { FREQUENCIES, SEVERITIES, cleanScope, creditSummary, fusionTotal } from './model.js';
+import { FREQUENCIES, SEVERITIES, cleanScope, creditSummary, fusionTotal, trCreditsOf } from './model.js';
 import { allSections, moneyText, sectionHtml } from './explain.js';
 import { SEVERITY_COLOURS, backlogTrendChart, debtFixChart, forecastChart, monthLabel, ratesChart, severityChart, severityCharts } from './charts.js';
 
@@ -102,10 +102,13 @@ function scopeLine(source, L) {
 function answer(data, sum, L) {
   const { w, num } = L;
   const tr = data.tr ? trFigures(data.tr) : null;
+  const est = data.tr ? 0 : trCreditsOf(data) ?? 0;
   const months = data.months ?? data.fusion?.periodMonths ?? null;
   const parts = [
     tr && { key: 'backlog', label: w('Backlog today'), value: tr.backlogCredits, colour: 'var(--ink)' },
     tr && tr.aheadCredits > 0 && { key: 'ahead', label: w('Findings ahead'), value: tr.aheadCredits, colour: 'var(--accent)' },
+    // Code only counted: the estimated triage & remediation, where the Admin lets it count (beta), marked as such.
+    !tr && est > 0 && { key: 'estimate', label: `${w('Triage & remediation')} <span class="est-tag">${w('estimated')}</span>`, value: est, colour: '#7c3aed' },
     data.fusion && { key: 'fusion', label: data.fusionNew ? w('Fusion — existing customer') : w('Fusion scans'), value: data.fusion.totals.credits ?? 0, colour: '#0d9488' },
     data.fusionNew && { key: 'fusion-new', label: newLabel(data.fusionNew, w), value: data.fusionNew.totals.credits ?? 0, colour: '#b7791f' },
     sum.extra > 0 && { key: 'extra', label: w('Extra credits'), value: sum.extra, colour: 'var(--muted)' },
@@ -113,11 +116,12 @@ function answer(data, sum, L) {
   const total = parts.reduce((a, p) => a + p.value, 0) || 1;
   const bar = parts.map((p) => `<span style="width:${((p.value / total) * 100).toFixed(2)}%;background:${p.colour}" title="${esc(`${p.label}: ${num(p.value, 1)}`)}"></span>`).join('');
   const keys = parts.map((p) => `<li><i style="background:${p.colour}"></i><span>${p.label}</span><b>${num(p.value, 1)}</b></li>`).join('');
+  const estNote = est > 0 ? `<span class="answer-est">${w('Includes {0} estimated triage & remediation credits (beta): the code has been counted, not scanned. The first scan replaces the estimate.', num(est, 0))}</span>` : '';
   return `<section class="answer">
   <div class="answer-main">
     <span class="eyebrow">${w('Total credits required')}</span>
     <b class="big">${num(sum.total, 0)}</b>
-    <span class="answer-sub">${w('{0} bundles of {1} credits', num(sum.bundles), num(sum.settings.bundleCredits))}${months ? ` · ${w('over {0} months', num(months))}` : ''}${sum.settings.extraPercent ? ` · ${w('including {0}% extra', num(sum.settings.extraPercent, 2))}` : ''}</span>
+    <span class="answer-sub">${w('{0} bundles of {1} credits', num(sum.bundles), num(sum.settings.bundleCredits))}${months ? ` · ${w('over {0} months', num(months))}` : ''}${sum.settings.extraPercent ? ` · ${w('including {0}% extra', num(sum.settings.extraPercent, 2))}` : ''}</span>${estNote}
   </div>
   ${parts.length ? `<div class="bar" role="img" aria-label="${w('What the credits are for')}">${bar}</div><ul class="keys">${keys}</ul>` : ''}
 </section>`;
@@ -239,7 +243,7 @@ function estimateSection(data, L) {
     code.activeShare === null || code.activeShare === undefined ? '' : `${num(Math.round(code.activeShare * 100))}% ${w('of the code still being changed')}`,
   ].filter(Boolean).join(' · ');
   return `<section class="estimate"><h2>${w('Indicative triage & remediation estimate')} <span class="beta">${w('beta')}</span></h2>
-<p class="note"><b>${w('An estimate, not a scan, and not part of the credits required.')}</b> ${w('This code has been counted, not scanned. What a first scan is likely to report is estimated from comparable accounts: their lines of code against their open findings. Codebases of one size differ widely, so it is a range; the first scan replaces it.')}</p>
+<p class="note"><b>${trCreditsOf({ estimateTotal: data.estimateTotal }) && !data.tr ? w('An estimate, not a scan: counted in the credits required above, marked as estimated.') : w('An estimate, not a scan, and not part of the credits required.')}</b> ${w('This code has been counted, not scanned. What a first scan is likely to report is estimated from comparable accounts: their lines of code against their open findings. Codebases of one size differ widely, so it is a range; the first scan replaces it.')}</p>
 <p class="sub">${esc(facts)}</p>
 <div class="table-wrap"><table><thead><tr><th>${w('Estimated from')}</th><th class="num">${w('Open findings, range')}</th><th class="num">${w('Open findings')}</th><th class="num">${w('New a month')}</th><th class="num">${w('Credits, range')}</th><th class="num">${w('Triage & remediation credits')}</th></tr></thead><tbody>
 ${row(`${w('Comparable accounts')}${e.own ? ` (${num(e.own.accounts)})` : ''}`, e.own)}
@@ -542,7 +546,7 @@ h2{margin:0 0 12px;font-size:18px;font-weight:600} h3{margin:18px 0 6px;font-siz
 .card{border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
 .card h3{margin:0 0 8px}
 .figure{margin:0 0 6px;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums} .figure span{font-size:13px;color:var(--muted);font-weight:400}
-.estimate{margin-top:28px;padding:18px 20px;border:1px dashed var(--line,#cbd5e1);border-radius:12px} .estimate .beta{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;vertical-align:middle;opacity:.75} .estimate .note{margin:6px 0 10px} .estimate table{width:100%} .impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .lv-num[data-fixed]{background:transparent;border-color:transparent;pointer-events:none;color:var(--ink)} .beta-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;background:#ffe2a8;border:1px solid #f0b443;vertical-align:middle} .impact-tile.beta{border-style:dashed} .beta-note{border-left:3px solid #f0b443;padding-left:10px} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
+.est-tag{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:999px;border:1px solid #7c3aed;color:#7c3aed;margin-left:4px;vertical-align:1px} .answer-est{display:block;margin-top:6px;font-size:13px;color:#6d28d9} .estimate{margin-top:28px;padding:18px 20px;border:1px dashed var(--line,#cbd5e1);border-radius:12px} .estimate .beta{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;vertical-align:middle;opacity:.75} .estimate .note{margin:6px 0 10px} .estimate table{width:100%} .impact .cards{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))} .impact-tile h3{font-size:13px;color:var(--muted);font-weight:500} .impact-tile.gold .figure{color:var(--gold)} .lv-num[data-fixed]{background:transparent;border-color:transparent;pointer-events:none;color:var(--ink)} .beta-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b00;background:#ffe2a8;border:1px solid #f0b443;vertical-align:middle} .impact-tile.beta{border-style:dashed} .beta-note{border-left:3px solid #f0b443;padding-left:10px} .impact .figure{overflow-wrap:anywhere} .impact-part{margin:22px 0 4px;font-size:16px} .impact>.cards+.cards{margin-top:12px}
 .sevs{list-style:none;margin:0 0 8px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:13px}
 .sevs li{display:flex;align-items:center;gap:6px} .sevs i{width:8px;height:8px;border-radius:2px;display:inline-block} .sevs b{margin-inline-start:auto;font-variant-numeric:tabular-nums;font-weight:500}
 table.calc{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
@@ -706,7 +710,7 @@ export function countedFusion(data) {
 }
 
 /** The total of a report's data, as its answer says it. */
-const reportTotal = (data) => creditSummary(data.tr?.totals?.credits ?? null, fusionTotal(data.fusion, data.fusionNew), data.summary?.settings);
+const reportTotal = (data) => creditSummary(trCreditsOf(data), fusionTotal(data.fusion, data.fusionNew), data.summary?.settings);
 
 /**
  * The levers, under the answer: per severity the backlog to include, the false positives and the credits
@@ -780,7 +784,7 @@ export function reportMain(raw, { t, lang = 'en', live = null } = {}) {
   const data = countedFusion(raw);
   const L = wording({ t, lang });
   const { w } = L;
-  const sum = creditSummary(data.tr?.totals?.credits ?? null, fusionTotal(data.fusion, data.fusionNew), data.summary?.settings);
+  const sum = creditSummary(trCreditsOf(data), fusionTotal(data.fusion, data.fusionNew), data.summary?.settings);
   return `${answer(data, sum, L)}
 ${live ? leversPanel(data, live, L) : ''}
 ${story(data, L)}

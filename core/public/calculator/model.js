@@ -952,6 +952,17 @@ export function totalsSettings(value = {}) {
  * the extra % on top, and the bundles that covers: total ÷ credits per bundle, rounded up to a
  * whole bundle (exactBundles keeps the fraction).
  */
+/**
+ * The triage & remediation credits a report counts: those of its scanned backlog (`tr`); for code that was only
+ * counted, the estimate an Admin lets count in the total (beta: `estimateTotal`, made in the calculator); else none.
+ */
+export function trCreditsOf(data) {
+  const scanned = data?.tr?.totals?.credits;
+  if (Number.isFinite(scanned)) return scanned;
+  const estimated = data?.estimateTotal?.credits;
+  return Number.isFinite(estimated) && estimated > 0 ? estimated : null;
+}
+
 export function creditSummary(trCredits, fusionCredits, value = {}) {
   const settings = totalsSettings(value);
   const tr = Number.isFinite(trCredits) ? trCredits : null;

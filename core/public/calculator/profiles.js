@@ -2,7 +2,7 @@
 // server (src/projections.js, in the data folder) and in the standalone calculator (in the browser). No
 // Node or browser APIs beyond crypto and TextEncoder, so both can use it.
 
-import { CRITICALITIES, DEFAULT_TR, FREQUENCIES, LOOKBACKS, MAX_CLOC_LANGUAGES, MAX_PROJECTS, aheadSettings, cleanOrigins, cleanScope, creditSummary, fusionSettings, fusionTotal, impactSettings, modelsNamed, newCustomerSettings, totalsSettings, wholeNumber } from './model.js';
+import { aheadSettings, cleanOrigins, cleanScope, creditSummary, CRITICALITIES, DEFAULT_TR, FREQUENCIES, fusionSettings, fusionTotal, impactSettings, LOOKBACKS, MAX_CLOC_LANGUAGES, MAX_PROJECTS, modelsNamed, newCustomerSettings, totalsSettings, trCreditsOf, wholeNumber } from './model.js';
 import { DEFAULT_ENGINES, cleanEngines } from '../engines.js';
 
 export const MAX_PROFILES = 200;
@@ -349,7 +349,9 @@ export function newReport({ customerId, customer, by = '', data }) {
     customer: text(customer, 120) || 'Customer',
     createdAt: new Date().toISOString(),
     createdBy: text(by, 254),
-    trCredits: finite(clean?.tr?.totals?.credits, null),
+    // Scanned, else the estimate counted in the total (beta, code only counted): as the report's headline says.
+    trCredits: trCreditsOf(clean),
+    trEstimated: !Number.isFinite(clean?.tr?.totals?.credits) && trCreditsOf(clean) !== null,
     // Fusion for the customer's projects in Checkmarx One and for its new code (cloc), together.
     fusionCredits: fusionTotal(clean?.fusion, clean?.fusionNew),
     data: clean,

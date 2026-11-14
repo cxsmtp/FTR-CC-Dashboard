@@ -42,7 +42,8 @@ export async function viewEstimate() {
     <div class="panel mt"><h2>Where SEs see it <span class="chip star">beta</span></h2>
       <form id="est-beta" data-nodraft>
         <label class="check"><input type="checkbox" name="calculator" ${d.beta.calculator ? 'checked' : ''} /> In the calculator, for an account whose code was only counted (Fusion only): the SE picks the customer’s industry and sees the estimate from all accounts beside the industry’s standard</label>
-        <label class="check"><input type="checkbox" name="report" ${d.beta.report ? 'checked' : ''} ${d.beta.calculator ? '' : 'disabled'} /> In the report of such an account, when its SE ticks it: a section of its own, marked as an estimate, never part of the credits required</label>
+        <label class="check"><input type="checkbox" name="total" ${d.beta.total ? 'checked' : ''} ${d.beta.calculator ? '' : 'disabled'} /> In the credits total, for such an account: its estimated triage &amp; remediation counts in the credits required, in the calculator, its report and on Overview and Accounts, marked as estimated everywhere. From all accounts until its SE chooses the customer’s industry, then from that industry’s standard. Reports already made stay as they are; the first scan replaces the estimate.</label>
+        <label class="check"><input type="checkbox" name="report" ${d.beta.report ? 'checked' : ''} ${d.beta.calculator ? '' : 'disabled'} /> In the report of such an account, when its SE ticks it: a section of its own, marked as an estimate, with how it was made</label>
       </form>
     </div>
 

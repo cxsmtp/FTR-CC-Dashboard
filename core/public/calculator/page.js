@@ -50,7 +50,7 @@ function appLook() {
  * customer tab may count code from git (on the server, or in the launcher on its computer; never in the
  * HTML file on its own, which can reach nothing).
  */
-export function initCalculator({ api, $, esc, toast, setStatus, showError, handleAuthLoss, fmtDateTime, me, can, standalone = false, sampleFile = null, canRead = () => !standalone, canGit = () => !standalone, impactOn = () => false, estimateOf = () => null, sure = async (message) => window.confirm(message) }) {
+export function initCalculator({ api, $, esc, toast, setStatus, showError, handleAuthLoss, fmtDateTime, me, can, standalone = false, sampleFile = null, canRead = () => !standalone, canGit = () => !standalone, impactOn = () => false, estimateOf = () => null, estimateInTotal = () => null, sure = async (message) => window.confirm(message) }) {
   // What the parts of the page that live in their own files (page-*.js) read from it: each thing by name, looked up
   // when it is used (so one made further down is found too), and set where a part changes it.
   const d = {
@@ -75,6 +75,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     get esc() { return esc; },
     get estimate() { return estimate; },
     get estimateOf() { return estimateOf; },
+    get estimateInTotal() { return estimateInTotal; },
     get fillImpact() { return fillImpact; },
     get flush() { return flush; },
     get fmtDateTime() { return fmtDateTime; },
@@ -259,6 +260,8 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   return {
     load,
     renderOrg,
+    // The credits strip worked out again (the estimate counted in the total changed).
+    summary: () => c.open && renderSummary(),
     // Read Checkmarx One now (Connect): after a read this page is starting by itself, never a second one.
     read: async () => {
       for (let i = 0; i < 50 && reading.starting; i += 1) await new Promise((r) => setTimeout(r, 100));
