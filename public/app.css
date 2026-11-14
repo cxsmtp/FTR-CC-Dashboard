@@ -1210,3 +1210,6 @@ dialog.sured { width: min(480px, 94vw); }
 dialog.sured .db { padding-top: 20px; }
 dialog.sured .sure-q { margin: 0 0 6px; font-size: 15px; font-weight: 600; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
 dialog.sured .db p.small { white-space: pre-line; overflow-wrap: anywhere; }
+
+/* A page that cannot be shown: what happened, and a way on (public/js/auth.js stuckHtml). */
+.empty.stuck { display: grid; gap: 14px; justify-items: center; }

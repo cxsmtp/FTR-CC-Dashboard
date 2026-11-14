@@ -131,6 +131,15 @@ export const home = () => {
   if (h === 'activity' || h === 'guide') return `/${h}`;
   return can('dashboard.view') ? '/overview' : '/guide';
 };
+/**
+ * A page that cannot be shown (not for this role, gone, failed): what happened, and a way on, to the person's own home
+ * page and to Get help, so nobody is left on a sentence with nowhere to go.
+ */
+export function stuckHtml(message) {
+  const to = home();
+  const label = { '/calculator': 'Open the calculator', '/overview': 'Go to Overview', '/accounts': 'Go to Accounts', '/activity': 'Go to CxOne API audit' }[to] ?? 'Go to the quick guide';
+  return `<div class="panel"><div class="empty stuck"><b>${esc(message)}</b><div class="flex"><a class="btn primary" href="${to === '/calculator' ? to : `#${to}`}">${esc(label)}</a><a class="btn ghost" href="#/help">Get help</a></div></div></div>`;
+}
 
 // ---- First sign-in: password, terms, quick guide ----------------------------------------------------------
 export async function viewWelcome() {

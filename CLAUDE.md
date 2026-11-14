@@ -35,5 +35,7 @@ Rules from the owner, for every change:
 - What the dashboard and the calculator's page must do the same way lives once, in public/js/links.js (what people
   type: Salesforce links, emails, "are you sure?") and public/js/theme.js (the looks); both are in the calculator's
   bundle too. Do not copy such a thing into client/calculator-hosted.js.
+- Every page has one main action (a `primary` button) where there is a next step; a page that cannot be shown uses
+  `stuckHtml()` (public/js/auth.js): what happened, and a way on. Settings that save as you type need none.
 - Questions are asked with `sure()` (the app's own dialog), never the browser's `confirm()`.
 - A person's picture is a file (pictures/<id>, server/iam.js `setPicture` / `pictureOf`), never in the people file.

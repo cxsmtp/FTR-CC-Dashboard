@@ -2,6 +2,15 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.114.00 — 2026-11-14
+
+- **A way on from every page.** A page someone may not open, or that cannot be shown (the vulnerability estimate or
+  the audit log for a Sales Engineer, an account that is gone), said one sentence and stopped. It now says it and
+  offers the person's own home page (Open the calculator, Go to Overview, …) and Get help.
+- **The quick guide starts you off.** Under its title, one button to the first step (for a Sales Engineer: Open the
+  calculator; for an Admin: Teams).
+- **Email (SMTP): Test connection** is the page's main button, the step after filling it in.
+
 ## CC-01.113.00 — 2026-11-14
 
 - **Faster under heavy load.** A load test (200 people at once, over HTTPS) found every request paying for a walk

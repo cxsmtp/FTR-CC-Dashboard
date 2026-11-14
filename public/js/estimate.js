@@ -1,5 +1,6 @@
 import { $, $$, api, dateTime, esc, num, once, state, toast } from './core.js';
 import { loading, shell } from './shell.js';
+import { stuckHtml } from './auth.js';
 
 // ---- Vulnerability estimate (the Admins' board) ------------------------------------------------------------------
 // Findings and triage & remediation credits for code that Checkmarx One has not scanned, from what this
@@ -12,7 +13,7 @@ const times = (r) => (r > 0 ? `×${num(Math.max(r, 1 / r), 1)} ${r >= 1 ? 'more'
 
 export async function viewEstimate() {
   if (state.me?.role?.id !== 'admin') {
-    shell('estimate', '<div class="panel"><div class="empty"><b>The estimate is for Admins.</b></div></div>');
+    shell('estimate', stuckHtml('The vulnerability estimate is for Admins.'));
     return;
   }
   if (!$('#est')) shell('estimate', loading());

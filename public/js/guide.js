@@ -93,7 +93,7 @@ export function guideHtml(persona, { first = false, tabs = [] } = {}) {
     <div class="gx-hero">
       <div class="gx-orbit" aria-hidden="true"><i></i><i></i><i></i><span>${art(g.steps[0][0])}</span></div>
       <div class="gx-intro"><span class="chip star">${first ? 'Welcome · step 3 of 3' : 'Quick guide'}</span><h1 class="serif">${first ? `Welcome, ${esc(state.me.user.name.split(' ')[0])}` : `The ${esc(g.name)} guide`}</h1>
-      <p>${esc(g.tagline)}</p><p class="muted small">${esc(state.me.role.name)} · ${esc(state.me.team?.path ?? 'no team yet')}</p></div>
+      <p>${esc(g.tagline)}</p><p class="muted small">${esc(state.me.role.name)} · ${esc(state.me.team?.path ?? 'no team yet')}</p>${first ? '' : `<p><a class="btn primary" href="${g.steps[0][3].startsWith('/calculator') ? g.steps[0][3] : `#${g.steps[0][3]}`}">Start: ${esc(g.steps[0][4])} →</a></p>`}</div>
     </div>
     ${tabs.length > 1 ? `<div class="gx-tabs" role="tablist">${tabs.map((t) => `<button type="button" role="tab" data-guide="${t}" aria-selected="${t === persona}" class="${t === persona ? 'on' : ''}">${esc(GUIDES[t].name)}${t === personaOf() ? ' <small>yours</small>' : ''}</button>`).join('')}</div>` : ''}
     <ol class="gx-steps">${g.steps.map(([k, t, p, href, cta], i) => `<li class="gx-step" data-css="--i:${i}"><div class="gx-art">${art(k)}<b class="gx-n">${i + 1}</b></div><h3>${esc(t)}</h3><p>${esc(p)}</p>${first ? '' : `<a class="gx-go" href="${href.startsWith('/calculator') ? href : `#${href}`}">${esc(cta)} →</a>`}</li>`).join('')}</ol>

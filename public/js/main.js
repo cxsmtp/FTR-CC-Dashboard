@@ -2,7 +2,7 @@ import { viewAbout } from './about.js';
 import { viewAccount, viewAccounts } from './accounts.js';
 import { viewActivity } from './activity.js';
 import { viewAudit } from './audit.js';
-import { firstStepsDone, home, viewForgot, viewLogin, viewReset, viewWelcome } from './auth.js';
+import { firstStepsDone, home, stuckHtml, viewForgot, viewLogin, viewReset, viewWelcome } from './auth.js';
 import { $, api, applyMyTheme, can, esc, go, setRedraw, state, toast, warm } from './core.js';
 import { viewEstimate } from './estimate.js';
 import { viewGuide } from './guide.js';
@@ -78,7 +78,7 @@ async function show() {
     go(home());
   } catch (error) {
     if (error.status === 401) return;
-    if ($('#main')) $('#main').innerHTML = `<div class="panel"><div class="empty"><b>${esc(error.message)}</b></div></div>`;
+    if ($('#main')) $('#main').innerHTML = stuckHtml(error.message);
     else toast(error.message, 'bad');
   }
 }
