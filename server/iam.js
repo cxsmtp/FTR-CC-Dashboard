@@ -5,10 +5,11 @@
  * an httpOnly cookie; only their SHA-256 is kept on disk, so a copy of the data folder cannot sign anyone in.
  */
 import { createHash, randomBytes, randomUUID, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-import { Doc, fail } from './store.js';
+import { Doc, fail, safeId } from './store.js';
 import { ADMIN_ONLY, DEFAULT_ROLES, PERMISSION_IDS, cleanPermissions, HOMES } from './rbac.js';
 
 const scrypt = promisify(scryptCb);
@@ -61,8 +62,62 @@ export class Iam {
   constructor(dataDir) {
     this.doc = new Doc(path.join(dataDir, 'iam.json'), () => ({ roles: {}, users: [] }));
     this.sessions = new Doc(path.join(dataDir, 'sessions.json'), () => ({ sessions: {} }));
+    this.picturesDir = path.join(dataDir, 'pictures');
     this.#normalise();
+    this.#picturesOut();
     if (this.migrated) this.save();
+  }
+
+  // ---- Profile pictures: each a file of its own (pictures/<person>), not in the people file ------------------------
+  // The people file is written whole on every change to anyone (a sign-in too): with the pictures in it, it grew by
+  // up to a quarter of a megabyte a person. What the people file keeps of a picture is its type and when it was set.
+  #pictureFile(id) {
+    const ok = safeId(id);
+    return ok ? path.join(this.picturesDir, ok) : null;
+  }
+  #writePicture(id, buffer) {
+    const file = this.#pictureFile(id);
+    if (!file) throw fail(404, 'Not found.');
+    fs.mkdirSync(this.picturesDir, { recursive: true, mode: 0o700 });
+    const tmp = `${file}.${randomUUID()}.tmp`;
+    fs.writeFileSync(tmp, buffer, { mode: 0o600, flag: 'wx' });
+    fs.renameSync(tmp, file);
+  }
+  /** Pictures kept in the people file by a version before this (or by a restored backup of one) move to their files. */
+  #picturesOut() {
+    for (const u of this.doc.value.users) {
+      if (!u.picture?.data) continue;
+      try {
+        this.#writePicture(u.id, Buffer.from(u.picture.data, 'base64'));
+        const { data, ...kept } = u.picture;
+        u.picture = kept;
+        this.migrated = true;
+      } catch {
+        // Left where it is (it is still served from there), and tried again at the next start.
+      }
+    }
+  }
+  /** Set a person's picture ({ type, data: base64, bytes, at } as branding.js makes it), or take it away (null). */
+  setPicture(user, image) {
+    const file = this.#pictureFile(user.id);
+    if (!image) {
+      delete user.picture;
+      if (file) fs.rmSync(file, { force: true });
+    } else {
+      this.#writePicture(user.id, Buffer.from(image.data, 'base64'));
+      user.picture = { type: image.type, bytes: image.bytes, at: image.at };
+    }
+    this.save();
+  }
+  /** A person's picture as { type, at, bytes: Buffer }, or null. */
+  pictureOf(user) {
+    if (!user?.picture) return null;
+    if (user.picture.data) return { ...user.picture, bytes: Buffer.from(user.picture.data, 'base64') };
+    try {
+      return { ...user.picture, bytes: fs.readFileSync(this.#pictureFile(user.id)) };
+    } catch {
+      return null;
+    }
   }
 
   #normalise() {
@@ -304,6 +359,8 @@ export class Iam {
     if (!user) throw fail(404, 'That person no longer has access.');
     if (user.role === 'admin' && this.activeAdmins().length <= 1) throw fail(409, 'There must always be at least one active Admin.');
     this.doc.value.users = this.users().filter((u) => u.id !== id);
+    const picture = this.#pictureFile(id);
+    if (picture) fs.rmSync(picture, { force: true });
     // Those who reported to them report to whom they reported to (or to nobody).
     for (const u of this.users()) if (u.managerId === id) u.managerId = user.managerId ?? null;
     this.save();

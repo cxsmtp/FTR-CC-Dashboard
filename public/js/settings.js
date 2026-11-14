@@ -646,7 +646,11 @@ export const ADMIN_VIEWS = {
     </div>
     ${rd ? `<div class="panel wide-panel mt" id="ready"><h2>Ready for production? <small>${rd.todo ? `${num(rd.todo)} to do` : 'nothing left to do'}${rd.notes ? ` · ${num(rd.notes)} to check` : ''}</small></h2>
       <p class="muted small">What to put right before the server is opened to more people, and where. Looking changes nothing.</p>
-      <div class="tw"><table class="ready-table"><thead><tr><th>Check</th><th>State</th><th>What was found</th><th>Where</th></tr></thead><tbody>${rd.checks.map((c) => `<tr><td><b>${esc(c.title)}</b></td><td data-sort="${{ todo: 0, note: 1, ok: 2 }[c.state]}" data-v="${RD[c.state][1]}"><span class="chip ${RD[c.state][0]}"><i></i>${RD[c.state][1]}</span></td><td class="small">${esc(c.detail)}</td><td>${c.where && c.state !== 'ok' ? `<a class="btn ghost sm" href="#${esc(c.where)}">Open</a>` : ''}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+      <div class="tw"><table class="ready-table"><thead><tr><th>Check</th><th>State</th><th>What was found</th><th>Where</th></tr></thead><tbody>${rd.checks.map((c) => `<tr><td><b>${esc(c.title)}</b></td><td data-sort="${{ todo: 0, note: 1, ok: 2 }[c.state]}" data-v="${RD[c.state][1]}"><span class="chip ${RD[c.state][0]}"><i></i>${RD[c.state][1]}</span></td><td class="small">${esc(c.detail)}</td><td><span class="ready-act">${c.where && c.state !== 'ok' ? `<a class="btn ghost sm" href="#${esc(c.where)}">Open</a>` : ''}${c.canAccept && c.state !== 'ok' ? `<button class="ghost sm" data-accept="${esc(c.id)}" title="It is as you mean it: shown as ready until what was found changes">As meant</button>` : ''}${c.accepted ? `<span class="muted small">as meant: ${esc(c.accepted.by)}, ${esc(date(c.accepted.at))}</span><button class="ghost sm" data-ask="${esc(c.id)}">Ask again</button>` : ''}</span></td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+    for (const btn of $$('[data-accept], [data-ask]')) btn.onclick = async () => {
+      await api(`/api/system/readiness/${encodeURIComponent(btn.dataset.accept ?? btn.dataset.ask)}`, { method: 'PUT', body: { accept: Boolean(btn.dataset.accept) } }).then(() => toast(btn.dataset.accept ? 'Kept as meant.' : 'It is asked again.', 'ok'), (x) => toast(x.message, 'bad'));
+      viewAdmin('backups');
+    };
     $('#now').onclick = async () => {
       await api('/api/backups', { method: 'POST', body: {} }).then(() => toast('Backed up.', 'ok'), (x) => toast(x.message, 'bad'));
       viewAdmin('backups');

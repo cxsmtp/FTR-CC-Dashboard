@@ -44,11 +44,11 @@ export function registerProfile(d) {
       changed.push('impact figures');
     }
     if (body?.picture !== undefined) {
-      if (body.picture === null) delete u.picture;
+      if (body.picture === null) iam.setPicture(u, null);
       else {
         const img = imageFromUpload(body.picture, 'Your picture');
         if (img.type === 'image/svg+xml') throw fail(415, 'Your picture: a PNG, JPEG or WebP image.');
-        u.picture = img;
+        iam.setPicture(u, img);
       }
       changed.push('picture');
     }
@@ -59,8 +59,9 @@ export function registerProfile(d) {
   /** A person's picture, for whoever is signed in. */
   r('GET', '/api/people/:id/picture', signedIn, (req, ctx, body, res, url, params) => {
     const u = iam.byId(params.id);
-    if (!u?.picture?.data) return send(res, 404, { error: 'No picture.' });
-    return send(res, 200, Buffer.from(u.picture.data, 'base64'), { ...imageHeaders(u.picture), 'Cache-Control': 'private, max-age=86400' });
+    const picture = iam.pictureOf(u);
+    if (!picture) return send(res, 404, { error: 'No picture.' });
+    return send(res, 200, picture.bytes, { ...imageHeaders(picture), 'Cache-Control': 'private, max-age=86400' });
   });
   /** Sign out everywhere else (this browser stays signed in). */
   r('POST', '/api/me/signout-others', ownSelf, (req, ctx) => {

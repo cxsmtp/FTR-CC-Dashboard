@@ -3,7 +3,9 @@
  * where it is put right. It only reads: nothing is changed by looking.
  *
  * `facts` is what the app holds (see server/routes/diagnostics.js); the answer is a list of
- * { id, title, state: 'ok' | 'todo' | 'note', detail, where } ('note' is worth knowing, not a fault).
+ * { id, title, state: 'ok' | 'todo' | 'note', detail, where } ('note' is worth knowing, not a fault). An Admin can say
+ * of a note that it is as meant (`f.accepted`: id → { detail, by, at }): it then reads as ready, until what was found
+ * changes (another role, a new error), when it is asked again.
  */
 const DAY = 24 * 3600 * 1000;
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -47,5 +49,10 @@ export function readiness(f, now = Date.now()) {
   const errors = f.recentErrors.filter((e) => now - new Date(e.at).getTime() < DAY);
   add('errors.recent', 'No errors in the last day', errors.length ? 'note' : 'ok', errors.length ? `${plural(errors.length, 'line')} in the server’s log since yesterday that say error or failed; the newest: ${errors.at(-1).line.slice(0, 160)}` : 'None since yesterday (or since it last started).', '/admin/backups');
 
+  for (const c of out) {
+    const yes = f.accepted?.[c.id];
+    if (c.state === 'note') c.canAccept = true;
+    if (c.state === 'note' && yes && yes.detail === c.detail) Object.assign(c, { state: 'ok', accepted: { by: yes.by, at: yes.at } });
+  }
   return { checks: out, todo: out.filter((c) => c.state === 'todo').length, notes: out.filter((c) => c.state === 'note').length };
 }

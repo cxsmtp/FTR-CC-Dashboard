@@ -2,6 +2,20 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.112.00 — 2026-11-14
+
+- **Profile pictures are files of their own.** They were kept inside the people file, which is written whole on every
+  change to anyone (each sign-in too), so it grew by up to a quarter of a megabyte a person with a picture. Each
+  picture now sits beside it (pictures/, in every backup as before) and the people file stays small. Pictures already
+  set move by themselves as this version starts and look exactly as they did; a backup made before this still
+  restores with its pictures.
+- **Ready for production: "As meant".** A row that asks you to check something (who sees every team, not marked
+  Staging or Production, no restore tried) can be marked as meant: it then reads as ready, with who said so and
+  when, until what was found changes (another role, say), when it is asked again. A gap ("To do") cannot be accepted:
+  it is put right where it is. Recorded in the audit log.
+- **One copy of the looks.** The dashboard and the calculator each had their own code for light, dark, Standard and
+  Command Center; both now use the same one, so they cannot disagree.
+
 ## CC-01.111.00 — 2026-11-14
 
 - **The calculator's page code is nine files in place of one of 4,000 lines** (customers, triage & remediation,

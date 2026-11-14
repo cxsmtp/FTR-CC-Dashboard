@@ -5,42 +5,10 @@
 
 import { initCalculator } from './page.js';
 import { emailList, sfRead, sureParts } from '../links.js';
+import { OPS, THEMES as ACCENTS, applyKeptTheme, applyOps, applyTheme } from '../theme.js';
 import { startHelpTips } from '../help-tips.js';
 
-const THEME_KEY = 'cxcalc-theme';
-const ACCENT_KEY = 'cc-accent';
-const ACCENTS = [
-  ['aurora', 'Standard', 'Calm and plain: the command center\u2019s own'],
-  ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
-];
 const ADMIN_PERMS = ['settings.manage', 'security.sso', 'security.https', 'system.update', 'backup.manage'];
-const OPS = [['green', '#39ff88'], ['cyan', '#00e5ff'], ['blue', '#4d9fff'], ['amber', '#ffb000'], ['red', '#ff4d4d'], ['violet', '#be82ff']];
-function applyOps(ops) {
-  const v = OPS.some(([id]) => id === ops) ? ops : 'green';
-  document.documentElement.dataset.ops = v;
-  try {
-    localStorage.setItem('cc-ops', v);
-  } catch {}
-}
-try {
-  applyOps(localStorage.getItem('cc-ops'));
-} catch {}
-const media = matchMedia('(prefers-color-scheme: dark)');
-let themeMode = 'light';
-/** The same look as the dashboard: light, dark or the system's, in one of six palettes (public/app.js applyTheme). */
-function applyTheme(mode = themeMode, accent) {
-  themeMode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light';
-  const root = document.documentElement;
-  root.dataset.theme = themeMode === 'system' ? (media.matches ? 'dark' : 'light') : themeMode;
-  // A look from before (Ocean, Emerald, Sunset, Royal, Graphite) is now the standard one.
-  if (accent) root.dataset.accent = ACCENTS.some(([id]) => id === accent) ? accent : 'aurora';
-  try {
-    localStorage.setItem(THEME_KEY, root.dataset.theme);
-    localStorage.setItem(ACCENT_KEY, root.dataset.accent);
-  } catch {}
-}
-media.addEventListener?.('change', () => themeMode === 'system' && applyTheme('system'));
-
 const OPEN_KEY = 'mz-calc-customer';
 const TEAM_KEY = 'cc-calc-team';
 
@@ -49,11 +17,7 @@ const fail = (status, message) => Object.assign(new Error(message), { status });
 
 export async function startHosted() {
   // The look the dashboard last had on this device, at once; then this person's own, from the server.
-  try {
-    applyTheme(localStorage.getItem(THEME_KEY) || 'light', localStorage.getItem(ACCENT_KEY) || 'aurora');
-  } catch {
-    applyTheme('light', 'aurora');
-  }
+  applyKeptTheme();
   // This person's settings (the page itself is the same for everyone, so it is cached).
   let cfg = {};
   // Asked for at once, in parallel, as soon as the team is known: what the calculator asks for first anyway.

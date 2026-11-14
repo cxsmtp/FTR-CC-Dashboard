@@ -32,3 +32,8 @@ Rules from the owner, for every change:
   to; a new part gets its own file and a place in MODULES (core/src/calculator-bundle.js), before page.js.
 - The dashboard's code is one module per page in public/js/ (main.js is the router; core.js the shared helpers;
   shell.js the frame and menus; widgets.js tables, multi-selects and drafts). Add a page as its own file.
+- What the dashboard and the calculator's page must do the same way lives once, in public/js/links.js (what people
+  type: Salesforce links, emails, "are you sure?") and public/js/theme.js (the looks); both are in the calculator's
+  bundle too. Do not copy such a thing into client/calculator-hosted.js.
+- Questions are asked with `sure()` (the app's own dialog), never the browser's `confirm()`.
+- A person's picture is a file (pictures/<id>, server/iam.js `setPicture` / `pictureOf`), never in the people file.

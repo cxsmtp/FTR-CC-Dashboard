@@ -1,5 +1,6 @@
 import { listBackups } from '../backup.js';
 import { readiness } from '../readiness.js';
+import { fail } from '../store.js';
 import fs from 'node:fs';
 
 /**
@@ -43,7 +44,7 @@ export function registerDiagnostics(d) {
     return { download: JSON.stringify(report, null, 2), name: `cc-troubleshooting-${report.generatedAt.slice(0, 10)}.json`, type: 'application/json' };
   });
   // ---- Ready for production? What is still to be put right, each with where (it only reads) -----------------------
-  r('GET', '/api/system/readiness', perm('settings.manage'), () => {
+  const ready = () => {
     let disk = null;
     try {
       const st = fs.statfsSync(config.dataDir);
@@ -65,7 +66,21 @@ export function registerDiagnostics(d) {
       teams: teams.list(),
       unrated: d.fusionRates.detected.map((m) => m.name),
       recentErrors,
+      accepted: d.settings.value.readinessAccepted ?? {},
     });
+  };
+  r('GET', '/api/system/readiness', perm('settings.manage'), () => ready());
+  /** "As meant": a note (never a gap) is accepted as it stands, or asked again. */
+  r('PUT', '/api/system/readiness/:id', perm('settings.manage'), (req, ctx, body, res, url, params) => {
+    const check = ready().checks.find((c) => c.id === params.id);
+    if (!check?.canAccept) throw fail(400, 'Only something to check can be accepted as meant: a gap is put right where it is.');
+    const accepted = { ...(d.settings.value.readinessAccepted ?? {}) };
+    if (body?.accept === false) delete accepted[check.id];
+    else accepted[check.id] = { detail: check.detail, by: ctx.user.name, at: new Date().toISOString() };
+    d.settings.value.readinessAccepted = accepted;
+    d.settings.save();
+    record(ctx, req, body?.accept === false ? 'readiness.asked-again' : 'readiness.accepted', check.title, { id: check.id, found: check.detail });
+    return ready();
   });
   r('GET', '/api/audit/verify', perm('audit.view'), (req, ctx) => {
     const result = audit.verify();

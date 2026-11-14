@@ -1,5 +1,6 @@
 import { route } from './main.js';
 import { sureParts } from './links.js';
+import { OPS, THEMES, applyKeptTheme, applyOps, applyTheme, lookOf } from './theme.js';
 
 // FTR Credits Command Center: the dashboard. One page, routes in the hash (#/overview, #/accounts/<id>…), every
 // figure from the server's /api, everything written into the page escaped.
@@ -251,45 +252,9 @@ export const go = (path) => {
 };
 
 // ---- Themes: light, dark or the system's, and six palettes; each person's own, else the organisation's ---------------
-export const THEME_KEY = 'cxcalc-theme';
-export const ACCENT_KEY = 'cc-accent';
-export const THEMES = [
-  ['aurora', 'Standard', 'Calm and plain: the command center\u2019s own'],
-  ['command', 'Command Center', 'The war room: phosphor green and amber, radar, DEFCON status'],
-];
-/** A look from before (Ocean, Emerald, Sunset, Royal, Graphite) is now the standard one. */
-export const lookOf = (accent) => (THEMES.some(([id]) => id === accent) ? accent : 'aurora');
-export const OPS = [['green', '#39ff88'], ['cyan', '#00e5ff'], ['blue', '#4d9fff'], ['amber', '#ffb000'], ['red', '#ff4d4d'], ['violet', '#be82ff']];
-export const OPS_KEY = 'cc-ops';
-/** Command Center's phosphor colour (green unless chosen). */
-export function applyOps(ops) {
-  const v = OPS.some(([id]) => id === ops) ? ops : 'green';
-  document.documentElement.dataset.ops = v;
-  try {
-    localStorage.setItem(OPS_KEY, v);
-  } catch {}
-}
-try {
-  applyOps(localStorage.getItem(OPS_KEY));
-} catch {}
-export const media = matchMedia('(prefers-color-scheme: dark)');
-export let themeMode = 'light';
-export function applyTheme(mode = themeMode, accent) {
-  themeMode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light';
-  document.documentElement.dataset.theme = themeMode === 'system' ? (media.matches ? 'dark' : 'light') : themeMode;
-  if (accent) accent = lookOf(accent);
-  if (accent) document.documentElement.dataset.accent = accent;
-  try {
-    localStorage.setItem(THEME_KEY, document.documentElement.dataset.theme);
-    if (accent) localStorage.setItem(ACCENT_KEY, accent);
-  } catch {}
-}
-media.addEventListener?.('change', () => themeMode === 'system' && applyTheme('system'));
-try {
-  applyTheme(localStorage.getItem(THEME_KEY) || 'light', localStorage.getItem(ACCENT_KEY) || 'aurora');
-} catch {
-  applyTheme('light', 'aurora');
-}
+// (public/js/theme.js: one copy, shared with the calculator's page.)
+export { THEMES, applyTheme, lookOf };
+applyKeptTheme();
 /** The signed-in person's look: theirs (when people may choose), else the organisation's. */
 export function applyMyTheme() {
   const me = state.me;

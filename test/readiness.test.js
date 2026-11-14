@@ -70,6 +70,23 @@ test('Ready for production: each gap is said, with where it is put right', () =>
   assert.ok(r.checks.filter((c) => c.state !== 'ok').every((c) => c.where.startsWith('/')));
 });
 
+test('Ready for production: a note accepted as meant reads as ready, until what was found changes', () => {
+  const roles = { admin: { name: 'Admin', permissions: ['scope.all'] }, tester: { name: 'Tester', permissions: ['scope.all'] }, cs: { name: 'Customer Success', permissions: ['scope.all'] } };
+  const users = [...facts().users, { id: 'x', role: 'tester', active: true, createdAt: '2026-01-01T00:00:00Z', lastSignInAt: '2026-11-13T00:00:00Z' }];
+  const found = readiness(facts({ roles, users }), NOW).checks.find((c) => c.id === 'roles.wide');
+  assert.equal(found.state, 'note');
+  assert.equal(found.canAccept, true);
+  const accepted = { 'roles.wide': { detail: found.detail, by: 'Avery', at: '2026-11-14T00:00:00Z' } };
+  const after = readiness(facts({ roles, users, accepted }), NOW);
+  assert.equal(after.checks.find((c) => c.id === 'roles.wide').state, 'ok');
+  assert.equal(after.notes, 0);
+  // Another role now sees every team: it is asked again.
+  const more = [...users, { id: 'y', role: 'cs', active: true, createdAt: '2026-01-01T00:00:00Z', lastSignInAt: '2026-11-13T00:00:00Z' }];
+  assert.equal(readiness(facts({ roles, users: more, accepted }), NOW).checks.find((c) => c.id === 'roles.wide').state, 'note');
+  // A gap cannot be accepted.
+  assert.equal(readiness(facts({ backupSealed: false }), NOW).checks.find((c) => c.id === 'backup.sealed').canAccept, undefined);
+});
+
 test('The start reads each account and report once, and still loads what recovery put back', () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-start-'));
   new Accounts(dataDir); // makes the folders

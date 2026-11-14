@@ -151,7 +151,8 @@ At the foot of Backups & health, a list of what to put right before the server i
 (recent, away from the data, sealed, a restore tried), the audit log, the certificate, updates, email, room on the
 disk, a second Admin, invitations nobody answered, teams without a leader, roles that reach further than meant,
 engines without a rate, and errors in the last day. "To do" is a gap; "Check" is worth a look and may be as you
-mean it. Each opens the page where it is put right. The list only reads: nothing changes by looking.
+mean it: **As meant** marks such a row ready, with your name and the date, until what was found changes (**Ask
+again** undoes it). Each row opens the page where it is put right. Looking changes nothing.
 
 ## Settings → General and Roles
 

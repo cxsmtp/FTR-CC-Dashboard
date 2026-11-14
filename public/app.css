@@ -1206,7 +1206,8 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 .ready-table :is(th, td) { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
 .ready-table th:nth-child(1) { width: 24%; }
 .ready-table th:nth-child(2) { width: 92px; }
-.ready-table th:nth-child(4) { width: 104px; }
+.ready-table th:nth-child(4) { width: 132px; }
+.ready-act { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
 /* "Are you sure?": the app's own dialog, in place of the browser's. */
 dialog.sured { width: min(480px, 94vw); }
