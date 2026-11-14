@@ -27,5 +27,8 @@ Rules from the owner, for every change:
   `settingsNav`).
 - The server's routes are one module per area in server/routes/ (server/app.js builds the app and hands each one `d`,
   what the app holds, read by name when used). Add a route in the file of its area; a new area gets its own file.
+- The calculator's page code is one module per part in core/public/calculator/ (page.js holds what the page shares and
+  calls each `setup<Part>(d)` in page-*.js; `d` gives a part what the page holds, by name). Add to the part it belongs
+  to; a new part gets its own file and a place in MODULES (core/src/calculator-bundle.js), before page.js.
 - The dashboard's code is one module per page in public/js/ (main.js is the router; core.js the shared helpers;
   shell.js the frame and menus; widgets.js tables, multi-selects and drafts). Add a page as its own file.

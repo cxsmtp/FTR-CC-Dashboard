@@ -2,6 +2,14 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.111.00 — 2026-11-14
+
+- **The calculator's page code is nine files in place of one of 4,000 lines** (customers, triage & remediation,
+  Fusion, code counted, git, cloc-fusion, the settings and Apply, reading Checkmarx One, reports). Nothing was
+  retyped: each part was moved as it was. Every page and calculator tab was photographed before and after (31 of 31
+  the same), and a report, an estimate and the percentage boxes were run through on the result. Nothing looks or
+  works differently.
+
 ## CC-01.110.00 — 2026-11-14
 
 - **Ready for production?** A list for Admins on Settings → Backups & health: backups (recent, kept away from the
