@@ -1200,3 +1200,16 @@ th.tx-th .tx-tools button { padding: 0 2px !important; min-width: 0 !important; 
 .stage-box p { margin: 0; }
 /* Vulnerability estimate: the line to quote stands out. */
 #est-out tr.strong td { background: color-mix(in srgb, var(--brand, var(--accent)) 7%, transparent); font-weight: 600; }
+
+/* Ready for production? (Settings → Backups & health): what was found wraps, so the table never scrolls sideways. */
+.ready-table { table-layout: fixed; }
+.ready-table :is(th, td) { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.ready-table th:nth-child(1) { width: 24%; }
+.ready-table th:nth-child(2) { width: 92px; }
+.ready-table th:nth-child(4) { width: 104px; }
+
+/* "Are you sure?": the app's own dialog, in place of the browser's. */
+dialog.sured { width: min(480px, 94vw); }
+dialog.sured .db { padding-top: 20px; }
+dialog.sured .sure-q { margin: 0 0 6px; font-size: 15px; font-weight: 600; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+dialog.sured .db p.small { white-space: pre-line; overflow-wrap: anywhere; }

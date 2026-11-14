@@ -1,4 +1,4 @@
-import { $, $$, ago, api, can, date, dateTime, esc, go, icon, initials, num, once, state, toast } from './core.js';
+import { $, $$, ago, api, can, date, dateTime, esc, go, icon, initials, num, once, state, sure, toast } from './core.js';
 import { emailList } from './links.js';
 import { paint, teamSelect } from './overview.js';
 import { loading, shell } from './shell.js';
@@ -162,7 +162,7 @@ export async function viewAccounts(params) {
     const removeAccount = async (a) => {
       const reports = a.reportCount ? `its ${num(a.reportCount)} report${a.reportCount === 1 ? '' : 's'}` : 'no reports';
       const sales = a.sold ? ` and ${num(Math.round(a.sold))} credits of recorded sales` : '';
-      if (!confirm(`Delete ${a.name}, with ${reports}${sales}? This cannot be undone.`)) return;
+      if (!await sure(`Delete ${a.name}, with ${reports}${sales}? This cannot be undone.`)) return;
       try {
         await api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'DELETE' });
         toast(`${a.name} is deleted.`, 'ok');
@@ -406,7 +406,7 @@ export async function viewAccount(id) {
   wireSales(a, d);
   if ($('#forget-key')) $('#forget-key').onclick = async (e) => {
     e.preventDefault();
-    if (!confirm(`Forget the Checkmarx One key kept for ${a.name}?`)) return;
+    if (!await sure(`Forget the Checkmarx One key kept for ${a.name}?`)) return;
     await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/cxone`, { method: 'DELETE' }).catch((x) => toast(x.message, 'bad'));
     viewAccount(a.id);
   };
@@ -438,7 +438,7 @@ export async function viewAccount(id) {
   };
   if ($('#reset-acct')) $('#reset-acct').onclick = () => resetAccount({ id: a.id, name: a.name, reportCount: d.reports.length }, () => viewAccount(a.id));
   if ($('#del-acct')) $('#del-acct').onclick = async () => {
-    if (!confirm(`Delete ${a.name} and its ${a.reportCount} report(s)? This cannot be undone.`)) return;
+    if (!await sure(`Delete ${a.name} and its ${a.reportCount} report(s)? This cannot be undone.`)) return;
     try {
       await api(`/api/cc/accounts/${encodeURIComponent(a.id)}`, { method: 'DELETE' });
       toast('Account deleted.', 'ok');
@@ -467,7 +467,7 @@ export async function viewAccount(id) {
       if (act === 'share') return shareInline(b.closest('tr').querySelector('.shared-cell'), rid, { onDone: () => viewAccount(a.id), suggest: customerEmails(d) });
       if (act === 'unshare') await api(`/api/cc/reports/${encodeURIComponent(rid)}/shared`, { method: 'POST', body: { shared: false } });
       if (act === 'delete') {
-        if (!confirm('Delete this report? This cannot be undone.')) return;
+        if (!await sure('Delete this report? This cannot be undone.')) return;
         await api(`/api/cc/reports/${encodeURIComponent(rid)}`, { method: 'DELETE' });
       }
       toast('Done.', 'ok');
@@ -546,7 +546,7 @@ export async function reloadFromReports(done) {
   if (go) go.onclick = async () => {
     const ids = [...dlg.querySelectorAll('[name=rl]:checked')].map((c) => c.value);
     if (!ids.length) return void (dlg.querySelector('#rl-err').textContent = 'Tick at least one account.');
-    if (!confirm(`Replace what the calculator holds for ${num(ids.length)} account${ids.length === 1 ? '' : 's'} with their uploaded reports?`)) return;
+    if (!await sure(`Replace what the calculator holds for ${num(ids.length)} account${ids.length === 1 ? '' : 's'} with their uploaded reports?`)) return;
     go.disabled = true;
     try {
       const r = await api('/api/cc/reload-from-reports', { method: 'POST', body: { ids } });
@@ -695,7 +695,7 @@ export function wireSales(a, d) {
   for (const b of $$('[data-unsell]')) b.onclick = async () => {
     const id = b.closest('tr').dataset.sale;
     const x = d.sales.find((s) => s.id === id);
-    if (!confirm(`Remove the sale of ${num(x.credits)} credits on ${date(x.date)}?`)) return;
+    if (!await sure(`Remove the sale of ${num(x.credits)} credits on ${date(x.date)}?`)) return;
     try {
       await api(`/api/cc/accounts/${encodeURIComponent(a.id)}/sales/${encodeURIComponent(id)}`, { method: 'DELETE' });
       viewAccount(a.id);

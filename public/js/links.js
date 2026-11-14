@@ -39,3 +39,15 @@ export function emailList(value) {
   const list = String(value ?? '').split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
   return list.length && list.every((e) => /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[a-z]{2,}$/i.test(e)) ? list : null;
 }
+
+/**
+ * How an "are you sure?" is read, for the dashboard's dialog and the calculator's: the first paragraph is the
+ * question, any after it the small print; something that cannot be taken back gets a red button and the focus on
+ * Cancel; the button says what it does where the question starts with it.
+ */
+export const sureParts = (message) => {
+  const [question, ...rest] = String(message ?? '').split(/\n\s*\n/);
+  const danger = /cannot be undone|^(Delete|Remove|Forget|Stop|Turn off|Restore|Roll back|Take everything|Start again)\b/i.test(question) || /cannot be undone|is replaced/i.test(rest.join(' '));
+  const verb = /^(Delete|Remove|Forget|Replace|Restore|Reload|Switch|Move|Roll back|Sign in|Start again)\b/.exec(question)?.[1] ?? 'Confirm';
+  return { question, rest, danger, verb };
+};

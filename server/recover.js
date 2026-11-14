@@ -15,9 +15,10 @@ import { listBackups, readBackup } from './backup.js';
 const CORE = new Set(['iam.json', 'teams.json', 'settings.json', 'terms.json', 'sessions.json', 'https.json', 'acme.json', 'reads.json']);
 const COLLECTIONS = ['accounts', 'reports'];
 
-function readable(file) {
+function readable(file, read) {
   try {
-    JSON.parse(fs.readFileSync(file, 'utf8'));
+    const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+    read?.(value);
     return true;
   } catch (error) {
     return error.code === 'ENOENT';
@@ -38,8 +39,13 @@ function dataFiles(dataDir) {
   return out;
 }
 
-export function recoverDataDir({ dataDir, backupDir, passphrase = '', log = console.log }) {
-  const damaged = dataFiles(dataDir).filter((rel) => !readable(path.join(dataDir, rel)));
+/**
+ * `seen(rel, value)`, when given, is told each account and report as it is read here, so the start does not read
+ * every one of them a second time (what it keeps of each is small: see Accounts). A file brought back from a backup
+ * is not told: it is read when the server loads it.
+ */
+export function recoverDataDir({ dataDir, backupDir, passphrase = '', log = console.log, seen = null }) {
+  const damaged = dataFiles(dataDir).filter((rel) => !readable(path.join(dataDir, rel), seen && !CORE.has(rel) ? (value) => seen(rel, value) : null));
   if (!damaged.length) return [];
   log(`! [recover] ${damaged.length} data file(s) could not be read: ${damaged.slice(0, 5).join(', ')}${damaged.length > 5 ? '…' : ''}. Looking in the backups.`);
   // The backups, newest first; each opened at most once.

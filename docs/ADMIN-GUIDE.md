@@ -145,6 +145,14 @@ Making a release: bump `version` in package.json, add the CHANGELOG entry, and m
 - **Audit log:** every action, by everyone, and everything refused, with the reason. Each event is chained to the one before by SHA-256: **Check the log is intact** (on the Audit log page) and **Health** show whether the chain is intact, or where it breaks. Filter by who, what, dates and outcome, and export what the filters show as CSV.
 - **Troubleshooting report:** versions, health, settings in force, update events, backups and recent errors. It holds no secrets, keys or customer data.
 
+### Ready for production?
+
+At the foot of Backups & health, a list of what to put right before the server is opened to more people: backups
+(recent, away from the data, sealed, a restore tried), the audit log, the certificate, updates, email, room on the
+disk, a second Admin, invitations nobody answered, teams without a leader, roles that reach further than meant,
+engines without a rate, and errors in the last day. "To do" is a gap; "Check" is worth a look and may be as you
+mean it. Each opens the page where it is put right. The list only reads: nothing changes by looking.
+
 ## Settings → General and Roles
 
 - **General:** the organisation name on reports, the default theme for everyone, and the Salesforce, Checkmarx One and git hosts the server may call. Addresses inside the network are never called.

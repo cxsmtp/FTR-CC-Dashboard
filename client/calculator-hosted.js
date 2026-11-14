@@ -4,7 +4,7 @@
 // its accountable SE and its team, and shows its primary report and what was shared with the customer.
 
 import { initCalculator } from './page.js';
-import { emailList, sfRead } from '../links.js';
+import { emailList, sfRead, sureParts } from '../links.js';
 import { startHelpTips } from '../help-tips.js';
 
 const THEME_KEY = 'cxcalc-theme';
@@ -118,6 +118,21 @@ export async function startHosted() {
     };
     document.body.prepend(bar);
   }
+  /** "Are you sure?", in the page's own dialog (never the browser's grey box): resolves true when confirmed. */
+  const sure = (message) =>
+    new Promise((resolve) => {
+      const { question, rest, danger, verb } = sureParts(message);
+      const dlg = document.createElement('dialog');
+      dlg.className = 'hc-dialog hc-sure';
+      dlg.setAttribute('role', 'alertdialog');
+      dlg.innerHTML = `<form method="dialog"><p class="hc-sure-q">${esc(question)}</p>${rest.map((x) => `<p class="hint">${esc(x)}</p>`).join('')}<div class="hc-dialog-actions"><button value="cancel" class="ghost"${danger ? ' autofocus' : ''}>Cancel</button><button value="ok" class="${danger ? 'ghost hc-danger' : 'primary'}"${danger ? '' : ' autofocus'}>${esc(verb)}</button></div></form>`;
+      document.body.append(dlg);
+      dlg.addEventListener('close', () => {
+        resolve(dlg.returnValue === 'ok');
+        dlg.remove();
+      });
+      dlg.showModal();
+    });
   let toastTimer = null;
   const toast = (message, kind = '', ms = 6000) => {
     if (!message) return;
@@ -887,7 +902,7 @@ export async function startHosted() {
   }
   $('hc-refresh').addEventListener('click', refreshFromKept);
   $('hc-clear-cx').addEventListener('click', async () => {
-    if (!account || !confirm(`Take everything read from Checkmarx One out of ${account.name}? Its backlog, its trend and the projects read go; reports already made, projects typed by hand and code counted from git or cloc-fusion stay. This cannot be undone.`)) return;
+    if (!account || !await sure(`Take everything read from Checkmarx One out of ${account.name}? Its backlog, its trend and the projects read go; reports already made, projects typed by hand and code counted from git or cloc-fusion stay. This cannot be undone.`)) return;
     try {
       const done = await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/cxone/clear`, { method: 'POST', body: {} });
       toast(`${num(done.projects)} projects and ${done.backlog ? 'the backlog' : 'no backlog'} read from Checkmarx One are out of ${account.name}.`, 'ok');
@@ -897,7 +912,7 @@ export async function startHosted() {
     }
   });
   $('hc-forget').addEventListener('click', async () => {
-    if (!account || !confirm(`Forget the Checkmarx One key kept for ${account.name}? Refreshing then needs it pasted again.`)) return;
+    if (!account || !await sure(`Forget the Checkmarx One key kept for ${account.name}? Refreshing then needs it pasted again.`)) return;
     try {
       await server(`/api/cc/accounts/${encodeURIComponent(account.id)}/cxone`, { method: 'DELETE' });
       showAccount(account.id);
@@ -1115,6 +1130,7 @@ export async function startHosted() {
   // ---- The calculator ---------------------------------------------------------------------------------
   let connected = false;
   calculator = initCalculator({
+    sure,
     api,
     $,
     esc,
@@ -1235,7 +1251,7 @@ export async function startHosted() {
       // The same customer already has an account (in any team, however its name is written): said, and asked.
       try {
         const { similar } = await server(`/api/cc/accounts-similar?name=${encodeURIComponent(typed)}`);
-        if (similar?.length && !confirm(`${similar.map((x) => `${x.name} · ${x.team}${x.owner ? ` · ${x.owner}` : ''}${x.salesforceId ? ` · ${x.salesforceId}` : ''}`).join('\n')}\n\n${similar.length === 1 ? 'An account of this name already exists.' : 'Accounts of this name already exist.'} Open it from the name list if it is the same opportunity. Make a new account anyway (another opportunity of the same customer)?`)) return;
+        if (similar?.length && !await sure(`${similar.length === 1 ? 'An account of this name already exists.' : 'Accounts of this name already exist.'} Make a new account anyway (another opportunity of the same customer)?\n\n${similar.map((x) => `${x.name} · ${x.team}${x.owner ? ` · ${x.owner}` : ''}${x.salesforceId ? ` · ${x.salesforceId}` : ''}`).join('\n')}\n\nOpen it from the name list if it is the same opportunity.`)) return;
       } catch {}
       naming = false;
       newName = '';

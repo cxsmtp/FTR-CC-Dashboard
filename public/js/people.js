@@ -1,6 +1,6 @@
 import { workbook } from '../xlsx-write.js';
 import { HOME_PAGES } from './auth.js';
-import { $, $$, ago, api, avatar, can, esc, icon, num, state, toast } from './core.js';
+import { $, $$, ago, api, avatar, can, esc, icon, num, state, sure, toast } from './core.js';
 import { csvCell, loading, shell } from './shell.js';
 // ---- People -------------------------------------------------------------------------------------------
 export async function peopleList() {
@@ -165,20 +165,20 @@ export function peopleTable(d) {
     $('#bulk-role').onchange = async (e) => {
       if (!e.target.value) return;
       const name = e.target.selectedOptions[0].textContent;
-      if (confirm(`Give ${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'} the role ${name}?`)) await runBulk(`Role → ${name}`, (u) => api(P(u), { method: 'PUT', body: { role: e.target.value } }));
+      if (await sure(`Give ${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'} the role ${name}?`)) await runBulk(`Role → ${name}`, (u) => api(P(u), { method: 'PUT', body: { role: e.target.value } }));
       e.target.value = '';
     };
     $('#bulk-team').onchange = async (e) => {
       if (!e.target.value) return;
       const name = e.target.selectedOptions[0].textContent;
-      if (confirm(`Move ${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'} to ${name}?`)) await runBulk(`Team → ${name}`, (u) => api(P(u), { method: 'PUT', body: { teamId: e.target.value } }));
+      if (await sure(`Move ${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'} to ${name}?`)) await runBulk(`Team → ${name}`, (u) => api(P(u), { method: 'PUT', body: { teamId: e.target.value } }));
       e.target.value = '';
     };
     $('#bulk-manager').onchange = async (e) => {
       if (!e.target.value) return;
       const name = e.target.selectedOptions[0].textContent;
       const managerId = e.target.value === '-' ? null : e.target.value;
-      if (confirm(`${num(selected.size)} ${selected.size === 1 ? 'person reports' : 'people report'} to ${managerId ? name : 'nobody'}?`)) await runBulk(`Reports to → ${name}`, (u) => api(P(u), { method: 'PUT', body: { managerId } }));
+      if (await sure(`${num(selected.size)} ${selected.size === 1 ? 'person reports' : 'people report'} to ${managerId ? name : 'nobody'}?`)) await runBulk(`Reports to → ${name}`, (u) => api(P(u), { method: 'PUT', body: { managerId } }));
       e.target.value = '';
     };
     $('#bulk-clear').onclick = () => (selected.clear(), render());
@@ -187,15 +187,15 @@ export function peopleTable(d) {
       if (!act) return;
       const n = `${num(selected.size)} ${selected.size === 1 ? 'person' : 'people'}`;
       if (act === 'on') return runBulk('Access on', (u) => api(P(u), { method: 'PUT', body: { active: true } }));
-      if (act === 'off' && confirm(`Turn off access for ${n}? They are signed out at once; their accounts and reports stay with their teams.`)) return runBulk('Access off', (u) => api(P(u), { method: 'PUT', body: { active: false } }));
-      if (act === 'welcome' && confirm(`Email a welcome to ${n}?`)) return runBulk('Welcome sent', (u) => api(`${P(u)}/welcome`, { method: 'POST', body: {} }), { reload: false });
-      if (act === 'signout' && confirm(`Sign ${n} out on every device?`)) return runBulk('Signed out', (u) => api(`${P(u)}/signout`, { method: 'POST', body: {} }));
+      if (act === 'off' && await sure(`Turn off access for ${n}? They are signed out at once; their accounts and reports stay with their teams.`)) return runBulk('Access off', (u) => api(P(u), { method: 'PUT', body: { active: false } }));
+      if (act === 'welcome' && await sure(`Email a welcome to ${n}?`)) return runBulk('Welcome sent', (u) => api(`${P(u)}/welcome`, { method: 'POST', body: {} }), { reload: false });
+      if (act === 'signout' && await sure(`Sign ${n} out on every device?`)) return runBulk('Signed out', (u) => api(`${P(u)}/signout`, { method: 'POST', body: {} }));
       if (act === 'unlock') return runBulk('Unlocked', (u) => api(`${P(u)}/unlock`, { method: 'POST', body: {} }));
-      if (act === 'remove' && confirm(`Remove ${n}? Their accounts and reports stay with their teams. This cannot be undone.`)) {
+      if (act === 'remove' && await sure(`Remove ${n}? Their accounts and reports stay with their teams. This cannot be undone.`)) {
         await runBulk('Removed', (u) => api(P(u), { method: 'DELETE' }));
         return;
       }
-      if (act === 'reset' && confirm(`Give ${n} a new temporary password? Their current ones stop working and they are signed out everywhere. The new ones download once, as a sheet.`)) {
+      if (act === 'reset' && await sure(`Give ${n} a new temporary password? Their current ones stop working and they are signed out everywhere. The new ones download once, as a sheet.`)) {
         const done = await runBulk('Passwords reset', (u) => api(`${P(u)}/reset`, { method: 'POST', body: {} }));
         if (done.length) {
           const csv = ['Name,Email,Temporary password', ...done.map(({ u, r }) => [u.name, u.email, r.temporary].map(csvCell).join(','))].join('\r\n');
@@ -387,28 +387,28 @@ export async function personAction(d, u, act) {
   const path = `/api/people/${encodeURIComponent(u.id)}`;
   try {
     if (act === 'impersonate') {
-      if (!confirm(`Sign in as ${u.name}? You see and work as they do for up to an hour; everything you do is recorded as you acting as them. Their password, profile and sessions stay theirs.`)) return;
+      if (!await sure(`Sign in as ${u.name}? You see and work as they do for up to an hour; everything you do is recorded as you acting as them. Their password, profile and sessions stay theirs.`)) return;
       const r = await api(`${path}/impersonate`, { method: 'POST', body: {} });
       location.href = r.home === 'calculator' ? '/calculator' : `/#/${r.home || 'overview'}`;
       if (r.home !== 'calculator') location.reload();
       return;
     }
     if (act === 'reset') {
-      if (!confirm(`Give ${u.name} a new temporary password? Their current one stops working and they are signed out everywhere.`)) return;
+      if (!await sure(`Give ${u.name} a new temporary password? Their current one stops working and they are signed out everywhere.`)) return;
       const r = await api(`${path}/reset`, { method: 'POST', body: {} });
       return showTemporary(u.email, r.temporary);
     }
     if (act === 'unlock') await api(`${path}/unlock`, { method: 'POST', body: {} });
     if (act === 'signout') {
-      if (!confirm(`Sign ${u.name} out on every device?`)) return;
+      if (!await sure(`Sign ${u.name} out on every device?`)) return;
       await api(`${path}/signout`, { method: 'POST', body: {} });
     }
     if (act === 'toggle') {
-      if (u.active && !confirm(`Turn off ${u.name}'s access? They are signed out at once; their accounts and reports stay with their team.`)) return;
+      if (u.active && !await sure(`Turn off ${u.name}'s access? They are signed out at once; their accounts and reports stay with their team.`)) return;
       await api(path, { method: 'PUT', body: { active: !u.active } });
     }
     if (act === 'remove') {
-      if (!confirm(`Remove ${u.name}? Their accounts and reports stay with their team.`)) return;
+      if (!await sure(`Remove ${u.name}? Their accounts and reports stay with their team.`)) return;
       await api(path, { method: 'DELETE' });
     }
     toast('Done.', 'ok');

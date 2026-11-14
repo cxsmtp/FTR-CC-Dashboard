@@ -165,10 +165,24 @@ const reportIndex = (r) => ({
  */
 export const viewing = new AsyncLocalStorage();
 
+/**
+ * For the start: `seen` is told each account and report as the start checks that it can be read (server/recover.js)
+ * and keeps of it what the lists keep, so `new Accounts(dataDir, known)` does not read every file a second time.
+ */
+export function startIndex() {
+  const known = { accounts: new Map(), reports: new Map() };
+  const meta = { accounts: accountMeta, reports: reportIndex };
+  const seen = (rel, record) => {
+    const [dir, name] = String(rel).split('/');
+    if (known[dir] && name) known[dir].set(name, record?.id ? [record.id, meta[dir](record)] : [null, null]);
+  };
+  return { known, seen };
+}
+
 export class Accounts {
-  constructor(dataDir) {
-    this.accounts = new Collection(path.join(dataDir, 'accounts'), accountMeta);
-    this.reports = new Collection(path.join(dataDir, 'reports'), reportIndex);
+  constructor(dataDir, known = null) {
+    this.accounts = new Collection(path.join(dataDir, 'accounts'), accountMeta, known?.accounts);
+    this.reports = new Collection(path.join(dataDir, 'reports'), reportIndex, known?.reports);
   }
 
   // ---- Accounts ---------------------------------------------------------------------------------

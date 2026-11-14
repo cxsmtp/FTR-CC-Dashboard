@@ -13,7 +13,7 @@ import { AuditLog, Doc, fail } from './store.js';
 import { Iam } from './iam.js';
 import { need, needTeam, scopeOf } from './rbac.js';
 import { Teams } from './teams.js';
-import { Accounts, DEFAULT_SALESFORCE_HOSTS, viewing } from './accounts.js';
+import { Accounts, DEFAULT_SALESFORCE_HOSTS, startIndex, viewing } from './accounts.js';
 import { Terms } from './terms.js';
 import { Sso } from './sso.js';
 import { ActivityLog } from './activity.js';
@@ -164,10 +164,11 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const backupPassphrase = String(config.env?.BACKUP_PASSPHRASE ?? '');
   // The passphrase that seals backups now: the environment's, else the Admin's (Settings → Backups), else none.
   const backupPassphraseOf = () => backupPassphrase || (settings?.value?.backupSeal ? secrets.open(settings.value.backupSeal) : '');
-  const recovered = recoverDataDir({ dataDir: config.dataDir, backupDir, passphrase: backupPassphrase, log });
+  const atStart = startIndex(); // each account and report is read once: as it is checked
+  const recovered = recoverDataDir({ dataDir: config.dataDir, backupDir, passphrase: backupPassphrase, log, seen: atStart.seen });
   const iam = new Iam(config.dataDir);
   const teams = new Teams(config.dataDir);
-  const accounts = new Accounts(config.dataDir);
+  const accounts = new Accounts(config.dataDir, atStart.known);
   const audit = new AuditLog(path.join(config.dataDir, 'audit.log'));
   const terms = new Terms({ dataDir: config.dataDir, textFile: path.join(config.root, 'TERMS.md') });
   const settings = new Doc(path.join(config.dataDir, 'settings.json'), () => ({ organisationName: 'Checkmarx', salesforceHosts: [], cxoneHosts: [], gitHosts: [] }));

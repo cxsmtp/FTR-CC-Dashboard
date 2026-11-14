@@ -1,4 +1,4 @@
-import { $, $$, ago, api, dateTime, esc, icon, num, toast } from './core.js';
+import { $, $$, ago, api, dateTime, esc, icon, num, sure, toast } from './core.js';
 import { autosave } from './settings.js';
 import { loading, shell } from './shell.js';
 // ---- Fusion engines & rates: the Admin's list and default engine; each team's own (leaders and above) -------------
@@ -86,11 +86,11 @@ export async function viewRates(params) {
       timer = setTimeout(save, 700);
     });
     form.addEventListener('change', (e) => e.target.type === 'radio' && save());
-    form.addEventListener('click', (e) => {
+    form.addEventListener('click', async (e) => {
       const del = e.target.closest('[data-del]');
       if (!del) return;
       const row = del.closest('tr');
-      if (!confirm(`Remove ${row.querySelector('[name=name]').value || 'this engine'} from the list?`)) return;
+      if (!await sure(`Remove ${row.querySelector('[name=name]').value || 'this engine'} from the list?`)) return;
       row.remove();
       save();
     });

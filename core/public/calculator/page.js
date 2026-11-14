@@ -85,7 +85,7 @@ function appLook() {
  * customer tab may count code from git (on the server, or in the launcher on its computer; never in the
  * HTML file on its own, which can reach nothing).
  */
-export function initCalculator({ api, $, esc, toast, setStatus, showError, handleAuthLoss, fmtDateTime, me, can, standalone = false, sampleFile = null, canRead = () => !standalone, canGit = () => !standalone, impactOn = () => false, estimateOf = () => null }) {
+export function initCalculator({ api, $, esc, toast, setStatus, showError, handleAuthLoss, fmtDateTime, me, can, standalone = false, sampleFile = null, canRead = () => !standalone, canGit = () => !standalone, impactOn = () => false, estimateOf = () => null, sure = async (message) => window.confirm(message) }) {
   // On its own with no way to Checkmarx One (the HTML file opened from disk): the two exports are the way in.
   const offline = () => standalone && !canRead();
   const c = { customers: [], open: null, pending: null, timer: null, saving: null, draft: {}, dirty: {}, present: false, remainingCredits: null, reports: [] };
@@ -374,7 +374,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     }
   });
   $('calc-delete').addEventListener('click', async () => {
-    if (!c.open || !confirm(`Delete this customer?\n\n${c.open.name}\n\nTheir uploads, plan and Fusion projects go with them. Reports already made are kept.`)) return;
+    if (!c.open || !await sure(`Delete this customer?\n\n${c.open.name}\n\nTheir uploads, plan and Fusion projects go with them. Reports already made are kept.`)) return;
     const { id } = c.open;
     if (c.pending?.id === id) c.pending = null;
     try {
@@ -2955,7 +2955,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
       maxProjects: `Projects to read: up to ${num(wanted.scope.maxProjects)} projects, more than the last read took.`,
       origins: 'Include scans from: the last read did not record where the scans come from.',
     };
-    return `Apply reads Checkmarx One again for these changes:\n\n${reads.map((x) => `• ${why[x.key]}`).join('\n')}\n\nOn a large tenant this takes a while. Read it now?`;
+    return `Read Checkmarx One again now? These changes need it.\n\n${reads.map((x) => `• ${why[x.key]}`).join('\n')}\n\nOn a large tenant this takes a while.`;
   }
 
   /**
@@ -2975,7 +2975,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
     const changes = settingChanges(before, wanted, lastRead());
     const reads = offline() ? [] : changes.filter((x) => x.reads);
     if (!changes.length && !read) return renderPending();
-    if (reads.length && !read && !confirm(readQuestion(reads, wanted))) return;
+    if (reads.length && !read && !await sure(readQuestion(reads, wanted))) return;
     if (changes.length) {
       c.open.scope = cleanScope(wanted.scope);
       fusion().periodMonths = wanted.periodMonths;
@@ -3944,7 +3944,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
   $('calc-restart').addEventListener('click', async () => {
     if (!c.open) return;
     const again = offline() ? 'and the two exports are cleared' : 'and Checkmarx One is read again';
-    if (!confirm(`Start again for ${c.open.name}?\n\nEvery choice made here goes back to the defaults (the projects narrowed, the plan, the Fusion numbers, the extra credits), ${again}. The Fusion models and their credits stay. Reports already made are kept.`)) return;
+    if (!await sure(`Start again for ${c.open.name}?\n\nEvery choice made here goes back to the defaults (the projects narrowed, the plan, the Fusion numbers, the extra credits), ${again}. The Fusion models and their credits stay. Reports already made are kept.`)) return;
     const models = fusion().models;
     c.open.scope = cleanScope({});
     c.open.tr = { totals: null, fixed: null, selected: Object.fromEntries(SEVERITIES.map((s) => [s, null])), triageCost: { ...DEFAULT_TR.triageCost }, fpPercent: { ...DEFAULT_TR.fpPercent }, remediationCost: { ...DEFAULT_TR.remediationCost }, lookbackMonths: DEFAULT_TR.lookbackMonths, ...aheadSettings({}) };
@@ -4002,7 +4002,7 @@ export function initCalculator({ api, $, esc, toast, setStatus, showError, handl
         const { report } = await api(`/api/projections/reports/${encodeURIComponent(id)}`, { quiet: true });
         await downloadPdf(report);
       } else if (event.target.closest('[data-delete-report]')) {
-        if (!confirm('Delete this projection report? It cannot be undone.')) return;
+        if (!await sure('Delete this projection report? It cannot be undone.')) return;
         await api(`/api/projections/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
         loadReports();
       }

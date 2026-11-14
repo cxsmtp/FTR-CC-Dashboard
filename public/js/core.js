@@ -1,4 +1,5 @@
 import { route } from './main.js';
+import { sureParts } from './links.js';
 
 // FTR Credits Command Center: the dashboard. One page, routes in the hash (#/overview, #/accounts/<id>…), every
 // figure from the server's /api, everything written into the page escaped.
@@ -199,6 +200,23 @@ async function fetchApi(path, { method = 'GET', body } = {}) {
 
 export let toastTimer;
 /** A short message at the bottom; `ms`: how long it stays (longer for what must be read, such as an error). */
+/** "Are you sure?", in the app's own dialog (never the browser's grey box): resolves true when confirmed. */
+export function sure(message) {
+  return new Promise((resolve) => {
+    const { question, rest, danger, verb } = sureParts(message);
+    const dlg = document.createElement('dialog');
+    dlg.className = 'sured';
+    dlg.setAttribute('role', 'alertdialog');
+    dlg.innerHTML = `<form method="dialog"><div class="db"><p class="sure-q">${esc(question)}</p>${rest.map((x) => `<p class="muted small">${esc(x)}</p>`).join('')}</div><div class="df"><button value="cancel" class="ghost"${danger ? ' autofocus' : ''}>Cancel</button><button value="ok" class="${danger ? 'danger' : 'primary'}"${danger ? '' : ' autofocus'}>${esc(verb)}</button></div></form>`;
+    document.body.append(dlg);
+    dlg.addEventListener('close', () => {
+      resolve(dlg.returnValue === 'ok');
+      dlg.remove();
+    });
+    dlg.showModal();
+  });
+}
+
 export function toast(message, kind = '', ms = 5500) {
   const el = $('#toast');
   el.textContent = message;

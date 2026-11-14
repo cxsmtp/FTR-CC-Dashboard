@@ -49,13 +49,19 @@ export class Collection {
   #meta;
   #index = new Map();
 
-  constructor(dir, meta) {
+  /** `known`: what was already read of each file as the start checked it (file name → [id, what is kept]), if any. */
+  constructor(dir, meta, known = null) {
     this.#dir = dir;
     this.#meta = meta;
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith('.json')) {
         if (name.endsWith('.tmp')) fs.rmSync(path.join(dir, name), { force: true });
+        continue;
+      }
+      const had = known?.get(name);
+      if (had) {
+        if (had[0]) this.#index.set(had[0], had[1]);
         continue;
       }
       const record = readJson(path.join(dir, name), null);

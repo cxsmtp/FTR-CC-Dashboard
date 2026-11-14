@@ -2,6 +2,20 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.110.00 — 2026-11-14
+
+- **Ready for production?** A list for Admins on Settings → Backups & health: backups (recent, kept away from the
+  data, sealed, a restore tried), the audit log, the certificate, updates, email, room on the disk, a second Admin,
+  invitations nobody answered, teams without a leader, roles that reach further than meant, engines without a rate,
+  and errors in the last day. Each says what was found and opens the page where it is put right. Looking changes
+  nothing.
+- **One "are you sure?"** Every question that used the browser's grey box (delete, remove, restore, roll back, start
+  again and the rest: 34 of them) now asks in the app's own dialog, in the dashboard and in the calculator. What cannot
+  be taken back has a red button, and Cancel is the one in focus.
+- **A shorter pause as a version takes over on a large server.** Each account and report was read twice as a version
+  started (once to check it, once to load it); now once. With 1,900 accounts and 3,300 reports the start went from
+  1.5 s to 0.8 s.
+
 ## CC-01.109.00 — 2026-11-13
 
 - **Vulnerability estimate, taken further.**

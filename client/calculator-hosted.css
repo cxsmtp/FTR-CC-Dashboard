@@ -846,3 +846,9 @@ html[data-cc] .hc-cloc #hc-cf-dl:hover { background: color-mix(in srgb, var(--br
 .hc-est-table { table-layout: fixed; width: 100%; }
 .hc-est-table :is(th, td) { white-space: normal !important; overflow-wrap: anywhere; }
 .hc-est-table th:first-child { width: 26%; }
+
+/* "Are you sure?": the page's own dialog, in place of the browser's. */
+.hc-sure { width: min(460px, 92vw); }
+.hc-sure-q { margin: 0 0 8px; font-size: 15px; font-weight: 600; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.hc-sure .hint { white-space: pre-line; overflow-wrap: anywhere; }
+.hc-sure button.hc-danger { color: var(--red, #dc2626) !important; border-color: color-mix(in srgb, var(--red, #dc2626) 45%, transparent) !important; }

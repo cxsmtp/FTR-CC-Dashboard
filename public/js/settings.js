@@ -1,6 +1,6 @@
 import { aboutHtml, md } from './about.js';
 import { home } from './auth.js';
-import { $, $$, LOGO, THEMES, api, applyMyTheme, can, date, dateTime, esc, go, icon, lookOf, num, state, toast } from './core.js';
+import { $, $$, api, applyMyTheme, can, date, dateTime, esc, go, icon, LOGO, lookOf, num, state, sure, THEMES, toast } from './core.js';
 import { loading, shell } from './shell.js';
 // ---- Settings: one tab per area, each only for those whose role allows it (the special ones are Admin-only) -------------
 export let adminTab = 'general';
@@ -339,7 +339,7 @@ export const ADMIN_VIEWS = {
       try {
         await api('/api/https/mode', { method: 'POST', body: { mode } });
       } catch (error) {
-        if (!(/Confirm/.test(error.message) && confirm(error.message))) return err(error);
+        if (!(/Confirm/.test(error.message) && await sure(error.message))) return err(error);
         try {
           await api('/api/https/mode', { method: 'POST', body: { mode, confirm: true } });
         } catch (again) {
@@ -372,7 +372,7 @@ export const ADMIN_VIEWS = {
       try {
         await api('/api/https/certificate', { method: 'POST', body });
       } catch (error) {
-        if (!(/Confirm|confirm/.test(error.message) && confirm(error.message))) return ($('#upres').textContent = error.message);
+        if (!(/Confirm|confirm/.test(error.message) && await sure(error.message))) return ($('#upres').textContent = error.message);
         try {
           await api('/api/https/certificate', { method: 'POST', body: { ...body, confirm: true } });
         } catch (again) {
@@ -556,7 +556,7 @@ export const ADMIN_VIEWS = {
     };
     for (const b of $$('[data-act]')) b.onclick = async () => {
       const v = b.closest('tr').dataset.v;
-      if (b.dataset.rollback && !confirm(`Roll back to ${v}? A backup is taken first, and it takes over without a restart. Going back to an older version can leave newer data it does not know.`)) return;
+      if (b.dataset.rollback && !await sure(`Roll back to ${v}? A backup is taken first, and it takes over without a restart. Going back to an older version can leave newer data it does not know.`)) return;
       if (b.dataset.act === 'builtin') {
         busy(b, 'Switching…');
         try {
@@ -579,7 +579,7 @@ export const ADMIN_VIEWS = {
       viewAdmin('updates');
     };
     for (const b of $$('[data-roll]')) b.onclick = async () => {
-      if (!confirm(`Switch to ${b.dataset.roll}? A backup is taken first. Going back to an older version can leave newer data it does not know.`)) return;
+      if (!await sure(`Switch to ${b.dataset.roll}? A backup is taken first. Going back to an older version can leave newer data it does not know.`)) return;
       try {
         const r = await api('/api/updates/switch', { method: 'POST', body: { version: b.dataset.roll, reason: 'rollback' } });
         waitForRestart(r.to);
@@ -617,14 +617,15 @@ export const ADMIN_VIEWS = {
       }
     };
     if ($('#restart')) $('#restart').onclick = async () => {
-      if (!confirm('Reload the server? It loads again beside the running one and takes over without a restart: nobody is signed out.')) return;
+      if (!await sure('Reload the server? It loads again beside the running one and takes over without a restart: nobody is signed out.')) return;
       await api('/api/system/restart', { method: 'POST', body: {} });
       waitForRestart(u.running);
     };
   },
 
   async backups() {
-    const [b, v] = await Promise.all([api('/api/backups'), can('audit.view') ? api('/api/audit/verify') : null]);
+    const [b, v, rd] = await Promise.all([api('/api/backups'), can('audit.view') ? api('/api/audit/verify') : null, can('settings.manage') ? api('/api/system/readiness').catch(() => null) : null]);
+    const RD = { ok: ['ok', 'Ready'], todo: ['bad', 'To do'], note: ['warn', 'Check'] };
     $('#tab').innerHTML = `<div class="grid g2">
       <div class="panel"><h2>Backups <small>nightly, before every version switch, and by hand · the newest 14 kept</small></h2>
         <p class="muted small">Everything: people, teams, accounts, reports, settings, certificates and the audit log. ${b.sealed ? (b.sealedBy === 'environment' ? 'Sealed with BACKUP_PASSPHRASE.' : 'Sealed with the passphrase set below.') : '<b class="warn-t">Not sealed:</b> anyone who gets a backup file can read everything in it. Set a passphrase below.'} Kept in <span class="mono">${esc(b.dir)}</span>.</p>
@@ -642,7 +643,10 @@ export const ADMIN_VIEWS = {
         ${b.recovered?.length ? `<h3>Repaired at start</h3><ul class="small">${b.recovered.map((e) => `<li>${esc(dateTime(e.at))}: <span class="mono">${esc(e.target)}</span> ${e.action === 'recover.restored' ? `could not be read and was restored from ${esc(e.details.backup)}` : 'could not be read, was in no backup, and was set aside'} (the damaged file is kept as ${esc(e.details.kept)})</li>`).join('')}</ul>` : '<p class="small muted">Every data file is checked at start; one that cannot be read is restored from the newest backup that has it. Nothing needed repairing.</p>'}
         <p class="muted small">The troubleshooting report has versions, health, settings in force, update events, backups and recent errors, and no secrets, keys or customer data.</p>
         <div class="flex"><button id="diag">${icon('download')}Download troubleshooting report</button>${can('audit.view') ? `<a class="btn ghost" href="/api/audit/export.csv" download>${icon('download')}Audit log (CSV)</a>` : ''}</div></div>
-    </div>`;
+    </div>
+    ${rd ? `<div class="panel wide-panel mt" id="ready"><h2>Ready for production? <small>${rd.todo ? `${num(rd.todo)} to do` : 'nothing left to do'}${rd.notes ? ` · ${num(rd.notes)} to check` : ''}</small></h2>
+      <p class="muted small">What to put right before the server is opened to more people, and where. Looking changes nothing.</p>
+      <div class="tw"><table class="ready-table"><thead><tr><th>Check</th><th>State</th><th>What was found</th><th>Where</th></tr></thead><tbody>${rd.checks.map((c) => `<tr><td><b>${esc(c.title)}</b></td><td data-sort="${{ todo: 0, note: 1, ok: 2 }[c.state]}" data-v="${RD[c.state][1]}"><span class="chip ${RD[c.state][0]}"><i></i>${RD[c.state][1]}</span></td><td class="small">${esc(c.detail)}</td><td>${c.where && c.state !== 'ok' ? `<a class="btn ghost sm" href="#${esc(c.where)}">Open</a>` : ''}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
     $('#now').onclick = async () => {
       await api('/api/backups', { method: 'POST', body: {} }).then(() => toast('Backed up.', 'ok'), (x) => toast(x.message, 'bad'));
       viewAdmin('backups');
@@ -659,7 +663,7 @@ export const ADMIN_VIEWS = {
       }
     };
     if ($('#unseal')) $('#unseal').onclick = async () => {
-      if (!confirm('Stop sealing backups? From the next one on, anyone who gets a backup file can read everything in it.')) return;
+      if (!await sure('Stop sealing backups? From the next one on, anyone who gets a backup file can read everything in it.')) return;
       await api('/api/backups/seal', { method: 'PUT', body: { passphrase: '' } }).then(() => viewAdmin('backups'), (x) => toast(x.message, 'bad'));
     };
     $('#diag').onclick = () => download('/api/system/diagnostics', 'cc-troubleshooting.json').catch((x) => toast(x.message, 'bad'));
@@ -670,7 +674,7 @@ export const ADMIN_VIEWS = {
       const body = { data: await fileToBase64(file), passphrase: e.target.pass.value };
       try {
         const info = await api('/api/backups/inspect', { method: 'POST', body });
-        if (!confirm(`Restore the backup of ${dateTime(info.at)} (${info.files} files: ${info.accounts} accounts, ${info.reports} reports)?\n\nEverything here is replaced. A backup of what is here now is taken first.`)) return;
+        if (!await sure(`Restore the backup of ${dateTime(info.at)} (${info.files} files: ${info.accounts} accounts, ${info.reports} reports)?\n\nEverything here is replaced. A backup of what is here now is taken first.`)) return;
         const r = await api('/api/backups/restore', { method: 'POST', body: { ...body, confirm: true } });
         $('#rsres').textContent = r.restarting ? 'Restored. The command center is loading it, without a restart…' : 'Restored. Restart the server to read it.';
         if (r.restarting) setTimeout(() => location.reload(), 6000);

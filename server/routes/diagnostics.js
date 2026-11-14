@@ -1,4 +1,5 @@
 import { listBackups } from '../backup.js';
+import { readiness } from '../readiness.js';
 import fs from 'node:fs';
 
 /**
@@ -40,6 +41,31 @@ export function registerDiagnostics(d) {
       recentErrors: recentErrors.slice(-20),
     };
     return { download: JSON.stringify(report, null, 2), name: `cc-troubleshooting-${report.generatedAt.slice(0, 10)}.json`, type: 'application/json' };
+  });
+  // ---- Ready for production? What is still to be put right, each with where (it only reads) -----------------------
+  r('GET', '/api/system/readiness', perm('settings.manage'), () => {
+    let disk = null;
+    try {
+      const st = fs.statfsSync(config.dataDir);
+      disk = { freeMB: Math.round((st.bavail * st.bsize) / 1048576), totalMB: Math.round((st.blocks * st.bsize) / 1048576) };
+    } catch {}
+    return readiness({
+      backups: listBackups(backupDir),
+      backupSeparate: Boolean(config.backupDir),
+      backupSealed: Boolean(backupPassphraseOf()),
+      restores: audit.recent({ limit: 5, filter: (e) => e.action === 'backup.restore' }).length,
+      audit: audit.verify(),
+      https: { ...httpsManager.describe(), mode: httpsManager.mode },
+      supervised,
+      auto: versionStore.state.auto,
+      mailReady: mailReady(),
+      disk,
+      users: iam.users(),
+      roles: iam.roles(),
+      teams: teams.list(),
+      unrated: d.fusionRates.detected.map((m) => m.name),
+      recentErrors,
+    });
   });
   r('GET', '/api/audit/verify', perm('audit.view'), (req, ctx) => {
     const result = audit.verify();
