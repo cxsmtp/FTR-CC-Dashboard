@@ -173,6 +173,8 @@ export function registerAuth(d) {
       support: supportChannel(),
       picture: ctx.user.picture ? `/api/people/${ctx.user.id}/picture?v=${encodeURIComponent(ctx.user.picture.at)}` : null,
       sessions: iam.sessionsOf(ctx.user.id),
+      // Joined by themselves and not reviewed yet, among the people this person manages (Overview says so).
+      joinersToReview: ctx.permissions.has('users.manage') ? iam.users().filter((u) => u.joined && !u.joined.reviewedAt && u.active !== false && d.canManage(ctx, u)).length : 0,
       impersonating: ctx.impersonator ? { by: { name: ctx.impersonator.name, email: ctx.impersonator.email }, until: new Date(ctx.session.actAs.until).toISOString() } : null,
     };
   });

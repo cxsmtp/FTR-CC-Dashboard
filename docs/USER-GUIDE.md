@@ -10,6 +10,12 @@ The command center is where every Sales Engineer works out the credits an accoun
 4. **Accept the terms of use.** Read them first: projections are supporting information only, keys and tokens are for the projection only, and the command center is for internal use under the PolyForm Internal Use License 1.0.0. You are asked again whenever the terms change.
 5. **Read your quick guide.** Six steps for your role (Sales Engineer, Leader or Admin). It is always under **Quick guide**, just above your name in the menu, with the guides for the roles below yours.
 
+**New here, or no password yet?** On the sign-in page, click **Join with your @checkmarx.com email** and enter your work email. You get an email:
+- if you already have access, a link to choose a new password (your password is never kept in a readable form, so it cannot be sent to you);
+- if you are new, a link to finish joining: your name, your team (from the structure your Admins set up), your role and a password. You are in at once; an Admin reviews your team and role, and may change them.
+
+The link works once, for 30 minutes. Nothing arrived? Check spam, or ask an Admin.
+
 **Forgot your password?** On the sign-in page, click **Forgot your password?** and enter your work email. A link to choose a new one arrives by email. It works once, for 30 minutes, and signs you out everywhere else. Nothing arrived? Check spam, or ask an Admin to reset it: they give you a new one-time password. Locked out after 5 wrong tries? Wait 15 minutes.
 
 ### Single sign-on

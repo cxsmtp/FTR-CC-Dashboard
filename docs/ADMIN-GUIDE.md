@@ -154,6 +154,21 @@ engines without a rate, and errors in the last day. "To do" is a gap; "Check" is
 mean it: **As meant** marks such a row ready, with your name and the date, until what was found changes (**Ask
 again** undoes it). Each row opens the page where it is put right. Looking changes nothing.
 
+### Joining by themselves
+
+People → **Sign-in** → *Joining by themselves*. Anyone with a work address of the domains you list (checkmarx.com to
+start with) can ask from the sign-in page. The page always gives the same answer; the email says the rest. Someone
+with access gets a link to choose a new password; someone new gets a one-time link (30 minutes), which proves the
+address is theirs, to give their name and choose their team from your structure, a role from the ones you open, and
+a password. They are in at once.
+
+- **Roles they may choose:** Sales Engineer, Customer Success, Sales and Viewer to start with. A role that manages
+  people, roles or teams, or sees every team (Admin, Executive, Leader), is never offered.
+- **Review:** Overview tells whoever manages people how many joined and wait for review. People lists them at the
+  top (*Joined, to review*): put their team and role right where needed, then **Approve**, or **Turn off** their
+  access. Leaders review those who joined their teams.
+- It needs the email server set up and tested and PUBLIC_URL set. Every request, join and approval is in the audit log.
+
 ## Settings → General and Roles
 
 - **General:** the organisation name on reports, the default theme for everyone, and the Salesforce, Checkmarx One and git hosts the server may call. Addresses inside the network are never called.

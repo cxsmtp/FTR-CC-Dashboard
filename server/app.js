@@ -35,6 +35,7 @@ import { registerAccounts } from './routes/accounts.js';
 import { registerExports } from './routes/exports.js';
 import { registerPeople } from './routes/people.js';
 import { registerImpersonate } from './routes/impersonate.js';
+import { registerJoin } from './routes/join.js';
 import { registerSupport } from './routes/support.js';
 import { registerHttps } from './routes/https.js';
 import { registerBackups } from './routes/backups.js';
@@ -103,6 +104,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     get outOfStep() { return outOfStep; },
     get ownSelf() { return ownSelf; },
     get passwordResets() { return passwordResets; },
+    get joinLinks() { return joinLinks; },
     get pendingReads() { return pendingReads; },
     get perm() { return perm; },
     get PUBLIC_DIR() { return PUBLIC_DIR; },
@@ -275,6 +277,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     return { mode: v.mode === 'email' ? 'email' : 'portal', email: String(v.email || DEFAULT_SUPPORT_EMAIL) };
   };
   const passwordResets = new PasswordResets();
+  // Joining by oneself (server/routes/join.js): the same one-time links, for an address not in the people list yet.
+  const joinLinks = new PasswordResets();
   const resetsInFlight = new Set();
   const RESET_ASKED = 'If that address has an account that may reset its password here, a link to choose a new one is on its way. It works once, for 30 minutes. Nothing arrived? Check spam, or ask an Admin.';
   const RESET_DEAD = 'This link no longer works: it was used, a newer one was sent, it is more than 30 minutes old, or the password has changed since. Ask for a new one.';
@@ -349,7 +353,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   };
   // ---- Every action in the audit log: what a route does not record itself is recorded here, by the router --------
   /** Asked for often while someone works, and change nothing: not recorded. */
-  const QUIET = new Set(['/api/projections/series', '/api/auth/reset/check', '/api/https/inspect', '/api/backups/inspect', '/api/https/browser-check', '/api/me/guide']);
+  const QUIET = new Set(['/api/projections/series', '/api/auth/reset/check', '/api/auth/join/check', '/api/https/inspect', '/api/backups/inspect', '/api/https/browser-check', '/api/me/guide']);
   /** Downloads and what is opened that matters: recorded as they are read. */
   const READS = new Map([['/api/projections/reports/:id', 'report.open'], ['/api/projections/git/cloc-fusion', 'cloc-fusion.download']]);
   const lastSeen = new Map();
@@ -439,6 +443,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const { canManage } = registerPeople(d);
   // ---- Sign in as: an Admin sees and works as another person, recorded as the Admin acting as them ----
   registerImpersonate(d);
+  // ---- Joining by oneself, from the sign-in page, and its review on People ------------------------------------------
+  registerJoin(d);
 
   // ---- Get help: everyone raises and follows their own; the support team sees them all, answers, moves them on ----
   registerSupport(d);
@@ -497,7 +503,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const SAMPLES = path.join(config.root, 'core', 'public', 'calculator', 'samples');
   const LEGAL = { '/legal/terms': 'TERMS.md', '/legal/license': 'LICENSE', '/legal/guide': 'docs/USER-GUIDE.md', '/legal/changelog': 'CHANGELOG.md' };
 
-  const PUBLIC_POSTS = new Set(['/api/auth/signin', '/api/auth/forgot', '/api/auth/reset/check', '/api/auth/reset/confirm']);
+  const PUBLIC_POSTS = new Set(['/api/auth/signin', '/api/auth/forgot', '/api/auth/reset/check', '/api/auth/reset/confirm', '/api/auth/join', '/api/auth/join/check', '/api/auth/join/confirm']);
 
   const sameSite = (origin, req) => {
     let o;
@@ -703,7 +709,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     frozen = frozen ?? 'The command center is moving to its new version: try again in a moment.';
     // Everything held only in memory goes to the next version (CLAUDE.md): the Checkmarx One connections and git
     // counts, password-reset links, single sign-ons under way, and what the Admins are shown of the last backup.
-    return { calc: calc.handoff(), resets: passwordResets.handoff(), sso: sso.handoff(), lastBackup, recentErrors: recentErrors.slice(-50) };
+    return { calc: calc.handoff(), resets: passwordResets.handoff(), joins: joinLinks.handoff(), sso: sso.handoff(), lastBackup, recentErrors: recentErrors.slice(-50) };
   };
   /** The next version did not come up: carry on as before. */
   const resume = () => {
@@ -716,6 +722,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (!state) return;
     if (state.calc) calc.adopt(state.calc);
     if (state.resets) passwordResets.adopt(state.resets);
+    if (state.joins) joinLinks.adopt(state.joins);
     if (state.sso) sso.adopt(state.sso);
     if (state.lastBackup?.at) lastBackup = state.lastBackup;
     if (Array.isArray(state.recentErrors)) recentErrors.unshift(...state.recentErrors.filter((e) => e?.at && e?.line));

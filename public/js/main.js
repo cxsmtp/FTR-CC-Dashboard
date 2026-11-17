@@ -2,7 +2,7 @@ import { viewAbout } from './about.js';
 import { viewAccount, viewAccounts } from './accounts.js';
 import { viewActivity } from './activity.js';
 import { viewAudit } from './audit.js';
-import { firstStepsDone, home, stuckHtml, viewForgot, viewLogin, viewReset, viewWelcome } from './auth.js';
+import { firstStepsDone, home, viewJoin, stuckHtml, viewForgot, viewLogin, viewReset, viewWelcome } from './auth.js';
 import { $, api, applyMyTheme, can, esc, go, setRedraw, state, toast, warm } from './core.js';
 import { viewEstimate } from './estimate.js';
 import { viewGuide } from './guide.js';
@@ -43,6 +43,7 @@ async function show() {
   if (path !== '/legal' && path !== '/about') document.getElementById('docd')?.close?.();
   document.getElementById('person-drawer')?.remove();
   if (path === '/forgot') return viewForgot(params);
+  if (path === '/join') return viewJoin(params);
   if (path === '/reset') return viewReset(params);
   if (!state.me) {
     try {

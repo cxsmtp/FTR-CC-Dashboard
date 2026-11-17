@@ -2,6 +2,21 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.116.00 — 2026-11-17
+
+- **People join by themselves, and you review them.** The sign-in page has "Join with your @checkmarx.com email".
+  - The page always says "check your inbox"; the email says the rest, so nobody can find out from the page who has
+    access.
+  - **Already with access:** a link to choose a new password. A password is never kept in a readable form, so it
+    cannot be sent.
+  - **New:** a one-time link (30 minutes) that proves the address is theirs. They give their name, choose their team
+    from your structure, their role and a password, and are signed in.
+  - **Roles they may choose:** Sales Engineer, Customer Success, Sales and Viewer. Roles that manage people or see
+    every team are never offered.
+  - **Your review:** Overview tells you how many joined; People lists them at the top with their team and role to
+    put right, and **Approve** or **Turn off**.
+  - Set it in People → Sign-in: on or off, the email domains, the roles. Everything is in the audit log.
+
 ## CC-01.115.00 — 2026-11-14
 
 - **The vulnerability estimate can count in the credits total (beta, off until an Admin turns it on).** Settings →

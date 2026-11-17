@@ -1216,3 +1216,14 @@ dialog.sured .db p.small { white-space: pre-line; overflow-wrap: anywhere; }
 
 /* The message in the corner is text only: clicks go through it to what is under it (a button it happens to cover). */
 .toast { pointer-events: none; }
+
+/* Joining by oneself: the way in on the sign-in page, the review on People, the banner on Overview. */
+.join-in { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.join-review { margin-bottom: 16px; }
+.join-table { table-layout: fixed; }
+.join-table :is(th, td) { white-space: normal; overflow-wrap: anywhere; vertical-align: middle; }
+.join-table select { width: 100%; min-width: 0; }
+.join-table th:nth-child(2) { width: 32%; }
+.join-table th:nth-child(3) { width: 19%; }
+.join-table th:nth-child(4) { width: 180px; }
+.join-banner { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }

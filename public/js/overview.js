@@ -133,6 +133,7 @@ export async function viewOverview(params) {
   $('#main').innerHTML = `
     <div class="head compact"><div class="ht"><h1 class="serif">Overview</h1><span class="crumbs">${esc(scopeName)}</span></div>
       <div class="tools">${teamSelect('focus', focus)}<button type="button" class="ghost" id="cards-btn" title="Choose the cards you see">${icon('overview')}Cards ▾</button>${can('dashboard.export') ? `<a class="btn ghost" href="/api/export/accounts.csv" download title="Every account, as a spreadsheet">${icon('download')}Accounts</a><a class="btn ghost" href="/api/export/reports.csv" download title="Every report, as a spreadsheet">${icon('download')}Reports</a>` : ''}${can('calculator.use') ? `<a class="btn primary" href="/calculator">${icon('calc')}Open calculator</a>` : ''}</div></div>
+    ${state.me.joinersToReview ? `<div class="callout warn join-banner"><span>${num(state.me.joinersToReview)} ${state.me.joinersToReview === 1 ? 'person has' : 'people have'} joined by themselves and ${state.me.joinersToReview === 1 ? 'waits' : 'wait'} for your review: their team and role.</span><a class="btn primary sm" href="#/people/people">Review</a></div>` : ''}
     ${overviewTiles(t)}
     <div>
       <div class="panel"><h2>Teams <small>credits from primary reports, teams below rolled up</small></h2>

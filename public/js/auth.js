@@ -18,9 +18,15 @@ export function viewLogin() {
         <a href="#/forgot" class="small" id="forgot-link">Forgot your password?</a>
       </form>
       <div id="sso-box" hidden><div class="or"><span>or</span></div><a class="btn sso" id="sso-btn" href="/saml/login">${icon('people')}<span id="sso-label">Sign in with SSO</span></a></div>
+      <div class="join-in" id="join-in" hidden><span>New here, or no password yet?</span> <a class="btn" href="#/join">Join with your work email</a></div>
       <p class="foot">Internal use only · <a href="#/legal" data-doc="terms">Terms of use &amp; license</a></p>
     </section>
   </div>`;
+  fetch('/api/auth/join').then((r) => r.json()).then((x) => {
+    if (!x.available) return;
+    $('#join-in').hidden = false;
+    $('#join-in a').textContent = `Join with your ${x.domains.map((d) => `@${d}`).join(' or ')} email`;
+  }).catch(() => {});
   fetch('/api/auth/sso').then((r) => r.json()).then((x) => {
     if (!x.enabled) return;
     $('#sso-label').textContent = x.label;
@@ -70,6 +76,67 @@ export async function viewForgot(params) {
     try {
       const r = await api('/api/auth/forgot', { method: 'POST', body: { email: new FormData(e.target).get('email') } });
       authCard(`<h2>Check your email</h2><div class="callout mt">${esc(r.message)}</div><p class="foot"><a href="#/login">Back to sign in</a></p>`);
+    } catch (error) {
+      $('#err').textContent = error.message;
+      button.disabled = false;
+    }
+  };
+}
+// ---- Joining by yourself: your work email, then (from the emailed link) your team, role and password --------------
+export async function viewJoin(params) {
+  const token = params.get('token') ?? '';
+  if (!token) {
+    const { available, domains = [] } = await api('/api/auth/join').catch(() => ({ available: false }));
+    if (!available) {
+      authCard('<h2>Join</h2><p class="lead">Joining by yourself is not available on this server yet.</p><div class="callout">Ask an Admin to add you.</div><p class="foot"><a href="#/login">Back to sign in</a></p>');
+      return;
+    }
+    authCard(`<h2>Join</h2><p class="lead">Enter your ${domains.map((d) => `@${esc(d)}`).join(' or ')} email. If you already have access, you get a link to choose a new password; if you are new, a link to finish joining: your team, your role and a password.</p>
+      <form class="form" id="jn"><label class="f">Work email<input type="email" name="email" autocomplete="username" required autofocus value="${esc(params.get('email') ?? '')}" /></label><div class="err" id="err"></div><button class="primary" type="submit">Send me the link</button><a href="#/login" class="small">Back to sign in</a></form>`);
+    $('#jn').onsubmit = async (e) => {
+      e.preventDefault();
+      const button = e.target.querySelector('button');
+      button.disabled = true;
+      try {
+        const r = await api('/api/auth/join', { method: 'POST', body: { email: new FormData(e.target).get('email') } });
+        authCard(`<h2>Check your email</h2><div class="callout mt">${esc(r.message)}</div><p class="foot"><a href="#/login">Back to sign in</a></p>`);
+      } catch (error) {
+        $('#err').textContent = error.message;
+        button.disabled = false;
+      }
+    };
+    return;
+  }
+  // The link's secret is not left in the address bar or the history.
+  history.replaceState(null, '', `${location.pathname}#/join`);
+  let j;
+  try {
+    j = await api('/api/auth/join/check', { method: 'POST', body: { token } });
+  } catch (error) {
+    authCard(`<h2>Join</h2><div class="callout warn mt">${esc(error.message)}</div><p class="foot"><a href="#/join">Ask for a new link</a> · <a href="#/login">Sign in</a></p>`);
+    return;
+  }
+  authCard(`<h2>Finish joining</h2><p class="lead">For <b>${esc(j.email)}</b>. Choose where you work and what you do: an Admin reviews it, and can change it.</p>
+    <form class="form" id="jf" autocomplete="off">
+      <label class="f">Your name<input name="name" maxlength="120" required value="${esc(j.name)}" autocomplete="name" /></label>
+      <label class="f">Title <span class="muted">optional</span><input name="title" maxlength="120" placeholder="Senior Sales Engineer" /></label>
+      <label class="f">Your team<select name="teamId" required><option value="">Choose…</option>${j.teams.map((t) => `<option value="${esc(t.id)}">${esc(t.path)}</option>`).join('')}</select></label>
+      <label class="f">Your role<select name="role" required id="jf-role"><option value="">Choose…</option>${j.roles.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select><small class="muted" id="jf-role-what"></small></label>
+      <label class="f">Password <span class="muted">at least 12 characters</span><input type="password" name="password" autocomplete="new-password" minlength="12" required /></label>
+      <label class="f">Password again<input type="password" name="again" autocomplete="new-password" minlength="12" required /></label>
+      <div class="err" id="err"></div><button class="primary" type="submit">Join</button></form>`);
+  $('#jf-role').onchange = (e) => ($('#jf-role-what').textContent = j.roles.find((r) => r.id === e.target.value)?.description ?? '');
+  $('#jf').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (f.get('password') !== f.get('again')) return ($('#err').textContent = 'The two passwords are not the same.');
+    const button = e.target.querySelector('button');
+    button.disabled = true;
+    try {
+      await api('/api/auth/join/confirm', { method: 'POST', body: { token, name: f.get('name'), title: f.get('title'), teamId: f.get('teamId'), role: f.get('role'), password: f.get('password') } });
+      state.me = await api('/api/me');
+      applyMyTheme();
+      go(firstStepsDone() ? home() : '/welcome');
     } catch (error) {
       $('#err').textContent = error.message;
       button.disabled = false;

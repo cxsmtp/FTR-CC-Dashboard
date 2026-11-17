@@ -27,6 +27,52 @@ export async function viewPeople(tab = peopleTab) {
   return peopleTable(d);
 }
 
+/**
+ * Joined by themselves (from the sign-in page) and not reviewed yet: their team and role as they chose them, to put
+ * right where they are not, then Approve (or turn their access off).
+ */
+function reviewJoiners(d, teams, roles) {
+  const waiting = d.people.filter((u) => u.joined && !u.joined.reviewedAt && u.active && u.manageable);
+  if (!waiting.length || !can('users.manage')) return;
+  $('#ptab').insertAdjacentHTML('afterbegin', `<div class="panel join-review" id="join-review"><h2>Joined, to review <small>${num(waiting.length)} ${waiting.length === 1 ? 'person' : 'people'} joined by themselves: check their team and role, then approve</small></h2>
+    <div class="tw"><table class="join-table"><thead><tr><th>Person</th><th>Team</th><th>Role</th><th></th></tr></thead><tbody>${waiting.map((u) => `<tr data-join="${esc(u.id)}">
+      <td data-v="${esc(u.name)}"><b>${esc(u.name)}</b><div class="muted small">${esc(u.email)}${u.title ? ` · ${esc(u.title)}` : ''} · joined ${esc(ago(u.joined.at))}</div></td>
+      <td data-v="${esc(u.teamPath)}"><select data-join-team aria-label="Team of ${esc(u.name)}">${teams.map((t) => `<option value="${esc(t.id)}"${t.id === u.teamId ? ' selected' : ''}>${esc(t.path)}</option>`).join('')}</select></td>
+      <td data-v="${esc(u.roleName)}"><select data-join-role aria-label="Role of ${esc(u.name)}">${roles.map((r) => `<option value="${esc(r.id)}"${r.id === u.role ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></td>
+      <td class="actions"><span class="flex nowrap"><button type="button" class="primary sm" data-join-ok>Approve</button><button type="button" class="ghost sm danger" data-join-off>Turn off</button></span></td></tr>`).join('')}</tbody></table></div></div>`);
+  const row = (el) => el.closest('[data-join]').dataset.join;
+  const change = async (id, body, said) => {
+    try {
+      await api(`/api/people/${encodeURIComponent(id)}`, { method: 'PUT', body });
+      toast(said, 'ok');
+    } catch (error) {
+      toast(error.message, 'bad', 9000);
+      viewPeople('people');
+    }
+  };
+  for (const s of $$('[data-join-team]')) s.onchange = () => change(row(s), { teamId: s.value }, `Team: ${s.selectedOptions[0].textContent}.`);
+  for (const s of $$('[data-join-role]')) s.onchange = () => change(row(s), { role: s.value }, `Role: ${s.selectedOptions[0].textContent}.`);
+  for (const b of $$('[data-join-ok]')) b.onclick = async () => {
+    b.disabled = true;
+    try {
+      await api(`/api/people/${encodeURIComponent(row(b))}/approve`, { method: 'POST', body: {} });
+      if (state.me.joinersToReview) state.me.joinersToReview -= 1;
+      toast('Approved.', 'ok');
+      viewPeople('people');
+    } catch (error) {
+      toast(error.message, 'bad', 9000);
+      b.disabled = false;
+    }
+  };
+  for (const b of $$('[data-join-off]')) b.onclick = async () => {
+    const who = waiting.find((u) => u.id === row(b));
+    if (!(await sure(`Turn off ${who.name}'s access? They are signed out at once and cannot sign in until it is turned on again.`))) return;
+    await change(who.id, { active: false }, 'Access turned off.');
+    if (state.me.joinersToReview) state.me.joinersToReview -= 1;
+    viewPeople('people');
+  };
+}
+
 export function peopleTable(d) {
   const manage = can('users.manage');
   const roles = d.roles.filter((r) => r.grantable);
@@ -57,6 +103,7 @@ export function peopleTable(d) {
       <button type="button" class="sm danger" data-bulk="remove">Remove</button><button type="button" class="sm ghost" id="bulk-clear">Clear</button><span class="muted small" id="bulk-out"></span></div>` : ''}
     <div class="tw mt"><table class="people"><thead><tr>${manage ? '<th class="sel"><input type="checkbox" id="sel-all" title="Select everyone shown by the filters" aria-label="Select everyone shown by the filters" /></th>' : ''}<th>Person</th><th>Role</th><th>Team</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
     <div class="flex pager" id="pager"><span class="muted small" id="pinfo"></span><span class="spacer"></span><button class="sm" id="prev">Previous</button><button class="sm" id="next">Next</button></div></div>`;
+  reviewJoiners(d, teams, roles);
   const list = () => {
     const q = $('#q').value.trim().toLowerCase();
     const [role, team, status, boss] = [$('#f-role').value, $('#f-team').value, $('#f-status').value, $('#f-manager').value];
@@ -504,14 +551,34 @@ export function rolesMatrix(d) {
 }
 
 export async function signInTab() {
-  const s = await api('/api/people/signin');
-  $('#ptab').innerHTML = `<div class="grid g2"><div class="panel"><h2>Forgotten passwords</h2>
+  const [s, j] = await Promise.all([api('/api/people/signin'), api('/api/settings/join').catch(() => null)]);
+  const joinPanel = j ? `<div class="panel wide-panel"><h2>Joining by themselves <small>from the sign-in page</small></h2>
+    <p class="muted small">Someone with a work address of these domains asks from the sign-in page. Already with access: they get a link to choose a new password. New: a link (it proves the address is theirs) to give their name and choose their team, one of the roles below and a password. They are in at once, and listed on People for review. Roles that manage people, roles or teams, or see every team, are never offered.</p>
+    <form class="form" id="jset" data-nodraft>
+      <label class="check"><input type="checkbox" name="enabled" ${j.enabled ? 'checked' : ''} ${j.canChange ? '' : 'disabled'} /><span>People may join by themselves</span></label>
+      <label class="f">Email domains <span class="muted">one or more, such as checkmarx.com</span><input name="domains" value="${esc(j.domains.join(', '))}" ${j.canChange ? '' : 'disabled'} /></label>
+      <div class="f"><span>Roles they may choose</span><div class="flex wrap">${j.allRoles.map((r) => `<label class="check"><input type="checkbox" name="role" value="${esc(r.id)}" ${j.roles.includes(r.id) ? 'checked' : ''} ${j.canChange && r.open ? '' : 'disabled'} /><span>${esc(r.name)}${r.open ? '' : ' <small class="muted">never</small>'}</span></label>`).join('')}</div></div>
+    </form>
+    ${j.ready.ready ? '<div class="callout mt">Joining is working: the sign-in page shows the way in.</div>' : `<div class="callout warn mt">Not available yet: ${j.ready.missing.map(esc).join(' ')}</div>`}
+    ${j.canChange ? '<p class="small muted">Changes save as you choose.</p>' : '<p class="small muted mt">An Admin changes this.</p>'}</div>` : '';
+  $('#ptab').innerHTML = `${joinPanel}<div class="grid g2 mt"><div class="panel"><h2>Forgotten passwords</h2>
     <p class="muted small">"Forgot your password?" sends a one-time link to the account's own email. It works once, for 30 minutes, signs the account out everywhere when used, and is followed by an email saying the password was changed. The answer never says whether an address has an account.</p>
     <label class="f">Who may reset a forgotten password by email<select id="policy" ${s.canChange ? '' : 'disabled'}><option value="everyone"${s.passwordReset === 'everyone' ? ' selected' : ''}>Everyone with a password</option><option value="not-admins"${s.passwordReset === 'not-admins' ? ' selected' : ''}>Everyone except those who manage people</option><option value="off"${s.passwordReset === 'off' ? ' selected' : ''}>Nobody: a person who manages people sets a temporary password</option></select></label>
     ${s.reset.ready ? '<div class="callout mt">"Forgot your password?" is working.</div>' : `<div class="callout warn mt">Not available yet: ${s.reset.missing.map(esc).join(' ')}</div>`}
     ${s.canChange ? '' : '<p class="small muted mt">An Admin changes this.</p>'}</div>
     <div class="panel"><h2>How people sign in</h2><dl class="kv"><dt>Passwords</dt><dd>At least 12 characters; locked 15 minutes after 5 wrong ones (unlock from People).</dd><dt>Single sign-on</dt><dd>${s.sso.ready ? `On ("${esc(s.sso.label)}")${s.sso.passwordSignIn === 'admins' ? '; passwords for Admins only' : ''}` : 'Off'}</dd><dt>Idle sign-out</dt><dd>After ${esc(s.idleHours)} hours; never longer than 7 days.</dd><dt>New people</dt><dd>A temporary password, then their own, the terms of use and the quick guide.</dd></dl>
     ${can('security.sso') ? '<a class="btn mt" href="#/admin/sso">Single sign-on settings</a>' : ''}</div></div>`;
+  if (j?.canChange) $('#jset').onchange = async (e) => {
+    const f = e.currentTarget;
+    const body = e.target.name === 'enabled' ? { enabled: e.target.checked } : e.target.name === 'role' ? { roles: [...f.querySelectorAll('input[name=role]:checked')].map((x) => x.value) } : { domains: f.domains.value };
+    try {
+      await api('/api/settings/join', { method: 'PUT', body });
+      toast('Saved.', 'ok');
+    } catch (error) {
+      toast(error.message, 'bad', 9000);
+    }
+    viewPeople('signin');
+  };
   if (s.canChange) $('#policy').onchange = async (e) => {
     try {
       await api('/api/settings/smtp', { method: 'PUT', body: { passwordReset: e.target.value } });
