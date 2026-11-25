@@ -20,7 +20,7 @@ import { fail } from '../store.js';
  *   /link/kendra/none         nobody is signed in to Kendra: this app's own sign-in page, without asking again
  */
 export function registerLinked(d) {
-  const { audit, cookie, iam, idleMs, ipOf, perm, r, record, settings } = d;
+  const { audit, cookie, iam, idleMs, ipOf, perm, r, record, settings, teams } = d;
   const used = new Map();
   const view = () => {
     const l = settings.value.link ?? {};
@@ -33,6 +33,12 @@ export function registerLinked(d) {
   const html = (res, body, headers = {}) => send(res, 200, body, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', ...headers });
   const passFor = (user) => encodeURIComponent(makePass({ key: view().key, from: 'ftr', to: 'kendra', email: user.email, name: user.name }));
   const actor = (u) => ({ id: u.id, email: u.email, name: u.name });
+  /** May this address be added on its first arrival from Kendra? The domains open to joining (checkmarx.com by default). */
+  const mayJoin = (email) => {
+    const v = settings.value.selfJoin ?? {};
+    const domains = Array.isArray(v.domains) && v.domains.length ? v.domains : ['checkmarx.com'];
+    return v.enabled !== false && domains.includes(String(email).split('@')[1] ?? '');
+  };
 
   // Where Kendra is, for the menu and the sign-in page (an address only; nothing secret).
   r('GET', '/api/auth/linked', () => ({ kendra: ready() ? view().kendraUrl : null }));
@@ -91,7 +97,7 @@ export function registerLinked(d) {
     return send(res, 302, '', { Location: `${base}/link/ftr/in?pass=${passFor(ctx.user)}&to=${encodeURIComponent(safePath(url.searchParams.get('to') || '/'))}` });
   });
   // Kendra vouches for someone signed in there.
-  r('GET', '/link/kendra/in', (req, ctx, body, res, url) => {
+  r('GET', '/link/kendra/in', async (req, ctx, body, res, url) => {
     if (!ready()) return notLinked(res);
     const ip = ipOf(req);
     req.ccAudited = true;
@@ -103,7 +109,22 @@ export function registerLinked(d) {
       audit.record({ action: 'auth.linked.refused', ip, details: { error: error.message } });
       return html(res, movePage('/#/login?linked=none', 'Could not sign you in', error.message));
     }
-    const user = iam.byEmail(who.email);
+    let user = iam.byEmail(who.email);
+    // New here, with a work address of a domain that may join (Settings → People → Sign-in): added on arrival, as a
+    // Sales Engineer in the top team, and listed on People for whoever manages people to review (team and role).
+    if (!user && mayJoin(who.email)) {
+      try {
+        const role = iam.roles().se ? 'se' : Object.keys(iam.roles()).find((id) => id !== 'admin' && !(iam.roles()[id].permissions ?? []).some((p) => ['users.manage', 'roles.manage', 'teams.manage', 'scope.all'].includes(p)));
+        const top = teams.list().find((t) => !t.parentId) ?? null;
+        ({ user } = await iam.create({ email: who.email, name: who.name || who.email.split('@')[0], role, teamId: top?.id ?? null }));
+        const at = new Date().toISOString();
+        Object.assign(user, { mustChangePassword: false, joined: { at, teamId: top?.id ?? null, role, reviewedAt: null, reviewedBy: null, via: 'kendra' } });
+        iam.save();
+        audit.record({ actor: actor(user), action: 'user.create.linked', target: user.email, ip, details: { role, team: top?.name ?? '' } });
+      } catch (error) {
+        audit.record({ action: 'auth.linked.refused', target: who.email, ip, details: { error: error.message } });
+      }
+    }
     if (!user || user.active === false) {
       audit.record({ action: 'auth.linked.refused', target: who.email, ip, details: { why: user ? 'access turned off' : 'no access' } });
       return html(res, movePage('/#/login?linked=none', 'No access yet', user ? 'Your access to the FTR command center is turned off: ask an Admin.' : 'You are signed in to Kendra, but you have no access to the FTR command center yet: ask an Admin to add you with the same email.'));
@@ -117,6 +138,21 @@ export function registerLinked(d) {
     audit.record({ actor: actor(user), action: 'auth.linked.signin', target: 'Kendra', ip });
     // A page of this site moves on, so the browser sends the new (SameSite=Strict) cookie with the next request.
     return html(res, movePage(to === '/' ? '/#/' : to, 'Signed in'), { 'Set-Cookie': cookie(token, Math.floor(idleMs / 1000), req) });
+  });
+  // Kendra reads the team structure (teams, leaders, people), asking with a pass made for this alone.
+  r('GET', '/link/kendra/directory', (req, ctx, body, res) => {
+    if (!ready()) return send(res, 404, { error: 'Not linked.' });
+    try {
+      readPass(String(req.headers['x-link-pass'] ?? ''), { key: view().key, me: 'ftr', from: 'kendra', used, purpose: 'directory' });
+    } catch (error) {
+      audit.record({ action: 'link.directory.refused', ip: ipOf(req), details: { error: error.message } });
+      return send(res, 403, { error: error.message });
+    }
+    req.ccAudited = true;
+    const all = teams.list();
+    const people = iam.users().filter((u) => u.active !== false).map((u) => ({ email: u.email, name: u.name, title: u.title ?? '', role: u.role, roleName: iam.roles()[u.role]?.name ?? u.role, teamId: u.teamId ?? null }));
+    audit.record({ action: 'link.directory', target: 'Kendra', ip: ipOf(req), details: { teams: all.length, people: people.length } });
+    return send(res, 200, { at: new Date().toISOString(), teams: all.map((t) => ({ id: t.id, name: t.name, region: t.region ?? '', parentId: t.parentId ?? null, leaderIds: t.leaderIds ?? [] })), people: people.map((p) => ({ ...p, id: iam.byEmail(p.email)?.id })) });
   });
   r('GET', '/link/kendra/none', (req, ctx, body, res) => html(res, movePage('/#/login?linked=none', 'Sign in')));
 

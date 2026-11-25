@@ -268,7 +268,7 @@ export const ADMIN_VIEWS = {
     $('#tab').innerHTML = `${SAVES_AS_YOU_TYPE}<div class="grid g2">
       <div class="panel"><h2>Kendra ${chip}</h2>
         <form class="form" id="linkf" autocomplete="off">
-          <p class="muted small">Someone signed in to one opens the other already signed in, as the same person (their email): from the menu, or by opening it directly. They need access, turned on, in both; nobody is added this way.</p>
+          <p class="muted small">Someone signed in to one opens the other already signed in, as the same person (their email): from the menu, or by opening it directly. Someone new with an address of a domain open to joining (People → Sign-in) is added as a Sales Engineer in the top team, for you to review on People. Kendra takes its teams from here every hour.</p>
           <label class="f">Kendra’s address<input name="kendraUrl" type="url" value="${esc(l.kendraUrl)}" placeholder="https://kendra.company.com" /></label>
           <label class="f">Shared key <span class="muted">${l.hasKey ? 'kept: paste a new one to replace it' : 'paste the key Kendra made, or make one here'}</span><input name="key" autocomplete="off" spellcheck="false" placeholder="${l.hasKey ? '••••••••••••••••' : '43 letters and digits'}" /></label>
           <div id="newkey"></div>

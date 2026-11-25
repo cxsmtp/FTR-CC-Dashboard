@@ -121,7 +121,7 @@ Every assertion must be signed by that certificate, addressed to this service, r
 2. **Make a new key** on one side (it is shown once), and paste it in the other.
 3. From then on, someone signed in to one opens the other already signed in: from **Kendra** in the menu, or by opening it directly.
 
-They need access, turned on, in both (the same email); nobody is added this way, and someone you are signed in as (Sign in as) does not carry over. Each sign-in is a pass signed with the shared key, for one app, good for a minute and used once; both audit logs record it (`auth.linked.*`). The key is kept encrypted and never shown again. **Unlink** on either side stops it.
+They need access in both (the same email). Someone new with an address of a domain open to joining (People → Sign-in) is added on arrival as a Sales Engineer in the top team, listed on People for you to review; someone you are signed in as (Sign in as) does not carry over. Kendra reads the team structure (teams, leaders, people; no passwords) every hour to build its reporting tree. Each sign-in is a pass signed with the shared key, for one app, good for a minute and used once; both audit logs record it (`auth.linked.*`). The key is kept encrypted and never shown again. **Unlink** on either side stops it.
 
 ## Settings → Email (SMTP)
 

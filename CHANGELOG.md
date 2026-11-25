@@ -6,7 +6,12 @@ Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero versio
 
 - **One sign-in for this command center and Kendra.** Signed in to one, you open the other already signed in, as
   yourself (your email): from **Kendra** in the menu, or by opening it directly (its sign-in page asks the other once).
-  - You need access, turned on, in both; nobody is added this way. Someone an Admin is signed in as does not carry over.
+  - Someone new with an address of a domain open to joining (checkmarx.com by default; People → Sign-in) is added on
+    arrival as a Sales Engineer in the top team, listed on People for review. Someone an Admin is signed in as does not
+    carry over.
+  - **Kendra takes its teams from here:** every hour it reads the teams, their leaders and the people in them (with a
+    pass made for that alone), so who reports to whom, roles and regions are the same in both.
+  - The page between the two is a small card with a spinner, light or dark as your device.
   - Each hop carries a pass signed with a key both sides share: for one app, good for a minute, used once. Both audit
     logs record it.
   - Set it in Settings → Linked apps: Kendra's address and the shared key (made on one side, pasted in the other).

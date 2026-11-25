@@ -68,6 +68,23 @@ test('Kendra and the FTR command center: signed in to one, signed in to the othe
   const away = await fetch(`${base}/link/kendra/in?pass=${encodeURIComponent(makePass({ key, from: 'kendra', to: 'ftr', email: 'se2@t.example' }))}&to=${encodeURIComponent('//evil.example')}`, { redirect: 'manual' });
   assert.doesNotMatch(await away.text(), /evil/);
 
+  // A Checkmarx address new here: added on arrival as a Sales Engineer in the top team, to be reviewed.
+  const jit = await fetch(`${base}/link/kendra/in?pass=${encodeURIComponent(makePass({ key, from: 'kendra', to: 'ftr', email: 'new.se@checkmarx.com', name: 'New SE' }))}`, { redirect: 'manual' });
+  assert.ok(jit.headers.get('set-cookie'), 'signed in on arrival');
+  const joined = env.app.iam.byEmail('new.se@checkmarx.com');
+  assert.equal(joined.role, 'se');
+  assert.ok(joined.joined && !joined.joined.reviewedAt, 'listed for review');
+
+  // Kendra reads the team structure with a directory pass, and only with one.
+  assert.equal((await fetch(`${base}/link/kendra/directory`)).status, 403);
+  assert.equal((await fetch(`${base}/link/kendra/directory`, { headers: { 'X-Link-Pass': makePass({ key, from: 'kendra', to: 'ftr', email: 'se1@t.example' }) } })).status, 403, 'a sign-in pass opens no directory');
+  const dir = await (await fetch(`${base}/link/kendra/directory`, { headers: { 'X-Link-Pass': makePass({ key, from: 'kendra', to: 'ftr', purpose: 'directory' }) } })).json();
+  assert.ok(dir.teams.some((t) => t.name === 'EMEA' && t.leaderIds.length));
+  assert.ok(dir.people.some((p) => p.email === 'se1@t.example' && p.teamId && p.role === 'se'));
+  assert.ok(!JSON.stringify(dir).includes('passwordHash'), 'nothing secret');
+  // A directory pass signs nobody in.
+  assert.ok(!(await fetch(`${base}/link/kendra/in?pass=${encodeURIComponent(makePass({ key, from: 'kendra', to: 'ftr', purpose: 'directory', email: 'se1@t.example' }))}`, { redirect: 'manual' })).headers.get('set-cookie'));
+
   // In the audit log; and unlinked, nothing more.
   const log = JSON.stringify((await admin.get('/api/audit?limit=200')).data);
   assert.match(log, /auth\.linked\.signin/);
