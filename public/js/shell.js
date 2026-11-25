@@ -33,7 +33,7 @@ export function shell(active, content) {
         <a href="#/people" class="${inSettings ? 'on' : ''}">${icon('admin')}<span>Settings</span></a>
       </nav>
       <a class="bgwork" id="bgwork" hidden></a>
-      <nav class="nav guide-nav">${link('/guide', 'guide', 'Quick guide')}${link('/help', 'help', 'Get help')}</nav>
+      <nav class="nav guide-nav">${me.linked?.kendra ? `<a href="/link/kendra?to=%2F" target="_blank" rel="noopener" title="Kendra, the POV command center, signed in as you">${icon('ext')}<span>Kendra</span></a>` : ''}${link('/guide', 'guide', 'Quick guide')}${link('/help', 'help', 'Get help')}</nav>
       <button class="ver" id="ver" title="${can('system.update') ? 'Versions and updates' : 'About, version and what is new'}">${esc(me.versionLabel ?? '')}</button>
       <div class="side-links"><a href="#/about">About</a><span>·</span><a href="#/legal" data-doc="terms">Terms &amp; license</a></div>
       <div class="side-lic">PolyForm Internal Use 1.0.0 · internal use only</div>

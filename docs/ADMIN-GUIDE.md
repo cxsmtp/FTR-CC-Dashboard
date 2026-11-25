@@ -115,6 +115,14 @@ You can also start with your files: `TLS_CERT_FILE` and `TLS_KEY_FILE` (or `TLS_
 
 Every assertion must be signed by that certificate, addressed to this service, recent, and an answer to a sign-in this server started. A replayed or unrequested answer is refused.
 
+## Settings → Linked apps (one sign-in with Kendra)
+
+1. Give each app the other's address: here **Kendra's address**; in Kendra, Settings → Linked apps → this command center's address.
+2. **Make a new key** on one side (it is shown once), and paste it in the other.
+3. From then on, someone signed in to one opens the other already signed in: from **Kendra** in the menu, or by opening it directly.
+
+They need access, turned on, in both (the same email); nobody is added this way, and someone you are signed in as (Sign in as) does not carry over. Each sign-in is a pass signed with the shared key, for one app, good for a minute and used once; both audit logs record it (`auth.linked.*`). The key is kept encrypted and never shown again. **Unlink** on either side stops it.
+
 ## Settings → Email (SMTP)
 
 The mail server is used for "Forgot your password?" links and welcome emails. **Save**, then **Test connection**: nothing is sent until a test succeeds for exactly the settings in force. The password is kept encrypted (key in `DATA_DIR/secret.key`) and never shown again.

@@ -45,6 +45,7 @@ import { registerEmail } from './routes/email.js';
 import { registerProjections } from './routes/projections.js';
 import { registerEstimate } from './routes/estimate.js';
 import { registerRates } from './routes/rates.js';
+import { registerLinked } from './routes/linked.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 /** The version as people see it, the calculator’s way: CC-01.01.00. */
@@ -97,6 +98,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     set lastBackup(v) { lastBackup = v; },
     get LETSENCRYPT_DOMAIN() { return LETSENCRYPT_DOMAIN; },
     get linkBase() { return linkBase; },
+    get linkedView() { return linkedView; },
     get log() { return log; },
     get mailReady() { return mailReady; },
     get mailTransport() { return mailTransport; },
@@ -467,6 +469,8 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
   const { forBrowser, takenView } = registerProjections(d);
   // ---- Fusion rates: the Admin's engines and default engine, each team's own, and engines seen without a rate ----
   registerRates(d);
+  // ---- Linked apps: one sign-in for this command center and Kendra (server/routes/linked.js) ----------------------------
+  const { linkedView, linkedHandoff, linkedAdopt } = registerLinked(d);
   // ---- The vulnerability estimate, for Admins (server/estimate.js) ---------------------------------------
   const { estimateBeta } = registerEstimate(d);
 
@@ -709,7 +713,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     frozen = frozen ?? 'The command center is moving to its new version: try again in a moment.';
     // Everything held only in memory goes to the next version (CLAUDE.md): the Checkmarx One connections and git
     // counts, password-reset links, single sign-ons under way, and what the Admins are shown of the last backup.
-    return { calc: calc.handoff(), resets: passwordResets.handoff(), joins: joinLinks.handoff(), sso: sso.handoff(), lastBackup, recentErrors: recentErrors.slice(-50) };
+    return { calc: calc.handoff(), resets: passwordResets.handoff(), joins: joinLinks.handoff(), sso: sso.handoff(), linked: linkedHandoff(), lastBackup, recentErrors: recentErrors.slice(-50) };
   };
   /** The next version did not come up: carry on as before. */
   const resume = () => {
@@ -724,6 +728,7 @@ export function createApp(config, { log: baseLog = console.log, calculatorServic
     if (state.resets) passwordResets.adopt(state.resets);
     if (state.joins) joinLinks.adopt(state.joins);
     if (state.sso) sso.adopt(state.sso);
+    if (state.linked) linkedAdopt(state.linked);
     if (state.lastBackup?.at) lastBackup = state.lastBackup;
     if (Array.isArray(state.recentErrors)) recentErrors.unshift(...state.recentErrors.filter((e) => e?.at && e?.line));
   };

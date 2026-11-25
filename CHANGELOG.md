@@ -2,6 +2,15 @@
 
 Each version is shown as CC-xx.xx.xx, with the calculator's CxMissionZero version. Newest first.
 
+## CC-01.117.00 — 2026-11-25
+
+- **One sign-in for this command center and Kendra.** Signed in to one, you open the other already signed in, as
+  yourself (your email): from **Kendra** in the menu, or by opening it directly (its sign-in page asks the other once).
+  - You need access, turned on, in both; nobody is added this way. Someone an Admin is signed in as does not carry over.
+  - Each hop carries a pass signed with a key both sides share: for one app, good for a minute, used once. Both audit
+    logs record it.
+  - Set it in Settings → Linked apps: Kendra's address and the shared key (made on one side, pasted in the other).
+
 ## CC-01.116.00 — 2026-11-17
 
 - **People join by themselves, and you review them.** The sign-in page has "Join with your @checkmarx.com email".

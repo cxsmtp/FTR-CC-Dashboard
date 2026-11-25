@@ -195,6 +195,8 @@ export function registerProjections(d) {
   r('GET', '/api/cc/calc-config', perm('calculator.use'), (req, ctx) => ({
     csrf: ctx.session.csrf,
     user: { id: ctx.user.id, name: ctx.user.name },
+    // Kendra, when linked (Settings → Linked apps): the menu opens it signed in.
+    linked: d.linkedView(),
     impersonating: ctx.impersonator ? { by: { name: ctx.impersonator.name, email: ctx.impersonator.email } } : null,
     roleName: iam.roles()[ctx.user.role]?.name ?? '',
     role: ctx.user.role,

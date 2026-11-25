@@ -220,6 +220,7 @@ export async function startHosted() {
   function renderMenu() {
     const ICONS = {
       help: '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 9h6"/><path d="M9 12h4"/>',
+      ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
       engine: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
       overview: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
       accounts: '<path d="M3 7h18M3 12h18M3 17h12"/>',
@@ -240,7 +241,7 @@ export async function startHosted() {
       ${link('/#/accounts', 'accounts', 'Accounts', can('dashboard.view'))}
       ${link('/calculator', 'calc', 'Calculator', true, true)}
       ${link('/#/people', 'admin', 'Settings')}`;
-    $('cc-guide-nav').innerHTML = `${link('/#/guide', 'guide', 'Quick guide')}${link('/#/help', 'help', 'Get help')}`;
+    $('cc-guide-nav').innerHTML = `${cfg.linked?.kendra ? link('/link/kendra?to=%2F', 'ext', 'Kendra').replace('<a ', '<a target="_blank" rel="noopener" title="Kendra, the POV command center, signed in as you" ') : ''}${link('/#/guide', 'guide', 'Quick guide')}${link('/#/help', 'help', 'Get help')}`;
     const name = cfg.user?.name ?? '';
     $('cc-avatar').textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
     $('cc-name').textContent = name;

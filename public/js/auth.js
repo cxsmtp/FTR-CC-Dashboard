@@ -4,6 +4,25 @@ import { sfRead } from './links.js';
 import { signOut } from './shell.js';
 // ---- Sign in --------------------------------------------------------------------------------------------
 export function viewLogin() {
+  // Linked to Kendra (Settings → Linked apps): ask it once a visit; signed in there, signed in here.
+  if (!/[?&]linked=none/.test(location.hash)) {
+    let tried = false;
+    try {
+      tried = sessionStorage.getItem('ftr.linkTried') === '1';
+    } catch {}
+    if (!tried) {
+      try {
+        sessionStorage.setItem('ftr.linkTried', '1');
+      } catch {}
+      fetch('/api/auth/linked').then((r) => r.json()).then((x) => {
+        if (!x.kendra || !document.getElementById('login')) return;
+        const next = new URLSearchParams(location.hash.split('?')[1] ?? '').get('next');
+        const back = next && next.startsWith('/calculator') ? next : location.hash && !location.hash.startsWith('#/login') ? `/${location.hash}` : '/';
+        $('#login').insertAdjacentHTML('beforebegin', '<p class="small muted" id="linked-wait">Checking your Kendra sign-in…</p>');
+        location.replace(`${x.kendra}/link/ftr/authorize?to=${encodeURIComponent(back)}`);
+      }).catch(() => {});
+    }
+  }
   $('#app').className = 'app bare';
   $('#app').innerHTML = `
   <div class="auth fade">

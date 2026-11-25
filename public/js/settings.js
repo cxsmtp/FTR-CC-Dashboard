@@ -59,6 +59,7 @@ export const ADMIN_TABS = [
   ['branding', 'Branding', 'settings.manage'],
   ['email', 'Email (SMTP)', 'settings.manage'],
   ['sso', 'Single sign-on', 'security.sso'],
+  ['linked', 'Linked apps', 'settings.manage'],
   ['https', 'HTTPS', 'security.https'],
   ['updates', 'Updates', 'system.update'],
   ['backups', 'Backups & health', 'backup.manage'],
@@ -260,6 +261,55 @@ export const ADMIN_VIEWS = {
     wireSmtp(m);
   },
 
+  // Linked apps: one sign-in for this command center and Kendra (server/routes/linked.js).
+  async linked() {
+    const l = await api('/api/settings/link');
+    const chip = l.ready ? '<span class="chip ok"><i></i>Linked</span>' : '<span class="chip"><i></i>Not linked</span>';
+    $('#tab').innerHTML = `${SAVES_AS_YOU_TYPE}<div class="grid g2">
+      <div class="panel"><h2>Kendra ${chip}</h2>
+        <form class="form" id="linkf" autocomplete="off">
+          <p class="muted small">Someone signed in to one opens the other already signed in, as the same person (their email): from the menu, or by opening it directly. They need access, turned on, in both; nobody is added this way.</p>
+          <label class="f">Kendra’s address<input name="kendraUrl" type="url" value="${esc(l.kendraUrl)}" placeholder="https://kendra.company.com" /></label>
+          <label class="f">Shared key <span class="muted">${l.hasKey ? 'kept: paste a new one to replace it' : 'paste the key Kendra made, or make one here'}</span><input name="key" autocomplete="off" spellcheck="false" placeholder="${l.hasKey ? '••••••••••••••••' : '43 letters and digits'}" /></label>
+          <div id="newkey"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="link-new">Make a new key</button>${l.ready ? '<a class="btn ghost" href="/link/kendra?to=%2F" target="_blank" rel="noopener">Try it</a><button type="button" class="ghost danger" id="link-off">Unlink</button>' : ''}</div>
+          ${l.at ? `<p class="small muted">Set ${esc(dateTime(l.at))}${l.by ? ` by ${esc(l.by)}` : ''}.</p>` : ''}
+        </form><div class="saved-foot" id="linksaved">All changes are saved.</div></div>
+      <div class="panel"><h2>On Kendra</h2>
+        <ol style="margin:0;padding-left:20px;line-height:1.7"><li>Settings → Linked apps: give it this command center’s address, <span class="mono">${esc(location.origin)}</span>.</li><li>The same shared key on both sides: make it on one, paste it in the other.</li><li>Try it: each menu shows the other; opening one while signed in to the other signs you in.</li></ol>
+        <div class="callout mt">Each sign-in travels as a pass signed with the key, for one app, good for a minute and used once; both audit logs record it. Someone an Admin is signed in as (Sign in as) does not carry over. Unlink here or there to stop it.</div></div></div>`;
+    const showKey = (key) => {
+      $('#newkey').innerHTML = `<div class="callout"><b>The new shared key</b> (shown once): paste it in Kendra.<div style="display:flex;gap:8px;margin-top:8px"><input readonly class="mono" style="flex:1" value="${esc(key)}" /><button type="button" class="sm" id="link-copy" style="flex:none">Copy</button></div></div>`;
+      $('#link-copy').onclick = () => navigator.clipboard?.writeText(key).then(() => toast('Copied'));
+    };
+    autosave($('#linkf'), async (form) => {
+      const body = { kendraUrl: form.elements.kendraUrl.value };
+      if (form.elements.key.value.trim()) body.key = form.elements.key.value.trim();
+      const r = await api('/api/settings/link', { method: 'PUT', body });
+      form.elements.key.value = '';
+      if (r.ready !== l.ready) {
+        state.me.linked = r.ready ? { kendra: r.kendraUrl } : null;
+        ADMIN_VIEWS.linked();
+      }
+    }, { status: $('#linksaved'), keep: ['key'] });
+    $('#link-new').onclick = async () => {
+      if (l.hasKey && !(await sure('Make a new shared key? The old one stops working, so paste the new one in Kendra too.'))) return;
+      try {
+        const r = await api('/api/settings/link', { method: 'PUT', body: { kendraUrl: $('#linkf').elements.kendraUrl.value, newKey: true } });
+        state.me.linked = r.ready ? { kendra: r.kendraUrl } : null;
+        await ADMIN_VIEWS.linked();
+        showKey(r.key);
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+    if ($('#link-off')) $('#link-off').onclick = async () => {
+      if (!(await sure('Unlink Kendra? Signing in to one no longer signs you in to the other.'))) return;
+      await api('/api/settings/link', { method: 'PUT', body: { remove: true } });
+      state.me.linked = null;
+      ADMIN_VIEWS.linked();
+    };
+  },
   async sso() {
     const x = await api('/api/settings/sso');
     const chip = x.ready ? '<span class="chip ok"><i></i>On</span>' : x.enabled ? '<span class="chip warn"><i></i>On, but PUBLIC_URL is missing</span>' : '<span class="chip"><i></i>Off</span>';
